@@ -1,0 +1,24 @@
+[env]
+TERM = "xterm-256color"
+
+[general]
+import = ["~/.config/alacritty/3rd/alacritty-theme/themes/gruvbox_light.toml"]
+
+[window]
+startup_mode = "Fullscreen"
+
+[scrolling]
+history = 100000
+
+[selection]
+save_to_clipboard = true
+
+[cursor]
+style.blinking = "Always"
+
+[terminal]
+osc52 = "CopyPaste"
+
+[font]
+normal.family = "JetBrainsMono Nerd Font"
+size = 18
