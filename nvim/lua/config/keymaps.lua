@@ -5,93 +5,89 @@
 -- functions
 -- information
 local function get_datetime()
-	return os.date("%Y-%m-%d %H:%M:%S") -- 如 "2023-10-05 14:30:00"
+  return os.date("%Y-%m-%d %H:%M:%S") -- 如 "2023-10-05 14:30:00"
 end
 local function get_filename()
-	return vim.fn.expand("%:t")
+  return vim.fn.expand("%:t")
 end
 -- insert
 local function insert_into_cursor(txt)
-	-- 获取当前光标位置（行号从 1 开始，列号从 0 开始）
-	local row = vim.fn.line(".") - 1 -- 转换为 0-based 行号
-	local col = vim.fn.col(".") - 1 -- 转换为 0-based 列号
-	vim.api.nvim_buf_set_text(0, row, col, row, col, { txt })
+  -- 获取当前光标位置（行号从 1 开始，列号从 0 开始）
+  local row = vim.fn.line(".") - 1 -- 转换为 0-based 行号
+  local col = vim.fn.col(".") - 1 -- 转换为 0-based 列号
+  vim.api.nvim_buf_set_text(0, row, col, row, col, { txt })
 end
 
 local function insert_multiple_lines(lines)
-	local row = vim.fn.line(".") - 1 -- 当前行号（0-based）
-	local line_count = vim.api.nvim_buf_line_count(0)
-	-- 在下一行开始插入多行（利用 nvim_buf_set_lines）
-	vim.api.nvim_buf_set_lines(0, row + 1, row + 1, true, lines)
-	-- 调整光标到新插入的第一行的行首（可选）
-	vim.api.nvim_win_set_cursor(0, { row + 2, 0 })
+  local row = vim.fn.line(".") - 1 -- 当前行号（0-based）
+  local line_count = vim.api.nvim_buf_line_count(0)
+  -- 在下一行开始插入多行（利用 nvim_buf_set_lines）
+  vim.api.nvim_buf_set_lines(0, row + 1, row + 1, true, lines)
+  -- 调整光标到新插入的第一行的行首（可选）
+  vim.api.nvim_win_set_cursor(0, { row + 2, 0 })
 end
 
 -- custome insert keymaps
 -- insert file name
 vim.keymap.set("n", "<Leader>zif", function()
-	insert_into_cursor(get_filename())
+  insert_into_cursor(get_filename())
 end, { desc = "Insert filename", silent = true, noremap = true })
 -- insert datetime
 vim.keymap.set("n", "<Leader>zit", function()
-	insert_into_cursor(get_datetime())
+  insert_into_cursor(get_datetime())
 end, { desc = "Insert datetime", silent = true, noremap = true })
 
 -- custome template keymaps
 -- c++ file doxygen style comment
 vim.keymap.set("n", "<Leader>td", function()
-	local lines_to_insert = {
-		"/**",
-		" * @file " .. get_filename(),
-		" * @brief ",
-		" * @author zhenkai.sun",
-		" * @date " .. get_datetime(),
-		-- " *",
-		-- " * @details",
-		-- " * ${2:details}",
-		-- " * @example",
-		-- " * ${3:example}",
-		" */",
-	}
-	insert_multiple_lines(lines_to_insert)
+  local lines_to_insert = {
+    "/**",
+    " * @file " .. get_filename(),
+    " * @brief ",
+    " * @author zhenkai.sun",
+    " * @date " .. get_datetime(),
+    -- " *",
+    -- " * @details",
+    -- " * ${2:details}",
+    -- " * @example",
+    -- " * ${3:example}",
+    " */",
+  }
+  insert_multiple_lines(lines_to_insert)
 end, { desc = "Insert doxygen style file comment", silent = true, noremap = true })
 
 -- insert c++ function comment in doxygen style
 vim.keymap.set("n", "<Leader>tf", function()
-	local lines_to_insert = {
-		"/**",
-		" * @brief ",
-		-- " *",
-		-- " * @details",
-		-- " *",
-		-- " * @example",
-		" */",
-	}
-	insert_multiple_lines(lines_to_insert)
+  local lines_to_insert = {
+    "/**",
+    " * @brief ",
+    -- " *",
+    -- " * @details",
+    -- " *",
+    -- " * @example",
+    " */",
+  }
+  insert_multiple_lines(lines_to_insert)
 end, { desc = "Insert doxygen style function comment", silent = true, noremap = true })
 
 -- toggleterm
-vim.keymap.set(
-	"n",
-	"<Leader>tt",
-	':lua require("toggleterm").toggle()<CR>',
-	{ desc = "Toggle Terminal", silent = true, noremap = true }
-)
-vim.keymap.set(
-	"n",
-	"<C-/>",
-	':lua require("toggleterm").toggle()<CR>',
-	{ desc = "Toggle Terminal", silent = true, noremap = true }
-)
+
+-- vim.keymap.set(
+-- 	"n",
+-- 	"<C-/>",
+-- 	':lua require("toggleterm").toggle()<CR>',
+-- 	{ desc = "Toggle Terminal", silent = true, noremap = true }
+-- )
+
 -- 可视模式下 <leader>y 复制到系统剪贴板
 vim.keymap.set("v", "<leader>y", '"+y', {
-	noremap = true, -- 非递归映射
-	silent = true, -- 静默执行
-	desc = "Copy to system clipboard", -- 可选的描述
+  noremap = true,                   -- 非递归映射
+  silent = true,                    -- 静默执行
+  desc = "Copy to system clipboard", -- 可选的描述
 })
 -- 可视模式下 <leader>p 粘贴系统剪贴板内容
 vim.keymap.set("v", "<leader>p", '"+p', {
-	noremap = true, -- 非递归映射
-	silent = true, -- 静默执行
-	desc = "Paste from system clipboard", -- 可选的描述
+  noremap = true,                      -- 非递归映射
+  silent = true,                       -- 静默执行
+  desc = "Paste from system clipboard", -- 可选的描述
 })
