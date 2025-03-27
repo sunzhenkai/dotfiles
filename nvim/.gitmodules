@@ -1,0 +1,6 @@
+[submodule "3rd/LazyVim"]
+	path = 3rd/LazyVim
+	url = https://github.com/LazyVim/starter.git
+[submodule "3rd/nvchad"]
+	path = 3rd/nvchad
+	url = https://github.com/NvChad/starter.git
