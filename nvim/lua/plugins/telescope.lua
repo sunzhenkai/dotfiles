@@ -41,7 +41,8 @@ return {
     })
 
     telescope.load_extension("fzf")
-    telescope.load_extension("file_browser")
+    -- NOTE: diable file browser
+    -- telescope.load_extension("file_browser")
 
     local builtin = require("telescope.builtin")
 
@@ -50,7 +51,8 @@ return {
     local map = vim.keymap.set
     local opts = { noremap = true, silent = true }
 
-    map("n", "-", ":Telescope file_browser<CR>")
+    -- NOTE: diable file browser
+    -- map("n", "<leader>-", ":Telescope file_browser<CR>")
 
     map("n", "<leader>ff", builtin.find_files, opts)  -- Lists files in your current working directory, respects .gitignore
     map("n", "<leader>fx", builtin.treesitter, opts)  -- Lists tree-sitter symbols
