@@ -19,6 +19,6 @@ nvim:
 kitty:
 	$(call install_config,kitty,~/.config/kitty)
 tmux:
-	$(call install_config,tmux,~/.tmux)
+	$(call install_config,tmux,~/.config/tmux)
 	$(call install_config,tmux/tmux.conf,~/.tmux.conf)
 	$(call install_config,tmux/tmux.conf.local,~/.tmux.conf.local)

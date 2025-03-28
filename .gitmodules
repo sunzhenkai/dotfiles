@@ -1,3 +1,6 @@
 [submodule "init"]
 	path = init
 	url = git@github.com:sunzhenkai/env-init.git
+[submodule "tmux/3rd/tpm"]
+	path = tmux/3rd/tpm
+	url = https://github.com/tmux-plugins/tpm.git
