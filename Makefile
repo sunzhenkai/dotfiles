@@ -22,3 +22,5 @@ tmux:
 	$(call install_config,tmux,~/.config/tmux)
 	$(call install_config,tmux/tmux.conf,~/.tmux.conf)
 	$(call install_config,tmux/tmux.conf.local,~/.tmux.conf.local)
+alacritty:
+	$(call install_config,alacritty,~/.config/alacritty)
