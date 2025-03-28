@@ -1,6 +1,10 @@
+# Important
+
+**STAY AWAY FROM KITTY**
+
 # kitty
 
-Kitty config.
+Kitty config.kkk
 
 # Apply
 
