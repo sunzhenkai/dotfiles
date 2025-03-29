@@ -1,4 +1,4 @@
-.PHONY: starship nvim kitty alacritty starship tmux
+.PHONY: all starship nvim kitty alacritty starship tmux zellij
 
 TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
@@ -12,6 +12,7 @@ define install_config
 	@ln -s $(PWD)/$(1) $(2)
 endef
 
+all: starship nvim kitty tmux alacritty
 starship:
 	$(call install_config,starship/starship.toml,~/.config/starship.toml)
 nvim:
@@ -24,3 +25,5 @@ tmux:
 	$(call install_config,tmux/tmux.conf.local,~/.tmux.conf.local)
 alacritty:
 	$(call install_config,alacritty,~/.config/alacritty)
+zellij:
+	$(call install_config,zellij,~/.config/zellij)
