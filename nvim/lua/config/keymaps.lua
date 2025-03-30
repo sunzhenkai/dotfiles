@@ -72,12 +72,12 @@ end, { desc = "Insert doxygen style function comment", silent = true, noremap = 
 
 -- toggleterm
 
--- vim.keymap.set(
--- 	"n",
--- 	"<C-/>",
--- 	':lua require("toggleterm").toggle()<CR>',
--- 	{ desc = "Toggle Terminal", silent = true, noremap = true }
--- )
+vim.keymap.set(
+  "n",
+  "<C-/>",
+  ':lua require("toggleterm").toggle()<CR>',
+  { desc = "Toggle Terminal", silent = true, noremap = true }
+)
 
 -- 可视模式下 <leader>y 复制到系统剪贴板
 vim.keymap.set("v", "<leader>y", '"+y', {
