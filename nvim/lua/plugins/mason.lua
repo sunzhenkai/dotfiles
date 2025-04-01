@@ -28,6 +28,11 @@ return {
       "stylua",
       "sonarlint-language-server",
       "gospel",
+      "pylint",
+      "debugpy",
+      "pydocstyle",
+      "python-lsp-server",
+      "ast-grep",
     },
     ui = {
       icons = {
