@@ -1,4 +1,4 @@
-.PHONY: all starship nvim kitty alacritty starship tmux zellij
+.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty
 
 TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
@@ -27,3 +27,5 @@ alacritty:
 	$(call install_config,alacritty,~/.config/alacritty)
 zellij:
 	$(call install_config,zellij,~/.config/zellij)
+ghostty:
+	$(call install_config,ghostty,~/.config/ghostty)

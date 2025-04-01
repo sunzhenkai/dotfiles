@@ -1,0 +1,11 @@
+# NOTES:
+# [cmd+shift+,] / [ctrl+shift+,] to reload config
+
+# [theme]
+font-size = 18
+theme = GruvboxLight
+
+# [window]
+fullscreen = true
+#macos-titlebar-style = hidden
+
