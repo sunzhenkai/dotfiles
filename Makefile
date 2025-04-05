@@ -33,4 +33,10 @@ zsh:
 	@# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
 	$(call install_config,zsh,~/.config/zsh)
 git:
+	$(call install_config,git,~/.config/git)
+	@echo "WARN: extra operation should be processed"
+	@echo "      append following texts into ~/.gitconfig after [user] scope"
+	@echo '[includeIf "gitdir:~/.config/git/gitconfig"]'
+	@echo ' path = ~/.config/git/gitconfig'
+git-global:
 	$(call install_config,git/gitconfig,~/.gitconfig)
