@@ -6,13 +6,16 @@ bindkey -v
 # this makes the switch between modes quicker
 export KEYTIMEOUT=1
 
+# personal binaries
+export PATH="${HOME}/.local/bin:${PATH}"
+
 # using startship as alternative
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
 #[[ ! -f $Z10K_CONFIG ]] || source $Z10K_CONFIG
 
 # cargo
 export CARGE_ENV="$HOME/.cargo/env"
-[[ -e ${CARGE_ENV} ]] && . ${CARGE_ENV}
+[[ -e ${CARGE_ENV} ]] && source ${CARGE_ENV}
 
 # starship
 command -v starship >/dev/null && eval "$(starship init zsh)"
