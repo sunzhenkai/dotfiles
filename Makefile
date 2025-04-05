@@ -12,7 +12,7 @@ define install_config
 	@ln -s $(PWD)/$(1) $(2)
 endef
 
-all: starship nvim kitty tmux alacritty zellij ghostty zsh git
+all: starship nvim kitty tmux alacritty zellij ghostty zsh
 starship:
 	$(call install_config,starship/starship.toml,~/.config/starship.toml)
 nvim:
@@ -32,6 +32,8 @@ ghostty:
 zsh:
 	@# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
 	$(call install_config,zsh,~/.config/zsh)
+
+# personal configs of mine
 git:
 	$(call install_config,git,~/.config/git)
 	@echo "WARN: extra operation should be processed"
