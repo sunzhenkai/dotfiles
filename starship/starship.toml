@@ -16,7 +16,7 @@ disabled = true
 disabled = false
 [os.symbols]
 # FYI: the icon copied from nerd fonts [https://www.nerdfonts.com/cheat-sheet]
-ubuntu = '󰕈 '
+Ubuntu = '󰕈 '
 
 [time]
 disabled = false
