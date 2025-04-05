@@ -16,6 +16,7 @@ source ~/.config/zsh/antigen.zsh
 
 # antigen
 # nonstandard plugins
+export ANTIGEN_ENABELD=true
 antigen use oh-my-zsh
 antigen bundle jsontools
 antigen bundle git
@@ -23,4 +24,5 @@ antigen bundle z
 antigen bundle command-not-found
 antigen bundle zsh-users/zsh-syntax-highlighting
 antigen bundle zsh-users/zsh-autosuggestions
+#antigen theme romkatv/powerlevel10k    # NOTE:  using startship as alternative
 antigen apply

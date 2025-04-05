@@ -4,3 +4,7 @@ export EDITOR="nvim"
 bindkey -v
 # this makes the switch between modes quicker
 export KEYTIMEOUT=1
+
+# using startship as alternative
+#export Z10K_CONFIG=~/.config/zsh/p10k.zsh
+#[[ ! -f $Z10K_CONFIG ]] || source $Z10K_CONFIG
