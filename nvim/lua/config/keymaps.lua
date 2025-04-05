@@ -1,6 +1,8 @@
 -- Keymaps are automatically loaded on the VeryLazy event
 -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
 -- Add any additional keymaps here
+local keymap = vim.keymap
+-- local opts = { noremap = true, silent = true }
 
 -- functions
 -- information
@@ -29,17 +31,17 @@ end
 
 -- custome insert keymaps
 -- insert file name
-vim.keymap.set("n", "<Leader>zif", function()
+keymap.set("n", "<Leader>zif", function()
   insert_into_cursor(get_filename())
 end, { desc = "Insert filename", silent = true, noremap = true })
 -- insert datetime
-vim.keymap.set("n", "<Leader>zit", function()
+keymap.set("n", "<Leader>zit", function()
   insert_into_cursor(get_datetime())
 end, { desc = "Insert datetime", silent = true, noremap = true })
 
 -- custome template keymaps
 -- c++ file doxygen style comment
-vim.keymap.set("n", "<Leader>td", function()
+keymap.set("n", "<Leader>td", function()
   local lines_to_insert = {
     "/**",
     " * @file " .. get_filename(),
@@ -57,7 +59,7 @@ vim.keymap.set("n", "<Leader>td", function()
 end, { desc = "Insert doxygen style file comment", silent = true, noremap = true })
 
 -- insert c++ function comment in doxygen style
-vim.keymap.set("n", "<Leader>tf", function()
+keymap.set("n", "<Leader>tf", function()
   local lines_to_insert = {
     "/**",
     " * @brief ",
@@ -71,8 +73,7 @@ vim.keymap.set("n", "<Leader>tf", function()
 end, { desc = "Insert doxygen style function comment", silent = true, noremap = true })
 
 -- toggleterm
-
-vim.keymap.set(
+keymap.set(
   "n",
   "<C-/>",
   ':lua require("toggleterm").toggle()<CR>',
@@ -80,13 +81,13 @@ vim.keymap.set(
 )
 
 -- 可视模式下 <leader>y 复制到系统剪贴板
-vim.keymap.set("v", "<leader>y", '"+y', {
+keymap.set("v", "<leader>y", '"+y', {
   noremap = true,                   -- 非递归映射
   silent = true,                    -- 静默执行
   desc = "Copy to system clipboard", -- 可选的描述
 })
 -- 可视模式下 <leader>p 粘贴系统剪贴板内容
-vim.keymap.set("v", "<leader>p", '"+p', {
+keymap.set("v", "<leader>p", '"+p', {
   noremap = true,                      -- 非递归映射
   silent = true,                       -- 静默执行
   desc = "Paste from system clipboard", -- 可选的描述
