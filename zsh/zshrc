@@ -6,8 +6,11 @@ bindkey -v
 # this makes the switch between modes quicker
 export KEYTIMEOUT=1
 
-# personal binaries
+# envs
+# personal binariebash <(curl -L https://zellij.dev/launchbash <(curl -L https://zellij.dev/launch))s
 export PATH="${HOME}/.local/bin:${PATH}"
+# LOCAL, DEV, PROD
+export DEVELOPMENT_ENV=LOCAL
 
 # using startship as alternative
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
