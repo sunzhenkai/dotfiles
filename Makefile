@@ -30,5 +30,5 @@ zellij:
 ghostty:
 	$(call install_config,ghostty,~/.config/ghostty)
 zsh:
-	# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
+	@# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
 	$(call install_config,zsh,~/.config/zsh)
