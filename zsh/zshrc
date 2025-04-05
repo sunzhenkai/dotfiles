@@ -1,0 +1,6 @@
+export EDITOR="nvim"
+
+# vi mode
+bindkey -v
+# this makes the switch between modes quicker
+export KEYTIMEOUT=1
