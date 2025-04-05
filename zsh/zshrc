@@ -8,3 +8,24 @@ export KEYTIMEOUT=1
 # using startship as alternative
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
 #[[ ! -f $Z10K_CONFIG ]] || source $Z10K_CONFIG
+
+# cargo
+export CARGE_ENV="$HOME/.cargo/env"
+[[ -e ${CARGE_ENV} ]] && . ${CARGE_ENV}
+
+# starship
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# vcpkg root
+DEFAULT_VCPKG_ROOT=$HOME/.local/vcpkg
+if [[ "$VCPKG_ROOT" == "" && -e ${DEFAULT_VCPKG_ROOT} ]]; then
+  export VCPKG_ROOT=${DEFAULT_VCPKG_ROOT}
+  export PATH="$DEFAULT_VCPKG_ROOT:$PATH"
+fi
+
+# nvm
+DFT_NVM_DIR="$HOME/.nvm"
+if [[ "$NVM_DIR" == "" && -e "$DFT_NVM_DIR" ]]; then
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+fi
