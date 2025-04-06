@@ -208,7 +208,7 @@ keybinds clear-defaults=true {
     // }
 
     // NOTE: custome setting
-    // unbind "Ctrl n"
+    unbind "Ctrl n"
 }
 
 // Plugin aliases - can be used to change the implementation of Zellij

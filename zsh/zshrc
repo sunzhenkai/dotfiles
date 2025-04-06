@@ -51,3 +51,7 @@ if [[ -e "$BREW_FLEX" ]]; then
   export CPPFLAGS="-I$BREW_FLEX/include"
 fi
 
+# kitty
+if command -v kitty >/dev/null; then 
+  alias kssh="kitty +kitten ssh"
+fi
