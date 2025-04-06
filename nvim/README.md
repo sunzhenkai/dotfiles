@@ -3,9 +3,10 @@
 # Dependencies
 
 ```shell
-brew install fzf ripgrep luarocks lazygit hunspell
+brew install fzf ripgrep luarocks lazygit hunspell imagemagick fd tectonic ghostscript
 
-npm install yarn -g
+npm install -g yarn 
+npm install -g @mermaid-js/mermaid-cli
 
 # ubuntu
 sudo apt install build-essential libhunspell-dev
