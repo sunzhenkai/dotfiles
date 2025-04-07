@@ -22,5 +22,6 @@ osc52 = "CopyPaste"
 [font]
 #normal.family = "UbuntuMono Nerd Font Mono"
 #normal.family = "SauceCodePro Nerd Font Mono"
-normal.family = "Mononoki Nerd Font Mono"
+normal.family = "0xProto Nerd Font Mono"
+#normal.family = "Mononoki Nerd Font Mono"
 size = 20
