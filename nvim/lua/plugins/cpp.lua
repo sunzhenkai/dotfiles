@@ -134,4 +134,18 @@ return {
 			},
 		},
 	},
+	{ -- Autoformat
+		"stevearc/conform.nvim",
+		lazy = false,
+		opts = {
+			formatters_by_ft = {
+				c = { "clang_format" },
+			},
+			formatters = {
+				clang_format = {
+					prepend_args = { "--style=file", "--fallback-style=LLVM" },
+				},
+			},
+		},
+	},
 }

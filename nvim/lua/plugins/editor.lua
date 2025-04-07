@@ -30,5 +30,20 @@ return {
 				desc = "Format Injected Langs",
 			},
 		},
+		opts = {
+
+			notify_on_error = true,
+			opts = {
+				formatters_by_ft = {
+					lua = { "stylua" },
+					sh = { "shfmt" },
+				},
+				formatters = {
+					shfmt = {
+						prepend_args = { "-i", "4" },
+					},
+				},
+			},
+		},
 	},
 }
