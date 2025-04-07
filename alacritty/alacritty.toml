@@ -20,5 +20,7 @@ style.blinking = "Always"
 osc52 = "CopyPaste"
 
 [font]
-normal.family = "SauceCodePro Nerd Font Mono"
-size = 18
+#normal.family = "UbuntuMono Nerd Font Mono"
+#normal.family = "SauceCodePro Nerd Font Mono"
+normal.family = "Mononoki Nerd Font Mono"
+size = 20
