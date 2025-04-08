@@ -29,9 +29,18 @@ return {
 	{
 		"neovim/nvim-lspconfig",
 		opts = {
+			setup = {
+				gopls = function(_, opts)
+					local capabilities = require("cmp_nvim_lsp").default_capabilities()
+					opts.capabilities = vim.tbl_deep_extend("force", opts.capabilities or {}, capabilities)
+				end,
+			},
 			servers = {
 				gopls = {
 					settings = {
+						capabilities = require("cmp_nvim_lsp").default_capabilities(
+							vim.lsp.protocol.make_client_capabilities()
+						),
 						gopls = {
 							gofumpt = true,
 							codelenses = {
