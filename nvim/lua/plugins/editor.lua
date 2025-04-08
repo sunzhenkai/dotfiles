@@ -20,6 +20,7 @@ return {
 		dependencies = { "mason.nvim" },
 		lazy = true,
 		cmd = "ConformInfo",
+		event = { "BufWritePre" },
 		keys = {
 			{
 				"<leader>cF",
