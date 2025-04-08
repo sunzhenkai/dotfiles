@@ -25,12 +25,22 @@ return {
 			servers = {
 				-- pyright will be automatically installed with mason and loaded with lspconfig
 				pyright = {
-					-- settings = {
-					-- 	python = {
-					-- 		venvPath = vim.fn.getcwd(),
-					-- 		venv = "venv",
-					-- 	},
-					-- },
+					settings = {
+						python = {
+							venvPath = vim.fn.getcwd() .. "/..",
+							venv = ".venv,venv",
+						},
+					},
+				},
+				pylsp = {
+					settings = {
+						pylsp = {
+							plugins = {
+								pylint = { enabled = true },
+								pycodestyle = { maxLineLength = 120 },
+							},
+						},
+					},
 				},
 			},
 		},
@@ -49,10 +59,23 @@ return {
 				"pydocstyle",
 				-- "python-lsp-server",
 				"pyright",
+				-- formatter
+				"black",
+				"isort",
 			},
 		},
 	},
 	{
-		"nvim-neotest/neotest-python",
+		"stevearc/conform.nvim",
+		opts = {
+			formatters_by_ft = {
+				python = { "black" },
+			},
+			formatters = {
+				black = {
+					prepend_args = { "--line-length", "100" },
+				},
+			},
+		},
 	},
 }
