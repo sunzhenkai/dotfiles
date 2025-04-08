@@ -153,7 +153,7 @@ return {
       },
 
       keymap = {
-        preset = "enter",
+        -- preset = "enter",
         ["<C-y>"] = { "select_and_accept" },
       },
     },
