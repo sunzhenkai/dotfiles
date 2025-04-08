@@ -59,7 +59,6 @@ return {
       },
     },
   },
-
   {
     "olimorris/codecompanion.nvim",
     -- enabled = false,
@@ -102,10 +101,5 @@ return {
       "nvim-lua/plenary.nvim",
       "nvim-treesitter/nvim-treesitter",
     },
-  },
-  {
-    "Exafunction/codeium.vim",
-    enabled = false,
-    event = "BufEnter",
   },
 }

@@ -73,9 +73,11 @@ return {
     --   })
     -- end,
   },
+  -- Blink-cmp plugin
   {
     "saghen/blink.compat",
-    enabled = false,
+    enabled = true,
+    optional = true, -- make optional so it's only enabled if any extras need it
     -- use the latest release, via version = '*', if you also use the latest release for blink.cmp
     version = "*",
     -- lazy.nvim will automatically load the plugin when it's required by blink.cmp
@@ -94,13 +96,7 @@ return {
     },
     dependencies = {
       "rafamadriz/friendly-snippets",
-      -- add blink.compat to dependencies
-      {
-        "saghen/blink.compat",
-        optional = true, -- make optional so it's only enabled if any extras need it
-        opts = {},
-        version = not vim.g.lazyvim_blink_main and "*",
-      },
+      "saghen/blink.compat",
     },
     event = "InsertEnter",
 
