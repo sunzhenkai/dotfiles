@@ -1,26 +1,19 @@
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
-		opts = { ensure_installed = { "cmake", "cpp" } },
+		opts = { ensure_installed = { "cmake", "cpp", "c", "make" } },
 	},
 	{
 		"williamboman/mason.nvim",
 		opts = {
 			-- https://github.com/williamboman/mason-lspconfig.nvim
 			ensure_installed = {
-				"cmakelang",
+				"cmake-language-server",
 				"cmakelint",
 				"clangd",
 				"codelldb",
 				"clang-format",
-			},
-		},
-	},
-	{
-		"neovim/nvim-lspconfig",
-		opts = {
-			servers = {
-				neocmake = {},
+				"cpplint",
 			},
 		},
 	},
@@ -85,6 +78,7 @@ return {
 		},
 		opts = {
 			servers = {
+				cmake = {},
 				-- Ensure mason installs the server
 				clangd = {
 					keys = {
@@ -107,15 +101,15 @@ return {
 					capabilities = {
 						offsetEncoding = { "utf-16" },
 					},
-					-- cmd = {
-					-- 	"clangd",
-					-- 	"--background-index",
-					-- 	"--clang-tidy",
-					-- 	"--header-insertion=iwyu",
-					-- 	"--completion-style=detailed",
-					-- 	"--function-arg-placeholders",
-					-- 	"--fallback-style=llvm",
-					-- },
+					cmd = {
+						"clangd",
+						"--background-index",
+						"--clang-tidy",
+						"--header-insertion=iwyu",
+						"--completion-style=detailed",
+						"--function-arg-placeholders",
+						"--fallback-style=llvm",
+					},
 					init_options = {
 						usePlaceholders = true,
 						completeUnimported = true,
@@ -139,10 +133,29 @@ return {
 		opts = {
 			formatters_by_ft = {
 				c = { "clang_format" },
+				cpp = { "clang_format" },
 			},
 			formatters = {
 				clang_format = {
 					prepend_args = { "--style=file", "--fallback-style=LLVM" },
+				},
+			},
+		},
+	},
+	{
+		"mfussenegger/nvim-lint",
+		opts = {
+			linters_by_ft = {
+				c = { "cpplint" },
+				cpp = { "cpplint" },
+			},
+			linters = {
+				cpplint = {
+					args = {
+						"--filter=-legal/copyright",
+						-- set line length, the default value is 80
+						"--linelength=100",
+					},
 				},
 			},
 		},
