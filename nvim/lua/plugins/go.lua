@@ -107,18 +107,23 @@ return {
     "williamboman/mason.nvim",
     opts = {
       ensure_installed = {
-        "golines",
-        "gotestsum",
-        "go-debug-adapter",
-        "golangci-lint",
+        -- lsp
         "gopls",
-        "golangci-lint-langserver",
-        "gospel",
-        "gomodifytags",
-        "gotests",
-        "goimports-reviser",
-        "impl",
+        -- debug
+        "go-debug-adapter",
         "delve",
+        -- formatter
+        "goimports-reviser",
+        "golines",
+        -- lint
+        "golangci-lint",
+        "golangci-lint-langserver",
+        -- test
+        "gotests",
+        "gotestsum",
+        -- generate
+        "gomodifytags",
+        "impl",
       },
     },
   },
