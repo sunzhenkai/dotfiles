@@ -95,6 +95,7 @@ return {
   {
     "leoluz/nvim-dap-go",
     ft = "go",
+    enabled = false,
     dependencies = {
       "mfussenegger/nvim-dap",
       "rcarriga/nvim-dap-ui",
@@ -111,7 +112,7 @@ return {
         "gopls",
         -- debug
         "go-debug-adapter",
-        "delve",
+        -- "delve",
         -- formatter
         "goimports-reviser",
         "golines",
@@ -123,12 +124,13 @@ return {
         "gotestsum",
         -- generate
         "gomodifytags",
-        "impl",
+        -- "impl",
       },
     },
   },
   {
     "nvim-neotest/neotest",
+    enabled = false,
     dependencies = {
       "nvim-lua/plenary.nvim",
       "fredrikaverpil/neotest-golang",
