@@ -73,3 +73,10 @@ if command -v asdf >/dev/null; then
   # fix python binraries
   fix_asdf_plugin_path python
 fi
+
+# env init
+ENV_INIT_DIR="$HOME/.local/env-init/env"
+if [[ -e "$ENV_INIT_DIR" ]]; then
+  source "$ENV_INIT_DIR"
+  alias ienv="source $ENV_INIT_DIR" 
+fi
