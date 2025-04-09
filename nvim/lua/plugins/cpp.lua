@@ -1,8 +1,10 @@
 return {
+	-- nvim-treesitter/nvim-treesitter
 	{
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "cmake", "cpp", "c", "make" } },
 	},
+	-- williamboman/mason.nvim
 	{
 		"williamboman/mason.nvim",
 		opts = {
@@ -17,8 +19,10 @@ return {
 			},
 		},
 	},
+	-- Civitasv/cmake-tools.nvim
 	{
 		"Civitasv/cmake-tools.nvim",
+		enabled = false,
 		lazy = true,
 		init = function()
 			local loaded = false
@@ -128,7 +132,9 @@ return {
 			},
 		},
 	},
-	{ -- Autoformat
+	-- stevearc/conform.nvim
+	-- autoformat
+	{
 		"stevearc/conform.nvim",
 		opts = {
 			formatters_by_ft = {
@@ -144,6 +150,7 @@ return {
 	},
 	{
 		"mfussenegger/nvim-lint",
+		enabled = false,
 		opts = {
 			linters_by_ft = {
 				c = { "cpplint" },

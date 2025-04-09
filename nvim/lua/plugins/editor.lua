@@ -32,7 +32,6 @@ return {
 			},
 		},
 		opts = {
-
 			notify_on_error = true,
 			opts = {
 				formatters_by_ft = {

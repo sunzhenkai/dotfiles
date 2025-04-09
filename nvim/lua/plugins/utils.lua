@@ -16,12 +16,6 @@ return {
 				desc = "toggle terminal",
 			},
 		},
-		--  vim.keymap.set(
-		-- "n",
-		-- "<leader>tt",
-		-- ':lua require("toggleterm").toggle()<cr>',
-		-- { desc = "toggle terminal", silent = true, noremap = true }
-		--)
 	},
 	{
 		"nvim-telescope/telescope-fzf-native.nvim",

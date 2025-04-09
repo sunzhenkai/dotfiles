@@ -6,13 +6,6 @@ return {
 			-- add any options here
 		},
 	},
-	-- folke/ts-comments.nvim
-	{
-		"folke/ts-comments.nvim",
-		opts = {},
-		event = "VeryLazy",
-		enabled = vim.fn.has("nvim-0.10.0") == 1,
-	},
 	-- folke/trouble.nvim
 	{
 		"folke/trouble.nvim",
@@ -49,7 +42,7 @@ return {
 
 			vim.api.nvim_create_autocmd("FileType", {
 				pattern = { "go" },
-				callback = function(ev)
+				callback = function()
 					-- CTRL/control keymaps
 					vim.api.nvim_buf_set_keymap(0, "n", "<C-i>", ":GoImport<CR>", {})
 					-- conflict with vim shotcut
