@@ -47,6 +47,7 @@ return {
 	-- C/C++
 	{
 		"p00f/clangd_extensions.nvim",
+		-- enabled = false,
 		lazy = true,
 		config = function() end,
 		opts = {
@@ -77,9 +78,9 @@ return {
 	},
 	{
 		"neovim/nvim-lspconfig",
-		dependencies = {
-			"p00f/clangd_extensions.nvim",
-		},
+		-- dependencies = {
+		-- 	"p00f/clangd_extensions.nvim",
+		-- },
 		opts = {
 			servers = {
 				cmake = {},
@@ -105,14 +106,15 @@ return {
 					capabilities = {
 						offsetEncoding = { "utf-16" },
 					},
+					--	"--header-insertion=iwyu",
 					cmd = {
 						"clangd",
 						"--background-index",
 						"--clang-tidy",
-						"--header-insertion=iwyu",
+						"--header-insertion=never",
 						"--completion-style=detailed",
 						"--function-arg-placeholders",
-						"--fallback-style=llvm",
+						"--fallback-style=google",
 					},
 					init_options = {
 						usePlaceholders = true,
