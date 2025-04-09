@@ -5,9 +5,9 @@ local keymap = vim.keymap
 -- local opts = { noremap = true, silent = true }
 
 -- Diagnostics
--- keymap.set("n", "<C-j>", function()
---   vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.WARN })
--- end)
+keymap.set("n", "<C-j>", function()
+	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.WARN })
+end)
 
 -- functions
 -- information
