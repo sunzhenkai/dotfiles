@@ -12,7 +12,6 @@ return {
 				"shfmt",
 				"stylua",
 				"sonarlint-language-server",
-				"ast-grep",
 			},
 			ui = {
 				icons = {

@@ -8,6 +8,9 @@ local keymap = vim.keymap
 keymap.set("n", "<C-j>", function()
 	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.WARN })
 end)
+keymap.set("n", "<C-l>", function()
+	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
+end)
 
 -- functions
 -- information
