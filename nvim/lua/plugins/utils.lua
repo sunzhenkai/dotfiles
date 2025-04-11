@@ -1,4 +1,6 @@
 return {
+	-- akinsho/toggleterm.nvim
+	-- terminal
 	{
 		"akinsho/toggleterm.nvim",
 		cmd = "ToggleTerm",
@@ -17,6 +19,8 @@ return {
 			},
 		},
 	},
+	-- nvim-telescope/telescope-fzf-native.nvim
+	-- telescope extensions
 	{
 		"nvim-telescope/telescope-fzf-native.nvim",
 		build = "make",
@@ -24,7 +28,10 @@ return {
 			return vim.fn.executable("make") == 1
 		end,
 	},
+	-- nvim-telescope/telescope-file-browser.nvim
+	-- telescope extensions
 	{ "nvim-telescope/telescope-file-browser.nvim", enabled = true },
+	-- nvim-telescope/telescope.nvim
 	{
 		"nvim-telescope/telescope.nvim",
 		dependencies = {
@@ -84,6 +91,7 @@ return {
 			map("n", "<leader>fs", builtin.spell_suggest, opts) -- Lists spell options
 		end,
 	},
+	-- folke/snacks.nvim
 	{
 		"folke/snacks.nvim",
 		priority = 1000,
