@@ -27,5 +27,15 @@ return {
 		dependencies = {
 			"williamboman/mason.nvim",
 		},
+		opts = {
+			ensure_installed = {
+				"lua_ls", -- Lua
+				"pyright", -- Python
+				"gopls", -- Go
+				"rust_analyzer", -- Rust
+				"clangd", -- C/C++
+			},
+			automatic_installation = true,
+		},
 	},
 }
