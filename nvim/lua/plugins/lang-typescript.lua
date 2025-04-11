@@ -182,7 +182,7 @@ return {
 		},
 	},
 	{
-		"williamboman/mason-lsconfig.nvim",
+		"williamboman/mason-lspconfig.nvim",
 		opts = {
 			ensure_installed = {
 				"typescript-language-server",
