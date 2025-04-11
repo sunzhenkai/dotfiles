@@ -219,25 +219,16 @@ return {
 			indent = { enable = true },
 			ensure_installed = {
 				"bash",
-				"c",
 				"diff",
 				"html",
-				"javascript",
-				"jsdoc",
-				"json",
-				"jsonc",
 				"lua",
 				"luadoc",
 				"luap",
-				"markdown",
-				"markdown_inline",
 				"printf",
-				"python",
 				"query",
 				"regex",
 				"toml",
 				"tsx",
-				"typescript",
 				"vim",
 				"vimdoc",
 				"xml",
@@ -272,6 +263,10 @@ return {
 						["[A"] = "@parameter.inner",
 					},
 				},
+			},
+			matchup = {
+				enable = true, -- mandatory, false will disable the whole extension
+				disable = {}, -- optional, list of language that will be disabled, for instance: "c", "ruby"
 			},
 		},
 		---@param opts TSConfig

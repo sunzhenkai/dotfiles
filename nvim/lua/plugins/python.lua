@@ -47,7 +47,7 @@ return {
 	},
 	{
 		"nvim-treesitter/nvim-treesitter",
-		opts = { ensure_installed = { "ninja", "rst" } },
+		opts = { ensure_installed = { "ninja", "rst", "python" } },
 	},
 	{
 		"williamboman/mason.nvim",

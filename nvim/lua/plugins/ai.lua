@@ -34,8 +34,9 @@ return {
 			"zbirenbaum/copilot.lua", -- for providers='copilot'
 			{
 				-- support for image pasting
-				-- WARN: this will lead to slow pasting operation
-				-- "HakonHarnes/img-clip.nvim",
+				-- WARN: will lead to slow pasting operation
+				"HakonHarnes/img-clip.nvim",
+				enabled = false,
 				event = "VeryLazy",
 				opts = {
 					-- recommended settings

@@ -56,4 +56,8 @@ return {
 			}):map("<leader>um")
 		end,
 	},
+	{
+		"nvim-treesitter/nvim-treesitter",
+		opts = { ensure_installed = { "markdown", "markdown_inline" } },
+	},
 }
