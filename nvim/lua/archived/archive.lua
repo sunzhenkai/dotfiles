@@ -1,5 +1,5 @@
--- cmp: completion
 return {
+	-- cmp: completion
 	-- hrsh7th/nvim-cmp
 	{
 		"hrsh7th/nvim-cmp",
@@ -224,6 +224,178 @@ return {
 			end
 
 			require("blink.cmp").setup(opts)
+		end,
+	},
+	-- cpp
+	-- Civitasv/cmake-tools.nvim
+	{
+		"Civitasv/cmake-tools.nvim",
+		enabled = false,
+		lazy = true,
+		init = function()
+			local loaded = false
+			local function check()
+				local cwd = vim.fn.getcwd()
+				if vim.fn.filereadable(cwd .. "/CMakeLists.txt") == 1 then
+					require("lazy").load({ plugins = { "cmake-tools.nvim" } })
+					loaded = true
+				end
+			end
+			check()
+			vim.api.nvim_create_autocmd("DirChanged", {
+				callback = function()
+					if not loaded then
+						check()
+					end
+				end,
+			})
+		end,
+		opts = {},
+	},
+	-- C/C++
+	{
+		"p00f/clangd_extensions.nvim",
+		-- enabled = false,
+		lazy = true,
+		config = function() end,
+		opts = {
+			inlay_hints = {
+				inline = false,
+			},
+			ast = {
+				--These require codicons (https://github.com/microsoft/vscode-codicons)
+				role_icons = {
+					type = "",
+					declaration = "",
+					expression = "",
+					specifier = "",
+					statement = "",
+					["template argument"] = "",
+				},
+				kind_icons = {
+					Compound = "",
+					Recovery = "",
+					TranslationUnit = "",
+					PackExpansion = "",
+					TemplateTypeParm = "",
+					TemplateTemplateParm = "",
+					TemplateParamObject = "",
+				},
+			},
+		},
+		{
+			"mfussenegger/nvim-lint",
+			enabled = false,
+			opts = {
+				linters_by_ft = {
+					c = { "cpplint" },
+					cpp = { "cpplint" },
+				},
+				linters = {
+					cpplint = {
+						args = {
+							"--filter=-legal/copyright",
+							-- set line length, the default value is 80
+							"--linelength=100",
+						},
+					},
+				},
+			},
+		},
+	},
+	{
+		"olexsmir/gopher.nvim",
+		ft = "go",
+		enabled = false,
+		-- branch = "develop"
+		-- (optional) will update plugin's deps on every update
+		build = function()
+			vim.cmd.GoInstallBinaries()
+		end,
+		---@type gopher.Config
+		opts = {},
+	},
+	{
+		"leoluz/nvim-dap-go",
+		ft = "go",
+		enabled = false,
+		dependencies = {
+			"mfussenegger/nvim-dap",
+			"rcarriga/nvim-dap-ui",
+		},
+		config = function()
+			require("dap-go").setup()
+		end,
+	},
+	{
+		"nvim-neotest/neotest",
+		enabled = false,
+		dependencies = {
+			"nvim-lua/plenary.nvim",
+			"fredrikaverpil/neotest-golang",
+			"nvim-neotest/nvim-nio",
+		},
+		config = function()
+			require("neotest").setup({
+				adapters = {
+					require("neotest-golang")({
+						args = { "-count=1", "-timeout=60s" },
+					}),
+				},
+			})
+		end,
+	},
+	-- themes
+	{
+		"catppuccin/nvim",
+		name = "catppuccin",
+		-- tag = "v1.9.0",
+		enabled = false,
+		priority = 1000,
+		config = function()
+			vim.opt.termguicolors = true
+
+			local catppuccin = require("catppuccin")
+
+			catppuccin.setup({
+				flavour = "mocha",
+				term_colors = true,
+				styles = {
+					conditionals = {},
+					functions = { "italic" },
+					types = { "bold" },
+				},
+				color_overrides = {
+					mocha = {
+						base = "#171717", -- background
+						surface2 = "#9A9A9A", -- comments
+						text = "#F6F6F6",
+					},
+				},
+				highlight_overrides = {
+					mocha = function(C)
+						return {
+							NvimTreeNormal = { bg = C.none },
+							CmpBorder = { fg = C.surface2 },
+							Pmenu = { bg = C.none },
+							NormalFloat = { bg = C.none },
+							TelescopeBorder = { link = "FloatBorder" },
+						}
+					end,
+				},
+				integrations = {
+					barbar = true,
+					cmp = true,
+					gitsigns = true,
+					native_lsp = { enabled = true },
+					nvimtree = true,
+					telescope = true,
+					treesitter = true,
+					treesitter_context = true,
+				},
+			})
+
+			vim.cmd.colorscheme("catppuccin")
 		end,
 	},
 }

@@ -1,7 +1,6 @@
 return {
 	{
 		"nvim-lualine/lualine.nvim",
-		-- enabled = false,
 		dependencies = { "nvim-tree/nvim-web-devicons", "catppuccin/nvim" },
 		config = function()
 			require("lualine").setup({})
@@ -33,7 +32,7 @@ return {
 			require("luasnip").filetype_extend("cs", { "csharpdoc" })
 			require("luasnip").filetype_extend("java", { "javadoc" })
 			require("luasnip").filetype_extend("c", { "cdoc" })
-			require("luasnip").filetype_extend("cc", { "cdoc" })
+			require("luasnip").filetype_extend("cc", { "cppdoc" })
 			require("luasnip").filetype_extend("cpp", { "cppdoc" })
 			require("luasnip").filetype_extend("php", { "phpdoc" })
 			require("luasnip").filetype_extend("kotlin", { "kdoc" })
