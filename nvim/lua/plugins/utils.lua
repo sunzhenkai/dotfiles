@@ -32,6 +32,7 @@ return {
 			"nvim-telescope/telescope-fzf-native.nvim",
 			"nvim-telescope/telescope-file-browser.nvim",
 		},
+		branch = "0.1.x",
 		config = function()
 			local telescope = require("telescope")
 			local actions = require("telescope.actions")

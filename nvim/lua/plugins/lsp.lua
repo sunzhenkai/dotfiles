@@ -17,7 +17,7 @@ return {
 					underline = true,
 					update_in_insert = false,
 					virtual_text = {
-						spacing = 4,
+						spacing = 2,
 						source = "if_many",
 						prefix = "●",
 						-- this will set set the prefix to a function that returns the diagnostics icon based on the severity
@@ -38,7 +38,7 @@ return {
 				-- Be aware that you also will need to properly configure your LSP server to
 				-- provide the inlay hints.
 				inlay_hints = {
-					enabled = true,
+					enabled = false,
 					exclude = { "vue" }, -- filetypes for which you don't want to enable inlay hints
 				},
 				-- Enable this to enable the builtin LSP code lenses on Neovim >= 0.10.0
@@ -65,39 +65,7 @@ return {
 				},
 				-- LSP Server Settings
 				---@type lspconfig.options
-				servers = {
-					lua_ls = {
-						-- mason = false, -- set to false if you don't want this server to be installed with mason
-						-- Use this to add any additional keymaps
-						-- for specific lsp servers
-						-- ---@type LazyKeysSpec[]
-						-- keys = {},
-						settings = {
-							Lua = {
-								workspace = {
-									checkThirdParty = false,
-								},
-								codeLens = {
-									enable = true,
-								},
-								completion = {
-									callSnippet = "Replace",
-								},
-								doc = {
-									privateName = { "^_" },
-								},
-								hint = {
-									enable = true,
-									setType = false,
-									paramType = true,
-									paramName = "Disable",
-									semicolon = "Disable",
-									arrayIndex = "Disable",
-								},
-							},
-						},
-					},
-				},
+				servers = {},
 				-- you can do any additional lsp server setup here
 				-- return true if you don't want this server to be setup with lspconfig
 				---@type table<string, fun(server:string, opts:_.lspconfig.options):boolean?>

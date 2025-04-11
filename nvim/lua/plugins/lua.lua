@@ -1,7 +1,7 @@
 return {
 	{
 		"nvim-lualine/lualine.nvim",
-		dependencies = { "nvim-tree/nvim-web-devicons", "catppuccin/nvim" },
+		dependencies = { "nvim-tree/nvim-web-devicons" },
 		config = function()
 			require("lualine").setup({})
 		end,
@@ -39,5 +39,43 @@ return {
 			require("luasnip").filetype_extend("ruby", { "rdoc" })
 			require("luasnip").filetype_extend("sh", { "shelldoc" })
 		end,
+	},
+	{
+		"neovim/nvim-lspconfig",
+		opts = {
+			servers = {
+				lua_ls = {
+					-- mason = false, -- set to false if you don't want this server to be installed with mason
+					-- Use this to add any additional keymaps
+					-- for specific lsp servers
+					-- ---@type LazyKeysSpec[]
+					-- keys = {},
+					settings = {
+						Lua = {
+							workspace = {
+								checkThirdParty = false,
+							},
+							codeLens = {
+								enable = true,
+							},
+							completion = {
+								callSnippet = "Replace",
+							},
+							doc = {
+								privateName = { "^_" },
+							},
+							hint = {
+								enable = true,
+								setType = false,
+								paramType = true,
+								paramName = "Disable",
+								semicolon = "Disable",
+								arrayIndex = "Disable",
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 }
