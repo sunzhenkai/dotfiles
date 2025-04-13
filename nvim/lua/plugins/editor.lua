@@ -89,7 +89,8 @@ return {
 		---@diagnostic disable-next-line: missing-fields
 		opts = {
 			highlight = { enable = true },
-			indent = { enable = true },
+			-- bugs found in cc file
+			indent = { enable = false },
 			ensure_installed = {
 				"bash",
 				"diff",
