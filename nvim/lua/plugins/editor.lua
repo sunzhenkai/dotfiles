@@ -14,7 +14,7 @@ return {
      { "<leader>sT", "<cmd>TodoTelescope keywords=TODO,FIX,FIXME<cr>", desc = "Todo/Fix/Fixme" },
     },
 	},
-	-- formatter
+	-- auto-formatter
 	{
 		"stevearc/conform.nvim",
 		dependencies = { "mason.nvim" },
@@ -37,10 +37,15 @@ return {
 				formatters_by_ft = {
 					lua = { "stylua" },
 					sh = { "shfmt" },
+					c = { "clang_format" },
+					cpp = { "clang_format" },
 				},
 				formatters = {
 					shfmt = {
 						prepend_args = { "-i", "2" },
+					},
+					clang_format = {
+						prepend_args = { "--style=file", "--fallback-style=LLVM" },
 					},
 				},
 			},
@@ -101,6 +106,11 @@ return {
 				"vimdoc",
 				"xml",
 				"yaml",
+				-- c/c++/cmake
+				"cmake",
+				"cpp",
+				"c",
+				"make",
 			},
 			incremental_selection = {
 				enable = true,

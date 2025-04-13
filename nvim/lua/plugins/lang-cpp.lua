@@ -1,9 +1,4 @@
 return {
-	-- nvim-treesitter/nvim-treesitter
-	{
-		"nvim-treesitter/nvim-treesitter",
-		opts = { ensure_installed = { "cmake", "cpp", "c", "make" } },
-	},
 	-- williamboman/mason.nvim
 	{
 		"williamboman/mason.nvim",
@@ -71,22 +66,6 @@ return {
 						-- set line length, the default value is 80
 						"--linelength=100",
 					},
-				},
-			},
-		},
-	},
-	-- stevearc/conform.nvim
-	-- autoformat
-	{
-		"stevearc/conform.nvim",
-		opts = {
-			formatters_by_ft = {
-				c = { "clang_format" },
-				cpp = { "clang_format" },
-			},
-			formatters = {
-				clang_format = {
-					prepend_args = { "--style=file", "--fallback-style=LLVM" },
 				},
 			},
 		},
