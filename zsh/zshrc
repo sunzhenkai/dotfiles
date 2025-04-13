@@ -14,6 +14,24 @@ export PATH="${HOME}/.local/bin:${PATH}"
 # LOCAL, DEV, PROD
 export DEVELOPMENT_ENV=LOCAL
 
+# homebrew
+HOMEBREW_ROOT="/home/linuxbrew/.linuxbrew"
+if [[ -e "$HOMEBREW_ROOT" ]]; then
+  eval "$($HOMEBREW_ROOT/bin/brew shellenv)"
+fi
+BREW_BISON=/opt/homebrew/opt/bison
+if [[ -e "$BREW_BISON" ]]; then
+  export PATH="$BREW_BISON/bin:$PATH"
+  export LDFLAGS="-L$BREW_BISON/lib"
+fi
+BREW_FLEX=/opt/homebrew/opt/flex
+if [[ -e "$BREW_FLEX" ]]; then
+  export PATH="$BREW_FLEX/bin:$PATH"
+  export LDFLAGS="-L$BREW_FLEX/lib"
+  export CPPFLAGS="-I$BREW_FLEX/include"
+fi
+
+
 # using startship as alternative
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
 #[[ ! -f $Z10K_CONFIG ]] || source $Z10K_CONFIG
@@ -38,19 +56,6 @@ if [[ "$NVM_DIR" == "" && -e "$DFT_NVM_DIR" ]]; then
   export NVM_DIR="$DFT_NVM_DIR"
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-fi
-
-# homebrew
-BREW_BISON=/opt/homebrew/opt/bison
-if [[ -e "$BREW_BISON" ]]; then
-  export PATH="$BREW_BISON/bin:$PATH"
-  export LDFLAGS="-L$BREW_BISON/lib"
-fi
-BREW_FLEX=/opt/homebrew/opt/flex
-if [[ -e "$BREW_FLEX" ]]; then
-  export PATH="$BREW_FLEX/bin:$PATH"
-  export LDFLAGS="-L$BREW_FLEX/lib"
-  export CPPFLAGS="-I$BREW_FLEX/include"
 fi
 
 # kitty

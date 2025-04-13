@@ -13,6 +13,8 @@ cd ~/.config/iconfig/init
 vim ~/.zshrc
 ## config
 ZSH_CUSTOME=~/.config/zsh/oh-my-zsh
+## before source $ZSH/oh-my-zsh.sh
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # install programs
 ii homebrew -i
