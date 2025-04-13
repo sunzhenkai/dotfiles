@@ -212,7 +212,7 @@ return {
 							pylsp = {
 								plugins = {
 									pylint = { enabled = true },
-									pycodestyle = { maxLineLength = 120 },
+									pycodestyle = { maxLineLength = 100 },
 								},
 							},
 						},

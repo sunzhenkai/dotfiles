@@ -45,7 +45,7 @@ return {
 						prepend_args = { "-i", "2" },
 					},
 					clang_format = {
-						prepend_args = { "--style=file", "--fallback-style=LLVM" },
+						prepend_args = { "--style=file", "--fallback-style=google", "--verbose" },
 					},
 				},
 			},
