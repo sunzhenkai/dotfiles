@@ -55,17 +55,8 @@ return {
 		"mfussenegger/nvim-lint",
 		enabled = false,
 		opts = {
-			linters_by_ft = {
-				c = { "cpplint" },
-				cpp = { "cpplint" },
-			},
+			linters_by_ft = {},
 			linters = {
-				cpplint = {
-					args = {
-						"--filter=-legal/copyright",
-						-- set line length, the default value is 80
-						"--linelength=100",
-					},
 				},
 			},
 		},
