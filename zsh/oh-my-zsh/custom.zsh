@@ -11,7 +11,6 @@
 # brainstormr=~/Projects/development/planetargon/brainstormr
 # cd $brainstormr
 
-source ~/.config/zsh/zshrc
 source ~/.config/zsh/antigen.zsh
 
 # antigen
@@ -26,3 +25,6 @@ antigen bundle zsh-users/zsh-syntax-highlighting
 antigen bundle zsh-users/zsh-autosuggestions
 #antigen theme romkatv/powerlevel10k    # NOTE:  using startship as alternative
 antigen apply
+
+source ~/.config/zsh/zshrc
+
