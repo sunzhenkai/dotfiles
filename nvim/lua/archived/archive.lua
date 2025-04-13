@@ -252,57 +252,6 @@ return {
 		end,
 		opts = {},
 	},
-	-- C/C++
-	{
-		"p00f/clangd_extensions.nvim",
-		-- enabled = false,
-		lazy = true,
-		config = function() end,
-		opts = {
-			inlay_hints = {
-				inline = false,
-			},
-			ast = {
-				--These require codicons (https://github.com/microsoft/vscode-codicons)
-				role_icons = {
-					type = "",
-					declaration = "",
-					expression = "",
-					specifier = "",
-					statement = "",
-					["template argument"] = "",
-				},
-				kind_icons = {
-					Compound = "",
-					Recovery = "",
-					TranslationUnit = "",
-					PackExpansion = "",
-					TemplateTypeParm = "",
-					TemplateTemplateParm = "",
-					TemplateParamObject = "",
-				},
-			},
-		},
-		{
-			"mfussenegger/nvim-lint",
-			enabled = false,
-			opts = {
-				linters_by_ft = {
-					c = { "cpplint" },
-					cpp = { "cpplint" },
-				},
-				linters = {
-					cpplint = {
-						args = {
-							"--filter=-legal/copyright",
-							-- set line length, the default value is 80
-							"--linelength=100",
-						},
-					},
-				},
-			},
-		},
-	},
 	{
 		"olexsmir/gopher.nvim",
 		ft = "go",
@@ -458,5 +407,33 @@ return {
 				group = vim.api.nvim_create_augroup("go_autocommands", { clear = true }),
 			})
 		end,
+	},
+	-- lspconfig
+	{
+		opts = {
+			servers = {
+				neocmake = {
+					init_options = {
+						format = {
+							enable = true,
+							line_length = 100,
+						},
+						lint = { enable = true },
+					},
+				},
+				cmake = {
+					settings = {
+						cmake = {
+							lint = {
+								lineLength = 100,
+							},
+							formatting = {
+								lineLength = 100,
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 }

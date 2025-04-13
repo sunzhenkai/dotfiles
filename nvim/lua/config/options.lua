@@ -7,6 +7,11 @@ vim.opt.encoding = "utf-8"
 vim.opt.fileencoding = "utf-8"
 
 vim.opt.wrap = false
+vim.opt.tabstop = 2
+vim.opt.softtabstop = 2
+vim.opt.shiftwidth = 2
+vim.opt.expandtab = true
+vim.opt.textwidth = 100
 
 vim.g.lazyvim_prettier_needs_config = true
 vim.g.lazyvim_picker = "telescope"

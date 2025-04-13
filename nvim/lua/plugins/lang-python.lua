@@ -18,34 +18,6 @@ return {
 		},
 	},
 	{
-		"neovim/nvim-lspconfig",
-		---@class PluginLspOpts
-		opts = {
-			---@type lspconfig.options
-			servers = {
-				-- pyright will be automatically installed with mason and loaded with lspconfig
-				pyright = {
-					settings = {
-						python = {
-							venvPath = vim.fn.getcwd() .. "/..",
-							venv = ".venv,venv",
-						},
-					},
-				},
-				pylsp = {
-					settings = {
-						pylsp = {
-							plugins = {
-								pylint = { enabled = true },
-								pycodestyle = { maxLineLength = 120 },
-							},
-						},
-					},
-				},
-			},
-		},
-	},
-	{
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "ninja", "rst", "python" } },
 	},
