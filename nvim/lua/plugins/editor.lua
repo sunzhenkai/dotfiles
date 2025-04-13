@@ -190,7 +190,7 @@ return {
 				-- c/c++/cmake
 				cpplint = {
 					args = {
-						"--filter=-legal/copyright",
+						"--filter=-legal/copyright,-build/include_subdir",
 						-- set line length, the default value is 80
 						"--linelength=100",
 					},
