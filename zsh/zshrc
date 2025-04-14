@@ -86,6 +86,7 @@ if command -v asdf >/dev/null; then
   # fix python binraries
   fix_asdf_plugin_path python
   fix_asdf_plugin_path golang
+  fix_asdf_plugin_path nodejs
 fi
 
 # env init
