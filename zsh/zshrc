@@ -67,8 +67,15 @@ fi
 function fix_asdf_plugin_path() {
   local t_plugin=$1
   if asdf current ${t_plugin}>/dev/null; then
-    local t_plugin_version=$(asdf current python | grep python | awk '{print$2}')
-    export PATH="${ASDF_DATA_DIR}/installs/${t_plugin}/${t_plugin_version}/bin:$PATH"
+    local t_plugin_version=$(asdf current $t_plugin | grep $t_plugin | awk '{print$2}')
+    local t_bin_path="${ASDF_DATA_DIR}/installs/${t_plugin}/${t_plugin_version}/bin"
+    if [[ -e "$t_bin_path" ]]; then
+      export PATH="$t_bin_path:$PATH"
+    fi
+    local t_pkg_bin_path="${ASDF_DATA_DIR}/installs/${t_plugin}/${t_plugin_version}/packages/bin"
+    if [[ -e "$t_pkg_bin_path" ]]; then
+      export PATH="$t_pkg_bin_path:$PATH"
+    fi
   fi
 }
 
@@ -78,6 +85,7 @@ if command -v asdf >/dev/null; then
   export PATH="${ASDF_DATA_DIR}/shims:$PATH"
   # fix python binraries
   fix_asdf_plugin_path python
+  fix_asdf_plugin_path golang
 fi
 
 # env init
