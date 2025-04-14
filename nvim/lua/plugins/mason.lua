@@ -30,7 +30,8 @@ return {
 		opts = {
 			ensure_installed = {
 				"lua_ls", -- Lua
-				"pyright", -- Python
+				"pylsp",
+				-- "pyright", -- Python
 				"gopls", -- Go
 				"rust_analyzer", -- Rust
 				"clangd", -- C/C++

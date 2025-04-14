@@ -29,8 +29,8 @@ return {
 				"pylint",
 				"debugpy",
 				"pydocstyle",
-				-- "python-lsp-server",
-				"pyright",
+				"python-lsp-server",
+				-- "pyright",
 				-- formatter
 				"black",
 				"isort",

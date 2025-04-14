@@ -199,14 +199,14 @@ return {
 					-- markdown
 					marksman = {},
 					-- python
-					pyright = {
-						settings = {
-							python = {
-								venvPath = vim.fn.getcwd() .. "/..",
-								venv = ".venv,venv",
-							},
-						},
-					},
+					-- pyright = {
+					-- 	settings = {
+					-- 		python = {
+					-- 			venvPath = vim.fn.getcwd() .. "/..",
+					-- 			venv = ".venv,venv",
+					-- 		},
+					-- 	},
+					-- },
 					pylsp = {
 						settings = {
 							pylsp = {
