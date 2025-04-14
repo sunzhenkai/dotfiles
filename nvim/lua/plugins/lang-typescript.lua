@@ -8,14 +8,6 @@ return {
 		},
 	},
 	{
-		"williamboman/mason-lspconfig.nvim",
-		opts = {
-			ensure_installed = {
-				"typescript-language-server",
-			},
-		},
-	},
-	{
 		"echasnovski/mini.icons",
 		opts = {
 			file = {

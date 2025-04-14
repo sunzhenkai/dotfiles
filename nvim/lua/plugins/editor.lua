@@ -124,6 +124,8 @@ return {
 				"make",
 				"go",
 				"proto",
+				"typescript",
+				"tsx",
 			},
 			incremental_selection = {
 				enable = true,

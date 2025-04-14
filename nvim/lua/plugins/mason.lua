@@ -38,6 +38,7 @@ return {
 				"rust_analyzer", -- Rust
 				"clangd", -- C/C++
 				"buf_ls", -- protobuf
+				"ts_ls", -- typescript
 			},
 			automatic_installation = true,
 		},
