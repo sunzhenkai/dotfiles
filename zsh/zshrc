@@ -94,3 +94,10 @@ if [[ -e "$ENV_INIT_DIR" ]]; then
   source "$ENV_INIT_DIR"
   alias ienv="source $ENV_INIT_DIR" 
 fi
+
+# private config
+PRIVATE_CONFIG_ENV="$HOME/.config/private-config/envs/env"
+if [[ -e "$PRIVATE_CONFIG_ENV" ]]; then
+  source "$PRIVATE_CONFIG_ENV"
+fi
+
