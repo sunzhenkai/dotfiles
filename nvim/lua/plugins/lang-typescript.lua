@@ -101,11 +101,18 @@ return {
 				"jsdoc",
 				"javascript",
 				"typescript",
+				"tsx",
 			},
 		},
 	},
 	{
 		"nvim-treesitter/nvim-treesitter",
-		opts = { ensure_installed = { "ninja", "rst", "python" } },
+		opts = function(_, opts)
+			-- add tsx and treesitter
+			vim.list_extend(opts.ensure_installed, {
+				"tsx",
+				"typescript",
+			})
+		end,
 	},
 }

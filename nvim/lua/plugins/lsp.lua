@@ -66,7 +66,6 @@ return {
 					timeout_ms = nil,
 				},
 				-- LSP Server Settings
-				---@type lspconfig.options
 				servers = {
 					-- c/c++
 					clangd = {
@@ -211,7 +210,7 @@ return {
 						},
 					},
 					-- typescript
-					tsserver = {
+					ts_ls = {
 						filetypes = { "typescript", "typescriptreact", "typescript.tsx" },
 						cmd = { "typescript-language-server", "--stdio" },
 						settings = {
@@ -262,7 +261,11 @@ return {
 				setup = {
 					-- Specify * to use this function as a fallback for any server
 					-- ["*"] = function(server, opts) end,
-
+					-- typescript
+					tsserver = function(_, opts)
+						require("typescript").setup({ server = opts })
+						return true
+					end,
 					-- c/c++/cmake
 					clangd = function(_, opts)
 						local clangd_ext_opts = LazyVim.opts("clangd_extensions.nvim")
