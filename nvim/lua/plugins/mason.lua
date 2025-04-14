@@ -12,6 +12,8 @@ return {
 				"shfmt",
 				"stylua",
 				"sonarlint-language-server",
+				"buf",
+				"protolint",
 			},
 			ui = {
 				icons = {
@@ -35,6 +37,7 @@ return {
 				"gopls", -- Go
 				"rust_analyzer", -- Rust
 				"clangd", -- C/C++
+				"buf_ls", -- protobuf
 			},
 			automatic_installation = true,
 		},

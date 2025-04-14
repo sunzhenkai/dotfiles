@@ -70,6 +70,7 @@ return {
 				servers = {
 					-- c/c++
 					clangd = {
+						filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
 						keys = {
 							{
 								"<leader>ch",
