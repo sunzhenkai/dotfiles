@@ -22,6 +22,11 @@ HOMEBREW_ROOT="/home/linuxbrew/.linuxbrew"
 if [[ -e "$HOMEBREW_ROOT" ]]; then
   eval "$($HOMEBREW_ROOT/bin/brew shellenv)"
 fi
+HOMEBREW_ROOT_MACOS="/opt/homebrew"
+if [[ -e "$HOMEBREW_ROOT_MACOS" ]]; then
+  eval "$($HOMEBREW_ROOT_MACOS/bin/brew shellenv)"
+  export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_FALLBACK_LIBRARY_PATH"
+fi
 BREW_BISON=/opt/homebrew/opt/bison
 if [[ -e "$BREW_BISON" ]]; then
   export PATH="$BREW_BISON/bin:$PATH"
