@@ -2,6 +2,8 @@ export ICONFIG_FLAG=1
 
 export EDITOR="nvim"
 alias vim='nvim'
+alias zlj='zellij'
+alias za='zellij a'
 
 # vi mode
 bindkey -v
