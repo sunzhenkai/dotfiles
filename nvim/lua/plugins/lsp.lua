@@ -3,10 +3,8 @@ return {
 		"neovim/nvim-lspconfig",
 		event = "LazyFile",
 		dependencies = {
-			"mason.nvim",
+			"williamboman/mason.nvim",
 			"williamboman/mason-lspconfig.nvim",
-			-- "hrsh7th/nvim-cmp",
-			-- "hrsh7th/cmp-nvim-lsp",
 			-- c/c++
 			"p00f/clangd_extensions.nvim",
 		},
@@ -198,18 +196,6 @@ return {
 					},
 					-- markdown
 					marksman = {},
-					-- python
-					pylsp = {
-						settings = {
-							pylsp = {
-								plugins = {
-									pylint = { enabled = true },
-									pycodestyle = { maxLineLength = 100 },
-									jedi_completion = { fuzzy = true },
-								},
-							},
-						},
-					},
 					-- typescript
 					ts_ls = {
 						filetypes = { "typescript", "typescriptreact", "typescript.tsx" },

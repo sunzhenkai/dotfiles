@@ -47,7 +47,6 @@ return {
 					css = { "prettier" },
 					javascript = { "prettier" },
 					typescript = { "prettier" },
-					python = { "isort", "black" },
 					proto = { "buf" },
 				},
 				formatters = {
@@ -112,7 +111,6 @@ return {
 				"query",
 				"regex",
 				"toml",
-				"tsx",
 				"vim",
 				"vimdoc",
 				"xml",
@@ -126,6 +124,7 @@ return {
 				"proto",
 				"typescript",
 				"tsx",
+				"python",
 			},
 			incremental_selection = {
 				enable = true,
@@ -191,6 +190,8 @@ return {
 				-- go
 				go = { "golangcilint" },
 				proto = { "protolint" },
+				-- python
+				python = { "ruff" },
 			},
 			-- LazyVim extension to easily override linter options
 			-- or add custom linters.
