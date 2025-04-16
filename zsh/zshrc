@@ -21,6 +21,7 @@ export DEVELOPMENT_ENV=LOCAL
 HOMEBREW_ROOT="/home/linuxbrew/.linuxbrew"
 if [[ -e "$HOMEBREW_ROOT" ]]; then
   eval "$($HOMEBREW_ROOT/bin/brew shellenv)"
+  export LD_LIBRARY_PATH="$(brew --prefix)/lib:$LD_LIBRARY_PATH"
 fi
 HOMEBREW_ROOT_MACOS="/opt/homebrew"
 if [[ -e "$HOMEBREW_ROOT_MACOS" ]]; then
