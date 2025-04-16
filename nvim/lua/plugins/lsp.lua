@@ -1,3 +1,7 @@
+local dft_capabilities = vim.lsp.protocol.make_client_capabilities()
+dft_capabilities.general = dft_capabilities.general or {}
+dft_capabilities.general.positionEncodings = { "utf-16" }
+
 return {
 	{
 		"neovim/nvim-lspconfig",
@@ -49,6 +53,9 @@ return {
 				},
 				-- add any global capabilities here
 				capabilities = {
+					general = {
+						positionEncodings = { "utf-16" },
+					},
 					workspace = {
 						fileOperations = {
 							didRename = true,
@@ -67,14 +74,10 @@ return {
 				servers = {
 					-- Python
 					pyright = {
-						capabilities = {
-							offsetEncoding = { "utf-16" },
-						},
+						capabilities = dft_capabilities,
 					},
 					ruff = {
-						capabilities = {
-							offsetEncoding = { "utf-16" },
-						},
+						capabilities = dft_capabilities,
 						cmd_env = { RUFF_TRACE = "messages" },
 						init_options = {
 							settings = {
@@ -90,9 +93,7 @@ return {
 						},
 					},
 					ruff_lsp = {
-						capabilities = {
-							offsetEncoding = { "utf-16" },
-						},
+						capabilities = dft_capabilities,
 						keys = {
 							{
 								"<leader>co",
@@ -125,9 +126,7 @@ return {
 								"compile_flags.txt"
 							)(fname) or require("lspconfig.util").find_git_ancestor(fname)
 						end,
-						capabilities = {
-							offsetEncoding = { "utf-16" },
-						},
+						capabilities = dft_capabilities,
 						--	"--header-insertion=iwyu",
 						cmd = {
 							"clangd",
@@ -244,6 +243,9 @@ return {
 					yamlls = {
 						-- Have to add this for yamlls to understand that we support line folding
 						capabilities = {
+							general = {
+								offsetEncoding = { "utf-16" },
+							},
 							textDocument = {
 								foldingRange = {
 									dynamicRegistration = false,
@@ -301,8 +303,7 @@ return {
 					gopls = function(_, opts)
 						local has_cmp_nvim_lsp, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
 						if has_cmp_nvim_lsp then
-							local capabilities = cmp_nvim_lsp.default_capabilities()
-							opts.capabilities = vim.tbl_deep_extend("force", opts.capabilities or {}, capabilities)
+							opts.capabilities = vim.tbl_deep_extend("force", opts.capabilities or {}, dft_capabilities)
 						end
 						-- workaround for gopls not supporting semanticTokensProvider
 						-- https://github.com/golang/go/issues/54531#issuecomment-1464982242
@@ -424,7 +425,7 @@ return {
 				vim.lsp.protocol.make_client_capabilities(),
 				has_cmp and cmp_nvim_lsp.default_capabilities() or {},
 				has_blink and blink.get_lsp_capabilities() or {},
-				opts.capabilities or {}
+				opts.capabilities or dft_capabilities
 			)
 
 			local function setup(server)
