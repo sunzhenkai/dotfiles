@@ -12,9 +12,12 @@ return {
 		keys = {
 			{ ",v", "<cmd>VenvSelect<cr>" },
 		},
-		---@type venv-selector.Config
 		opts = {
 			-- Your settings go here
+			name = "venv",
+			auto_refresh = true,
+			search_venv_managers = true,
+			search_workspace = true,
 		},
 	},
 	{
