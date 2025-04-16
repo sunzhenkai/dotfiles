@@ -75,6 +75,14 @@ return {
 					-- Python
 					pyright = {
 						capabilities = dft_capabilities,
+						disableLanguageServices = false,
+						disableOrganizeImports = false,
+						typeCheckingMode = "strict",
+						python = {
+							analysis = {
+								django = true,
+							},
+						},
 					},
 					ruff = {
 						capabilities = dft_capabilities,
