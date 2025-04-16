@@ -65,6 +65,42 @@ return {
 				},
 				-- LSP Server Settings
 				servers = {
+					-- Python
+					pyright = {
+						capabilities = {
+							offsetEncoding = { "utf-16" },
+						},
+					},
+					ruff = {
+						capabilities = {
+							offsetEncoding = { "utf-16" },
+						},
+						cmd_env = { RUFF_TRACE = "messages" },
+						init_options = {
+							settings = {
+								logLevel = "error",
+							},
+						},
+						keys = {
+							{
+								"<leader>co",
+								LazyVim.lsp.action["source.organizeImports"],
+								desc = "Organize Imports",
+							},
+						},
+					},
+					ruff_lsp = {
+						capabilities = {
+							offsetEncoding = { "utf-16" },
+						},
+						keys = {
+							{
+								"<leader>co",
+								LazyVim.lsp.action["source.organizeImports"],
+								desc = "Organize Imports",
+							},
+						},
+					},
 					-- c/c++
 					clangd = {
 						filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
@@ -291,8 +327,17 @@ return {
 						if vim.fn.has("nvim-0.10") == 0 then
 							LazyVim.lsp.on_attach(function(client, _)
 								client.server_capabilities.documentFormattingProvider = true
+								client.server_capabilities.hoverProvider = false
 							end, "yamlls")
 						end
+					end,
+					pyright = function()
+						require("lazyvim.util").lsp.on_attach(function(client, _)
+							if client.name == "pyright" then
+								-- disable hover in favor of jedi-language-server
+								client.server_capabilities.hoverProvider = false
+							end
+						end)
 					end,
 					-- cmp-nvim-lsp config
 					["*"] = function(_, opts)

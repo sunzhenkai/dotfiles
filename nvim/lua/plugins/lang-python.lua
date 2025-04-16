@@ -27,7 +27,7 @@ return {
 			ensure_installed = {
 				"black",
 				"ruff",
-				"python-lsp-server",
+				-- "python-lsp-server",
 				"pyright",
 			},
 		},
@@ -48,94 +48,5 @@ return {
 	{
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "ninja", "rst", "python" } },
-	},
-	{
-		"neovim/nvim-lspconfig",
-		opts = {
-			servers = {
-				ruff = {
-					cmd_env = { RUFF_TRACE = "messages" },
-					init_options = {
-						settings = {
-							logLevel = "error",
-						},
-					},
-					keys = {
-						{
-							"<leader>co",
-							LazyVim.lsp.action["source.organizeImports"],
-							desc = "Organize Imports",
-						},
-					},
-				},
-				ruff_lsp = {
-					keys = {
-						{
-							"<leader>co",
-							LazyVim.lsp.action["source.organizeImports"],
-							desc = "Organize Imports",
-						},
-					},
-				},
-			},
-			setup = {
-				on_attach = function(client, bufnr)
-					client.server_capabilities.hoverProvider = false
-				end,
-			},
-		},
-	},
-	{
-		"neovim/nvim-lspconfig",
-		dependencies = {},
-		opts = {
-			servers = {
-				-- pyright = {},
-				pylsp = {
-					mason = false,
-					settings = {
-						pylsp = {
-							plugins = {
-								rope_autoimport = {
-									enabled = true,
-								},
-							},
-						},
-					},
-				},
-				-- ruff_lsp = {
-				--   -- handlers = {
-				--   --   ["textDocument/publishDiagnostics"] = function() end,
-				--   -- },
-				-- },
-				jedi_language_server = {},
-			},
-			setup = {
-				pylsp = function()
-					LazyVim.lsp.on_attach(function(client, _)
-						if client.name == "pylsp" then
-							-- disable hover in favor of jedi-language-server
-							client.server_capabilities.hoverProvider = false
-						end
-					end)
-				end,
-				-- ruff_lsp = function()
-				--   require("lazyvim.util").lsp.on_attach(function(client, _)
-				--     if client.name == "ruff_lsp" then
-				--       -- Disable hover in favor of Pyright
-				--       client.server_capabilities.hoverProvider = false
-				--     end
-				--   end)
-				-- end,
-				pyright = function()
-					require("lazyvim.util").lsp.on_attach(function(client, _)
-						if client.name == "pyright" then
-							-- disable hover in favor of jedi-language-server
-							client.server_capabilities.hoverProvider = false
-						end
-					end)
-				end,
-			},
-		},
 	},
 }
