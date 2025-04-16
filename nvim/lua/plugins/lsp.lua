@@ -307,6 +307,27 @@ return {
 							end, "yamlls")
 						end
 					end,
+					-- python
+					pylint = function(_, _)
+						local root_dir = vim.fn.getcwd()
+						local venv_path = root_dir .. "/venv/bin/python"
+
+						require("lspconfig").pylint.setup({
+							cmd = {
+								venv_path,
+								"-m",
+								"pylint",
+								"--output-format=text",
+								"--score=no",
+								"--msg-template='{path}:{line}:{column}: {msg_id}: {msg} ({symbol})'",
+							},
+							settings = {
+								pylint = {
+									args = { "--load-plugins=pylint_django" },
+								},
+							},
+						})
+					end,
 					-- cmp-nvim-lsp config
 					["*"] = function(_, opts)
 						local has_cmp_nvim_lsp, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
