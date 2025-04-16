@@ -100,16 +100,6 @@ return {
 							},
 						},
 					},
-					ruff_lsp = {
-						capabilities = dft_capabilities,
-						keys = {
-							{
-								"<leader>co",
-								LazyVim.lsp.action["source.organizeImports"],
-								desc = "Organize Imports",
-							},
-						},
-					},
 					-- c/c++
 					clangd = {
 						filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
