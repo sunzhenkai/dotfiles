@@ -1,35 +1,7 @@
 local wezterm = require("wezterm")
+local C = require("colors")
+local T = require("tools")
 local act = wezterm.action
-
-local gruvbox_light_colors = {
-	bg = "#F9F5D7",
-	bg0 = "#FBF1C7",
-	bg1 = "#EBDBB2",
-	bg2 = "#D5C4A1",
-	bg3 = "#BDAE93",
-	bg4 = "#A89984",
-	gray = "#928374",
-	fg = "#3C3836",
-	fg0 = "#282828",
-	fg1 = "#3C3836",
-	fg2 = "#504945",
-	fg3 = "#665C54",
-	fg4 = "#7C6F64",
-	red = "#9D0006",
-	red1 = "#CC241D",
-	green = "#79740E",
-	green1 = "#98971A",
-	yellow = "#B57614",
-	yellow1 = "#D79921",
-	blue = "#076678",
-	blue1 = "#458588",
-	purple = "#8F3F71",
-	purple1 = "#B16286",
-	aqua = "#427B58",
-	aqua1 = "#689D6A",
-	orange = "#AF3A03",
-	orange1 = "#D65D0E",
-}
 
 local config = {
 	font = wezterm.font_with_fallback({
@@ -47,7 +19,8 @@ local config = {
 	text_background_opacity = 1,
 	show_tab_index_in_tab_bar = false,
 	tab_max_width = 32,
-
+	-- 非 native fullscreen 时, 切回来时会展示 dock
+	native_macos_fullscreen_mode = true,
 	-- disable_default_key_bindings = true,
 }
 
@@ -61,16 +34,16 @@ config.font_rules = {
 
 config.colors = {
 	-- text
-	foreground = gruvbox_light_colors.green1,
+	foreground = C.GruvboxLightColors.green1,
 	tab_bar = {
-		background = gruvbox_light_colors.blue,
+		background = C.GruvboxLightColors.blue,
 		active_tab = {
-			bg_color = gruvbox_light_colors.orange,
-			fg_color = gruvbox_light_colors.bg1,
+			bg_color = C.GruvboxLightColors.orange,
+			fg_color = C.GruvboxLightColors.bg1,
 		},
 		inactive_tab = {
-			bg_color = gruvbox_light_colors.green,
-			fg_color = gruvbox_light_colors.fg0,
+			bg_color = C.GruvboxLightColors.green,
+			fg_color = C.GruvboxLightColors.fg0,
 			italic = true,
 		},
 	},
@@ -95,20 +68,20 @@ end
 local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
 local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
 wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
-	local edge_background = gruvbox_light_colors.blue
-	local background = gruvbox_light_colors.green
-	local foreground = gruvbox_light_colors.fg0
+	local edge_background = C.GruvboxLightColors.blue
+	local background = C.GruvboxLightColors.green
+	local foreground = C.GruvboxLightColors.fg0
 
 	if tab.is_active then
-		background = gruvbox_light_colors.orange
-		foreground = gruvbox_light_colors.bg1
+		background = C.GruvboxLightColors.orange
+		foreground = C.GruvboxLightColors.bg1
 	elseif hover then
-		background = gruvbox_light_colors.green1
-		foreground = gruvbox_light_colors.fg0
+		background = C.GruvboxLightColors.green1
+		foreground = C.GruvboxLightColors.fg0
 	end
 
 	local edge_foreground = background
-	local title = tab_title(tab)
+	local title = T.TabTitle(tab)
 	title = wezterm.truncate_right(title, max_width - 2)
 
 	return {
@@ -129,13 +102,7 @@ wezterm.on("update-right-status", function(window, pane)
 	local hostname = wezterm.hostname()
 	local username = os.getenv("USER") or os.getenv("LOGNAME") or os.getenv("USERNAME")
 	-- https://wezterm.org/config/lua/wezterm.url/Url.html
-	local pwd = ""
-	if pane then
-		pwd = pane:get_current_working_dir()
-		if pwd then
-			pwd = pwd.file_path
-		end
-	end
+	local pwd = T.GetPwdFromPane(pane, 16)
 
 	window:set_right_status(wezterm.format({
 		{ Text = " " .. pwd .. " " },
