@@ -2,7 +2,8 @@
 
 add_newline = false
 # move the rest of the prompt to the right 
-right_format = """$cmd_duration$memory_usage$time$battery$os$localip"""
+#right_format = """$cmd_duration$memory_usage$time$battery$os$localip"""
+right_format = """$cmd_duration"""
 # left prompt
 format = """$all"""
 
@@ -19,7 +20,7 @@ disabled = false
 Ubuntu = ' '
 
 [time]
-disabled = false
+disabled = true
 format = '[$time]($style) '
 
 [git_branch]
@@ -29,7 +30,7 @@ format = '[$symbol$branch(:$remote_branch)]($style) '
 format = '[$duration]($style) '
 
 [memory_usage]
-disabled = false
+disabled = true
 threshold = -1
 format = '[${ram}]($style) '
 
@@ -41,5 +42,5 @@ format = '[$ssh_symbol$hostname]($style) '
 format = '[$user]($style) '
 
 [localip]
-disabled = false
+disabled = true
 format = '[$localipv4]($style)'
