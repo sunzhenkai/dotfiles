@@ -12,6 +12,7 @@ local config = {
 	color_scheme = "GruvboxLight",
 
 	-- tabs
+	enable_tab_bar = false,
 	use_fancy_tab_bar = false,
 	show_new_tab_button_in_tab_bar = false,
 	hide_tab_bar_if_only_one_tab = true,
