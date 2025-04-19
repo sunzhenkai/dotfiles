@@ -1,11 +1,9 @@
 return {
 	{
 		"ellisonleao/gruvbox.nvim",
-		priority = 1000,
+		priority = 1001,
 		config = function()
 			require("gruvbox").setup({})
-			vim.o.background = "light"
-			vim.cmd("colorscheme gruvbox")
 		end,
 		opts = {},
 	},

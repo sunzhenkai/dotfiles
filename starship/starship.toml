@@ -14,7 +14,7 @@ format = """$all"""
 disabled = true
 
 [os]
-disabled = false
+disabled = true
 [os.symbols]
 # FYI: the icon copied from nerd fonts [https://www.nerdfonts.com/cheat-sheet]
 Ubuntu = ' '
