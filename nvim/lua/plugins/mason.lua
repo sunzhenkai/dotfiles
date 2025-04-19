@@ -11,7 +11,6 @@ return {
 				"rust-analyzer",
 				"shfmt",
 				"stylua",
-				"sonarlint-language-server",
 				"buf",
 				"protolint",
 			},

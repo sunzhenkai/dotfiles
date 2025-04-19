@@ -46,7 +46,7 @@ return {
 					json = { "prettier" },
 					css = { "prettier" },
 					javascript = { "prettier" },
-					typescript = { "prettier" },
+					typescript = { "prettier", "ts-standard" },
 					proto = { "buf" },
 				},
 				formatters = {
@@ -192,6 +192,8 @@ return {
 				proto = { "protolint" },
 				-- python
 				python = { "ruff" },
+				typescript = { "ts-standard" },
+				typescriptreact = { "ts-standard" },
 			},
 			-- LazyVim extension to easily override linter options
 			-- or add custom linters.
