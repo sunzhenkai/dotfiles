@@ -91,7 +91,7 @@ local function tab_title(tab_info)
 end
 local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
 local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
-wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
+wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
 	local edge_background = gruvbox_light_colors.blue
 	local background = gruvbox_light_colors.green
 	local foreground = gruvbox_light_colors.fg0
