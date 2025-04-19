@@ -4,6 +4,7 @@ export EDITOR="nvim"
 alias vim='nvim'
 alias zlj='zellij'
 alias za='zellij a'
+alias zs='zellij -s'
 
 # vi mode
 bindkey -v
@@ -49,9 +50,6 @@ fi
 export CARGE_ENV="$HOME/.cargo/env"
 [[ -e ${CARGE_ENV} ]] && source ${CARGE_ENV}
 
-# starship
-command -v starship >/dev/null && eval "$(starship init zsh)"
-
 # vcpkg root
 DEFAULT_VCPKG_ROOT=$HOME/.local/vcpkg
 if [[ "$VCPKG_ROOT" == "" && -e ${DEFAULT_VCPKG_ROOT} ]]; then
@@ -95,13 +93,6 @@ if command -v asdf >/dev/null; then
   fix_asdf_plugin_path python
   fix_asdf_plugin_path golang
   fix_asdf_plugin_path nodejs
-fi
-
-# env init
-ENV_INIT_DIR="$HOME/.local/env-init/env"
-if [[ -e "$ENV_INIT_DIR" ]]; then
-  source "$ENV_INIT_DIR"
-  alias ienv="source $ENV_INIT_DIR" 
 fi
 
 # private config
