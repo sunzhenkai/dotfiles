@@ -1,9 +1,13 @@
 return {
 	{
 		"ellisonleao/gruvbox.nvim",
+		-- "morhetz/gruvbox",
 		priority = 1001,
 		config = function()
-			require("gruvbox").setup({})
+			require("gruvbox").setup({
+				dim_inactive = false,
+				transparent_mode = true,
+			})
 		end,
 		opts = {},
 	},

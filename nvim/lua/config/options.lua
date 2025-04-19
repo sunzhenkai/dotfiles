@@ -10,6 +10,7 @@ vim.opt.softtabstop = 2
 vim.opt.textwidth = 100
 vim.opt.ignorecase = false
 vim.opt.relativenumber = false
+vim.opt.termguicolors = true
 
 vim.g.lazyvim_prettier_needs_config = true
 vim.g.lazyvim_picker = "telescope"
