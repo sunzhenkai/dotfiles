@@ -55,6 +55,3 @@ require("lazy").setup({
 		},
 	},
 })
-
--- theme config
--- vim.o.background = "light"

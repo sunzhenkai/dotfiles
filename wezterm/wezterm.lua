@@ -47,6 +47,8 @@ local config = {
 	text_background_opacity = 1,
 	show_tab_index_in_tab_bar = false,
 	tab_max_width = 32,
+
+	-- disable_default_key_bindings = true,
 }
 
 config.font_rules = {
