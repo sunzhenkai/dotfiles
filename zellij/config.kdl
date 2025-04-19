@@ -148,6 +148,8 @@ keybinds clear-defaults=true {
         bind "Ctrl b" { Write 2; SwitchToMode "Normal"; }
         bind "\"" { NewPane "Down"; SwitchToMode "Normal"; }
         bind "%" { NewPane "Right"; SwitchToMode "Normal"; }
+        bind "-" { NewPane "Down"; SwitchToMode "Normal"; }
+        bind "_" { NewPane "Right"; SwitchToMode "Normal"; }       
         bind "z" { ToggleFocusFullscreen; SwitchToMode "Normal"; }
         bind "c" { NewTab; SwitchToMode "Normal"; }
         bind "," { SwitchToMode "RenameTab"; }
@@ -203,9 +205,9 @@ keybinds clear-defaults=true {
     shared_except "move" "locked" {
         bind "Ctrl h" { SwitchToMode "Move"; }
     }
-    // shared_except "tmux" "locked" {
-    //     bind "Ctrl b" { SwitchToMode "Tmux"; }
-    // }
+    shared_except "tmux" "locked" {
+        bind "Ctrl b" { SwitchToMode "Tmux"; }
+    }
 
     // NOTE: custome setting
     unbind "Ctrl n"
