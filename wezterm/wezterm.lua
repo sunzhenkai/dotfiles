@@ -81,6 +81,50 @@ config.window_padding = {
 	bottom = 0,
 }
 
+local function tab_title(tab_info)
+	local title = tab_info.tab_title
+	if title and #title > 0 then
+		return title
+	else
+		return tab_info.active_pane.title
+	end
+end
+local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
+local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
+wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
+	local edge_background = gruvbox_light_colors.blue
+	local background = gruvbox_light_colors.green
+	local foreground = gruvbox_light_colors.fg0
+
+	if tab.is_active then
+		background = gruvbox_light_colors.orange
+		foreground = gruvbox_light_colors.bg1
+	elseif hover then
+		background = gruvbox_light_colors.green1
+		foreground = gruvbox_light_colors.fg0
+	end
+
+	local edge_foreground = background
+
+	local title = tab_title(tab)
+
+	-- ensure that the titles fit in the available space,
+	-- and that we have room for the edges.
+	title = wezterm.truncate_right(title, max_width - 2)
+
+	return {
+		{ Background = { Color = edge_background } },
+		{ Foreground = { Color = edge_foreground } },
+		{ Text = SOLID_LEFT_ARROW },
+		{ Background = { Color = background } },
+		{ Foreground = { Color = foreground } },
+		{ Text = title },
+		{ Background = { Color = edge_background } },
+		{ Foreground = { Color = edge_foreground } },
+		{ Text = SOLID_RIGHT_ARROW },
+	}
+end)
+
 wezterm.on("update-right-status", function(window, pane)
 	local date = wezterm.strftime("%H:%M:%S")
 	local hostname = wezterm.hostname()
@@ -100,7 +144,7 @@ config.inactive_pane_hsb = {
 }
 
 -- keys
-config.leader = { key = "n", mods = "CTRL" }
+config.leader = { key = "i", mods = "CTRL" }
 
 config.keys = {
 	{ key = "c", mods = "LEADER", action = wezterm.action.ActivateCommandPalette },
