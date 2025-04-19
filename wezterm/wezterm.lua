@@ -1,45 +1,126 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
 
+local gruvbox_light_colors = {
+	bg = "#F9F5D7",
+	bg0 = "#FBF1C7",
+	bg1 = "#EBDBB2",
+	bg2 = "#D5C4A1",
+	bg3 = "#BDAE93",
+	bg4 = "#A89984",
+	gray = "#928374",
+	fg = "#3C3836",
+	fg0 = "#282828",
+	fg1 = "#3C3836",
+	fg2 = "#504945",
+	fg3 = "#665C54",
+	fg4 = "#7C6F64",
+	red = "#9D0006",
+	red1 = "#CC241D",
+	green = "#79740E",
+	green1 = "#98971A",
+	yellow = "#B57614",
+	yellow1 = "#D79921",
+	blue = "#076678",
+	blue1 = "#458588",
+	purple = "#8F3F71",
+	purple1 = "#B16286",
+	aqua = "#427B58",
+	aqua1 = "#689D6A",
+	orange = "#AF3A03",
+	orange1 = "#D65D0E",
+}
+
 local config = {
-	font = wezterm.font("Maple Mono", { weight = "Bold" }),
+	font = wezterm.font_with_fallback({
+		{ family = "Maple Mono NF CN", weight = "Bold" },
+		{ family = "Maple Mono", weight = "Bold" },
+	}),
 	font_size = 18,
 	color_scheme = "GruvboxLight",
 
 	-- tabs
 	use_fancy_tab_bar = false,
-	-- hide_tab_bar_if_only_one_tab = true,
-	-- tab_bar_at_bottom = true,
+	show_new_tab_button_in_tab_bar = false,
+	hide_tab_bar_if_only_one_tab = true,
+	tab_bar_at_bottom = true,
+	text_background_opacity = 1,
+	show_tab_index_in_tab_bar = false,
+}
 
-	text_background_opacity = 0.3,
+config.font_rules = {
+	{
+		intensity = "Half",
+		italic = false,
+		font = config.font,
+	},
+}
+
+config.colors = {
+	-- text
+	foreground = gruvbox_light_colors.green1,
+	tab_bar = {
+		background = gruvbox_light_colors.blue,
+		active_tab = {
+			bg_color = gruvbox_light_colors.orange,
+			fg_color = gruvbox_light_colors.bg1,
+		},
+		inactive_tab = {
+			bg_color = gruvbox_light_colors.green,
+			fg_color = gruvbox_light_colors.fg0,
+			italic = true,
+		},
+	},
 }
 
 -- affect when using fancy tab bar
-config.window_frame = {
-	font = wezterm.font("Maple Mono", { italic = true }),
-	font_size = 15,
+config.window_padding = {
+	left = 0,
+	right = 0,
+	top = 0,
+	bottom = 0,
 }
 
 wezterm.on("update-right-status", function(window, pane)
 	local date = wezterm.strftime("%H:%M:%S")
 	local hostname = wezterm.hostname()
-	-- local table = window:active_key_table()
-	-- if table then
-	-- 	table = "T[" .. table .. "]"
-	-- end
 
 	window:set_right_status(wezterm.format({
-		{ Foreground = { Color = "#ffffff" } },
-		-- { Background = { Color = "#005f5f" } },
+		{ Text = " " },
 		{ Text = date },
-		{ Text = " | " },
+		{ Text = " " },
 		{ Text = hostname },
 		{ Text = " " },
 	}))
 end)
 
+config.inactive_pane_hsb = {
+	saturation = 0.95,
+	brightness = 0.95,
+}
+
+-- keys
 config.leader = { key = "n", mods = "CTRL" }
+
 config.keys = {
+	{ key = "c", mods = "LEADER", action = wezterm.action.ActivateCommandPalette },
+	-- scroll
+	{ key = "[", mods = "LEADER", action = act.ScrollByPage(-0.5) },
+	{ key = "]", mods = "LEADER", action = act.ScrollByPage(0.5) },
+	-- copy mode
+	-- press ctrl+v again to select rectangle area
+	{ key = "v", mods = "LEADER", action = wezterm.action.ActivateCopyMode },
+	-- panes
+	{
+		key = "\\",
+		mods = "LEADER",
+		action = wezterm.action.SplitHorizontal({ domain = "CurrentPaneDomain" }),
+	},
+	{
+		key = "-",
+		mods = "LEADER",
+		action = wezterm.action.SplitVertical({ domain = "CurrentPaneDomain" }),
+	},
 	{
 		key = "r",
 		mods = "LEADER",
@@ -56,8 +137,11 @@ config.keys = {
 			timeout_milliseconds = 1000,
 		}),
 	},
+	{ key = "h", mods = "LEADER", action = act.ActivatePaneDirection("Left") },
+	{ key = "l", mods = "LEADER", action = act.ActivatePaneDirection("Right") },
+	{ key = "k", mods = "LEADER", action = act.ActivatePaneDirection("Up") },
+	{ key = "j", mods = "LEADER", action = act.ActivatePaneDirection("Down") },
 }
-
 config.key_tables = {
 	resize = {
 		{ key = "LeftArrow", action = act.AdjustPaneSize({ "Left", 1 }) },
