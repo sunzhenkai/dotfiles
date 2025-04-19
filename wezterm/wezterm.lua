@@ -43,9 +43,10 @@ local config = {
 	use_fancy_tab_bar = false,
 	show_new_tab_button_in_tab_bar = false,
 	hide_tab_bar_if_only_one_tab = true,
-	tab_bar_at_bottom = true,
+	-- tab_bar_at_bottom = false,
 	text_background_opacity = 1,
 	show_tab_index_in_tab_bar = false,
+	tab_max_width = 32,
 }
 
 config.font_rules = {
@@ -105,11 +106,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
 	end
 
 	local edge_foreground = background
-
 	local title = tab_title(tab)
-
-	-- ensure that the titles fit in the available space,
-	-- and that we have room for the edges.
 	title = wezterm.truncate_right(title, max_width - 2)
 
 	return {
@@ -128,13 +125,21 @@ end)
 wezterm.on("update-right-status", function(window, pane)
 	local date = wezterm.strftime("%H:%M:%S")
 	local hostname = wezterm.hostname()
+	local username = os.getenv("USER") or os.getenv("LOGNAME") or os.getenv("USERNAME")
+	-- https://wezterm.org/config/lua/wezterm.url/Url.html
+	local pwd = ""
+	if pane then
+		pwd = pane:get_current_working_dir()
+		if pwd then
+			pwd = pwd.file_path
+		end
+	end
 
 	window:set_right_status(wezterm.format({
-		{ Text = " " },
-		{ Text = date },
-		{ Text = " " },
-		{ Text = hostname },
-		{ Text = " " },
+		{ Text = " " .. pwd .. " " },
+		{ Text = " " .. username .. "@" },
+		{ Text = hostname .. " " },
+		{ Text = "󱑂 " .. date .. " " },
 	}))
 end)
 
