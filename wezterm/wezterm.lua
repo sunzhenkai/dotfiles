@@ -15,7 +15,7 @@ local config = {
 	use_fancy_tab_bar = false,
 	show_new_tab_button_in_tab_bar = false,
 	hide_tab_bar_if_only_one_tab = true,
-	tab_bar_at_bottom = true,
+	-- tab_bar_at_bottom = true,
 	text_background_opacity = 1,
 	show_tab_index_in_tab_bar = false,
 	tab_max_width = 32,
@@ -34,7 +34,7 @@ config.font_rules = {
 
 config.colors = {
 	-- text
-	foreground = C.GruvboxLightColors.green1,
+	-- foreground = C.GruvboxLightColors.green1,
 	tab_bar = {
 		background = C.GruvboxLightColors.blue,
 		active_tab = {
@@ -57,14 +57,6 @@ config.window_padding = {
 	bottom = 0,
 }
 
-local function tab_title(tab_info)
-	local title = tab_info.tab_title
-	if title and #title > 0 then
-		return title
-	else
-		return tab_info.active_pane.title
-	end
-end
 local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
 local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
 wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
@@ -105,6 +97,7 @@ wezterm.on("update-right-status", function(window, pane)
 	local pwd = T.GetPwdFromPane(pane, 16)
 
 	window:set_right_status(wezterm.format({
+		{ Foreground = { Color = C.GruvboxLightColors.bg1 } },
 		{ Text = " " .. pwd .. " " },
 		{ Text = " " .. username .. "@" },
 		{ Text = hostname .. " " },
