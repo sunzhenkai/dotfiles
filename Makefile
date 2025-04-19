@@ -1,4 +1,4 @@
-.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi
+.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi wezterm
 
 TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
@@ -29,6 +29,8 @@ zellij:
 	$(call install_config,zellij,~/.config/zellij)
 ghostty:
 	$(call install_config,ghostty,~/.config/ghostty)
+wezterm:
+	$(call install_config,wezterm,~/.config/wezterm)
 zsh:
 	@# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
 	$(call install_config,zsh,~/.config/zsh)
