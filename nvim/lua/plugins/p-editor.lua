@@ -127,6 +127,16 @@ return {
 						"--linelength=100",
 					},
 				},
+				eslint_d = {
+					cmd = "eslint_d",
+					args = { "--stdin", "--stdin-filename", "%filepath" },
+					stream = "stderr",
+					ignore_exitcode = true,
+					parser = require("lint.parser").from_errorformat("%f:%l:%c: %m", {
+						source = "eslint_d",
+						severity = vim.diagnostic.severity.WARN,
+					}),
+				},
 			},
 		},
 	},
