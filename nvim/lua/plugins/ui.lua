@@ -1,6 +1,7 @@
 return {
 	{
 		"ellisonleao/gruvbox.nvim",
+		enabled = false,
 		-- "morhetz/gruvbox",
 		priority = 1001,
 		config = function()
@@ -10,6 +11,13 @@ return {
 			})
 		end,
 		opts = {},
+	},
+	{
+		"rose-pine/neovim",
+		name = "rose-pine",
+		config = function()
+			vim.cmd("colorscheme rose-pine-dawn")
+		end,
 	},
 	{
 		"nvim-neo-tree/neo-tree.nvim",

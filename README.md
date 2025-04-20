@@ -26,12 +26,16 @@ ii zsh -c
 # Workflow
 
 - Local
-  - Kitty
+  - Wezterm
   - zsh
     - Oh My Zsh
     - Starship
+  - asdf
   - Homebrew
   - NVM
 - Remote
-  - Zellij
+  - Tmux / Zellij
   - Neovim
+
+# ColorScheme
+- [rose pine](https://rosepinetheme.com/)
