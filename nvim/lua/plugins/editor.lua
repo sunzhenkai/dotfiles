@@ -40,14 +40,17 @@ return {
 					sh = { "shfmt" },
 					c = { "clang_format" },
 					cpp = { "clang_format" },
-					go = { "goimports", "gofmt" },
+					go = { "gofumpt", "goimports-reviser" },
 					markdown = { "prettier", "markdownlint-cli2" },
 					yaml = { "yamlfmt" },
 					toml = { "taplo" },
 					json = { "prettier" },
 					css = { "prettier" },
-					javascript = { "prettier" },
-					typescript = { "prettier", "ts-standard" },
+					python = { "black", "ruff" },
+					typescriptreact = { "eslint_d" },
+					typescript = { "eslint_d" },
+					javascript = { "eslint_d" },
+					javascriptreact = { "eslint_d" },
 					proto = { "buf" },
 				},
 				formatters = {
@@ -56,6 +59,10 @@ return {
 					},
 					clang_format = {
 						prepend_args = { "--style=file", "--fallback-style=google", "--verbose" },
+					},
+					-- python
+					black = {
+						prepend_args = { "--line-length", "100" },
 					},
 				},
 			},
@@ -193,8 +200,10 @@ return {
 				proto = { "protolint" },
 				-- python
 				python = { "ruff" },
-				typescript = { "ts-standard" },
-				typescriptreact = { "ts-standard" },
+				typescriptreact = { "eslint_d" },
+				typescript = { "eslint_d" },
+				javascript = { "eslint_d" },
+				javascriptreact = { "eslint_d" },
 			},
 			-- LazyVim extension to easily override linter options
 			-- or add custom linters.

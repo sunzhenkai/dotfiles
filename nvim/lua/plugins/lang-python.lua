@@ -33,19 +33,6 @@ return {
 		},
 	},
 	{
-		"stevearc/conform.nvim",
-		opts = {
-			formatters_by_ft = {
-				python = { "black", "ruff" },
-			},
-			formatters = {
-				black = {
-					prepend_args = { "--line-length", "100" },
-				},
-			},
-		},
-	},
-	{
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "ninja", "rst", "python" } },
 	},

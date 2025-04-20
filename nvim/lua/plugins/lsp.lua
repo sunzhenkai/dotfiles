@@ -3,12 +3,15 @@ dft_capabilities.general = dft_capabilities.general or {}
 dft_capabilities.general.positionEncodings = { "utf-16" }
 
 return {
+	-- neovim/nvim-lspconfig
+	-- REF1 https://github.com/walissonsilva/nvim/blob/main/lua/wals/plugins/lsp/lspconfig.lua
 	{
 		"neovim/nvim-lspconfig",
 		event = "LazyFile",
 		dependencies = {
 			"williamboman/mason.nvim",
 			"williamboman/mason-lspconfig.nvim",
+			"hrsh7th/cmp-nvim-lsp",
 			-- c/c++
 			"p00f/clangd_extensions.nvim",
 		},
@@ -277,6 +280,7 @@ return {
 							},
 						},
 					},
+					tsserver = {},
 				},
 				-- you can do any additional lsp server setup here
 				-- return true if you don't want this server to be setup with lspconfig
@@ -286,7 +290,16 @@ return {
 					-- ["*"] = function(server, opts) end,
 					-- typescript
 					tsserver = function(_, opts)
-						require("typescript").setup({ server = opts })
+						require("lspconfig").tsserver.setup(vim.tbl_deep_extend("force", opts, {
+							filetypes = { "typescript", "typescriptreact", "javascript", "javascriptreact" },
+							on_attach = function(client, bufnr)
+								-- Disable built-in formatting in tsserver
+								client.server_capabilities.documentFormattingProvider = false
+								client.server_capabilities.documentRangeFormattingProvider = false
+								-- Call LazyVim's on_attach
+								require("lazyvim.util").on_attach(client, bufnr)
+							end,
+						}))
 						return true
 					end,
 					-- c/c++/cmake
@@ -419,11 +432,11 @@ return {
 			local has_blink, blink = pcall(require, "blink.cmp")
 			local capabilities = vim.tbl_deep_extend(
 				"force",
-				{},
+				dft_capabilities,
 				vim.lsp.protocol.make_client_capabilities(),
 				has_cmp and cmp_nvim_lsp.default_capabilities() or {},
 				has_blink and blink.get_lsp_capabilities() or {},
-				opts.capabilities or dft_capabilities
+				opts.capabilities or {}
 			)
 
 			local function setup(server)

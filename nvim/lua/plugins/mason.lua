@@ -13,6 +13,9 @@ return {
 				"stylua",
 				"buf",
 				"protolint",
+				-- typescript
+				"typescript-language-server",
+				"eslint_d",
 			},
 			ui = {
 				icons = {
