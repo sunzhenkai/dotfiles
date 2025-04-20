@@ -1,23 +1,17 @@
 return {
 	{
 		"ellisonleao/gruvbox.nvim",
-		enabled = false,
-		-- "morhetz/gruvbox",
-		priority = 1001,
+		priority = 1010,
 		config = function()
 			require("gruvbox").setup({
+				terminal_colors = false,
 				dim_inactive = false,
 				transparent_mode = true,
 			})
+			vim.o.background = "light"
+			vim.cmd([[colorscheme gruvbox]])
 		end,
 		opts = {},
-	},
-	{
-		"rose-pine/neovim",
-		name = "rose-pine",
-		config = function()
-			vim.cmd("colorscheme rose-pine-dawn")
-		end,
 	},
 	{
 		"nvim-neo-tree/neo-tree.nvim",
