@@ -1,9 +1,5 @@
 return {
 	{
-		"saghen/blink.cmp",
-		enabled = true,
-	},
-	{
 		"hrsh7th/nvim-cmp",
 		enabled = true,
 		dependencies = {
