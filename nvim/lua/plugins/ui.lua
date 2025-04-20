@@ -3,11 +3,7 @@ return {
 		"ellisonleao/gruvbox.nvim",
 		priority = 1010,
 		config = function()
-			require("gruvbox").setup({
-				terminal_colors = false,
-				dim_inactive = false,
-				transparent_mode = true,
-			})
+			require("gruvbox").setup()
 			vim.o.background = "light"
 			vim.cmd([[colorscheme gruvbox]])
 		end,

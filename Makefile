@@ -4,12 +4,12 @@ TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
 
 define backup_config
-	@if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi
+	if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi
 endef
 
 define install_config
-	@$(call backup_config,$(2))
-	@ln -s $(PWD)/$(1) $(2)
+	@if [ "$(shell realpath $(PWD)/$(1))" != "$(shell realpath $(2))" ]; then ($(call backup_config,$(2))); fi
+	@if [ ! -e "$(shell realpath $(2))" ]; then ln -s $(PWD)/$(1) $(2); echo "install $(1)"; fi
 endef
 
 all: starship nvim kitty tmux alacritty zellij ghostty zsh
@@ -21,7 +21,6 @@ kitty:
 	$(call install_config,kitty,~/.config/kitty)
 tmux:
 	$(call install_config,tmux,~/.config/tmux)
-	$(call install_config,tmux/tmux.conf,~/.tmux.conf)
 alacritty:
 	$(call install_config,alacritty,~/.config/alacritty)
 zellij:
