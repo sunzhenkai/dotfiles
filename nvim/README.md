@@ -5,7 +5,7 @@
 ```shell
 brew install fzf ripgrep luarocks lazygit hunspell imagemagick fd tectonic ghostscript
 
-npm install -g yarn 
+npm install -g yarn
 npm install -g @mermaid-js/mermaid-cli
 
 # ubuntu
@@ -56,7 +56,21 @@ DAP(Debug Adapter Protocol) 是一个用于调试程序的协议，允许调试�
 2. 使用 nvim-dap 插件进行配置。
 3. 利用按键映射进行调试操作（如设置断点、启动调试等）。
 
+# 自定义
+
+以下字段 Lazyvim 的默认设置会和多个配置文件的相同字段合并：
+
+- cmd
+- event
+- ft
+- keys
+- opts
+- dependencies
+
+除此之外的其他字段，自己配置的会覆盖默认配置.
+
 # 检查
+
 ```shell
 :checkhealth # 检查所有插件
 ```
@@ -64,4 +78,3 @@ DAP(Debug Adapter Protocol) 是一个用于调试程序的协议，允许调试�
 # References
 
 - [zjp-cn nvim0.6-blogs](https://zjp-cn.github.io/neovim0.6-blogs/index.html)
-

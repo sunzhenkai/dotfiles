@@ -67,4 +67,37 @@ return {
 			map("n", "<A-b>", "<Cmd>BufferCloseAllButCurrent<CR>", opts)
 		end,
 	},
+	{
+		"echasnovski/mini.icons",
+		opts = {
+			file = {
+				[".eslintrc.js"] = { glyph = "󰱺", hl = "MiniIconsYellow" },
+				[".node-version"] = { glyph = "", hl = "MiniIconsGreen" },
+				[".prettierrc"] = { glyph = "", hl = "MiniIconsPurple" },
+				[".yarnrc.yml"] = { glyph = "", hl = "MiniIconsBlue" },
+				["eslint.config.js"] = { glyph = "󰱺", hl = "MiniIconsYellow" },
+				["package.json"] = { glyph = "", hl = "MiniIconsGreen" },
+				["tsconfig.json"] = { glyph = "", hl = "MiniIconsAzure" },
+				["tsconfig.build.json"] = { glyph = "", hl = "MiniIconsAzure" },
+				["yarn.lock"] = { glyph = "", hl = "MiniIconsBlue" },
+			},
+		},
+	},
+	{
+		"folke/snacks.nvim",
+		keys = {
+			{ "<leader>e", false },
+			{ "<leader>E", false },
+		},
+	},
+	{
+		"nvim-neo-tree/neo-tree.nvim",
+		enabled = true,
+		dependencies = {
+			"nvim-lua/plenary.nvim",
+			"nvim-tree/nvim-web-devicons", -- not strictly required, but recommended
+			"MunifTanjim/nui.nvim",
+			-- {"3rd/image.nvim", opts = {}}, -- Optional image support in preview window: See `# Preview Mode` for more information
+		},
+	},
 }

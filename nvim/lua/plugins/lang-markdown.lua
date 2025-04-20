@@ -8,4 +8,6 @@ return {
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "markdown", "markdown_inline" } },
 	},
+	{ "markdown-preview.nvim" },
+	{ "MeanderingProgrammer/render-markdown.nvim" },
 }
