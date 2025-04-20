@@ -95,11 +95,11 @@ wezterm.on("update-right-status", function(window, pane)
 	local hostname = wezterm.hostname()
 	local username = os.getenv("USER") or os.getenv("LOGNAME") or os.getenv("USERNAME")
 	-- https://wezterm.org/config/lua/wezterm.url/Url.html
-	local pwd = T.GetPwdFromPane(pane, 16)
+	-- local pwd = T.GetPwdFromPane(pane, 16)
 
 	window:set_right_status(wezterm.format({
 		{ Foreground = { Color = C.GruvboxLightColors.bg1 } },
-		{ Text = " " .. pwd .. " " },
+		-- { Text = " " .. pwd .. " " },
 		{ Text = " " .. username .. "@" },
 		{ Text = hostname .. " " },
 		{ Text = "󱑂 " .. date .. " " },
