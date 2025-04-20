@@ -2,6 +2,7 @@ return {
 	{
 		-- https://github.com/yetone/avante.nvim
 		"yetone/avante.nvim",
+		enabled = false,
 		event = "VeryLazy",
 		version = false, -- Never set this value to "*"! Never!
 		opts = {
