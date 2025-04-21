@@ -84,13 +84,6 @@ return {
 		},
 	},
 	{
-		"folke/snacks.nvim",
-		keys = {
-			{ "<leader>e", false },
-			{ "<leader>E", false },
-		},
-	},
-	{
 		"nvim-neo-tree/neo-tree.nvim",
 		enabled = true,
 		dependencies = {
