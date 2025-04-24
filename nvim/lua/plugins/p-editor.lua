@@ -124,7 +124,7 @@ return {
 					args = {
 						"--filter=-legal/copyright,-build/include_subdir",
 						-- set line length, the default value is 80
-						"--linelength=100",
+						"--linelength=120",
 					},
 				},
 				eslint_d = {

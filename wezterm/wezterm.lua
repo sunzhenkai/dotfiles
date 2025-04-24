@@ -112,7 +112,7 @@ config.inactive_pane_hsb = {
 }
 
 -- keys
-config.leader = { key = "i", mods = "CTRL" }
+config.leader = { key = "a", mods = "CTRL" }
 
 config.keys = {
 	{ key = "c", mods = "LEADER", action = wezterm.action.ActivateCommandPalette },
