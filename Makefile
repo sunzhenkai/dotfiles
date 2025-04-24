@@ -1,4 +1,4 @@
-.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi wezterm
+.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi wezterm helix
 
 TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
@@ -34,6 +34,8 @@ zsh:
 	$(call install_config,zsh,~/.config/zsh)
 yazi:
 	$(call install_config,yazi,~/.config/yazi)
+helix:
+	$(call install_config,helix,~/.config/helix)
 
 # personal configs of mine
 git:

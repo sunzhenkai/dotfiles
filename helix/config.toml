@@ -1,4 +1,4 @@
 theme = "gruvbox_light"
 
 [editor]
-cursor-line = true
+cursorline = true
