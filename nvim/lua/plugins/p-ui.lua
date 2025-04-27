@@ -11,6 +11,7 @@ return {
 	},
 	{
 		"romgrk/barbar.nvim",
+		enabled = true,
 		dependencies = {
 			"nvim-tree/nvim-web-devicons", -- patched fonts support
 			"lewis6991/gitsigns.nvim", -- display git status
@@ -23,7 +24,7 @@ return {
 
 			barbar.setup({
 				clickable = true, -- Enables/disables clickable tabs
-				tabpages = false, -- Enable/disables current/total tabpages indicator (top right corner)
+				tabpages = true, -- Enable/disables current/total tabpages indicator (top right corner)
 				insert_at_end = true,
 				icons = {
 					button = "",
@@ -39,7 +40,6 @@ return {
 			})
 
 			-- key maps
-
 			local map = vim.api.nvim_set_keymap
 			local opts = { noremap = true, silent = true }
 
