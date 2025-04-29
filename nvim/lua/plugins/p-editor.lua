@@ -122,7 +122,7 @@ return {
 				-- c/c++/cmake
 				cpplint = {
 					args = {
-						"--filter=-legal/copyright,-build/include_subdir",
+						"--filter=-legal/copyright,-build/include_subdir,-runtime/indentation_namespace",
 						-- set line length, the default value is 80
 						"--linelength=120",
 					},

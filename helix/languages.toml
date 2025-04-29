@@ -1,2 +1,41 @@
 [[language]]
 name = "cpp"
+file-types = [
+  "cc",
+  "hh",
+  "c++",
+  "cpp",
+  "hpp",
+  "h",
+  "ipp",
+  "tpp",
+  "cxx",
+  "hxx",
+  "ixx",
+  "txx",
+  "C",
+  "H",
+  "cu",
+  "cuh",
+  "cppm",
+  "h++",
+  "ii",
+  "inl",
+]
+injection-regex = "cpp"
+roots = ["compile_commands.json", ".git"]
+indent = { tab-width = 2, unit = "  " }
+auto-format = true
+formatter = { command = "clang-format", args = ["--style=file"] }
+diagnostic-severity = "warning"
+persistent-diagnostic-sources = ["clangd"]
+
+[language-server.clangd]
+command = "clangd"
+args = [
+  "--background-index",
+  "--clang-tidy",
+  "--completion-style=detailed",
+  "--fallback-style=LLVM",
+]
+config = { fallbackFlags = ["-std=c++20"] }

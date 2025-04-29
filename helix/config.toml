@@ -2,3 +2,5 @@ theme = "gruvbox_light"
 
 [editor]
 cursorline = true
+true-color = true
+auto-completion = true
