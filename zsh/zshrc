@@ -46,10 +46,6 @@ fi
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
 #[[ ! -f $Z10K_CONFIG ]] || source $Z10K_CONFIG
 
-# cargo
-export CARGE_ENV="$HOME/.cargo/env"
-[[ -e ${CARGE_ENV} ]] && source ${CARGE_ENV}
-
 # vcpkg root
 DEFAULT_VCPKG_ROOT=$HOME/.local/vcpkg
 if [[ "$VCPKG_ROOT" == "" && -e ${DEFAULT_VCPKG_ROOT} ]]; then
@@ -100,4 +96,9 @@ PRIVATE_CONFIG_ENV="$HOME/.config/private-config/envs/env"
 if [[ -e "$PRIVATE_CONFIG_ENV" ]]; then
   source "$PRIVATE_CONFIG_ENV"
 fi
+
+# cargo
+# put cargo at the end, and it will sometimes build the nightly version 
+export CARGE_ENV="$HOME/.cargo/env"
+[[ -e ${CARGE_ENV} ]] && source ${CARGE_ENV}
 
