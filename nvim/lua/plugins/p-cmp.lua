@@ -1,16 +1,21 @@
 return {
+	{ "rafamadriz/friendly-snippets" },
 	{
-		"rafamadriz/friendly-snippets",
-		enabled = true,
+		"garymjr/nvim-snippets",
+		opts = {
+			friendly_snippets = true,
+		},
+		dependencies = { "rafamadriz/friendly-snippets" },
 	},
 	{
 		"hrsh7th/nvim-cmp",
 		enabled = true,
-	},
-	{
-		"saghen/blink.cmp",
-	},
-	{
-		"L3MON4D3/LuaSnip",
+		dependencies = {
+			"hrsh7th/cmp-nvim-lsp",
+			"hrsh7th/cmp-buffer",
+			"hrsh7th/cmp-path",
+			"rafamadriz/friendly-snippets",
+			"garymjr/nvim-snippets",
+		},
 	},
 }
