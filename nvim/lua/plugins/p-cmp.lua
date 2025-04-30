@@ -1,11 +1,16 @@
 return {
 	{
+		"rafamadriz/friendly-snippets",
+		enabled = true,
+	},
+	{
 		"hrsh7th/nvim-cmp",
 		enabled = true,
-		dependencies = {
-			"hrsh7th/cmp-nvim-lsp",
-			"hrsh7th/cmp-buffer",
-			"hrsh7th/cmp-path",
-		},
+	},
+	{
+		"saghen/blink.cmp",
+	},
+	{
+		"L3MON4D3/LuaSnip",
 	},
 }

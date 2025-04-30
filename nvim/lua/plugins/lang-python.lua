@@ -29,6 +29,7 @@ return {
 				"ruff",
 				-- "python-lsp-server",
 				"pyright",
+				"debugpy",
 			},
 		},
 	},
