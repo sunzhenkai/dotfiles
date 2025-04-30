@@ -100,3 +100,9 @@ keymap.set("v", "<leader>p", '"+p', {
 	silent = true, -- 静默执行
 	desc = "Paste from system clipboard", -- 可选的描述
 })
+
+-- window size
+vim.keymap.set("n", "<C-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Height" })
+vim.keymap.set("n", "<C-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
+vim.keymap.set("n", "<C-h>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
+vim.keymap.set("n", "<C-l>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
