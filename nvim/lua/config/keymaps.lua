@@ -5,10 +5,10 @@ local keymap = vim.keymap
 keymap.set("i", "ii", "<ESC>")
 
 -- Diagnostics
-keymap.set("n", "<C-j>", function()
+keymap.set("n", "<C-n>", function()
 	vim.diagnostic.goto_next({ severity = { min = vim.diagnostic.severity.WARN } })
 end)
-keymap.set("n", "<C-l>", function()
+keymap.set("n", "<C-m>", function()
 	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
 end)
 
