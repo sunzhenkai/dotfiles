@@ -32,19 +32,23 @@ common_init() {
 ubuntu_init() {
   echo "---- ubuntu init ----"
   ii ubuntu -c
-  # homebrew
-  ii homebrew -i
-  ii homebrew -c
-  # asdf
-  ii asdf -i
-  ii asdf -c
-  # zsh
-  ii zsh -c
 }
 
 arch_init() {
   echo "---- arch init ----"
   ii arch -c
+}
+
+post_init() {
+  echo "---- post init ----"
+  # install
+  ii homebrew -i
+  # config
+  ii zsh -c
+  . ~/.zshrc
+  ii homebrew -c
+  ii asdf -i
+  ii asdf -c
 }
 
 osx_init() {
@@ -75,3 +79,5 @@ darwin)
   exit 1
   ;;
 esac
+
+post_init
