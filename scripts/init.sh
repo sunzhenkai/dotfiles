@@ -19,7 +19,6 @@ prepare() {
 common_init() {
   echo "---- common init ----"
   ./init/activate
-  which ii
   . ~/.local/env-init/env
 
   . init/scripts/tool.sh
@@ -40,7 +39,8 @@ ubuntu_init() {
 }
 
 arch_init() {
-  echo "arch"
+  echo "---- arch init ----"
+  ii arch -c
 }
 
 osx_init() {
