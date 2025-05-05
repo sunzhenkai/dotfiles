@@ -11,8 +11,19 @@ else
   exit 1
 fi
 
+install_fonts() {
+  cd assets/fonts
+  for f in *.tar.gz; do tar -xzf "$f"; done
+  sudo mkdir -p /usr/share/fonts/local
+  sudo mv *.ttf /usr/share/fonts/local/
+  sudo fc-cache -fv
+}
+
 prepare() {
   git submodule update --init
+  if [ "$ID" != "darwin" ]; then
+    install_fonts
+  fi
 }
 
 common_init() {
