@@ -3,7 +3,8 @@
 ```shell
 # install
 git clone git@github.com:sunzhenkai/iconfig.git ~/.config/iconfig
-cd ~/.config/iconfig  make all
+cd ~/.config/iconfig
+make all
 
 # config
 cd ~/.config/iconfig/init && git submodule update --init
