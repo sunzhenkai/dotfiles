@@ -21,6 +21,9 @@ common_init() {
   ./init/activate
   which ii
   . ~/.local/env-init/env
+
+  . init/scripts/tool.sh
+  tool::append_to_profiles "source ~/.config/zsh/zshrc.sh"
 }
 
 ubuntu_init() {
