@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 # check os information
 if [ -f "/etc/os-release" ]; then
   . /etc/os-release
@@ -22,7 +21,12 @@ common_init() {
   . ~/.local/env-init/env
 
   . init/scripts/tool.sh
+  # iconfig
+  pushd ~/.config/iconfig
+  make all
+  popd
   tool::append_to_profiles "source ~/.config/zsh/zshrc.sh"
+  echo "---- common init done ----"
 }
 
 ubuntu_init() {
