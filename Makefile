@@ -1,4 +1,4 @@
-.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi wezterm helix
+.PHONY: all starship nvim kitty alacritty starship tmux zellij ghostty zsh git yazi wezterm helix init
 
 TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
@@ -11,6 +11,9 @@ define install_config
 	@if [ "$(shell realpath $(PWD)/$(1))" != "$(shell realpath $(2))" ]; then ($(call backup_config,$(2))); fi
 	@if [ ! -e "$(shell realpath $(2))" ]; then ln -s $(PWD)/$(1) $(2); echo "install $(1)"; fi
 endef
+
+init:
+	@bash scripts/init.sh
 
 all: starship nvim kitty tmux alacritty zellij ghostty zsh
 starship:
