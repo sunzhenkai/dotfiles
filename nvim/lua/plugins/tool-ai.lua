@@ -1,31 +1,10 @@
 return {
+	{ "stevearc/dressing.nvim", enabeled = true },
 	{
 		-- https://github.com/yetone/avante.nvim
 		"yetone/avante.nvim",
-		enabled = true,
 		event = "VeryLazy",
 		version = false, -- Never set this value to "*"! Never!
-		opts = {
-			provider = "qianwen",
-			vendors = {
-				deepseek = {
-					__inherited_from = "openai",
-					api_key_name = "DEEPSEEK_API_KEY",
-					endpoint = "https://api.deepseek.com/v1",
-					model = "deepseek-coder",
-				},
-				qianwen = {
-					__inherited_from = "openai",
-					api_key_name = "QWEN_API_KEY",
-					endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-					model = "qwen-coder-plus-latest",
-					timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
-					temperature = 0,
-					max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
-					--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
-				},
-			},
-		},
 		-- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
 		build = "make",
 		-- build = "powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false" -- for windows
@@ -66,6 +45,35 @@ return {
 					file_types = { "markdown", "Avante" },
 				},
 				ft = { "markdown", "Avante" },
+			},
+		},
+	},
+	{
+		"yetone/avante.nvim",
+		enabled = true,
+		opts = {
+			provider = "qianwen",
+			auto_suggestions_provider = "qianwen",
+			dual_boost = {
+				enabled = false,
+			},
+			vendors = {
+				deepseek = {
+					__inherited_from = "openai",
+					api_key_name = "DEEPSEEK_API_KEY",
+					endpoint = "https://api.deepseek.com/v1",
+					model = "deepseek-coder",
+				},
+				qianwen = {
+					__inherited_from = "openai",
+					api_key_name = "QWEN_API_KEY",
+					endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					model = "qwen-coder-plus-latest",
+					timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
+					temperature = 0,
+					max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
+					--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+				},
 			},
 		},
 	},

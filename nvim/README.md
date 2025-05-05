@@ -78,3 +78,9 @@ DAP(Debug Adapter Protocol) 是一个用于调试程序的协议，允许调试�
 # References
 
 - [zjp-cn nvim0.6-blogs](https://zjp-cn.github.io/neovim0.6-blogs/index.html)
+
+# Troubleshooting
+
+## Avante
+
+- 如果设置环境变量 OPENAI_API_KEY 且不可用，会出现奇怪的错误, 比如即便配置了其他的 provider 还是会往 openai 发送请求.
