@@ -3,15 +3,11 @@
 ```shell
 # install
 git clone git@github.com:sunzhenkai/iconfig.git ~/.config/iconfig
-cd ~/.config/iconfig && make all
+cd ~/.config/iconfig  make all
 
 # config
-cd ~/.config/iconfig/init
+cd ~/.config/iconfig/init && git submodule update --init
 ./activate
-
-# config oh-my-zsh
-vim ~/.zshrc
-ZSH_CUSTOME=~/.config/zsh/oh-my-zsh
 
 # install programs
 ii homebrew -i
@@ -21,6 +17,12 @@ ii asdf -i
 ii asdf -c
 
 ii zsh -c
+
+## config programs
+# config oh-my-zsh
+vim ~/.zshrc
+ZSH_CUSTOME=~/.config/zsh/oh-my-zsh
+
 ```
 
 # Workflow
@@ -38,4 +40,5 @@ ii zsh -c
   - Neovim
 
 # ColorScheme
+
 - [rose pine](https://rosepinetheme.com/)
