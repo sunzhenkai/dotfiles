@@ -31,11 +31,11 @@ common_init() {
   ./init/activate
   . ~/.local/env-init/env
 
-  . init/scripts/tool.sh
   # iconfig
   pushd ~/.config/iconfig
   make all
   popd
+  . init/scripts/tool.sh
   tool::append_to_profiles "source ~/.config/zsh/zshrc.sh"
   echo "---- common init done ----"
 }
