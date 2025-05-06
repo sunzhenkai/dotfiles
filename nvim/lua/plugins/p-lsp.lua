@@ -81,7 +81,7 @@ return {
 						"clangd",
 						"--background-index",
 						"--clang-tidy",
-						-- "--header-insertion=never",
+						"--header-insertion=never",
 						"--completion-style=detailed",
 						"--fallback-style=google",
 						"--log=error",
