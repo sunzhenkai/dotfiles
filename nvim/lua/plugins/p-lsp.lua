@@ -76,12 +76,11 @@ return {
 						)(fname) or require("lspconfig.util").find_git_ancestor(fname)
 					end,
 					capabilities = dft_capabilities,
-					--	"--header-insertion=iwyu",
 					cmd = {
 						"clangd",
 						"--background-index",
 						"--clang-tidy",
-						"--header-insertion=never",
+						"--header-insertion=iwyu",
 						"--completion-style=detailed",
 						"--fallback-style=google",
 						"--log=error",
