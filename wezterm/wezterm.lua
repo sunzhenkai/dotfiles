@@ -23,6 +23,8 @@ local config = {
 	-- 非 native fullscreen 时, 切回来时会展示 dock
 	native_macos_fullscreen_mode = true,
 	-- disable_default_key_bindings = true,
+
+	audible_bell = "Disabled",
 }
 
 config.font_rules = {
