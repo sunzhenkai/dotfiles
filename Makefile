@@ -1,4 +1,4 @@
-.PHONY: starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr eww waybar \
+.PHONY: starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr \
 	all init git
 
 TIMESTAMP := $(shell date +%s)
@@ -16,7 +16,7 @@ endef
 init:
 	@bash scripts/init.sh
 
-all: starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr eww waybar
+all: starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr
 starship:
 	$(call install_config,starship/starship.toml,~/.config/starship.toml)
 nvim:
@@ -42,10 +42,6 @@ hypr:
 	$(call install_config,hypr,~/.config/hypr)
 helix:
 	$(call install_config,helix,~/.config/helix)
-eww:
-	$(call install_config,eww,~/.config/eww)
-waybar:
-	$(call install_config,waybar,~/.config/waybar)
 
 # personal configs of mine
 git:
