@@ -26,8 +26,6 @@ return {
 			-- https://github.com/williamboman/mason-lspconfig.nvim
 			ensure_installed = {
 				"black",
-				"ruff",
-				-- "python-lsp-server",
 				"pyright",
 				"debugpy",
 			},

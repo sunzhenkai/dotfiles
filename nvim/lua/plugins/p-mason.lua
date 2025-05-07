@@ -4,17 +4,12 @@ return {
 		opts = {
 			-- https://github.com/williamboman/mason-lspconfig.nvim
 			ensure_installed = {
-				"rust-analyzer",
-				"cmake-language-server",
-				"lua-language-server",
 				"prettier",
 				"rust-analyzer",
 				"shfmt",
 				"stylua",
 				"buf",
 				"protolint",
-				-- typescript
-				"typescript-language-server",
 				"eslint_d",
 			},
 			ui = {
@@ -42,6 +37,7 @@ return {
 				"ts_ls", -- typescript
 			},
 			automatic_installation = true,
+			automatic_enable = true,
 		},
 	},
 }

@@ -7,7 +7,7 @@ return {
 			ensure_installed = {
 				"cmake-language-server",
 				"cmakelint",
-				"clangd",
+				-- "clangd",
 				"codelldb",
 				"clang-format",
 				"cpplint",
