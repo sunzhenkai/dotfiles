@@ -21,9 +21,6 @@ install_fonts() {
 
 prepare() {
   git submodule update --init
-  if [ "$ID" != "darwin" ]; then
-    install_fonts
-  fi
 }
 
 common_init() {
@@ -52,8 +49,12 @@ arch_init() {
 
 post_init() {
   echo "---- post init ----"
+  if [ "$ID" != "darwin" ]; then
+    install_fonts
+  fi
   # install
   ii homebrew -i
+  # TODO: enable zsh
   # config
   ii zsh -c
   . ~/.zshrc

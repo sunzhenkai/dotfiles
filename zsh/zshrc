@@ -7,7 +7,9 @@ alias za='zellij a'
 alias zs='zellij -s'
 
 # vi mode
-bindkey -v
+if command -v bindkey >/dev/null; then
+  bindkey -v
+fi
 # this makes the switch between modes quicker
 export KEYTIMEOUT=1
 export LESSCHARSET=utf-8
