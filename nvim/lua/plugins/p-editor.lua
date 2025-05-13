@@ -225,4 +225,25 @@ return {
 			require("ufo").setup()
 		end,
 	},
+	-- none-ls / null_ls
+	{
+		"nvimtools/none-ls.nvim",
+		enabled = false,
+		optional = true,
+		dependencies = {
+			"nvimtools/none-ls-extras.nvim",
+		},
+		opts = function(_, opts)
+			local nls = require("null-ls")
+			opts.sources = vim.list_extend(opts.sources or {}, {
+				nls.builtins.code_actions.gomodifytags,
+				nls.builtins.code_actions.impl,
+				nls.builtins.formatting.goimports,
+				nls.builtins.formatting.gofumpt,
+				nls.builtins.formatting.prettier,
+				nls.builtins.diagnostics.cmake_lint,
+				require("none-ls.diagnostics.cpplint"),
+			})
+		end,
+	},
 }

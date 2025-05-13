@@ -6,10 +6,10 @@ local keymap = vim.keymap
 
 -- Diagnostics
 keymap.set("n", "<C-n>", function()
-	vim.diagnostic.goto_next({ severity = { min = vim.diagnostic.severity.WARN } })
+	vim.diagnostic.jump({ count = 1, float = true, severity = { min = vim.diagnostic.severity.WARN } })
 end)
 keymap.set("n", "<C-m>", function()
-	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
+	vim.diagnostic.jump({ count = 1, float = true, severity = vim.diagnostic.severity.ERROR })
 end)
 
 -- functions
