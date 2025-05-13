@@ -101,6 +101,11 @@ fi
 
 # cargo
 # put cargo at the end, and it will sometimes build the nightly version 
-export CARGE_ENV="$HOME/.cargo/env"
-[[ -e ${CARGE_ENV} ]] && source ${CARGE_ENV}
+export CARGO_ENV="$HOME/.cargo/env"
+export CARGO_BIN="$HOME/.cargo/bin"
+if [[ -e ${CARGO_ENV} ]]; then 
+  source ${CARGO_ENV}
+elif [[ -e "${CARGO_BIN}" ]]; then
+  export PATH="$CARGO_BIN:$PATH"
+fi
 

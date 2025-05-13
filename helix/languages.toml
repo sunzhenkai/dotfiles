@@ -1,28 +1,5 @@
 [[language]]
 name = "cpp"
-file-types = [
-  "cc",
-  "hh",
-  "c++",
-  "cpp",
-  "hpp",
-  "h",
-  "ipp",
-  "tpp",
-  "cxx",
-  "hxx",
-  "ixx",
-  "txx",
-  "C",
-  "H",
-  "cu",
-  "cuh",
-  "cppm",
-  "h++",
-  "ii",
-  "inl",
-]
-injection-regex = "cpp"
 roots = ["compile_commands.json", ".git"]
 indent = { tab-width = 2, unit = "  " }
 auto-format = true
@@ -36,6 +13,30 @@ args = [
   "--background-index",
   "--clang-tidy",
   "--completion-style=detailed",
-  "--fallback-style=LLVM",
+  "--fallback-style=google",
+  # "--compile-commands-dir=build",
 ]
 config = { fallbackFlags = ["-std=c++20"] }
+
+[[language]]
+name = "go"
+auto-format = true
+formatter = { command = "goimports" }
+
+[[language]]
+name = "markdown"
+language-servers = ["marksman", "ltex-ls"]
+rulers = [120]
+
+[[language]]
+name = "json"
+formatter = { command = 'prettier', args = ["--parser", "json"] }
+
+[[language]]
+name = "css"
+formatter = { command = 'prettier', args = ["--parser", "css"] }
+
+[[language]]
+name = "javascript"
+formatter = { command = 'prettier', args = ["--parser", "typescript"] }
+auto-format = true
