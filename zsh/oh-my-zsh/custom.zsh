@@ -26,4 +26,4 @@ antigen bundle zsh-users/zsh-autosuggestions
 #antigen theme romkatv/powerlevel10k    # NOTE:  using startship as alternative
 antigen apply
 
-source ~/.config/zsh/zshrc
+source ~/.config/zsh/zshrc.sh

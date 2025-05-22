@@ -34,7 +34,7 @@ ghostty:
 wezterm:
 	$(call install_config,wezterm,~/.config/wezterm)
 zsh:
-	@# firstly, ZSH_CUSTOME sould be set to $HOME/.config/zsh/oh-my-zsh in $HOME/.zshrc
+	$(call install_config,zsh/zshrc,~/.zshrc)
 	$(call install_config,zsh,~/.config/zsh)
 yazi:
 	$(call install_config,yazi,~/.config/yazi)
