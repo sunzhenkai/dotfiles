@@ -13,3 +13,5 @@ if [[ -e "$ENV_INIT_DIR" ]]; then
   source "$ENV_INIT_DIR"
   alias ienv="source $ENV_INIT_DIR"
 fi
+
+[[ -e ~/.envrc ]] && source ~/.envrc
