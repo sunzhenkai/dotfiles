@@ -5,7 +5,7 @@ TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
 
 define backup_config
-	if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi
+	@bash -c 'if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi'
 endef
 
 define install_config
@@ -34,8 +34,9 @@ ghostty:
 wezterm:
 	$(call install_config,wezterm,~/.config/wezterm)
 zsh:
-	$(call install_config,zsh/zshrc,~/.zshrc)
 	$(call install_config,zsh,~/.config/zsh)
+	$(call backup_config,~/.zshrc)
+	@cp zsh/zshrc ~/.zshrc
 yazi:
 	$(call install_config,yazi,~/.config/yazi)
 hypr:

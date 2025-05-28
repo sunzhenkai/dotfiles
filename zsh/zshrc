@@ -15,3 +15,5 @@ if [[ -e "$ENV_INIT_DIR" ]]; then
 fi
 
 [[ -e ~/.envrc ]] && source ~/.envrc
+
+##
