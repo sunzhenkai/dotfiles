@@ -5,7 +5,9 @@ ZSH_CUSTOM=~/.config/zsh/oh-my-zsh
 source $ZSH/oh-my-zsh.sh
 
 # starship
-command -v starship >/dev/null && eval "$(starship init zsh)"
+if command -v starship >/dev/null; then 
+  eval "$(starship init zsh)"
+fi
 
 # env init
 ENV_INIT_DIR="$HOME/.local/env-init/env"
