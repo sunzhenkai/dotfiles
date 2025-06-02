@@ -5,7 +5,7 @@ TIMESTAMP := $(shell date +%s)
 PWD := $(shell pwd)
 
 define backup_config
-	@bash -c 'if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi'
+	bash -c 'if [ ! -z "$(1)" ] && [ -e $(1) ]; then mv $(1) $(1)-$(TIMESTAMP); fi'
 endef
 
 define install_config
