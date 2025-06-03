@@ -57,12 +57,17 @@ return {
 			dual_boost = {
 				enabled = false,
 			},
-			vendors = {
+			providers = {
 				deepseek = {
 					__inherited_from = "openai",
 					api_key_name = "DEEPSEEK_API_KEY",
 					endpoint = "https://api.deepseek.com/v1",
 					model = "deepseek-coder",
+					extra_request_body = {
+						temperature = 0,
+						max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
+						--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+					},
 				},
 				qianwen = {
 					__inherited_from = "openai",
@@ -70,9 +75,11 @@ return {
 					endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1",
 					model = "qwen-coder-plus-latest",
 					timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
-					temperature = 0,
-					max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
-					--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+					extra_request_body = {
+						temperature = 0,
+						max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
+						--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+					},
 				},
 			},
 		},
