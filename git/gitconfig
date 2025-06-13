@@ -1,9 +1,6 @@
-[user]
-  name = zhenkai.sun
-  email = zhenkai.sun@qq.com
 [pull]
   rebase = false
 [core]
-  editor = nvim
+  editor = vim
 [init]
 	defaultBranch = main

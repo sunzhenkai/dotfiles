@@ -49,7 +49,7 @@ git:
 	$(call install_config,git,~/.config/git)
 	@echo "WARN: extra operation should be processed"
 	@echo "      append following texts into ~/.gitconfig after [user] scope"
-	@echo '[includeIf "gitdir:~/.config/git/gitconfig"]'
+	@echo '[include]'
 	@echo ' path = ~/.config/git/gitconfig'
 git-global:
 	$(call install_config,git/gitconfig,~/.gitconfig)
