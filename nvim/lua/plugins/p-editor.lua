@@ -16,7 +16,7 @@ return {
 					toml = { "taplo" },
 					json = { "prettier" },
 					css = { "prettier" },
-					python = { "black", "ruff" },
+					python = { "isort", "black" },
 					typescriptreact = { "eslint_d" },
 					typescript = { "eslint_d" },
 					javascript = { "eslint_d" },
