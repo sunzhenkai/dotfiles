@@ -35,9 +35,17 @@ return {
 	{
 		"nvim-telescope/telescope.nvim",
 		dependencies = {
+			"rcarriga/nvim-notify",
 			"nvim-lua/plenary.nvim",
+			"nvim-telescope/telescope-ui-select.nvim",
+			"nvim-telescope/telescope-symbols.nvim",
 			"nvim-telescope/telescope-fzf-native.nvim",
-			"nvim-telescope/telescope-file-browser.nvim",
+			"nvim-telescope/telescope-live-grep-args.nvim",
+			-- "nvim-telescope/telescope-file-browser.nvim",
+			"nvim-telescope/telescope-project.nvim",
+			"nvim-telescope/telescope-dap.nvim",
+			"nvim-telescope/telescope-media-files.nvim",
+			"nvim-telescope/telescope-github.nvim",
 		},
 		branch = "0.1.x",
 		config = function()
@@ -75,6 +83,7 @@ return {
 			telescope.load_extension("fzf")
 			-- NOTE: diable file browser
 			-- telescope.load_extension("file_browser")
+			require("telescope").load_extension("notify")
 
 			local builtin = require("telescope.builtin")
 

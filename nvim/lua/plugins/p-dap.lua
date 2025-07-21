@@ -15,11 +15,18 @@ return {
 			"nvim-treesitter/nvim-treesitter",
 			-- c++, gtest
 			"alfaix/neotest-gtest",
+			-- go
+			"nvim-neotest/neotest-go",
 		},
-		opts = {
-			adapters = {
-				["neotest-gtest"] = {},
-			},
-		},
+		opts = function(_, opts)
+			opts.adapters = {
+				require("neotest-gtest"),
+				require("neotest-go")({
+					experimental = {
+						test_table = true,
+					},
+				}),
+			}
+		end,
 	},
 }
