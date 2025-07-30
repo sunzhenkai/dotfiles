@@ -88,7 +88,6 @@ return {
 			local builtin = require("telescope.builtin")
 
 			-- key maps
-
 			local map = vim.keymap.set
 			local opts = { noremap = true, silent = true }
 

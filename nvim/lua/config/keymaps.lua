@@ -106,7 +106,3 @@ vim.keymap.set("n", "<C-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Hei
 vim.keymap.set("n", "<C-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
 vim.keymap.set("n", "<C-h>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
 vim.keymap.set("n", "<C-l>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
-
-vim.keymap.set("n", "<leader>un", function()
-	require("telescope").extensions.notify.notify()
-end, { desc = "Notification History" })
