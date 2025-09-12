@@ -84,3 +84,11 @@ DAP(Debug Adapter Protocol) 是一个用于调试程序的协议，允许调试�
 ## Avante
 
 - 如果设置环境变量 OPENAI_API_KEY 且不可用，会出现奇怪的错误, 比如即便配置了其他的 provider 还是会往 openai 发送请求.
+
+## 启动报错
+
+如果遇到打开 nvim 时很多奇怪的报错，可以尝试同步插件.
+
+```shell
+:Lazy sync
+```
