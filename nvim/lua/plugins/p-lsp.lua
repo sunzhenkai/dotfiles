@@ -62,6 +62,10 @@ return {
 						},
 					},
 					root_dir = function(fname)
+						if type(fname) ~= "string" then
+							fname = vim.api.nvim_buf_get_name(0)
+						end
+
 						return require("lspconfig.util").root_pattern(
 							"Makefile",
 							"configure.ac",
@@ -69,11 +73,11 @@ return {
 							"config.h.in",
 							"meson.build",
 							"meson_options.txt",
-							"build.ninja"
-						)(fname) or require("lspconfig.util").root_pattern(
+							"build.ninja",
 							"compile_commands.json",
-							"compile_flags.txt"
-						)(fname) or require("lspconfig.util").find_git_ancestor(fname)
+							"compile_flags.txt",
+							".git"
+						)(fname)
 					end,
 					capabilities = dft_capabilities,
 					cmd = {
