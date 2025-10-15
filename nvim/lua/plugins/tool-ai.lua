@@ -1,9 +1,15 @@
 return {
-	{ "sidekick.nvim", enabeled = true },
+	{
+		"folke/sidekick.nvim",
+		enabled = false,
+		dependencies = {
+			"nvim-treesitter/nvim-treesitter-textobjects",
+		},
+	},
 	{
 		-- https://github.com/yetone/avante.nvim
 		"yetone/avante.nvim",
-		enabled = false,
+		enabled = true,
 		event = "VeryLazy",
 		version = false, -- Never set this value to "*"! Never!
 		-- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
@@ -48,10 +54,6 @@ return {
 				ft = { "markdown", "Avante" },
 			},
 		},
-	},
-	{
-		"yetone/avante.nvim",
-		enabled = false,
 		opts = {
 			provider = "qianwen",
 			auto_suggestions_provider = "qianwen",
@@ -83,6 +85,9 @@ return {
 					},
 				},
 			},
+		},
+		behaviour = {
+			auto_suggestions = true,
 		},
 	},
 	{
