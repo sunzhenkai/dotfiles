@@ -12,6 +12,10 @@ npm install -g @mermaid-js/mermaid-cli
 sudo apt install build-essential libhunspell-dev
 ```
 
+## qwen-code client
+
+- [qwen-code](https://github.com/QwenLM/qwen-code)
+
 # 字体
 
 Neovim 的图标可能无法正常显示，需要安装字体。
