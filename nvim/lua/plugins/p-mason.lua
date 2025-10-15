@@ -11,6 +11,7 @@ return {
 				"buf",
 				"protolint",
 				"eslint_d",
+				"copilot-language-server",
 			},
 			ui = {
 				icons = {
@@ -23,7 +24,7 @@ return {
 	},
 	{
 		"mason-org/mason-lspconfig.nvim",
-		enable = true,
+		enabled = true,
 		dependencies = {
 			"mason-org/mason.nvim",
 			"neovim/nvim-lspconfig",
