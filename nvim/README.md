@@ -15,6 +15,24 @@ sudo apt install build-essential libhunspell-dev
 ## qwen-code client
 
 - [qwen-code](https://github.com/QwenLM/qwen-code)
+  Install from npm
+
+```shell
+npm install -g @qwen-code/qwen-code@latest
+qwen --version
+```
+
+Install from homebrew
+
+```shell
+brew install qwen-code
+```
+
+Config
+
+```shell
+qwen
+```
 
 # 字体
 
