@@ -1,9 +1,21 @@
 return {
 	{
 		"folke/sidekick.nvim",
-		enabled = false,
+		enabled = true,
 		dependencies = {
 			"nvim-treesitter/nvim-treesitter-textobjects",
+		},
+		opts = {
+			nes = { enabled = false },
+		},
+		keys = {
+			{
+				"<leader>al",
+				function()
+					require("sidekick.cli").toggle()
+				end,
+				desc = "Sidekick Toggle CLI",
+			},
 		},
 	},
 	{
@@ -59,6 +71,8 @@ return {
 				ft = { "markdown", "Avante" },
 			},
 		},
+		---@module 'avante'
+		---@type avante.Config
 		opts = {
 			provider = "qianwen",
 			auto_suggestions_provider = "qianwen",
@@ -90,9 +104,17 @@ return {
 					},
 				},
 			},
-		},
-		behaviour = {
-			auto_suggestions = true,
+			behaviour = {
+				auto_suggestions = true,
+			},
+			input = {
+				provider = "snacks",
+				provider_opts = {
+					-- Additional snacks.input options
+					title = "Avante Input",
+					icon = " ",
+				},
+			},
 		},
 	},
 	{
