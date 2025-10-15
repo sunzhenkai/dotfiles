@@ -3,7 +3,7 @@
 //  2. https://github.com/mrnugget/dotfiles/blob/master/zed_keymap.json
 [
   {
-    "context": "Workspace",
+    "context": "Workspace && !(Editor && vim_mode == insert)",
     "bindings": {
       // open file tree
       "space e": "workspace::ToggleLeftDock",
@@ -23,9 +23,11 @@
       // pane
       "space -": "pane::SplitDown",
       "space |": "pane::SplitRight",
-      // tab / buffer
+      // buffer / tab
       "space b h": "pane::ActivateNextItem",
-      "space b l": "pane::ActivatePreviousItem"
+      "space b l": "pane::ActivatePreviousItem",
+      // git
+      "space g b": "git::Blame"
     }
   }
 ]
