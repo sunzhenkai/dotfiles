@@ -1,6 +1,6 @@
 return {
 	{
-		"williamboman/mason.nvim",
+		"mason-org/mason.nvim",
 		opts = {
 			-- https://github.com/williamboman/mason-lspconfig.nvim
 			ensure_installed = {
@@ -22,9 +22,11 @@ return {
 		},
 	},
 	{
-		"williamboman/mason-lspconfig.nvim",
+		"mason-org/mason-lspconfig.nvim",
+		enable = true,
 		dependencies = {
-			"williamboman/mason.nvim",
+			"mason-org/mason.nvim",
+			"neovim/nvim-lspconfig",
 		},
 		opts = {
 			ensure_installed = {

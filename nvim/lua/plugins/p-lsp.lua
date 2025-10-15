@@ -17,8 +17,8 @@ return {
 		"neovim/nvim-lspconfig",
 		event = "LazyFile",
 		dependencies = {
-			"williamboman/mason.nvim",
-			"williamboman/mason-lspconfig.nvim",
+			"mason-org/mason.nvim",
+			"mason-org/mason-lspconfig.nvim",
 			"hrsh7th/cmp-nvim-lsp",
 			-- c/c++
 			"p00f/clangd_extensions.nvim",

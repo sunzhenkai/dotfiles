@@ -21,7 +21,7 @@ return {
 		},
 	},
 	{
-		"williamboman/mason.nvim",
+		"mason-org/mason.nvim",
 		opts = {
 			-- https://github.com/williamboman/mason-lspconfig.nvim
 			ensure_installed = {

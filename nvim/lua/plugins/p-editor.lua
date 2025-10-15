@@ -179,9 +179,9 @@ return {
 		-- Uncomment next line if you want to follow only stable versions
 		-- version = "*"
 	},
-	-- echasnovski/mini.pairs
+	-- nvim-mini/mini.pairs
 	{
-		"echasnovski/mini.pairs",
+		"nvim-mini/mini.pairs",
 		event = "VeryLazy",
 		opts = {
 			modes = { insert = true, command = true, terminal = false },
