@@ -5,9 +5,9 @@ return {
 		dependencies = {
 			"nvim-treesitter/nvim-treesitter-textobjects",
 		},
-		opts = {
-			nes = { enabled = false },
-		},
+		-- opts = {
+		-- 	nes = { enabled = true },
+		-- },
 		keys = {
 			{
 				"<leader>al",
@@ -21,7 +21,7 @@ return {
 	{
 		-- https://github.com/yetone/avante.nvim
 		"yetone/avante.nvim",
-		enabled = true,
+		enabled = false,
 		-- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
 		-- ⚠️ must add this setting! ! !
 		build = vim.fn.has("win32") ~= 0
@@ -75,7 +75,7 @@ return {
 		---@type avante.Config
 		opts = {
 			provider = "qianwen",
-			auto_suggestions_provider = "qianwen",
+			auto_suggestions_provider = "qianwen_nes",
 			dual_boost = {
 				enabled = false,
 			},
@@ -95,7 +95,20 @@ return {
 					__inherited_from = "openai",
 					api_key_name = "QWEN_API_KEY",
 					endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-					model = "qwen-coder-plus-latest",
+					model = "qwen3-coder-plus",
+					timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
+					extra_request_body = {
+						temperature = 0,
+						max_completion_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
+						--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+					},
+				},
+				-- next edit suggestions
+				qianwen_nes = {
+					__inherited_from = "openai",
+					api_key_name = "QWEN_API_KEY",
+					endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					model = "qwen3-coder-flash",
 					timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
 					extra_request_body = {
 						temperature = 0,

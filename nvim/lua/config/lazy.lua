@@ -35,7 +35,7 @@ require("lazy").setup({
 		{ import = "lazyvim.plugins.extras.lang.toml" },
 		{ import = "lazyvim.plugins.extras.lang.yaml" },
 		{ import = "lazyvim.plugins.extras.coding.nvim-cmp" },
-		-- { import = "lazyvim.plugins.extras.ai.sidekick" },
+		{ import = "lazyvim.plugins.extras.ai.sidekick" },
 		{ import = "plugins" },
 	},
 	defaults = {
