@@ -15,7 +15,7 @@ return {
 			opts.options.always_show_bufferline = true
 			opts.options.separator_style = "slant"
 			opts.options.numbers = function(to)
-				return string.format("%s", to.lower(to.ordinal))
+				return string.format("%s", to.ordinal)
 			end
 			return opts
 		end,
