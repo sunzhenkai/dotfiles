@@ -15,7 +15,7 @@ return {
 			opts.options.always_show_bufferline = true
 			opts.options.separator_style = "slant"
 			opts.options.numbers = function(to)
-				return string.format("%s·%s", to.raise(to.id), to.lower(to.ordinal))
+				return string.format("%s", to.lower(to.ordinal))
 			end
 			return opts
 		end,
@@ -28,7 +28,6 @@ return {
 			vim.o.background = "dark"
 			vim.cmd([[colorscheme gruvbox]])
 		end,
-		opts = {},
 	},
 	{
 		"romgrk/barbar.nvim",
