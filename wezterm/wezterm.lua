@@ -9,7 +9,8 @@ local config = {
 		{ family = "Maple Mono", weight = "Bold" },
 	}),
 	font_size = 18,
-	color_scheme = "GruvboxLight",
+	color_scheme = "GruvboxDark",
+	-- color_scheme = "GruvboxLight",
 
 	-- tabs
 	-- enable_tab_bar = false,

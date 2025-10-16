@@ -6,7 +6,7 @@ return {
 			"nvim-treesitter/nvim-treesitter-textobjects",
 		},
 		-- opts = {
-		-- 	nes = { enabled = true },
+		-- 	nes = { enabled = false},
 		-- },
 		keys = {
 			{
