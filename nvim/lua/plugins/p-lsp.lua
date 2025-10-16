@@ -132,6 +132,7 @@ return {
 							semanticTokens = true,
 						},
 					},
+					cmd = { "gopls", "-remote=auto" }, -- Use gopls daemon mode for performance
 				},
 				jsonls = {
 					-- lazy-load schemastore when needed
