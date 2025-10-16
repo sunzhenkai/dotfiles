@@ -1,5 +1,23 @@
 return {
 	{
+		"akinsho/bufferline.nvim",
+		enabled = true,
+		version = "*",
+		dependencies = "nvim-tree/nvim-web-devicons",
+		keys = {
+			{ "<leader>bh", "<cmd>BufferLineCyclePrev<cr>", desc = "Buffer: Prev" },
+			{ "<leader>bl", "<cmd>BufferLineCycleNext<cr>", desc = "Buffer: Next" },
+			{ "<leader>b[", "<cmd>BufferLineMovePrev<cr>", desc = "Buffer: Move Prev" },
+			{ "<leader>b]", "<cmd>BufferLineMoveNext<cr>", desc = "Buffer: Move Next" },
+		},
+		opts = function(_, opts)
+			opts.options = opts.options or {}
+			opts.options.always_show_bufferline = true
+			opts.options.separator_style = "slant"
+			return opts
+		end,
+	},
+	{
 		"ellisonleao/gruvbox.nvim",
 		priority = 1010,
 		config = function()
@@ -11,7 +29,7 @@ return {
 	},
 	{
 		"romgrk/barbar.nvim",
-		enabled = true,
+		enabled = false,
 		dependencies = {
 			"nvim-tree/nvim-web-devicons", -- patched fonts support
 			"lewis6991/gitsigns.nvim", -- display git status
