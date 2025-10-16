@@ -4,7 +4,6 @@ return {
 	{
 		"akinsho/toggleterm.nvim",
 		cmd = "ToggleTerm",
-		build = ":ToggleTerm",
 		version = "*",
 		opts = { --[[ things you want to change go here]]
 			direction = "float",
@@ -15,33 +14,26 @@ return {
 			{
 				"<Leader>tt",
 				"<cmd>ToggleTerm<cr>",
-				desc = "toggle terminal",
+				desc = "Open ToggleTerm",
 			},
+			{ "<leader>t1", "<cmd>ToggleTerm 1<cr>", desc = "Open Terminal 1" },
+			{ "<leader>t2", "<cmd>ToggleTerm 2<cr>", desc = "Open Terminal 2" },
+			{ "<leader>t3", "<cmd>ToggleTerm 3<cr>", desc = "Open Terminal 3" },
 		},
 	},
-	-- nvim-telescope/telescope-fzf-native.nvim
-	-- telescope extensions
-	{
-		"nvim-telescope/telescope-fzf-native.nvim",
-		build = "make",
-		cond = function()
-			return vim.fn.executable("make") == 1
-		end,
-	},
-	-- nvim-telescope/telescope-file-browser.nvim
-	-- telescope extensions
-	{ "nvim-telescope/telescope-file-browser.nvim", enabled = true },
 	-- nvim-telescope/telescope.nvim
 	{
 		"nvim-telescope/telescope.nvim",
 		dependencies = {
+			"nvim-telescope/telescope-file-browser.nvim",
 			"rcarriga/nvim-notify",
 			"nvim-lua/plenary.nvim",
+			"nvim-telescope/telescope-fzf-native.nvim",
+			"nvim-telescope/telescope-file-browser.nvim",
 			"nvim-telescope/telescope-ui-select.nvim",
 			"nvim-telescope/telescope-symbols.nvim",
 			"nvim-telescope/telescope-fzf-native.nvim",
 			"nvim-telescope/telescope-live-grep-args.nvim",
-			-- "nvim-telescope/telescope-file-browser.nvim",
 			"nvim-telescope/telescope-project.nvim",
 			"nvim-telescope/telescope-dap.nvim",
 			"nvim-telescope/telescope-media-files.nvim",
