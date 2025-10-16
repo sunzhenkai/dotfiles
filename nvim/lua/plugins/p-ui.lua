@@ -14,6 +14,9 @@ return {
 			opts.options = opts.options or {}
 			opts.options.always_show_bufferline = true
 			opts.options.separator_style = "slant"
+			opts.options.numbers = function(to)
+				return string.format("%s·%s", to.raise(to.id), to.lower(to.ordinal))
+			end
 			return opts
 		end,
 	},
