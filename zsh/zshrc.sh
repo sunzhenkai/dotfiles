@@ -98,7 +98,7 @@ if [[ -e "$PRIVATE_CONFIG_ENV" ]]; then
   source "$PRIVATE_CONFIG_ENV"
 fi
 
-# cargo
+# rust / cargo
 # put cargo at the end, and it will sometimes build the nightly version
 export CARGO_ENV="$HOME/.cargo/env"
 export CARGO_BIN="$HOME/.cargo/bin"
