@@ -22,9 +22,10 @@ return {
 			cmake_regenerate_on_save = false,
 		},
 	},
-	{
-		"p00f/clangd_extensions.nvim",
-		lazy = true,
-		enabled = true,
-	},
+	-- installed by lazyvim extra feature clangd
+	-- {
+	-- 	"p00f/clangd_extensions.nvim",
+	-- 	lazy = true,
+	-- 	enabled = true,
+	-- },
 }

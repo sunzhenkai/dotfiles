@@ -35,4 +35,33 @@ return {
 		"nvim-treesitter/nvim-treesitter",
 		opts = { ensure_installed = { "ninja", "rst", "python" } },
 	},
+
+	-- neovim/nvim-lspconfig
+	{
+		"neovim/nvim-lspconfig",
+		opts = {
+			servers = {
+				-- pyright = {
+				-- 	disableLanguageServices = false,
+				-- 	disableOrganizeImports = false,
+				-- 	typeCheckingMode = "strict",
+				-- 	python = {
+				-- 		analysis = {
+				-- 			django = true,
+				-- 		},
+				-- 	},
+				-- },
+			},
+			setup = {
+			-- 	pyright = function()
+			-- 		require("lazyvim.util").lsp.on_attach(function(client, _)
+			-- 			if client.name == "pyright" then
+			-- 				-- disable hover in favor of jedi-language-server
+			-- 				client.server_capabilities.hoverProvider = false
+			-- 			end
+			-- 		end)
+			-- 	end,
+			-- },
+		},
+	},
 }
