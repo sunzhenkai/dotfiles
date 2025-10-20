@@ -30,30 +30,7 @@ return {
 		end,
 	},
 	{
-		"nvim-mini/mini.icons",
-		opts = {
-			file = {
-				[".eslintrc.js"] = { glyph = "󰱺", hl = "MiniIconsYellow" },
-				[".node-version"] = { glyph = "", hl = "MiniIconsGreen" },
-				[".prettierrc"] = { glyph = "", hl = "MiniIconsPurple" },
-				[".yarnrc.yml"] = { glyph = "", hl = "MiniIconsBlue" },
-				["eslint.config.js"] = { glyph = "󰱺", hl = "MiniIconsYellow" },
-				["package.json"] = { glyph = "", hl = "MiniIconsGreen" },
-				["tsconfig.json"] = { glyph = "", hl = "MiniIconsAzure" },
-				["tsconfig.build.json"] = { glyph = "", hl = "MiniIconsAzure" },
-				["yarn.lock"] = { glyph = "", hl = "MiniIconsBlue" },
-			},
-		},
-	},
-	{
 		"nvim-neo-tree/neo-tree.nvim",
-		enabled = true,
-		dependencies = {
-			"nvim-lua/plenary.nvim",
-			"nvim-tree/nvim-web-devicons", -- not strictly required, but recommended
-			"MunifTanjim/nui.nvim",
-			-- {"3rd/image.nvim", opts = {}}, -- Optional image support in preview window: See `# Preview Mode` for more information
-		},
 		opts = {
 			commands = {
 				go_to_parent_dir = function(state)

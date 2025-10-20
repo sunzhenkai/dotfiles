@@ -28,6 +28,7 @@ require("lazy").setup({
 		{ import = "lazyvim.plugins.extras.editor.telescope" },
 		{ import = "lazyvim.plugins.extras.editor.inc-rename" },
 		-- { import = "lazyvim.plugins.extras.editor.snacks_explorer" },
+		{ import = "lazyvim.plugins.extras.editor.neo-tree" },
 		{ import = "lazyvim.plugins.extras.editor.snacks_picker" },
 		{ import = "lazyvim.plugins.extras.util.mini-hipatterns" },
 		{ import = "lazyvim.plugins.extras.linting.eslint" },
