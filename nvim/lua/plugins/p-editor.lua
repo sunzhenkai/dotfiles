@@ -1,4 +1,15 @@
 return {
+	{
+		"folke/snacks.nvim",
+		opts = {
+			terminal = {
+				win = {
+					style = "float",
+					border = "rounded",
+				},
+			},
+		},
+	},
 	-- auto-formatter
 	{
 		"stevearc/conform.nvim",
@@ -120,23 +131,23 @@ return {
 				--   end,
 				-- },
 				-- c/c++/cmake
-				cpplint = {
-					args = {
-						"--filter=-legal/copyright,-build/include_subdir,-runtime/indentation_namespace",
-						-- set line length, the default value is 80
-						"--linelength=120",
-					},
-				},
-				eslint_d = {
-					cmd = "eslint_d",
-					args = { "--stdin", "--stdin-filename", "%filepath" },
-					stream = "stderr",
-					ignore_exitcode = true,
-					parser = require("lint.parser").from_errorformat("%f:%l:%c: %m", {
-						source = "eslint_d",
-						severity = vim.diagnostic.severity.WARN,
-					}),
-				},
+				-- cpplint = {
+				-- 	args = {
+				-- 		"--filter=-legal/copyright,-build/include_subdir,-runtime/indentation_namespace",
+				-- 		-- set line length, the default value is 80
+				-- 		"--linelength=120",
+				-- 	},
+				-- },
+				-- eslint_d = {
+				-- 	cmd = "eslint_d",
+				-- 	args = { "--stdin", "--stdin-filename", "%filepath" },
+				-- 	stream = "stderr",
+				-- 	ignore_exitcode = true,
+				-- 	parser = require("lint.parser").from_errorformat("%f:%l:%c: %m", {
+				-- 		source = "eslint_d",
+				-- 		severity = vim.diagnostic.severity.WARN,
+				-- 	}),
+				-- },
 			},
 		},
 	},
@@ -145,72 +156,6 @@ return {
 		"numToStr/Comment.nvim",
 		opts = {
 			-- add any options here
-		},
-	},
-	-- folke/trouble.nvim
-	{
-		"folke/trouble.nvim",
-		-- opts will be merged with the parent spec
-		opts = { use_diagnostic_signs = true },
-	},
-	-- danymat/neogen
-	{
-		"danymat/neogen",
-		config = function()
-			require("neogen").setup({ snippet_engine = "luasnip" })
-		end,
-		keys = {
-			{
-				"<Leader>znc",
-				"<cmd>lua require('neogen').generate({ type = 'class' })<CR>",
-				desc = "Generate Class Documentation",
-			},
-			{
-				"<Leader>znd",
-				"<cmd>lua require('neogen').generate({ type = 'file' })<CR>",
-				desc = "Generate File Documentation",
-			},
-			{
-				"<Leader>znf",
-				"<cmd>lua require('neogen').generate({ type = 'func' })<CR>",
-				desc = "Generate Function Documentation",
-			},
-		},
-		-- Uncomment next line if you want to follow only stable versions
-		-- version = "*"
-	},
-	-- nvim-mini/mini.pairs
-	{
-		"nvim-mini/mini.pairs",
-		event = "VeryLazy",
-		opts = {
-			modes = { insert = true, command = true, terminal = false },
-			-- skip autopair when next character is one of these
-			skip_next = [=[[%w%%%'%[%"%.%`%$]]=],
-			-- skip autopair when the cursor is inside these treesitter nodes
-			skip_ts = { "string" },
-			-- skip autopair when next character is closing pair
-			-- and there are more closing pairs than opening pairs
-			skip_unbalanced = true,
-			-- better deal with markdown code blocks
-			markdown = true,
-		},
-		config = function(_, opts)
-			LazyVim.mini.pairs(opts)
-		end,
-	},
-	-- folke/lazydev.nvim
-	{
-		"folke/lazydev.nvim",
-		ft = "lua",
-		cmd = "LazyDev",
-		opts = {
-			library = {
-				{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
-				{ path = "LazyVim", words = { "LazyVim" } },
-				{ path = "snacks.nvim", words = { "Snacks" } },
-				{ path = "lazy.nvim", words = { "LazyVim" } },
-			},
 		},
 	},
 	-- code folder
@@ -223,27 +168,6 @@ return {
 		},
 		setup = function()
 			require("ufo").setup()
-		end,
-	},
-	-- none-ls / null_ls
-	{
-		"nvimtools/none-ls.nvim",
-		enabled = false,
-		optional = true,
-		dependencies = {
-			"nvimtools/none-ls-extras.nvim",
-		},
-		opts = function(_, opts)
-			local nls = require("null-ls")
-			opts.sources = vim.list_extend(opts.sources or {}, {
-				nls.builtins.code_actions.gomodifytags,
-				nls.builtins.code_actions.impl,
-				nls.builtins.formatting.goimports,
-				nls.builtins.formatting.gofumpt,
-				nls.builtins.formatting.prettier,
-				nls.builtins.diagnostics.cmake_lint,
-				require("none-ls.diagnostics.cpplint"),
-			})
 		end,
 	},
 }

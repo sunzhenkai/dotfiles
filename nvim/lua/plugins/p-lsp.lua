@@ -3,15 +3,15 @@ dft_capabilities.general = dft_capabilities.general or {}
 dft_capabilities.general.positionEncodings = { "utf-16" }
 
 return {
-	{
-		"hrsh7th/cmp-nvim-lsp",
-		enabled = true,
-		dependencies = {
-			"hrsh7th/nvim-cmp",
-			"hrsh7th/cmp-buffer",
-			"hrsh7th/cmp-path",
-		},
-	},
+	-- {
+	-- 	"hrsh7th/cmp-nvim-lsp",
+	-- 	enabled = true,
+	-- 	dependencies = {
+	-- 		"hrsh7th/nvim-cmp",
+	-- 		"hrsh7th/cmp-buffer",
+	-- 		"hrsh7th/cmp-path",
+	-- 	},
+	-- },
 	-- neovim/nvim-lspconfig
 	{
 		"neovim/nvim-lspconfig",

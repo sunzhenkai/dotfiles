@@ -1,19 +1,4 @@
 return {
-	-- {
-	-- 	"ray-x/go.nvim",
-	-- 	enabled = true,
-	-- 	dependencies = { -- optional packages
-	-- 		"ray-x/guihua.lua",
-	-- 		"neovim/nvim-lspconfig",
-	-- 		"nvim-treesitter/nvim-treesitter",
-	-- 	},
-	-- 	config = function()
-	-- 		require("go").setup()
-	-- 	end,
-	-- 	event = { "CmdlineEnter" },
-	-- 	ft = { "go", "gomod" },
-	-- 	build = ':lua require("go.install").update_all_sync()', -- if you need to install/update all binaries
-	-- },
 	{
 		"ray-x/go.nvim",
 		ft = { "go", "gomod", "gowork", "gotmpl" },
@@ -94,37 +79,10 @@ return {
 			},
 		},
 	},
-	-- Dap (Debug Adapter Protocol) for Go debugging
-	{
-		"mfussenegger/nvim-dap",
-		optional = true,
-		dependencies = {
-			"leoluz/nvim-dap-go",
-			config = function()
-				require("dap-go").setup({
-					delve = {
-						-- On startup, run 'dlv test' (or 'dlv exec') instead of 'dlv attach'
-						args = { "--check-go-version=false", "--check-local-modifications=false" },
-					},
-				})
-			end,
-		},
-	},
 	-- Go symbols in telescope/coc
 	{
 		"ray-x/lsp_signature.nvim",
 		event = "VeryLazy",
 		opts = { debug = false, hint_enable = false },
-	},
-	-- Go test runner enhancement
-	{
-		"klen/nvim-test",
-		enabled = false, -- Since you have go.nvim's test features
-		ft = "go",
-		opts = {
-			runners = {
-				go = "nvim-test.runners.go-test",
-			},
-		},
 	},
 }

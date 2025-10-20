@@ -80,14 +80,6 @@ keymap.set("n", "<Leader>tf", function()
 	insert_multiple_lines(lines_to_insert)
 end, { desc = "Insert doxygen style function comment", silent = true, noremap = true })
 
--- toggleterm
-keymap.set(
-	"n",
-	"<C-/>",
-	':lua require("toggleterm").toggle()<CR>',
-	{ desc = "Toggle Terminal", silent = true, noremap = true }
-)
-
 -- 可视模式下 <leader>y 复制到系统剪贴板
 keymap.set("v", "<leader>y", '"+y', {
 	noremap = true, -- 非递归映射
