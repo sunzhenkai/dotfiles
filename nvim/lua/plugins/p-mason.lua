@@ -13,13 +13,13 @@ return {
 				"eslint_d",
 				"copilot-language-server",
 			},
-			ui = {
-				icons = {
-					package_installed = "✓",
-					package_pending = "➜",
-					package_uninstalled = "✗",
-				},
-			},
+			-- ui = {
+			-- 	icons = {
+			-- 		package_installed = "✓",
+			-- 		package_pending = "➜",
+			-- 		package_uninstalled = "✗",
+			-- 	},
+			-- },
 		},
 	},
 	{

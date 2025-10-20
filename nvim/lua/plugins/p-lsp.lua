@@ -1,6 +1,6 @@
-local dft_capabilities = vim.lsp.protocol.make_client_capabilities()
-dft_capabilities.general = dft_capabilities.general or {}
-dft_capabilities.general.positionEncodings = { "utf-16" }
+-- local dft_capabilities = vim.lsp.protocol.make_client_capabilities()
+-- dft_capabilities.general = dft_capabilities.general or {}
+-- dft_capabilities.general.positionEncodings = { "utf-16" }
 
 return {
 	-- neovim/nvim-lspconfig
