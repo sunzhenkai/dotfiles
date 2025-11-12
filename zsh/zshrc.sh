@@ -13,6 +13,8 @@ fi
 # this makes the switch between modes quicker
 export KEYTIMEOUT=1
 export LESSCHARSET=utf-8
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
 
 # envs
 # personal binariebash <(curl -L https://zellij.dev/launchbash <(curl -L https://zellij.dev/launch))s
