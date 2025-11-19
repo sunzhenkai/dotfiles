@@ -109,3 +109,8 @@ if [[ -e ${CARGO_ENV} ]]; then
 elif [[ -e "${CARGO_BIN}" ]]; then
   export PATH="$CARGO_BIN:$PATH"
 fi
+
+# golang
+if [[ -n "$GOPATH" ]]; then
+  export PATH="$GOPATH"
+fi
