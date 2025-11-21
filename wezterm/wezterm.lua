@@ -5,6 +5,7 @@ local act = wezterm.action
 
 local config = {
 	font = wezterm.font_with_fallback({
+		{ family = "Maple Mono CN", weight = "Bold" },
 		{ family = "Maple Mono NF CN", weight = "Bold" },
 		{ family = "Maple Mono", weight = "Bold" },
 	}),
@@ -26,6 +27,7 @@ local config = {
 	-- disable_default_key_bindings = true,
 
 	audible_bell = "Disabled",
+	enable_wayland = true,
 }
 
 config.font_rules = {
