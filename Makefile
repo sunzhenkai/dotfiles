@@ -47,6 +47,8 @@ shell_gpt:
 	$(call install_config,shell_gpt,~/.config/shell_gpt)
 zed:
 	$(call install_config,zed,~/.config/zed)
+fcitx5:
+	$(call install_config,fcitx5,~/.config/fcitx5)
 
 # personal configs of mine
 git:
