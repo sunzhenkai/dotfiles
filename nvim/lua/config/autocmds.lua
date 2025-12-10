@@ -3,6 +3,23 @@
 -- Add any additional autocmds here
 -- custom commands are preferred to start with 'I'
 
+-- Go 性能优化: 限制诊断更新频率，减少 CPU 占用
+local go_diagnostic_group = vim.api.nvim_create_augroup("GoDiagnosticOptimization", { clear = true })
+vim.api.nvim_create_autocmd("FileType", {
+	group = go_diagnostic_group,
+	pattern = "go",
+	callback = function()
+		-- 不在插入模式下更新诊断，减少 CPU 占用
+		vim.diagnostic.config({
+			update_in_insert = false,
+			virtual_text = {
+				spacing = 4,
+				prefix = "●",
+			},
+		})
+	end,
+})
+
 -- Using C-r to get content from register in Global Scope
 vim.cmd([[
   autocmd! FileType fzf tnoremap <expr> <C-r> getreg()
