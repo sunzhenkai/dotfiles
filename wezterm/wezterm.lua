@@ -5,8 +5,8 @@ local act = wezterm.action
 
 local config = {
 	font = wezterm.font_with_fallback({
-		{ family = "Maple Mono CN", weight = "Bold" },
 		{ family = "Maple Mono NF CN", weight = "Bold" },
+		{ family = "Maple Mono CN", weight = "Bold" },
 		{ family = "Maple Mono", weight = "Bold" },
 	}),
 	font_size = 18,
