@@ -10,6 +10,7 @@ local config = {
 		{ family = "Maple Mono", weight = "Bold" },
 	}),
 	font_size = 18,
+	scrollback_lines = 100000,
 	color_scheme = "GruvboxDark",
 	-- color_scheme = "GruvboxLight",
 
