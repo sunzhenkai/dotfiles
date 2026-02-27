@@ -4,21 +4,24 @@
     "bindings": {
       "space e": "workspace::ToggleLeftDock",
       "ctrl-/": "workspace::ToggleBottomDock",
-      "space a": "workspace::ToggleRightDock"
-    }
+      "space a": "workspace::ToggleRightDock",
+    },
   },
   {
     "context": "Editor && VimControl && !VimWaiting && !menu",
-    "bindings": {}
+    "bindings": {},
   },
   {
     "context": "Editor && (vim_mode == normal || vim_mode == visual)",
     "bindings": {
+      "ctrl-_": "workspace::OpenTerminal",
+      "space space": "file_finder::Toggle",
+      "space /": "workspace::NewSearch",
       "space -": "pane::SplitDown",
       "space |": "pane::SplitRight",
       "space b h": "pane::ActivateNextItem",
       "space b l": "pane::ActivatePreviousItem",
-      "space g b": "git::Blame"
-    }
-  }
+      "space g b": "git::Blame",
+    },
+  },
 ]
