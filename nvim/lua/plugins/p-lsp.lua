@@ -30,33 +30,64 @@ return {
 					},
 				},
 				gopls = {
-					cmd = { "gopls", "-remote=auto" }, -- Use gopls daemon mode for performance
+					cmd = { "gopls" },
 					settings = {
 						gopls = {
-							-- 性能优化设置
-							-- 限制诊断更新频率，减少 CPU 占用（延迟 500ms）
+							-- 性能优化，减少 CPU 占用
+							-- 增加诊断延迟，减少频繁更新
 							diagnosticsDelay = "500ms",
-							-- 禁用静态检查以提升性能（如果需要可以改为 true）
+							-- 禁用静态检查以减少 CPU
 							staticcheck = false,
-							-- 限制诊断范围，禁用耗时的检查
+							-- 限制诊断范围
 							diagnostics = {
 								staticcheck = false,
 								unusedparams = false,
 							},
-							-- 限制工作目录范围，避免索引整个系统
-							directoryFilters = { "-**/node_modules", "-**/.git", "-**/vendor" },
-							-- 减少并行度，降低 CPU 占用（默认是 CPU 核心数）
-							maxParallelism = 4,
+							-- 限制工作目录范围，避免索引大目录
+							directoryFilters = {
+								"-**/node_modules",
+								"-**/.git",
+								"-**/vendor",
+								"-**/third_party",
+							},
+							-- 减少并行度，降低 CPU 占用
+							maxParallelism = 2,
 							-- 限制代码补全的预算时间
 							completionBudget = "100ms",
 							-- 禁用占位符，提升补全速度
 							usePlaceholders = false,
 							-- 使用简化的悬停信息
 							hoverKind = "SynopsisDocumentation",
-							-- 使用模糊匹配，更快
-							symbolMatcher = "fuzzy",
+							-- 保留有用的 codelens，禁用耗时的
+							codelenses = {
+								gc_details = false,
+								generate = false,
+								regenerate_cgo = false,
+								test = true, -- 保留 test codelens
+								tidy = false,
+								upgrade_dependency = false,
+							},
+							-- 禁用 inlay hints
+							ui = {
+								inlayhint = {
+									enable = false,
+								},
+							},
 							-- 限制索引范围，只索引当前模块
 							expandWorkspaceToModule = false,
+							-- 使用模糊匹配
+							symbolMatcher = "fuzzy",
+							-- 限制内存使用
+							expansionTimeout = "5s",
+							-- 限制内存密集型功能
+							analyses = {
+								fieldalignment = false,
+								shadow = false,
+							},
+							-- 保留自动导入（编码体验重要）
+							completeUnimported = true,
+							-- 保留深度补全（编码体验重要）
+							deepCompletion = true,
 						},
 					},
 				},
