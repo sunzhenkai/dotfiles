@@ -11,6 +11,7 @@ vim.opt.textwidth = 100
 vim.opt.ignorecase = false
 vim.opt.relativenumber = false
 vim.opt.termguicolors = true
+vim.opt.history = 100000
 -- Clipboard
 vim.opt.clipboard = "unnamedplus"
 

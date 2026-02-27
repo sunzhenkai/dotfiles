@@ -94,6 +94,31 @@ if command -v asdf >/dev/null; then
   fix_asdf_plugin_path nodejs
 fi
 
+function fix_mise_plugin_path() {
+  local t_plugin=$1
+  if mise current ${t_plugin} >/dev/null 2>&1; then
+    local t_plugin_version=$(mise current $t_plugin | grep $t_plugin | awk '{print$2}')
+    local t_bin_path="${MISE_DATA_DIR}/installs/${t_plugin}/${t_plugin_version}/bin"
+    if [[ -e "$t_bin_path" ]]; then
+      export PATH="$t_bin_path:$PATH"
+    fi
+    local t_pkg_bin_path="${MISE_DATA_DIR}/installs/${t_plugin}/${t_plugin_version}/packages/bin"
+    if [[ -e "$t_pkg_bin_path" ]]; then
+      export PATH="$t_pkg_bin_path:$PATH"
+    fi
+  fi
+}
+
+# mise
+if command -v mise >/dev/null; then
+  export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+  export PATH="${MISE_DATA_DIR}/shims:$PATH"
+  # fix python binraries
+  fix_mise_plugin_path python
+  fix_mise_plugin_path golang
+  fix_mise_plugin_path nodejs
+fi
+
 # private config
 PRIVATE_CONFIG_ENV="$HOME/.config/private-config/envs/env"
 if [[ -e "$PRIVATE_CONFIG_ENV" ]]; then

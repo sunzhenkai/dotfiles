@@ -1,33 +1,29 @@
-// references:
-//  1. https://gist.github.com/oca159/0b480ed6555056418905b6e59af33674
-//  2. https://github.com/mrnugget/dotfiles/blob/master/zed_keymap.json
 [
   {
     "context": "Workspace && !(Editor && vim_mode == insert)",
     "bindings": {
-      // open file tree
       "space e": "workspace::ToggleLeftDock",
-      // open terminal
       "ctrl-/": "workspace::ToggleBottomDock",
-      // open
-      "space a": "workspace::ToggleRightDock"
-    }
+      "space a": "workspace::ToggleRightDock",
+    },
   },
   {
     "context": "Editor && VimControl && !VimWaiting && !menu",
-    "bindings": {}
+    "bindings": {},
   },
   {
     "context": "Editor && (vim_mode == normal || vim_mode == visual)",
     "bindings": {
-      // pane
+      "ctrl-_": "workspace::OpenTerminal",
+      "g r": "editor::FindAllReferences",
+      "space space": "file_finder::Toggle",
+      "space /": "workspace::NewSearch",
       "space -": "pane::SplitDown",
       "space |": "pane::SplitRight",
-      // buffer / tab
       "space b h": "pane::ActivateNextItem",
       "space b l": "pane::ActivatePreviousItem",
-      // git
-      "space g b": "git::Blame"
-    }
-  }
+      "space b d": "pane::CloseActiveItem",
+      "space g b": "git::Blame",
+    },
+  },
 ]
