@@ -5,7 +5,7 @@
   "agent": {
     "default_model": {
       "provider": "zhipu",
-      "model": "GLM-4.7",
+      "model": "GLM-5",
     },
     "inline_alternatives": [
       {
