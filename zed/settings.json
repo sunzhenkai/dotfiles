@@ -5,7 +5,7 @@
   "agent": {
     "default_model": {
       "provider": "zhipu",
-      "model": "GLM-5",
+      "model": "GLM-4.7",
     },
     "inline_alternatives": [
       {
@@ -23,7 +23,7 @@
           {
             "name": "GLM-5",
             "display_name": "GLM-5",
-            "max_tokens": 32768,
+            "max_tokens": 2097152,
             "capabilities": {
               "tools": true,
               "images": false,
@@ -34,7 +34,7 @@
           {
             "name": "GLM-4.7",
             "display_name": "GLM-4.7",
-            "max_tokens": 32768,
+            "max_tokens": 128000,
             "capabilities": {
               "tools": true,
               "images": false,
@@ -45,7 +45,7 @@
           {
             "name": "GLM-4.7-FlashX",
             "display_name": "GLM-4.7-FlashX",
-            "max_tokens": 32768,
+            "max_tokens": 128000,
             "capabilities": {
               "tools": true,
               "images": false,
