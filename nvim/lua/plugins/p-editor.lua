@@ -134,10 +134,10 @@ return {
 				-- Go: 优化 golangci-lint 性能
 				["golangci-lint"] = {
 					-- 使用超时避免卡死
-					timeout = 10000, -- 10秒超时
+					timeout = 100000, -- 超时
 					args = {
 						"--fast", -- 只运行快速检查
-						"--timeout=10s", -- 设置超时
+						"--timeout=100s", -- 设置超时
 					},
 				},
 				-- eslint_d = {
