@@ -70,8 +70,8 @@ require("lazy").setup({
 			-- disable some rtp plugins
 			disabled_plugins = {
 				"gzip",
-				"matchit",
-				"matchparen",
+				-- "matchit", -- 保留括号匹配功能
+				-- "matchparen", -- 保留括号高亮功能
 				"tarPlugin",
 				"tohtml",
 				"tutor",

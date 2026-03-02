@@ -61,16 +61,16 @@ return {
 							-- 保留有用的 codelens，禁用耗时的
 							codelenses = {
 								gc_details = false,
-								generate = false,
+								generate = true, -- 保留代码生成功能
 								regenerate_cgo = false,
 								test = true, -- 保留 test codelens
-								tidy = false,
+								tidy = true, -- 保留依赖整理功能
 								upgrade_dependency = false,
 							},
-							-- 禁用 inlay hints
+							-- 保留 inlay hints 提升编码体验
 							ui = {
 								inlayhint = {
-									enable = false,
+									enable = true,
 								},
 							},
 							-- 限制索引范围，只索引当前模块
