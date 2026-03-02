@@ -46,6 +46,7 @@ require("lazy").setup({
 		{ import = "lazyvim.plugins.extras.lang.toml" },
 		{ import = "lazyvim.plugins.extras.lang.yaml" },
 		{ import = "lazyvim.plugins.extras.lang.rust" },
+		{ import = "lazyvim.plugins.extras.lang.go" },
 		{ import = "lazyvim.plugins.extras.ai.sidekick" },
 		{ import = "lazyvim.plugins.extras.coding.neogen" },
 		{ import = "plugins" },
@@ -69,14 +70,19 @@ require("lazy").setup({
 			-- disable some rtp plugins
 			disabled_plugins = {
 				"gzip",
-				-- "matchit",
-				-- "matchparen",
-				-- "netrwPlugin",
+				-- "matchit", -- 保留括号匹配功能
+				-- "matchparen", -- 保留括号高亮功能
 				"tarPlugin",
 				"tohtml",
 				"tutor",
 				"zipPlugin",
+				"netrwPlugin",
 			},
 		},
+		-- 减少内存占用
+		cache = {
+			enabled = true,
+		},
+		reset_packpath = true,
 	},
 })

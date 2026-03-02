@@ -101,8 +101,8 @@ return {
 		event = "LazyFile",
 		opts = {
 			-- Event to trigger linters
-			-- 对于 Go，只在保存时触发，减少 CPU 占用
-			events = { "BufWritePost", "BufReadPost", "InsertLeave" },
+			-- 在保存和读取文件时触发，保持实时反馈
+			events = { "BufWritePost", "BufReadPost" },
 			linters_by_ft = {
 				-- c/c++/cmake
 				c = { "cpplint" },
@@ -110,7 +110,7 @@ return {
 				-- fish
 				fish = { "fish" },
 				-- go: 只在保存时 lint，避免频繁触发
-				go = { "golangcilint" },
+				go = { "golangci-lint" },
 				proto = { "protolint" },
 				-- python
 				python = { "ruff" },
@@ -131,13 +131,13 @@ return {
 						"--linelength=120",
 					},
 				},
-				-- Go: 优化 golangcilint 性能
-				golangcilint = {
+				-- Go: 优化 golangci-lint 性能
+				["golangci-lint"] = {
 					-- 使用超时避免卡死
-					timeout = 10000, -- 10秒超时
+					timeout = 60000, -- 60秒超时
 					args = {
 						"--fast", -- 只运行快速检查
-						"--timeout=10s", -- 设置超时
+						"--timeout=60s", -- 设置超时
 					},
 				},
 				-- eslint_d = {
