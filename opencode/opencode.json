@@ -9,9 +9,26 @@
     }
   },
   "provider": {
-    "anthropic-compatible": {
+    "anthropic": {
       "options": {
-        "baseURL": "https://globalai.vip"
+        "baseURL": "https://globalai.vip/v1"
+      }
+    },
+    "anthropic-compatible": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "Anthropic Compatible",
+      "options": {
+        "baseURL": "https://globalai.vip/v1",
+        "apiKey": "{env:ANTHROPIC_COMPATIBAL_API_KEY}"
+      },
+      "models": {
+        "claude-sonnet-4.5": {
+          "name": "Claude Sonnet 4.5",
+          "limit": {
+            "context": 200000,
+            "output": 64000
+          }
+        }
       }
     }
   }
