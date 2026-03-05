@@ -7,5 +7,12 @@
     "plan": {
       "prompt": "请使用中文进行思考和回答。"
     }
+  },
+  "provider": {
+    "anthropic-compatible": {
+      "options": {
+        "baseURL": "https://globalai.vip"
+      }
+    }
   }
 }
