@@ -3,20 +3,25 @@
 -- Add any additional autocmds here
 -- custom commands are preferred to start with 'I'
 
--- Go 性能优化: 限制诊断更新频率，减少 CPU 占用
-local go_diagnostic_group = vim.api.nvim_create_augroup("GoDiagnosticOptimization", { clear = true })
-vim.api.nvim_create_autocmd("FileType", {
-	group = go_diagnostic_group,
-	pattern = "go",
-	callback = function()
-		-- 不在插入模式下更新诊断，减少 CPU 占用
-		vim.diagnostic.config({
-			update_in_insert = false,
-			virtual_text = {
-				spacing = 4,
-				prefix = "●",
-			},
-		})
+-- 大文件优化: 对大文件禁用耗性能的功能
+local big_file_group = vim.api.nvim_create_augroup("BigFileOptimization", { clear = true })
+vim.api.nvim_create_autocmd("BufReadPre", {
+	group = big_file_group,
+	callback = function(args)
+		local ok, stats = pcall(vim.uv.fs_stat, vim.api.nvim_buf_get_name(args.buf))
+		if ok and stats and stats.size > 1024 * 1024 then -- 1MB
+			vim.b[args.buf].large_file = true
+			vim.opt_local.foldmethod = "manual"
+			vim.opt_local.spell = false
+			vim.opt_local.swapfile = false
+			vim.opt_local.undofile = false
+			-- 延迟禁用 treesitter 高亮
+			vim.schedule(function()
+				if vim.api.nvim_buf_is_valid(args.buf) then
+					pcall(vim.treesitter.stop, args.buf)
+				end
+			end)
+		end
 	end,
 })
 

@@ -11,6 +11,15 @@ vim.opt.textwidth = 100
 vim.opt.ignorecase = false
 vim.opt.relativenumber = false
 vim.opt.termguicolors = true
+
+-- 性能优化
+vim.opt.updatetime = 300 -- 减少 CursorHold 触发延迟（默认 4000ms）
+vim.opt.timeoutlen = 500 -- 按键序列超时（默认 1000ms）
+vim.opt.redrawtime = 1500 -- 语法高亮超时（默认 2000ms），防止大文件卡死
+vim.opt.maxmempattern = 1000 -- 限制正则匹配内存（默认 1000，显式设置）
+vim.opt.synmaxcol = 300 -- 限制语法高亮的列数，避免长行卡顿
+vim.opt.lazyredraw = false -- LazyVim 需要 false，不要改为 true
+
 -- Clipboard
 vim.opt.clipboard = "unnamedplus"
 

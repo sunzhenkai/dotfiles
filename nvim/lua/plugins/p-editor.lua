@@ -15,36 +15,34 @@ return {
 		"stevearc/conform.nvim",
 		opts = {
 			notify_on_error = true,
-			opts = {
-				formatters_by_ft = {
-					lua = { "stylua" },
-					sh = { "shfmt" },
-					c = { "clang_format" },
-					cpp = { "clang_format" },
-					go = { "gofumpt", "goimports-reviser" },
-					markdown = { "prettier", "markdownlint-cli2" },
-					yaml = { "yamlfmt" },
-					toml = { "taplo" },
-					json = { "prettier" },
-					css = { "prettier" },
-					python = { "isort", "black" },
-					typescriptreact = { "eslint_d" },
-					typescript = { "eslint_d" },
-					javascript = { "eslint_d" },
-					javascriptreact = { "eslint_d" },
-					proto = { "buf" },
+			formatters_by_ft = {
+				lua = { "stylua" },
+				sh = { "shfmt" },
+				c = { "clang_format" },
+				cpp = { "clang_format" },
+				go = { "gofumpt", "goimports-reviser" },
+				markdown = { "prettier", "markdownlint-cli2" },
+				yaml = { "yamlfmt" },
+				toml = { "taplo" },
+				json = { "prettier" },
+				css = { "prettier" },
+				python = { "isort", "black" },
+				typescriptreact = { "eslint_d" },
+				typescript = { "eslint_d" },
+				javascript = { "eslint_d" },
+				javascriptreact = { "eslint_d" },
+				proto = { "buf" },
+			},
+			formatters = {
+				shfmt = {
+					prepend_args = { "-i", "2" },
 				},
-				formatters = {
-					shfmt = {
-						prepend_args = { "-i", "2" },
-					},
-					clang_format = {
-						prepend_args = { "--style=file", "--fallback-style=google", "--verbose" },
-					},
-					-- python
-					black = {
-						prepend_args = { "--line-length", "100" },
-					},
+				clang_format = {
+					prepend_args = { "--style=file", "--fallback-style=google" },
+				},
+				-- python
+				black = {
+					prepend_args = { "--line-length", "100" },
 				},
 			},
 		},
@@ -58,6 +56,10 @@ return {
 			vim.g.matchup_matchparen_enabled = 1
 			vim.g.matchup_matchparen_hi_surround_always = 1
 			vim.g.matchup_matchparen_deferred = 1
+			vim.g.matchup_matchparen_deferred_show_delay = 100 -- 延迟匹配显示，减少 CPU
+			vim.g.matchup_matchparen_deferred_hide_delay = 500
+			vim.g.matchup_matchparen_timeout = 300 -- 匹配超时（毫秒）
+			vim.g.matchup_matchparen_insert_timeout = 60 -- 插入模式下更短的超时
 		end,
 	},
 	-- nvim-treesitter/nvim-treesitter
@@ -121,11 +123,12 @@ return {
 			},
 			-- LazyVim extension to easily override linter options
 			-- or add custom linters.
+			-- 注意：使用 prepend_args 追加参数，而非 args 覆盖（覆盖会丢失默认参数导致报错）
 			---@type table<string,table>
 			linters = {
 				-- c/c++/cmake
 				cpplint = {
-					args = {
+					prepend_args = {
 						"--filter=-legal/copyright,-build/include_subdir,-runtime/indentation_namespace",
 						-- set line length, the default value is 80
 						"--linelength=120",
@@ -133,23 +136,11 @@ return {
 				},
 				-- Go: 优化 golangci-lint 性能
 				["golangci-lint"] = {
-					-- 使用超时避免卡死
-					timeout = 60000, -- 60秒超时
-					args = {
-						"--fast", -- 只运行快速检查
-						"--timeout=60s", -- 设置超时
+					-- 使用 prepend_args 追加参数，保留默认的 run/--out-format 等必要参数
+					prepend_args = {
+						"--timeout=60s",
 					},
 				},
-				-- eslint_d = {
-				-- 	cmd = "eslint_d",
-				-- 	args = { "--stdin", "--stdin-filename", "%filepath" },
-				-- 	stream = "stderr",
-				-- 	ignore_exitcode = true,
-				-- 	parser = require("lint.parser").from_errorformat("%f:%l:%c: %m", {
-				-- 		source = "eslint_d",
-				-- 		severity = vim.diagnostic.severity.WARN,
-				-- 	}),
-				-- },
 			},
 		},
 	},
@@ -164,11 +155,12 @@ return {
 	-- kevinhwang91/nvim-ufo
 	{
 		"kevinhwang91/nvim-ufo",
+		event = "LazyFile",
 		dependencies = {
 			"kevinhwang91/promise-async",
 			"neovim/nvim-lspconfig",
 		},
-		setup = function()
+		config = function()
 			require("ufo").setup()
 		end,
 	},
