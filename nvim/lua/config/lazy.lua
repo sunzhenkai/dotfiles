@@ -27,8 +27,6 @@ require("lazy").setup({
 		{ import = "lazyvim.plugins.extras.editor.neo-tree" },
 		{ import = "lazyvim.plugins.extras.editor.telescope" },
 		{ import = "lazyvim.plugins.extras.editor.inc-rename" },
-		-- { import = "lazyvim.plugins.extras.editor.snacks_explorer" },
-		{ import = "lazyvim.plugins.extras.editor.neo-tree" },
 		{ import = "lazyvim.plugins.extras.editor.snacks_picker" },
 		{ import = "lazyvim.plugins.extras.util.mini-hipatterns" },
 		{ import = "lazyvim.plugins.extras.linting.eslint" },
@@ -46,7 +44,6 @@ require("lazy").setup({
 		{ import = "lazyvim.plugins.extras.lang.toml" },
 		{ import = "lazyvim.plugins.extras.lang.yaml" },
 		{ import = "lazyvim.plugins.extras.lang.rust" },
-		{ import = "lazyvim.plugins.extras.lang.go" },
 		{ import = "lazyvim.plugins.extras.ai.sidekick" },
 		{ import = "lazyvim.plugins.extras.coding.neogen" },
 		{ import = "plugins" },
@@ -64,6 +61,7 @@ require("lazy").setup({
 	checker = {
 		enabled = true, -- check for plugin updates periodically
 		notify = false, -- notify on update
+		frequency = 86400, -- 每天检查一次（默认3600秒），减少后台 CPU
 	}, -- automatically check for plugin updates
 	performance = {
 		rtp = {

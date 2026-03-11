@@ -15,6 +15,14 @@ return {
 			"p00f/clangd_extensions.nvim",
 		},
 		opts = {
+			-- 全局诊断配置：减少 CPU 占用
+			diagnostics = {
+				update_in_insert = false, -- 不在插入模式更新诊断
+				virtual_text = {
+					spacing = 4,
+					prefix = "●",
+				},
+			},
 			servers = {
 				clangd = {
 					filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
@@ -27,33 +35,32 @@ return {
 						"--function-arg-placeholders",
 						"--fallback-style=google",
 						"--log=error",
+						-- 性能优化
+						"-j=4", -- 限制后台索引并发数
+						"--pch-storage=memory", -- PCH 存储在内存中（更快但要注意内存）
+						"--background-index-priority=low", -- 后台索引低优先级
 					},
 				},
 				gopls = {
-					cmd = { "gopls" },
+					cmd = { "gopls", "-remote.listen.timeout=0" },
 					settings = {
 						gopls = {
 							-- 性能优化，减少 CPU 占用
-							-- 增加诊断延迟，减少频繁更新
 							diagnosticsDelay = "500ms",
-							-- 禁用静态检查以减少 CPU
 							staticcheck = false,
-							-- 限制诊断范围
-							diagnostics = {
-								staticcheck = false,
-								unusedparams = false,
-							},
 							-- 限制工作目录范围，避免索引大目录
 							directoryFilters = {
 								"-**/node_modules",
 								"-**/.git",
 								"-**/vendor",
 								"-**/third_party",
+								"-**/.cache",
+								"-**/bin",
 							},
 							-- 减少并行度，降低 CPU 占用
 							maxParallelism = 2,
 							-- 限制代码补全的预算时间
-							completionBudget = "100ms",
+							completionBudget = "200ms",
 							-- 禁用占位符，提升补全速度
 							usePlaceholders = false,
 							-- 使用简化的悬停信息
@@ -61,33 +68,32 @@ return {
 							-- 保留有用的 codelens，禁用耗时的
 							codelenses = {
 								gc_details = false,
-								generate = true, -- 保留代码生成功能
+								generate = true,
 								regenerate_cgo = false,
-								test = true, -- 保留 test codelens
-								tidy = true, -- 保留依赖整理功能
+								test = true,
+								tidy = true,
 								upgrade_dependency = false,
-							},
-							-- 保留 inlay hints 提升编码体验
-							ui = {
-								inlayhint = {
-									enable = true,
-								},
+								vendor = false,
 							},
 							-- 限制索引范围，只索引当前模块
 							expandWorkspaceToModule = false,
-							-- 使用模糊匹配
+							-- 使用模糊匹配（比 CaseSensitive 更省 CPU）
 							symbolMatcher = "fuzzy",
-							-- 限制内存使用
-							expansionTimeout = "5s",
-							-- 限制内存密集型功能
+							-- 限制内存密集型分析
 							analyses = {
 								fieldalignment = false,
 								shadow = false,
+								unusedparams = false,
+								unusedwrite = false,
+								nilness = true, -- 保留空指针检查（重要）
 							},
-							-- 保留自动导入（编码体验重要）
+							-- 保留自动导入和深度补全（编码体验重要）
 							completeUnimported = true,
-							-- 保留深度补全（编码体验重要）
 							deepCompletion = true,
+							-- 语义 token 优化
+							semanticTokens = true,
+							-- 内存优化：使用 gopls 内置的 gc
+							memoryMode = "DegradeClosed", -- 对关闭的文件降级内存使用
 						},
 					},
 				},
