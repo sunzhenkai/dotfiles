@@ -16,8 +16,29 @@ detect_os() {
   echo "Detected OS: $ID"
 }
 
+# Check if Linux has GUI (X11 or Wayland)
+has_linux_gui() {
+  # Check for display server
+  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    return 0
+  fi
+  
+  # Check if fc-cache exists (fontconfig is installed)
+  if command -v fc-cache >/dev/null 2>&1; then
+    return 0
+  fi
+  
+  return 1
+}
+
 # Install fonts on Linux
 install_fonts_linux() {
+  # Skip if no GUI environment
+  if ! has_linux_gui; then
+    echo "No GUI environment detected, skipping font installation."
+    return 0
+  fi
+  
   echo "Installing fonts on Linux..."
 
   local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,9 +51,9 @@ install_fonts_linux() {
 
   cd "$fonts_dir" || exit 1
 
-  # Extract font archives
+  # Extract font archives (suppress macOS extended attributes warnings)
   for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f"
+    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
   done
 
   # Create system fonts directory
@@ -42,7 +63,9 @@ install_fonts_linux() {
   sudo mv *.ttf /usr/share/fonts/local/ 2>/dev/null || true
 
   # Refresh font cache
-  sudo fc-cache -fv
+  if command -v fc-cache >/dev/null 2>&1; then
+    sudo fc-cache -fv
+  fi
 
   echo "Fonts installed successfully on Linux."
 }
@@ -61,9 +84,9 @@ install_fonts_macos() {
 
   cd "$fonts_dir" || exit 1
 
-  # Extract font archives
+  # Extract font archives (suppress macOS extended attributes warnings)
   for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f"
+    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
   done
 
   # Create user fonts directory
