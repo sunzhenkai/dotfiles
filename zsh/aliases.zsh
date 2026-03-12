@@ -1,6 +1,19 @@
 # Alias definitions
 # You can add your custom aliases here
 
+# Editor
+alias vim='nvim'
+
+# Zellij
+alias zlj='zellij'
+alias za='zellij a'
+alias zs='zellij -s'
+
+# Kitty
+if command -v kitty >/dev/null; then
+  alias kssh='kitty +kitten ssh'
+fi
+
 # Example aliases
 # alias ll='ls -la'
 # alias gs='git status'

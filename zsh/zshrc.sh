@@ -1,10 +1,9 @@
 export ICONFIG_FLAG=1
 
 export EDITOR="nvim"
-alias vim='nvim'
-alias zlj='zellij'
-alias za='zellij a'
-alias zs='zellij -s'
+
+# aliases
+source ~/.config/dotfiles/zsh/aliases.zsh
 
 # vi mode
 if command -v bindkey >/dev/null; then
@@ -63,11 +62,6 @@ if [[ "$NVM_DIR" == "" && -e "$DFT_NVM_DIR" ]]; then
   export NVM_DIR="$DFT_NVM_DIR"
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
-fi
-
-# kitty
-if command -v kitty >/dev/null; then
-  alias kssh="kitty +kitten ssh"
 fi
 
 function fix_asdf_plugin_path() {
