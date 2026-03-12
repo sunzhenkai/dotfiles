@@ -16,7 +16,7 @@ endef
 init:
 	@bash scripts/init.sh
 
-all: starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr shell_gpt zed opencode
+all: init starship nvim kitty alacritty starship tmux zellij ghostty zsh yazi wezterm helix hypr shell_gpt zed opencode
 starship:
 	$(call install_config,starship/starship.toml,~/.config/starship.toml)
 nvim:
