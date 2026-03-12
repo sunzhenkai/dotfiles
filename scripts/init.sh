@@ -22,7 +22,7 @@ has_linux_gui() {
   if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
     return 0
   fi
-  
+
   return 1
 }
 
@@ -33,13 +33,13 @@ install_fonts_linux() {
     echo "No GUI environment detected (DISPLAY or WAYLAND_DISPLAY not set), skipping font installation."
     return 0
   fi
-  
+
   # Check if fc-cache is available
   if ! command -v fc-cache >/dev/null 2>&1; then
     echo "fc-cache not found, fontconfig may not be installed. Skipping font installation."
     return 0
   fi
-  
+
   echo "Installing fonts on Linux..."
 
   local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -99,6 +99,7 @@ install_fonts_macos() {
 
 # Main
 main() {
+  git submodule update --init
   detect_os
 
   case "$ID" in
