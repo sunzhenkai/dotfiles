@@ -36,7 +36,7 @@ install_config() {
     exit 1
   fi
 
-  IFS=':' read -r source target <<< "$def"
+  IFS=':' read -r source target <<<"$def"
   target="${target/#\~/$HOME}"
   local expected_link="$DOTFILES_ROOT/$source"
 
@@ -76,42 +76,42 @@ install_zsh() {
 }
 
 # 特殊配置：git
-install_git() {
-  install_config "git"
-  echo ""
-  echo "⚠️  Add to ~/.gitconfig after [user]:"
-  echo '[include]'
-  echo '    path = ~/.config/git/gitconfig'
-}
-
-# 特殊配置：git-global
-install_git_global() {
-  local expected_link="$DOTFILES_ROOT/git/gitconfig"
-  
-  # 检查是否已经是正确的符号链接
-  if [ -L ~/.gitconfig ]; then
-    local current_link
-    current_link=$(readlink -f ~/.gitconfig 2>/dev/null || readlink ~/.gitconfig)
-    local expected_abs
-    expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
-    if [ "$current_link" = "$expected_abs" ]; then
-      echo "Already installed: git-global"
-      return 0
-    fi
-  fi
-
-  [ -e ~/.gitconfig ] && mv ~/.gitconfig ~/.gitconfig-$TIMESTAMP
-  ln -s "$expected_link" ~/.gitconfig
-  echo "Installed: git-global"
-}
+# install_git() {
+#   install_config "git"
+#   echo ""
+#   echo "⚠️  Add to ~/.gitconfig after [user]:"
+#   echo '[include]'
+#   echo '    path = ~/.config/git/gitconfig'
+# }
+#
+# # 特殊配置：git-global
+# install_git_global() {
+#   local expected_link="$DOTFILES_ROOT/git/gitconfig"
+#
+#   # 检查是否已经是正确的符号链接
+#   if [ -L ~/.gitconfig ]; then
+#     local current_link
+#     current_link=$(readlink -f ~/.gitconfig 2>/dev/null || readlink ~/.gitconfig)
+#     local expected_abs
+#     expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
+#     if [ "$current_link" = "$expected_abs" ]; then
+#       echo "Already installed: git-global"
+#       return 0
+#     fi
+#   fi
+#
+#   [ -e ~/.gitconfig ] && mv ~/.gitconfig ~/.gitconfig-$TIMESTAMP
+#   ln -s "$expected_link" ~/.gitconfig
+#   echo "Installed: git-global"
+# }
 
 # 安装全部
 install_all() {
   for name in "${!CONFIGS[@]}"; do
     case "$name" in
-      zsh) install_zsh ;;
-      git) install_git ;;
-      *) install_config "$name" ;;
+    zsh) install_zsh ;;
+    # git) install_git ;;
+    *) install_config "$name" ;;
     esac
   done
 }
@@ -135,11 +135,11 @@ main() {
   fi
 
   case "$config" in
-    --all|-a) install_all ;;
-    zsh) install_zsh ;;
-    git) install_git ;;
-    git-global) install_git_global ;;
-    *) install_config "$config" ;;
+  --all | -a) install_all ;;
+  zsh) install_zsh ;;
+  git) install_git ;;
+  git-global) install_git_global ;;
+  *) install_config "$config" ;;
   esac
 }
 
