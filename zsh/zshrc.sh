@@ -36,10 +36,6 @@ if [[ -e "$HOMEBREW_ROOT_MACOS" ]]; then
   export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_FALLBACK_LIBRARY_PATH"
 fi
 
-# 自动为 keg-only 软件包设置环境变量
-# if [[ -f ~/.config/dotfiles/zsh/homebrew.sh ]]; then
-#   source ~/.config/dotfiles/zsh/homebrew.sh
-# fi
 # BREW_BISON=/opt/homebrew/opt/bison
 # if [[ -e "$BREW_BISON" ]]; then
 #   export PATH="$BREW_BISON/bin:$PATH"
