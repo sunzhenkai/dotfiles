@@ -20,8 +20,8 @@ detect_os() {
 install_fonts_linux() {
   echo "Installing fonts on Linux..."
 
-  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local fonts_dir="$script_dir/assets/fonts"
+  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local fonts_dir="$dotfiles_root/assets/fonts"
 
   if [ ! -d "$fonts_dir" ]; then
     echo "Fonts directory not found: $fonts_dir"
@@ -51,8 +51,8 @@ install_fonts_linux() {
 install_fonts_macos() {
   echo "Installing fonts on macOS..."
 
-  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local fonts_dir="$script_dir/assets/fonts"
+  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local fonts_dir="$dotfiles_root/assets/fonts"
 
   if [ ! -d "$fonts_dir" ]; then
     echo "Fonts directory not found: $fonts_dir"
