@@ -38,12 +38,25 @@ install_config() {
 
   IFS=':' read -r source target <<< "$def"
   target="${target/#\~/$HOME}"
+  local expected_link="$DOTFILES_ROOT/$source"
 
-  # 备份
+  # 检查是否已经是正确的符号链接
+  if [ -L "$target" ]; then
+    local current_link
+    current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
+    local expected_abs
+    expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
+    if [ "$current_link" = "$expected_abs" ]; then
+      echo "Already installed: $name"
+      return 0
+    fi
+  fi
+
+  # 备份已存在的文件/目录
   [ -e "$target" ] && mv "$target" "$target-$TIMESTAMP"
 
   # 创建符号链接
-  ln -s "$DOTFILES_ROOT/$source" "$target"
+  ln -s "$expected_link" "$target"
   echo "Installed: $name"
 }
 
@@ -73,8 +86,22 @@ install_git() {
 
 # 特殊配置：git-global
 install_git_global() {
+  local expected_link="$DOTFILES_ROOT/git/gitconfig"
+  
+  # 检查是否已经是正确的符号链接
+  if [ -L ~/.gitconfig ]; then
+    local current_link
+    current_link=$(readlink -f ~/.gitconfig 2>/dev/null || readlink ~/.gitconfig)
+    local expected_abs
+    expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
+    if [ "$current_link" = "$expected_abs" ]; then
+      echo "Already installed: git-global"
+      return 0
+    fi
+  fi
+
   [ -e ~/.gitconfig ] && mv ~/.gitconfig ~/.gitconfig-$TIMESTAMP
-  ln -s "$DOTFILES_ROOT/git/gitconfig" ~/.gitconfig
+  ln -s "$expected_link" ~/.gitconfig
   echo "Installed: git-global"
 }
 
