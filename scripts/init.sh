@@ -23,11 +23,6 @@ has_linux_gui() {
     return 0
   fi
   
-  # Check if fc-cache exists (fontconfig is installed)
-  if command -v fc-cache >/dev/null 2>&1; then
-    return 0
-  fi
-  
   return 1
 }
 
@@ -35,7 +30,13 @@ has_linux_gui() {
 install_fonts_linux() {
   # Skip if no GUI environment
   if ! has_linux_gui; then
-    echo "No GUI environment detected, skipping font installation."
+    echo "No GUI environment detected (DISPLAY or WAYLAND_DISPLAY not set), skipping font installation."
+    return 0
+  fi
+  
+  # Check if fc-cache is available
+  if ! command -v fc-cache >/dev/null 2>&1; then
+    echo "fc-cache not found, fontconfig may not be installed. Skipping font installation."
     return 0
   fi
   
@@ -63,9 +64,7 @@ install_fonts_linux() {
   sudo mv *.ttf /usr/share/fonts/local/ 2>/dev/null || true
 
   # Refresh font cache
-  if command -v fc-cache >/dev/null 2>&1; then
-    sudo fc-cache -fv
-  fi
+  sudo fc-cache -fv
 
   echo "Fonts installed successfully on Linux."
 }
