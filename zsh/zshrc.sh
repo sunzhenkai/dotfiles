@@ -3,7 +3,9 @@ export ICONFIG_FLAG=1
 export EDITOR="nvim"
 
 # aliases
-source ~/.config/dotfiles/zsh/aliases.zsh
+if [[ -f ~/.config/dotfiles/zsh/aliases.zsh ]]; then
+  source ~/.config/dotfiles/zsh/aliases.zsh
+fi
 
 # vi mode
 if command -v bindkey >/dev/null; then
