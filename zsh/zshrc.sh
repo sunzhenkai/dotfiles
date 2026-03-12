@@ -36,6 +36,43 @@ if [[ -e "$HOMEBREW_ROOT_MACOS" ]]; then
   export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_FALLBACK_LIBRARY_PATH"
 fi
 
+# fix PKG_CONFIG_PATH if empty
+if [[ -z "$PKG_CONFIG_PATH" ]]; then
+  # common pkg-config paths
+  PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig"
+  # Debian/Ubuntu multiarch
+  if [[ -d "/usr/lib/x86_64-linux-gnu/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  if [[ -d "/usr/lib/aarch64-linux-gnu/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  # Fedora/RHEL/CentOS (64-bit)
+  if [[ -d "/usr/lib64/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/lib64/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  # Arch Linux / openSUSE / Gentoo / Fedora (32-bit fallback)
+  if [[ -d "/usr/lib/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  # FreeBSD
+  if [[ -d "/usr/local/lib/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  # macOS system
+  if [[ -d "/usr/lib/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  # add homebrew paths if available
+  if [[ -n "$HOMEBREW_ROOT" && -e "$HOMEBREW_ROOT/lib/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="$HOMEBREW_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  if [[ -n "$HOMEBREW_ROOT_MACOS" && -e "$HOMEBREW_ROOT_MACOS/lib/pkgconfig" ]]; then
+    PKG_CONFIG_PATH="$HOMEBREW_ROOT_MACOS/lib/pkgconfig:$PKG_CONFIG_PATH"
+  fi
+  export PKG_CONFIG_PATH
+fi
+
 # BREW_BISON=/opt/homebrew/opt/bison
 # if [[ -e "$BREW_BISON" ]]; then
 #   export PATH="$BREW_BISON/bin:$PATH"
