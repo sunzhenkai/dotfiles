@@ -35,17 +35,22 @@ if [[ -e "$HOMEBREW_ROOT_MACOS" ]]; then
   eval "$($HOMEBREW_ROOT_MACOS/bin/brew shellenv)"
   export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_FALLBACK_LIBRARY_PATH"
 fi
-BREW_BISON=/opt/homebrew/opt/bison
-if [[ -e "$BREW_BISON" ]]; then
-  export PATH="$BREW_BISON/bin:$PATH"
-  export LDFLAGS="-L$BREW_BISON/lib"
-fi
-BREW_FLEX=/opt/homebrew/opt/flex
-if [[ -e "$BREW_FLEX" ]]; then
-  export PATH="$BREW_FLEX/bin:$PATH"
-  export LDFLAGS="-L$BREW_FLEX/lib"
-  export CPPFLAGS="-I$BREW_FLEX/include"
-fi
+
+# 自动为 keg-only 软件包设置环境变量
+# if [[ -f ~/.config/dotfiles/zsh/homebrew.sh ]]; then
+#   source ~/.config/dotfiles/zsh/homebrew.sh
+# fi
+# BREW_BISON=/opt/homebrew/opt/bison
+# if [[ -e "$BREW_BISON" ]]; then
+#   export PATH="$BREW_BISON/bin:$PATH"
+#   export LDFLAGS="-L$BREW_BISON/lib"
+# fi
+# BREW_FLEX=/opt/homebrew/opt/flex
+# if [[ -e "$BREW_FLEX" ]]; then
+#   export PATH="$BREW_FLEX/bin:$PATH"
+#   export LDFLAGS="-L$BREW_FLEX/lib"
+#   export CPPFLAGS="-I$BREW_FLEX/include"
+# fi
 
 # using startship as alternative
 #export Z10K_CONFIG=~/.config/zsh/p10k.zsh
