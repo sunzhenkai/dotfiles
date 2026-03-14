@@ -18,6 +18,7 @@ fullscreen = true
 scrollback-limit = 100000
 
 auto-update = download
+term = xterm-256color
 
 # [keybinds] - Leader key: Ctrl+A
 # Clear default keybinds for leader sequences
