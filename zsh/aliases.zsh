@@ -14,6 +14,11 @@ if command -v kitty >/dev/null; then
   alias kssh='kitty +kitten ssh'
 fi
 
+# Ghostty (macOS cask install)
+if [[ -x /Applications/Ghostty.app/Contents/MacOS/ghostty ]]; then
+  alias ghostty='/Applications/Ghostty.app/Contents/MacOS/ghostty'
+fi
+
 # Example aliases
 # alias ll='ls -la'
 # alias gs='git status'
