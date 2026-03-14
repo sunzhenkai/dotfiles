@@ -31,5 +31,14 @@
         }
       }
     }
+  },
+  "mcp": {
+    "web-search-prime": {
+      "type": "remote",
+      "url": "https://open.bigmodel.cn/api/mcp/web_search_prime/mcp",
+      "headers": {
+        "Authorization": "Bearer ${ZHIPU_API_KEY}"
+      }
+    }
   }
 }

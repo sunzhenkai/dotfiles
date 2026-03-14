@@ -135,6 +135,7 @@ install_fonts_macos() {
 
 # Main
 main() {
+  git submodule update --init
   detect_os
 
   case "$ID" in

@@ -3,7 +3,7 @@
 init:
 	@bash scripts/init.sh
 
-all:
+all: init
 	@bash scripts/install-config.sh --all
 
 %:
