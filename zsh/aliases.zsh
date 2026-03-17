@@ -45,7 +45,9 @@ alias gb='git branch'
 alias gbd='git branch -D'
 alias glg='git log'
 alias glg1='git log -n 1 --pretty=format:"%H " | cat'
-function gck() {
+alias gck='git checkout'
+#alias gckm='git checkout main'
+function gckm() {
   if [ $# -eq 0 ]; then
     # 无参数时，自动切换到主分支 (优先 main，其次 master)
     if git rev-parse --verify main >/dev/null 2>&1; then
@@ -60,7 +62,6 @@ function gck() {
     git checkout "$@"
   fi
 }
-alias gckm='git checkout main'
 alias gckb='git checkout -b'
 alias gmm='git merge main'
 alias gfmm='git fetch origin main:main'
