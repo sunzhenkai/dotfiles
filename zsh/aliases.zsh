@@ -45,7 +45,21 @@ alias gb='git branch'
 alias gbd='git branch -D'
 alias glg='git log'
 alias glg1='git log -n 1 --pretty=format:"%H " | cat'
-alias gck='git checkout'
+function gck() {
+  if [ $# -eq 0 ]; then
+    # 无参数时，自动切换到主分支 (优先 main，其次 master)
+    if git rev-parse --verify main >/dev/null 2>&1; then
+      git checkout main
+    elif git rev-parse --verify master >/dev/null 2>&1; then
+      git checkout master
+    else
+      echo "Error: No main or master branch found" >&2
+      return 1
+    fi
+  else
+    git checkout "$@"
+  fi
+}
 alias gckm='git checkout main'
 alias gckb='git checkout -b'
 alias gmm='git merge main'
