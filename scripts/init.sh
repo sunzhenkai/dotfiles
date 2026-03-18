@@ -103,6 +103,22 @@ show_help() {
 main() {
   # 无参数：交互式安装所有模块
   if [[ $# -eq 0 ]]; then
+    echo "============================================"
+    echo "  Dotfiles 初始化脚本"
+    echo "============================================"
+    echo ""
+    echo "将安装以下模块:"
+    for m in "${MODULES[@]}"; do
+      printf "  - %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+    done
+    echo ""
+
+    if ! confirm "是否开始初始化流程?" "N"; then
+      echo "已取消初始化。"
+      echo "提示: 使用 '$0 --help' 查看更多选项。"
+      exit 0
+    fi
+
     interactive_install "${MODULES[@]}"
     exit 0
   fi
