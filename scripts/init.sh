@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk senv git fonts)
+MODULES=(homebrew system sdk senv git fonts npm)
 
 # 模块描述
 declare -A MODULE_DESC=(
@@ -14,6 +14,7 @@ declare -A MODULE_DESC=(
   [senv]="安装 senv 二进制工具"
   [git]="配置 Git"
   [fonts]="安装字体（Maple Mono NF CN）"
+  [npm]="安装 npm 全局包（docsify-cli 等）"
 )
 
 # 确认函数
@@ -39,6 +40,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/git.sh"
   source "$SCRIPT_DIR/scripts/tools/fonts.sh"
   source "$SCRIPT_DIR/scripts/tools/system.sh"
+  source "$SCRIPT_DIR/scripts/tools/npm.sh"
 }
 
 # 执行单个模块
@@ -62,6 +64,7 @@ run_module() {
     setup_golang
     ;;
   fonts) setup_fonts ;;
+  npm) install_npm_packages ;;
   esac
 }
 

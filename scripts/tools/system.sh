@@ -1,9 +1,6 @@
 #!/bin/bash
 # 探测系统信息，并安装必要软件，搭建开发环境
 
-# 记录脚本目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 # 检测操作系统
 detect_os() {
   if [ -f "/etc/os-release" ]; then
