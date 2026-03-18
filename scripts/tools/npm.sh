@@ -21,7 +21,7 @@ install_npm_packages() {
   fi
 
   # 文档工具
-  npm install -g docsify-cli
+  npm install -g docsify-cli@5.0.0-rc.4
 
   echo "npm 全局包安装完成!"
 }
