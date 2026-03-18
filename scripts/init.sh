@@ -1,156 +1,285 @@
 #!/bin/bash
-# Font installation script with system adaptation
-# Maple Mono NF CN https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip
+# 用于安装必要 sdk、配置文件
 
-FONT_URL="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
-FONT_ZIP="MapleMono-NF-CN.zip"
+# 记录 secret 项目的路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Detect OS
-detect_os() {
-  if [ -f "/etc/os-release" ]; then
-    . /etc/os-release
-  elif [ -f "/etc/arch-release" ]; then
-    export ID=arch
-  elif [[ "$OSTYPE" =~ ^darwin ]]; then
-    export ID=darwin
+# brew 可能的路径（支持 macOS 和 Linux）
+BREW_PATHS=(
+  "/opt/homebrew/bin/brew"              # macOS Apple Silicon
+  "/usr/local/bin/brew"                 # macOS Intel
+  "/home/linuxbrew/.linuxbrew/bin/brew" # Linux
+)
+
+# 设置 brew PATH
+setup_brew_path() {
+  # 如果 brew 命令已可用，直接返回
+  if command -v brew &>/dev/null; then
+    return 0
+  fi
+
+  # 遍历可能的 brew 路径
+  for brew_path in "${BREW_PATHS[@]}"; do
+    if [ -x "$brew_path" ]; then
+      local bin_dir
+      bin_dir="$(dirname "$brew_path")"
+      export PATH=$PATH:$bin_dir
+      echo "Found brew at: $brew_path"
+      return 0
+    fi
+  done
+}
+
+# 检查并安装 Homebrew
+install_homebrew() {
+  if ! command -v brew &>/dev/null; then
+    echo "Homebrew not found, installing..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    setup_brew_path
   else
-    echo "Unknown OS."
+    echo "Homebrew is already installed"
+  fi
+}
+
+# 克隆并初始化 dotfiles
+setup_dotfiles() {
+  local dotfile_dir="$HOME/.config/dotfiles"
+
+  if [ -d "$dotfile_dir" ]; then
+    echo "dotfile directory already exists, pulling latest changes..."
+    cd "$dotfile_dir" || exit 1
+
+    # 检查是否是 git 仓库
+    if [ -d ".git" ]; then
+      # 拉取最新代码
+      if git pull; then
+        echo "Successfully pulled latest changes"
+      else
+        echo "Warning: Failed to pull latest changes, continuing with existing version"
+      fi
+    else
+      echo "Warning: $dotfile_dir is not a git repository, skipping pull"
+    fi
+  else
+    echo "Cloning dotfiles..."
+    git clone git@github.com:sunzhenkai/dotfiles.git "$dotfile_dir"
+    cd "$dotfile_dir" || exit 1
+  fi
+
+  if [ -d "$dotfile_dir" ]; then
+    make all
+    cd "$SCRIPT_DIR" || exit 1
+  else
+    echo "Error: dotfile directory not found"
     exit 1
   fi
-  echo "Detected OS: $ID"
 }
 
-# Check if Linux has GUI (X11 or Wayland)
-has_linux_gui() {
-  # Check for display server
-  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
-    return 0
-  fi
+# 克隆并初始化 senvdata
+setup_senv() {
+  local senv_dir="$HOME/.config/senv"
 
-  return 1
-}
+  if [ -d "$senv_dir" ]; then
+    echo "senv directory already exists, pulling latest changes..."
+    cd "$senv_dir" || exit 1
 
-# Download fonts from GitHub
-download_fonts() {
-  local target_dir="$1"
-
-  echo "Downloading Maple Mono NF CN font..."
-  cd "$target_dir" || return 1
-
-  # Download the font zip file
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$FONT_URL" -o "$FONT_ZIP"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$FONT_URL" -O "$FONT_ZIP"
+    # 检查是否是 git 仓库
+    if [ -d ".git" ]; then
+      # 拉取最新代码
+      if git pull; then
+        echo "Successfully pulled latest changes"
+      else
+        echo "Warning: Failed to pull latest changes, continuing with existing version"
+      fi
+    else
+      echo "Warning: $senv_dir is not a git repository, skipping pull"
+    fi
   else
-    echo "Neither curl nor wget found. Cannot download fonts."
-    return 1
+    echo "Cloning senvdata..."
+    git clone git@codeup.aliyun.com:wii/senvdata.git "$senv_dir"
   fi
 
-  if [ ! -f "$FONT_ZIP" ]; then
-    echo "Failed to download font file."
-    return 1
-  fi
-
-  echo "Extracting font archive..."
-  unzip -oq "$FONT_ZIP" -d maple_font_extracted
-
-  # Find and move all ttf files to target directory
-  find maple_font_extracted -name "*.ttf" -exec mv {} "$target_dir/" \; 2>/dev/null || true
-
-  # Cleanup
-  rm -rf maple_font_extracted "$FONT_ZIP"
-
-  echo "Font download completed."
+  cd "$SCRIPT_DIR" || exit 1
 }
 
-# Install fonts on Linux
-install_fonts_linux() {
-  # Skip if no GUI environment
-  if ! has_linux_gui; then
-    echo "No GUI environment detected (DISPLAY or WAYLAND_DISPLAY not set), skipping font installation."
+# 编译安装 senv 程序
+install_senv_binary() {
+  echo "---- Installing senv binary ----"
+
+  # 检查 go 命令是否存在
+  if ! command -v go &>/dev/null; then
+    echo "Warning: go not found, skipping senv binary installation"
+    echo "Please install Go first (e.g., via mise)"
     return 0
   fi
 
-  # Check if fc-cache is available
-  if ! command -v fc-cache >/dev/null 2>&1; then
-    echo "fc-cache not found, fontconfig may not be installed. Skipping font installation."
+  # 确保 ~/.local/bin 存在
+  local install_dir="$HOME/.local/bin"
+  mkdir -p "$install_dir"
+
+  # 创建临时目录
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  echo "Building senv in temporary directory: $tmp_dir"
+
+  # 克隆源代码
+  cd "$tmp_dir" || exit 1
+  echo "Cloning senv source code..."
+  if ! git clone https://github.com/solo-kingdom/senv.git; then
+    echo "Error: Failed to clone senv repository"
+    cd "$SCRIPT_DIR" || exit 1
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  # 进入源码目录并编译
+  cd senv || exit 1
+  echo "Building senv..."
+  if ! go build -o senv .; then
+    echo "Error: Failed to build senv"
+    cd "$SCRIPT_DIR" || exit 1
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  # 安装到 ~/.local/bin
+  cp senv "$install_dir/senv"
+  chmod +x "$install_dir/senv"
+  echo "senv installed to: $install_dir/senv"
+
+  # 清理临时目录
+  cd "$SCRIPT_DIR" || exit 1
+  rm -rf "$tmp_dir"
+  echo "Temporary directory cleaned up"
+
+  echo "senv binary installed successfully!"
+}
+
+# 初始化系统（调用 setup-system.sh）
+setup_system() {
+  local setup_script="$SCRIPT_DIR/scripts/setup-system.sh"
+
+  if [ -f "$setup_script" ]; then
+    echo "Running system setup..."
+    bash "$setup_script"
+  else
+    echo "Warning: setup-system.sh not found, skipping system setup"
+  fi
+}
+
+# 初始化 git 配置
+setup_git() {
+  echo "---- Configuring git ----"
+
+  # 设置用户名和邮箱
+  git config --global user.name "zhenkai.sun"
+  git config --global user.email "zhenkai.sun@qq.com"
+
+  # pull 冲突后默认 merge（不使用 rebase）
+  git config --global pull.rebase false
+
+  # 设置默认编辑器
+  git config --global core.editor vim
+
+  # 设置默认分支名为 main
+  git config --global init.defaultBranch main
+
+  echo "Git configured successfully!"
+  echo "  user.name: $(git config --global user.name)"
+  echo "  user.email: $(git config --global user.email)"
+  echo "  pull.rebase: $(git config --global pull.rebase)"
+  echo "  core.editor: $(git config --global core.editor)"
+  echo "  init.defaultBranch: $(git config --global init.defaultBranch)"
+}
+
+# 初始化 SDK（通过 mise 管理多版本）
+setup_sdk() {
+  echo "---- Setting up SDKs via mise ----"
+
+  # 检查 mise 是否安装
+  if ! command -v mise &>/dev/null; then
+    echo "Warning: mise not found, skipping SDK setup"
+    echo "Please install mise first (e.g., brew install mise)"
     return 0
   fi
 
-  echo "Installing fonts on Linux..."
+  # 定义要安装的 SDK 及其版本
+  local go_versions=("1.24.9")
+  local python_versions=("3.13.12")
+  local node_versions=("20.10.0")
 
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
-
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
-
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
-
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
+  # 安装 Go 多版本
+  echo ""
+  echo "Installing Go versions: ${go_versions[*]}"
+  for version in "${go_versions[@]}"; do
+    echo "  Installing Go $version..."
+    mise install go@"$version"
   done
+  mise use -g go@"${go_versions[0]}"
+  echo "  Global Go version set to: ${go_versions[0]}"
 
-  # Create system fonts directory
-  sudo mkdir -p /usr/share/fonts/local
+  # 安装 Python 多版本
+  echo ""
+  echo "Installing Python versions: ${python_versions[*]}"
+  for version in "${python_versions[@]}"; do
+    echo "  Installing Python $version..."
+    mise install python@"$version"
+  done
+  mise use -g python@"${python_versions[0]}"
+  echo "  Global Python version set to: ${python_versions[0]}"
 
-  # Install fonts
-  sudo mv *.ttf /usr/share/fonts/local/ 2>/dev/null || true
+  # 安装 Node.js 多版本
+  echo ""
+  echo "Installing Node.js versions: ${node_versions[*]}"
+  for version in "${node_versions[@]}"; do
+    echo "  Installing Node.js $version..."
+    mise install node@"$version"
+  done
+  mise use -g node@"${node_versions[0]}"
+  echo "  Global Node.js version set to: ${node_versions[0]}"
 
-  # Refresh font cache
-  sudo fc-cache -fv
+  # 激活 mise 环境（将 SDK 添加到 PATH）
+  eval "$(mise activate bash)"
 
-  echo "Fonts installed successfully on Linux."
+  echo ""
+  echo "SDKs installed successfully!"
+  mise ls
 }
 
-# Install fonts on macOS
-install_fonts_macos() {
-  echo "Installing fonts on macOS..."
+# 初始化 Golang 环境
+setup_golang() {
+  echo "---- Configuring Golang ----"
 
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
+  # 检查 go 命令是否存在
+  if ! command -v go &>/dev/null; then
+    echo "Warning: go not found, skipping Golang setup"
+    echo "Please install Go first (e.g., via mise or homebrew)"
+    return 0
+  fi
 
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
+  # 设置私有库，不走代理
+  go env -w GOPRIVATE='gitlab.fegtech.com/*'
+  go env -w GONOSUMDB='gitlab.fegtech.com/*'
 
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
+  # 设置使用 fegtech gitlab ssh 认证
+  git config --global url."git@gitlab.fegtech.com:".insteadOf "https://gitlab.fegtech.com/"
 
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
-  done
-
-  # Create user fonts directory
-  mkdir -p ~/Library/Fonts
-
-  # Install fonts to user directory
-  mv *.ttf ~/Library/Fonts/ 2>/dev/null || true
-
-  echo "Fonts installed successfully on macOS."
+  echo "Golang configured successfully!"
+  echo "  GOPRIVATE: $(go env GOPRIVATE)"
+  echo "  GONOSUMDB: $(go env GONOSUMDB)"
 }
 
-# Main
+# 主函数
 main() {
-  git submodule update --init
-  detect_os
-
-  case "$ID" in
-  ubuntu | debian | pop | fedora | alinux | amzn | rhel | centos | rocky | opensuse-leap | arch | manjaro)
-    install_fonts_linux
-    ;;
-  darwin)
-    install_fonts_macos
-    ;;
-  *)
-    echo "Your system ($ID) is not supported by this script."
-    echo "Please install fonts manually."
-    exit 1
-    ;;
-  esac
+  setup_brew_path
+  install_homebrew
+  setup_system
+  setup_sdk
+  install_senv_binary
+  setup_dotfiles
+  setup_senv
+  setup_git
+  setup_golang
 }
 
-main "$@"
+main
