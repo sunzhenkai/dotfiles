@@ -503,15 +503,18 @@ dispatch_init() {
   esac
 }
 
-# 主函数
-main() {
-  common_init
+# 初始化系统（调用 system.sh）
+setup_system() {
+  if [ -f "$setup_script" ]; then
+    echo "Running system setup..."
 
-  detect_os
-  dispatch_init
-  post_init
+    common_init
+    detect_os
+    dispatch_init
+    post_init
 
-  echo "System initialization completed!"
+    echo "System initialization completed!"
+  else
+    echo "Warning: system.sh not found, skipping system setup"
+  fi
 }
-
-main
