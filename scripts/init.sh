@@ -1,156 +1,169 @@
 #!/bin/bash
-# Font installation script with system adaptation
-# Maple Mono NF CN https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip
+# 用于安装必要 sdk、配置文件
 
-FONT_URL="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
-FONT_ZIP="MapleMono-NF-CN.zip"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Detect OS
-detect_os() {
-  if [ -f "/etc/os-release" ]; then
-    . /etc/os-release
-  elif [ -f "/etc/arch-release" ]; then
-    export ID=arch
-  elif [[ "$OSTYPE" =~ ^darwin ]]; then
-    export ID=darwin
+# 可用模块列表
+MODULES=(homebrew system sdk senv git fonts)
+
+# 模块描述
+declare -A MODULE_DESC=(
+  [homebrew]="安装 Homebrew 包管理器"
+  [system]="系统配置（软件源、依赖等）"
+  [sdk]="安装 SDK（Go/Python/Node via mise）"
+  [senv]="安装 senv 二进制工具"
+  [git]="配置 Git"
+  [fonts]="安装字体（Maple Mono NF CN）"
+)
+
+# 确认函数
+confirm() {
+  local prompt="$1"
+  local default="${2:-Y}"
+  local reply
+
+  if [[ "$default" == "Y" ]]; then
+    read -r -p "$prompt [Y/n]: " reply
+    [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
   else
-    echo "Unknown OS."
-    exit 1
+    read -r -p "$prompt [y/N]: " reply
+    [[ "$reply" =~ ^[Yy] ]]
   fi
-  echo "Detected OS: $ID"
 }
 
-# Check if Linux has GUI (X11 or Wayland)
-has_linux_gui() {
-  # Check for display server
-  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
-    return 0
-  fi
-
-  return 1
+# 加载所有模块
+load_modules() {
+  source "$SCRIPT_DIR/scripts/tools/homebrew.sh"
+  source "$SCRIPT_DIR/scripts/tools/sdk.sh"
+  source "$SCRIPT_DIR/scripts/tools/senv.sh"
+  source "$SCRIPT_DIR/scripts/tools/git.sh"
+  source "$SCRIPT_DIR/scripts/tools/fonts.sh"
+  source "$SCRIPT_DIR/scripts/tools/system.sh"
 }
 
-# Download fonts from GitHub
-download_fonts() {
-  local target_dir="$1"
-
-  echo "Downloading Maple Mono NF CN font..."
-  cd "$target_dir" || return 1
-
-  # Download the font zip file
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$FONT_URL" -o "$FONT_ZIP"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$FONT_URL" -O "$FONT_ZIP"
-  else
-    echo "Neither curl nor wget found. Cannot download fonts."
-    return 1
-  fi
-
-  if [ ! -f "$FONT_ZIP" ]; then
-    echo "Failed to download font file."
-    return 1
-  fi
-
-  echo "Extracting font archive..."
-  unzip -oq "$FONT_ZIP" -d maple_font_extracted
-
-  # Find and move all ttf files to target directory
-  find maple_font_extracted -name "*.ttf" -exec mv {} "$target_dir/" \; 2>/dev/null || true
-
-  # Cleanup
-  rm -rf maple_font_extracted "$FONT_ZIP"
-
-  echo "Font download completed."
-}
-
-# Install fonts on Linux
-install_fonts_linux() {
-  # Skip if no GUI environment
-  if ! has_linux_gui; then
-    echo "No GUI environment detected (DISPLAY or WAYLAND_DISPLAY not set), skipping font installation."
-    return 0
-  fi
-
-  # Check if fc-cache is available
-  if ! command -v fc-cache >/dev/null 2>&1; then
-    echo "fc-cache not found, fontconfig may not be installed. Skipping font installation."
-    return 0
-  fi
-
-  echo "Installing fonts on Linux..."
-
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
-
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
-
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
-
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
-  done
-
-  # Create system fonts directory
-  sudo mkdir -p /usr/share/fonts/local
-
-  # Install fonts
-  sudo mv *.ttf /usr/share/fonts/local/ 2>/dev/null || true
-
-  # Refresh font cache
-  sudo fc-cache -fv
-
-  echo "Fonts installed successfully on Linux."
-}
-
-# Install fonts on macOS
-install_fonts_macos() {
-  echo "Installing fonts on macOS..."
-
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
-
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
-
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
-
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
-  done
-
-  # Create user fonts directory
-  mkdir -p ~/Library/Fonts
-
-  # Install fonts to user directory
-  mv *.ttf ~/Library/Fonts/ 2>/dev/null || true
-
-  echo "Fonts installed successfully on macOS."
-}
-
-# Main
-main() {
-  git submodule update --init
-  detect_os
-
-  case "$ID" in
-  ubuntu | debian | pop | fedora | alinux | amzn | rhel | centos | rocky | opensuse-leap | arch | manjaro)
-    install_fonts_linux
+# 执行单个模块
+run_module() {
+  local module="$1"
+  echo ""
+  echo "========================================"
+  echo "执行模块: $module"
+  echo "========================================"
+  case "$module" in
+  homebrew)
+    setup_brew_path
+    install_homebrew
+    init_homebrew
     ;;
-  darwin)
-    install_fonts_macos
+  system) setup_system ;;
+  sdk) setup_sdk ;;
+  senv) install_senv_binary ;;
+  git)
+    setup_git
+    setup_golang
     ;;
-  *)
-    echo "Your system ($ID) is not supported by this script."
-    echo "Please install fonts manually."
-    exit 1
-    ;;
+  fonts) setup_fonts ;;
   esac
+}
+
+# 交互式安装（指定模块列表）
+interactive_install() {
+  local modules=("$@")
+
+  load_modules
+
+  for module in "${modules[@]}"; do
+    if confirm "安装 ${MODULE_DESC[$module]}?"; then
+      run_module "$module"
+    else
+      echo "跳过 $module"
+    fi
+  done
+}
+
+# 显示帮助
+show_help() {
+  echo "用法: $0 [模块...] [选项]"
+  echo ""
+  echo "模块:"
+  for m in "${MODULES[@]}"; do
+    printf "  %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+  done
+  echo ""
+  echo "选项:"
+  echo "  --all, -a    安装所有模块（跳过确认）"
+  echo "  --help, -h   显示此帮助"
+  echo ""
+  echo "示例:"
+  echo "  $0              # 交互式安装所有模块"
+  echo "  $0 homebrew sdk # 只安装指定模块（仍需确认）"
+  echo "  $0 --all        # 全部安装（跳过确认）"
+}
+
+# 主函数
+main() {
+  # 无参数：交互式安装所有模块
+  if [[ $# -eq 0 ]]; then
+    echo "============================================"
+    echo "  Dotfiles 初始化脚本"
+    echo "============================================"
+    echo ""
+    echo "将安装以下模块:"
+    for m in "${MODULES[@]}"; do
+      printf "  - %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+    done
+    echo ""
+
+    if ! confirm "是否开始初始化流程?" "N"; then
+      echo "已取消初始化。"
+      echo "提示: 使用 '$0 --help' 查看更多选项。"
+      exit 0
+    fi
+
+    interactive_install "${MODULES[@]}"
+    exit 0
+  fi
+
+  # 解析参数
+  local modules=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --all | -a)
+      load_modules
+      echo "全部安装模式（跳过确认）"
+      for m in "${MODULES[@]}"; do
+        run_module "$m"
+      done
+      exit 0
+      ;;
+    --help | -h)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "未知选项: $1"
+      show_help
+      exit 1
+      ;;
+    *)
+      modules+=("$1")
+      ;;
+    esac
+    shift
+  done
+
+  # 执行指定模块
+  if [[ ${#modules[@]} -gt 0 ]]; then
+    # 验证模块名
+    for m in "${modules[@]}"; do
+      if [[ ! " ${MODULES[*]} " =~ " $m " ]]; then
+        echo "错误: 未知模块 '$m'"
+        echo ""
+        show_help
+        exit 1
+      fi
+    done
+    interactive_install "${modules[@]}"
+  fi
 }
 
 main "$@"
