@@ -133,8 +133,7 @@ install_fonts_macos() {
   echo "Fonts installed successfully on macOS."
 }
 
-# Main
-main() {
+setup_fonts() {
   git submodule update --init
   detect_os
 
@@ -152,5 +151,3 @@ main() {
     ;;
   esac
 }
-
-main "$@"
