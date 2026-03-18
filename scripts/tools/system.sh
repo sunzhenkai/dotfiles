@@ -272,66 +272,6 @@ init_darwin() {
 
   # 安装 Python mysqlclient 包
   pip install mysqlclient
-
-  # 安装软件
-  brew install --cask ghostty
-}
-
-# 通过 Homebrew 安装常用软件
-init_homebrew() {
-  echo "---- Installing packages via Homebrew ----"
-
-  # 让用户确认
-  read -p "Do you want to install packages via Homebrew? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Skipped Homebrew packages installation."
-    return 0
-  fi
-
-  # 工具类
-  brew install watch fswatch htop wget curl tree nmap
-
-  # 搜索/编辑
-  brew install bat the_silver_searcher perl universal-ctags
-  brew install fd fzf ripgrep nvim
-
-  # 文档/排版
-  brew install luarocks hunspell tectonic ghostscript
-  brew install poppler imagemagick resvg
-
-  # 文件/媒体
-  brew install yazi ffmpeg sevenzip jq zoxide chafa
-  # pngpaste 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
-    brew install pngpaste
-  fi
-
-  # 开发工具
-  brew install mise tmux zsh uv pkg-config mysql-connector-c
-  brew install anomalyco/tap/opencode
-  # ghostty 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
-    brew install --cask ghostty
-  fi
-
-  # Shell
-  brew install nushell fish starship
-
-  # Git
-  brew install lazygit gitui
-
-  # C/C++
-  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc clangd
-
-  # Java
-  brew install openjdk@17 bison flex
-
-  # Go (NOTE: Go 本体通过 mise 安装)
-  brew install gotests
-
-  echo "Homebrew packages installed successfully!"
 }
 
 # 更改用户默认 shell 为 zsh（优先使用 homebrew 安装的 zsh）
@@ -451,8 +391,6 @@ config_zsh() {
 # 通用后置初始化
 post_init() {
   echo "---- Post Initialization ----"
-  # 通过 Homebrew 安装软件
-  init_homebrew
   # 配置 zsh
   config_zsh
   init_docker

@@ -52,6 +52,7 @@ run_module() {
   homebrew)
     setup_brew_path
     install_homebrew
+    init_homebrew
     ;;
   system) setup_system ;;
   sdk) setup_sdk ;;
