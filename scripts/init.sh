@@ -1,26 +1,152 @@
 #!/bin/bash
 # 用于安装必要 sdk、配置文件
 
-# 记录 secret 项目的路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# 主函数
-main() {
-  # 加载工具脚本
+# 可用模块列表
+MODULES=(homebrew system sdk senv git fonts)
+
+# 模块描述
+declare -A MODULE_DESC=(
+  [homebrew]="安装 Homebrew 包管理器"
+  [system]="系统配置（软件源、依赖等）"
+  [sdk]="安装 SDK（Go/Python/Node via mise）"
+  [senv]="安装 senv 二进制工具"
+  [git]="配置 Git"
+  [fonts]="安装字体（Maple Mono NF CN）"
+)
+
+# 确认函数
+confirm() {
+  local prompt="$1"
+  local default="${2:-Y}"
+  local reply
+
+  if [[ "$default" == "Y" ]]; then
+    read -r -p "$prompt [Y/n]: " reply
+    [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
+  else
+    read -r -p "$prompt [y/N]: " reply
+    [[ "$reply" =~ ^[Yy] ]]
+  fi
+}
+
+# 加载所有模块
+load_modules() {
   source "$SCRIPT_DIR/scripts/tools/homebrew.sh"
   source "$SCRIPT_DIR/scripts/tools/sdk.sh"
   source "$SCRIPT_DIR/scripts/tools/senv.sh"
   source "$SCRIPT_DIR/scripts/tools/git.sh"
   source "$SCRIPT_DIR/scripts/tools/fonts.sh"
   source "$SCRIPT_DIR/scripts/tools/system.sh"
-
-  setup_brew_path
-  install_homebrew
-  setup_system
-  setup_sdk
-  install_senv_binary
-  setup_git
-  setup_fonts
 }
 
-main
+# 执行单个模块
+run_module() {
+  local module="$1"
+  echo ""
+  echo "========================================"
+  echo "执行模块: $module"
+  echo "========================================"
+  case "$module" in
+  homebrew)
+    setup_brew_path
+    install_homebrew
+    ;;
+  system) setup_system ;;
+  sdk) setup_sdk ;;
+  senv) install_senv_binary ;;
+  git)
+    setup_git
+    setup_golang
+    ;;
+  fonts) setup_fonts ;;
+  esac
+}
+
+# 交互式安装（指定模块列表）
+interactive_install() {
+  local modules=("$@")
+
+  load_modules
+
+  for module in "${modules[@]}"; do
+    if confirm "安装 ${MODULE_DESC[$module]}?"; then
+      run_module "$module"
+    else
+      echo "跳过 $module"
+    fi
+  done
+}
+
+# 显示帮助
+show_help() {
+  echo "用法: $0 [模块...] [选项]"
+  echo ""
+  echo "模块:"
+  for m in "${MODULES[@]}"; do
+    printf "  %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+  done
+  echo ""
+  echo "选项:"
+  echo "  --all, -a    安装所有模块（跳过确认）"
+  echo "  --help, -h   显示此帮助"
+  echo ""
+  echo "示例:"
+  echo "  $0              # 交互式安装所有模块"
+  echo "  $0 homebrew sdk # 只安装指定模块（仍需确认）"
+  echo "  $0 --all        # 全部安装（跳过确认）"
+}
+
+# 主函数
+main() {
+  # 无参数：交互式安装所有模块
+  if [[ $# -eq 0 ]]; then
+    interactive_install "${MODULES[@]}"
+    exit 0
+  fi
+
+  # 解析参数
+  local modules=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --all | -a)
+      load_modules
+      echo "全部安装模式（跳过确认）"
+      for m in "${MODULES[@]}"; do
+        run_module "$m"
+      done
+      exit 0
+      ;;
+    --help | -h)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "未知选项: $1"
+      show_help
+      exit 1
+      ;;
+    *)
+      modules+=("$1")
+      ;;
+    esac
+    shift
+  done
+
+  # 执行指定模块
+  if [[ ${#modules[@]} -gt 0 ]]; then
+    # 验证模块名
+    for m in "${modules[@]}"; do
+      if [[ ! " ${MODULES[*]} " =~ " $m " ]]; then
+        echo "错误: 未知模块 '$m'"
+        echo ""
+        show_help
+        exit 1
+      fi
+    done
+    interactive_install "${modules[@]}"
+  fi
+}
+
+main "$@"

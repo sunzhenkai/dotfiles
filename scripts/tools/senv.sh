@@ -12,9 +12,23 @@ install_senv_binary() {
     return 0
   fi
 
-  # 确保 ~/.local/bin 存在
   local install_dir="$HOME/.local/bin"
-  mkdir -p "$install_dir"
+  local senv_path="$install_dir/senv"
+
+  # 检查 senv 是否已存在
+  if [ -f "$senv_path" ]; then
+    echo "senv is already installed at: $senv_path"
+    local reply
+    read -r -p "Do you want to update/reinstall senv? [y/N]: " reply
+    if [[ ! "$reply" =~ ^[Yy] ]]; then
+      echo "Skipping senv installation."
+      return 0
+    fi
+    echo "Updating senv..."
+  else
+    # 确保 ~/.local/bin 存在
+    mkdir -p "$install_dir"
+  fi
 
   # 创建临时目录
   local tmp_dir
@@ -42,9 +56,9 @@ install_senv_binary() {
   fi
 
   # 安装到 ~/.local/bin
-  cp senv "$install_dir/senv"
-  chmod +x "$install_dir/senv"
-  echo "senv installed to: $install_dir/senv"
+  cp senv "$senv_path"
+  chmod +x "$senv_path"
+  echo "senv installed to: $senv_path"
 
   # 清理临时目录
   cd "$SCRIPT_DIR" || exit 1

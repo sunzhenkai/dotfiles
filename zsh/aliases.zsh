@@ -46,6 +46,8 @@ alias gbd='git branch -D'
 alias glg='git log'
 alias glg1='git log -n 1 --pretty=format:"%H " | cat'
 alias gck='git checkout'
+alias gdh='git diff HEAD'
+alias gdh1='git diff HEAD~1'
 #alias gckm='git checkout main'
 function gckm() {
   if [ $# -eq 0 ]; then

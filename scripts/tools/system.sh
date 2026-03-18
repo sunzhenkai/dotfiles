@@ -282,7 +282,7 @@ init_homebrew() {
   echo "---- Installing packages via Homebrew ----"
 
   # 让用户确认
-  read -p "Do you want to install these packages via Homebrew? [y/N] " -n 1 -r
+  read -p "Do you want to install packages via Homebrew? [y/N] " -n 1 -r
   echo ""
 
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -303,12 +303,18 @@ init_homebrew() {
 
   # 文件/媒体
   brew install yazi ffmpeg sevenzip jq zoxide chafa
-  brew install pngpaste
+  # pngpaste 仅在 macOS 上可用
+  if [[ "$ID" == "darwin" ]]; then
+    brew install pngpaste
+  fi
 
   # 开发工具
   brew install mise tmux zsh uv pkg-config mysql-connector-c
   brew install anomalyco/tap/opencode
-  brew install --cask ghostty
+  # ghostty 仅在 macOS 上可用
+  if [[ "$ID" == "darwin" ]]; then
+    brew install --cask ghostty
+  fi
 
   # Shell
   brew install nushell fish starship
@@ -503,18 +509,14 @@ dispatch_init() {
   esac
 }
 
-# 初始化系统（调用 system.sh）
+# 初始化系统
 setup_system() {
-  if [ -f "$setup_script" ]; then
-    echo "Running system setup..."
+  echo "Running system setup..."
 
-    common_init
-    detect_os
-    dispatch_init
-    post_init
+  common_init
+  detect_os
+  dispatch_init
+  post_init
 
-    echo "System initialization completed!"
-  else
-    echo "Warning: system.sh not found, skipping system setup"
-  fi
+  echo "System initialization completed!"
 }
