@@ -44,3 +44,16 @@ format = '[$user]($style) '
 [localip]
 disabled = true
 format = '[$localipv4]($style)'
+
+# 禁用云服务商信息
+[aws]
+disabled = true
+
+[gcloud]
+disabled = true
+
+[azure]
+disabled = true
+
+[openstack]
+disabled = true
