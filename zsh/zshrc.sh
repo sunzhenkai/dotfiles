@@ -179,3 +179,30 @@ if command -v senv >/dev/null; then
   #echo "Init senv: $(senv env export)"
   eval $(senv env export)
 fi
+
+# anaconda3 / conda
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+# Support two installation locations: default ~/anaconda3 and ~/.ii/programs/anaconda3
+CONDA_PREFIX=""
+if [[ -d "$HOME/anaconda3" ]]; then
+  CONDA_PREFIX="$HOME/anaconda3"
+elif [[ -d "$HOME/.ii/programs/anaconda3" ]]; then
+  CONDA_PREFIX="$HOME/.ii/programs/anaconda3"
+fi
+
+if [[ -n "$CONDA_PREFIX" ]]; then
+  __conda_setup="$('${CONDA_PREFIX}/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+  if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+  else
+    if [ -f "${CONDA_PREFIX}/etc/profile.d/conda.sh" ]; then
+      . "${CONDA_PREFIX}/etc/profile.d/conda.sh"
+    else
+      export PATH="${CONDA_PREFIX}/bin:$PATH"
+    fi
+  fi
+  unset __conda_setup
+fi
+unset CONDA_PREFIX
+# <<< conda initialize <<<
