@@ -9,11 +9,4 @@ if command -v starship >/dev/null; then
   eval "$(starship init zsh)"
 fi
 
-# env init
-ENV_INIT_DIR="$HOME/.local/env-init/env"
-if [[ -e "$ENV_INIT_DIR" ]]; then
-  source "$ENV_INIT_DIR"
-  alias ienv="source $ENV_INIT_DIR"
-fi
-
 [[ -e ~/.envrc ]] && source ~/.envrc
