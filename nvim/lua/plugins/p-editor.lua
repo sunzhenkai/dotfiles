@@ -1,6 +1,69 @@
 return {
 	{
 		"folke/snacks.nvim",
+		keys = {
+			{
+				"<leader><space>",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.picker.files({ cwd = root })
+				end,
+				desc = "Find Files (Neo-tree Root)",
+			},
+			{
+				"<leader>ff",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.picker.files({ cwd = root })
+				end,
+				desc = "Find Files (Neo-tree Root)",
+			},
+			{
+				"<c-/>",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.terminal(nil, { cwd = root })
+				end,
+				mode = { "n", "t" },
+				desc = "Terminal (Neo-tree Root)",
+			},
+			{
+				"<leader>ft",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.terminal(nil, { cwd = root })
+				end,
+				desc = "Terminal (Neo-tree Root)",
+			},
+		},
 		opts = {
 			terminal = {
 				win = {
