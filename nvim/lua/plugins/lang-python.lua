@@ -21,12 +21,17 @@ return {
 		opts = {
 			servers = {
 				pyright = {
-					disableLanguageServices = false,
-					disableOrganizeImports = false,
-					typeCheckingMode = "strict",
-					python = {
-						analysis = {
-							django = true,
+					-- initializationOptions (协议层，非 settings)
+					init_options = {
+						disableLanguageServices = false,
+						disableOrganizeImports = false,
+					},
+					settings = {
+						python = {
+							analysis = {
+								typeCheckingMode = "strict",
+								djangoSettings = true,
+							},
 						},
 					},
 				},

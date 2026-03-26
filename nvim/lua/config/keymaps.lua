@@ -8,9 +8,10 @@ local keymap = vim.keymap
 keymap.set("n", "<C-n>", function()
 	vim.diagnostic.jump({ count = 1, float = true, severity = { min = vim.diagnostic.severity.WARN } })
 end)
-keymap.set("n", "<C-m>", function()
+-- <C-m> == <Enter> in terminal, use <leader>je instead
+keymap.set("n", "<leader>je", function()
 	vim.diagnostic.jump({ count = 1, float = true, severity = vim.diagnostic.severity.ERROR })
-end)
+end, { desc = "Jump to next Error" })
 
 -- functions
 -- information

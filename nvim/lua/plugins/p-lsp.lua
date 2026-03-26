@@ -25,7 +25,7 @@ return {
 			},
 			servers = {
 				clangd = {
-					filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
+					filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
 					cmd = {
 						"clangd",
 						"--background-index",

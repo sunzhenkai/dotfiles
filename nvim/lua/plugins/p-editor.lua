@@ -26,7 +26,7 @@ return {
 				toml = { "taplo" },
 				json = { "prettier" },
 				css = { "prettier" },
-				python = { "isort", "black" },
+				python = { "ruff_format" },
 				typescriptreact = { "eslint_d" },
 				typescript = { "eslint_d" },
 				javascript = { "eslint_d" },
@@ -40,8 +40,8 @@ return {
 				clang_format = {
 					prepend_args = { "--style=file", "--fallback-style=google" },
 				},
-				-- python
-				black = {
+				-- python: ruff_format 替代 black + isort（ruff 内置 isort 功能）
+				ruff_format = {
 					prepend_args = { "--line-length", "100" },
 				},
 			},
@@ -160,8 +160,18 @@ return {
 			"kevinhwang91/promise-async",
 			"neovim/nvim-lspconfig",
 		},
+		init = function()
+			vim.o.foldcolumn = "1"
+			vim.o.foldlevel = 99
+			vim.o.foldlevelstart = 99
+			vim.o.foldenable = true
+		end,
 		config = function()
-			require("ufo").setup()
+			require("ufo").setup({
+				provider_selector = function()
+					return { "lsp", "indent" }
+				end,
+			})
 		end,
 	},
 }
