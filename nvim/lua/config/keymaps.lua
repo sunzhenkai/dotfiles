@@ -94,8 +94,8 @@ keymap.set("v", "<leader>p", '"+p', {
 	desc = "Paste from system clipboard", -- 可选的描述
 })
 
--- window size
-vim.keymap.set("n", "<C-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Height" })
-vim.keymap.set("n", "<C-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
-vim.keymap.set("n", "<C-h>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
-vim.keymap.set("n", "<C-l>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
+-- window size (use Alt+hjkl to avoid conflicting with LazyVim's <C-hjkl> window navigation)
+vim.keymap.set("n", "<A-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Height" })
+vim.keymap.set("n", "<A-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
+vim.keymap.set("n", "<A-h>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
+vim.keymap.set("n", "<A-l>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
