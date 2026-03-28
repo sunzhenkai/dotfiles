@@ -23,6 +23,7 @@ declare -A CONFIGS=(
   ["fcitx5"]="fcitx5:~/.config/fcitx5"
   ["git"]="git:~/.config/git"
   ["opencode"]="opencode:~/.config/opencode"
+  ["claude"]="claude:~/.config/claude"
 )
 
 # 通用安装函数
@@ -75,6 +76,60 @@ install_zsh() {
   echo "Installed: ~/.zshrc"
 }
 
+# 特殊配置：claude
+install_claude() {
+  # 创建 ~/.claude 目录
+  local claude_dir="$HOME/.claude"
+  if [ ! -d "$claude_dir" ]; then
+    mkdir -p "$claude_dir"
+  fi
+
+  # 检查环境变量 ZHIPU_API_KEY
+  if [ -z "$ZHIPU_API_KEY" ]; then
+    echo "⚠️  Warning: ZHIPU_API_KEY environment variable is not set"
+    echo "Please set it in your ~/.envrc or shell config before running the install script"
+  fi
+
+  # 安装 settings.json (动态生成以使用环境变量)
+  local settings_target="$claude_dir/settings.json"
+  local settings_template="$DOTFILES_ROOT/claude/settings.json"
+
+  if [ -e "$settings_target" ]; then
+    mv "$settings_target" "$settings_target-$TIMESTAMP"
+  fi
+
+  # 使用 sed 替换 API Key
+  if [ -n "$ZHIPU_API_KEY" ]; then
+    sed "s|your_zhipu_api_key|$ZHIPU_API_KEY|g" "$settings_template" > "$settings_target"
+    echo "Installed: settings.json (with ZHIPU_API_KEY)"
+  else
+    cp "$settings_template" "$settings_target"
+    echo "Installed: settings.json (please update ANTHROPIC_AUTH_TOKEN manually)"
+  fi
+
+  # 安装 .claude.json
+  local claude_json_target="$HOME/.claude.json"
+  local claude_json_source="$DOTFILES_ROOT/claude/.claude.json"
+
+  if [ -L "$claude_json_target" ]; then
+    local current_link
+    current_link=$(readlink -f "$claude_json_target" 2>/dev/null || readlink "$claude_json_target")
+    local expected_abs
+    expected_abs=$(readlink -f "$claude_json_source" 2>/dev/null || echo "$claude_json_source")
+    if [ "$current_link" = "$expected_abs" ]; then
+      echo "Already installed: .claude.json"
+    else
+      [ -e "$claude_json_target" ] && mv "$claude_json_target" "$claude_json_target-$TIMESTAMP"
+      ln -s "$claude_json_source" "$claude_json_target"
+      echo "Installed: .claude.json"
+    fi
+  else
+    [ -e "$claude_json_target" ] && mv "$claude_json_target" "$claude_json_target-$TIMESTAMP"
+    ln -s "$claude_json_source" "$claude_json_target"
+    echo "Installed: .claude.json"
+  fi
+}
+
 # 特殊配置：git
 # install_git() {
 #   install_config "git"
@@ -110,6 +165,7 @@ install_all() {
   for name in "${!CONFIGS[@]}"; do
     case "$name" in
     zsh) install_zsh ;;
+    claude) install_claude ;;
     # git) install_git ;;
     *) install_config "$name" ;;
     esac
@@ -137,6 +193,7 @@ main() {
   case "$config" in
   --all | -a) install_all ;;
   zsh) install_zsh ;;
+  claude) install_claude ;;
   git) install_git ;;
   git-global) install_git_global ;;
   *) install_config "$config" ;;
