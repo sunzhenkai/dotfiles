@@ -22,6 +22,7 @@ install_npm_packages() {
 
   # 文档工具
   npm install -g docsify-cli@5.0.0-rc.4 --ignore-scripts
+  npm install -g @fission-ai/openspec@latest
 
   echo "npm 全局包安装完成!"
 }
