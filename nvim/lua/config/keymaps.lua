@@ -99,3 +99,28 @@ vim.keymap.set("n", "<A-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Hei
 vim.keymap.set("n", "<A-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
 vim.keymap.set("n", "<A-h>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
 vim.keymap.set("n", "<A-l>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
+
+-- 与 <leader>/、<leader>sg 相同的根目录 live grep，但排除常见测试文件/目录
+local grep_no_test_exclude = {
+	"*_test.go",
+	"test_*.py",
+	"*_test.py",
+	"*_test.rs",
+	"*.test.ts",
+	"*.test.tsx",
+	"*.test.js",
+	"*.test.jsx",
+	"*.test.mjs",
+	"*.spec.ts",
+	"*.spec.tsx",
+	"*.spec.js",
+	"*.spec.jsx",
+	"*.snap",
+	"**/test/**",
+	"**/tests/**",
+	"**/testdata/**",
+	"**/__tests__/**",
+}
+keymap.set("n", "<leader>sE", LazyVim.pick("live_grep", { file_ignore_patterns = grep_no_test_exclude }), {
+	desc = "Grep (Root Dir, no test files)",
+})

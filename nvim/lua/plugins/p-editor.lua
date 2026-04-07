@@ -112,7 +112,7 @@ return {
 				-- fish
 				fish = { "fish" },
 				-- go: 只在保存时 lint，避免频繁触发
-				go = { "golangci-lint" },
+				go = { "golangcilint" },
 				proto = { "protolint" },
 				-- python
 				python = { "ruff" },
@@ -135,7 +135,7 @@ return {
 					},
 				},
 				-- Go: 优化 golangci-lint 性能
-				["golangci-lint"] = {
+				["golangcilint"] = {
 					-- 使用 prepend_args 追加参数，保留默认的 run/--out-format 等必要参数
 					prepend_args = {
 						"--timeout=60s",

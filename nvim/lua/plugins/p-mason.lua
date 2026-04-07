@@ -11,6 +11,8 @@ return {
 				"buf",
 				"protolint",
 				"eslint_d",
+				"gofumpt",
+				"goimports-reviser",
 			},
 			-- ui = {
 			-- 	icons = {
