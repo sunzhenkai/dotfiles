@@ -12,7 +12,7 @@ return {
 				"protolint",
 				"eslint_d",
 				"gofumpt",
-				"goimports-reviser",
+				"goimports",
 			},
 			-- ui = {
 			-- 	icons = {

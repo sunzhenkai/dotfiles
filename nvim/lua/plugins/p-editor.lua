@@ -20,7 +20,7 @@ return {
 				sh = { "shfmt" },
 				c = { "clang_format" },
 				cpp = { "clang_format" },
-				go = { "gofumpt", "goimports-reviser" },
+				go = { "gofumpt", "goimports" },
 				markdown = { "prettier", "markdownlint-cli2" },
 				yaml = { "yamlfmt" },
 				toml = { "taplo" },
