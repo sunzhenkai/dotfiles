@@ -138,7 +138,7 @@ return {
 				["golangcilint"] = {
 					-- 使用 prepend_args 追加参数，保留默认的 run/--out-format 等必要参数
 					prepend_args = {
-						"--timeout=60s",
+						-- "--timeout=60s",
 					},
 				},
 			},
