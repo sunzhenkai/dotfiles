@@ -3,6 +3,8 @@ set -e
 
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%s)
+# shellcheck source=install-claude.sh
+source "$DOTFILES_ROOT/scripts/install-claude.sh"
 
 # 配置映射：name="source:target"
 declare -A CONFIGS=(
@@ -23,6 +25,7 @@ declare -A CONFIGS=(
   ["fcitx5"]="fcitx5:~/.config/fcitx5"
   ["git"]="git:~/.config/git"
   ["opencode"]="opencode:~/.config/opencode"
+  ["claude"]="claude:~/.config/claude"
 )
 
 # 通用安装函数
@@ -110,6 +113,7 @@ install_all() {
   for name in "${!CONFIGS[@]}"; do
     case "$name" in
     zsh) install_zsh ;;
+    claude) install_claude ;;
     # git) install_git ;;
     *) install_config "$name" ;;
     esac
@@ -137,6 +141,7 @@ main() {
   case "$config" in
   --all | -a) install_all ;;
   zsh) install_zsh ;;
+  claude) install_claude ;;
   git) install_git ;;
   git-global) install_git_global ;;
   *) install_config "$config" ;;

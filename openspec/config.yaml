@@ -1,0 +1,20 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  这是一个开源的 dotfiles 仓库。
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+rules:
+  proposal:
+    - 优先使用简体中文
+    - Keep proposals under 500 words
+    - Always include a "Non-goals" section
+    - 这是开源仓库，不要提交隐私信息，注意检查
+    - 配置可能在多种环境、设备复用，注意兼容性
+  tasks:
+    - 优先使用简体中文
+    - Break tasks into chunks of max 2 hours
+    - 这是开源仓库，不要提交隐私信息，注意检查

@@ -25,7 +25,7 @@ return {
 			},
 			servers = {
 				clangd = {
-					filetypes = { "c", "cpp", "objc", "objcpp", "cuda", "hpp" },
+					filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
 					cmd = {
 						"clangd",
 						"--background-index",
@@ -35,8 +35,7 @@ return {
 						"--function-arg-placeholders",
 						"--fallback-style=google",
 						"--log=error",
-						-- 性能优化
-						"-j=4", -- 限制后台索引并发数
+						-- "-j=4", -- 限制后台索引并发数
 						"--pch-storage=memory", -- PCH 存储在内存中（更快但要注意内存）
 						"--background-index-priority=low", -- 后台索引低优先级
 					},
@@ -47,7 +46,7 @@ return {
 						gopls = {
 							-- 性能优化，减少 CPU 占用
 							diagnosticsDelay = "500ms",
-							staticcheck = false,
+							-- staticcheck = false,
 							-- 限制工作目录范围，避免索引大目录
 							directoryFilters = {
 								"-**/node_modules",
@@ -58,35 +57,35 @@ return {
 								"-**/bin",
 							},
 							-- 减少并行度，降低 CPU 占用
-							maxParallelism = 2,
+							-- maxParallelism = 2,
 							-- 限制代码补全的预算时间
-							completionBudget = "200ms",
+							-- completionBudget = "200ms",
 							-- 禁用占位符，提升补全速度
-							usePlaceholders = false,
+							-- usePlaceholders = false,
 							-- 使用简化的悬停信息
-							hoverKind = "SynopsisDocumentation",
+							-- hoverKind = "SynopsisDocumentation",
 							-- 保留有用的 codelens，禁用耗时的
-							codelenses = {
-								gc_details = false,
-								generate = true,
-								regenerate_cgo = false,
-								test = true,
-								tidy = true,
-								upgrade_dependency = false,
-								vendor = false,
-							},
+							-- codelenses = {
+							-- 	gc_details = false,
+							-- 	generate = true,
+							-- 	regenerate_cgo = false,
+							-- 	test = true,
+							-- 	tidy = true,
+							-- 	upgrade_dependency = false,
+							-- 	vendor = false,
+							-- },
 							-- 限制索引范围，只索引当前模块
-							expandWorkspaceToModule = false,
+							-- expandWorkspaceToModule = false,
 							-- 使用模糊匹配（比 CaseSensitive 更省 CPU）
 							symbolMatcher = "fuzzy",
 							-- 限制内存密集型分析
-							analyses = {
-								fieldalignment = false,
-								shadow = false,
-								unusedparams = false,
-								unusedwrite = false,
-								nilness = true, -- 保留空指针检查（重要）
-							},
+							-- analyses = {
+							-- 	fieldalignment = false,
+							-- 	shadow = false,
+							-- 	unusedparams = false,
+							-- 	unusedwrite = false,
+							-- 	nilness = true, -- 保留空指针检查（重要）
+							-- },
 							-- 保留自动导入和深度补全（编码体验重要）
 							completeUnimported = true,
 							deepCompletion = true,

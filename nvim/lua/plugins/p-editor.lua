@@ -83,13 +83,13 @@ return {
 				sh = { "shfmt" },
 				c = { "clang_format" },
 				cpp = { "clang_format" },
-				go = { "gofumpt", "goimports-reviser" },
+				go = { "gofumpt", "goimports" },
 				markdown = { "prettier", "markdownlint-cli2" },
 				yaml = { "yamlfmt" },
 				toml = { "taplo" },
 				json = { "prettier" },
 				css = { "prettier" },
-				python = { "isort", "black" },
+				python = { "ruff_format" },
 				typescriptreact = { "eslint_d" },
 				typescript = { "eslint_d" },
 				javascript = { "eslint_d" },
@@ -103,8 +103,8 @@ return {
 				clang_format = {
 					prepend_args = { "--style=file", "--fallback-style=google" },
 				},
-				-- python
-				black = {
+				-- python: ruff_format 替代 black + isort（ruff 内置 isort 功能）
+				ruff_format = {
 					prepend_args = { "--line-length", "100" },
 				},
 			},
@@ -175,7 +175,7 @@ return {
 				-- fish
 				fish = { "fish" },
 				-- go: 只在保存时 lint，避免频繁触发
-				go = { "golangci-lint" },
+				go = { "golangcilint" },
 				proto = { "protolint" },
 				-- python
 				python = { "ruff" },
@@ -198,10 +198,10 @@ return {
 					},
 				},
 				-- Go: 优化 golangci-lint 性能
-				["golangci-lint"] = {
+				["golangcilint"] = {
 					-- 使用 prepend_args 追加参数，保留默认的 run/--out-format 等必要参数
 					prepend_args = {
-						"--timeout=60s",
+						-- "--timeout=60s",
 					},
 				},
 			},
@@ -223,8 +223,18 @@ return {
 			"kevinhwang91/promise-async",
 			"neovim/nvim-lspconfig",
 		},
+		init = function()
+			vim.o.foldcolumn = "1"
+			vim.o.foldlevel = 99
+			vim.o.foldlevelstart = 99
+			vim.o.foldenable = true
+		end,
 		config = function()
-			require("ufo").setup()
+			require("ufo").setup({
+				provider_selector = function()
+					return { "lsp", "indent" }
+				end,
+			})
 		end,
 	},
 }

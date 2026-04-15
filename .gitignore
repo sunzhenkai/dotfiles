@@ -1,2 +1,6 @@
 .DS_Store
 *.zwc
+.claude
+.cursor
+.opencode
+openspec/changes

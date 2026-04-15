@@ -8,9 +8,10 @@ local keymap = vim.keymap
 keymap.set("n", "<C-n>", function()
 	vim.diagnostic.jump({ count = 1, float = true, severity = { min = vim.diagnostic.severity.WARN } })
 end)
-keymap.set("n", "<C-m>", function()
+-- <C-m> == <Enter> in terminal, use <leader>je instead
+keymap.set("n", "<leader>je", function()
 	vim.diagnostic.jump({ count = 1, float = true, severity = vim.diagnostic.severity.ERROR })
-end)
+end, { desc = "Jump to next Error" })
 
 -- functions
 -- information
@@ -93,8 +94,33 @@ keymap.set("v", "<leader>p", '"+p', {
 	desc = "Paste from system clipboard", -- 可选的描述
 })
 
--- window size
-vim.keymap.set("n", "<C-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Height" })
-vim.keymap.set("n", "<C-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
-vim.keymap.set("n", "<C-h>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
-vim.keymap.set("n", "<C-l>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
+-- window size (use Alt+hjkl to avoid conflicting with LazyVim's <C-hjkl> window navigation)
+vim.keymap.set("n", "<A-k>", "<cmd>resize +4<cr>", { desc = "Increase Window Height" })
+vim.keymap.set("n", "<A-j>", "<cmd>resize -4<cr>", { desc = "Decrease Window Height" })
+vim.keymap.set("n", "<A-h>", "<cmd>vertical resize -4<cr>", { desc = "Decrease Window Width" })
+vim.keymap.set("n", "<A-l>", "<cmd>vertical resize +4<cr>", { desc = "Increase Window Width" })
+
+-- 与 <leader>/、<leader>sg 相同的根目录 live grep，但排除常见测试文件/目录
+local grep_no_test_exclude = {
+	"*_test.go",
+	"test_*.py",
+	"*_test.py",
+	"*_test.rs",
+	"*.test.ts",
+	"*.test.tsx",
+	"*.test.js",
+	"*.test.jsx",
+	"*.test.mjs",
+	"*.spec.ts",
+	"*.spec.tsx",
+	"*.spec.js",
+	"*.spec.jsx",
+	"*.snap",
+	"**/test/**",
+	"**/tests/**",
+	"**/testdata/**",
+	"**/__tests__/**",
+}
+keymap.set("n", "<leader>sE", LazyVim.pick("live_grep", { file_ignore_patterns = grep_no_test_exclude }), {
+	desc = "Grep (Root Dir, no test files)",
+})

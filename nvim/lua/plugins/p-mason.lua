@@ -11,7 +11,8 @@ return {
 				"buf",
 				"protolint",
 				"eslint_d",
-				"copilot-language-server",
+				"gofumpt",
+				"goimports",
 			},
 			-- ui = {
 			-- 	icons = {
