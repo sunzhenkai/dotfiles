@@ -58,8 +58,3 @@ fi
 if [[ -n "$GOPATH" ]]; then
   export PATH="$GOPATH/bin:$PATH"
 fi
-
-# senv
-if command -v senv >/dev/null; then
-  znap eval senv 'senv env export'
-fi

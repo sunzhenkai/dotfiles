@@ -39,3 +39,8 @@ fi
 if [[ -f "${HOME}/google-cloud-sdk/completion.zsh.inc" ]]; then
   source "${HOME}/google-cloud-sdk/completion.zsh.inc"
 fi
+
+# senv
+if command -v senv >/dev/null; then
+  eval $(senv env export)
+fi
