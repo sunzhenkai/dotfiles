@@ -1,12 +1,1 @@
-# oh-my-zsh
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME=""  # Empty theme since we're using starship
-ZSH_CUSTOM=~/.config/zsh/oh-my-zsh
-source $ZSH/oh-my-zsh.sh
-
-# starship
-if command -v starship >/dev/null; then 
-  eval "$(starship init zsh)"
-fi
-
-[[ -e ~/.envrc ]] && source ~/.envrc
+source ~/.config/zsh/zshrc.sh
