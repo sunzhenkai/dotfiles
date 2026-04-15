@@ -29,7 +29,6 @@ source "$_mod_dir/vi-mode.zsh"
 source "$_mod_dir/misc.zsh"
 source "$_mod_dir/paths.zsh"
 source "$_mod_dir/lang.zsh"
-source "$_mod_dir/private.zsh"
 
 # =============================================================================
 # Prompt (starship)
