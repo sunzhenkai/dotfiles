@@ -41,12 +41,20 @@ install_claude() {
     if [ "$current_link" = "$expected_abs" ]; then
       echo "Already installed: .claude.json"
     else
-      [ -e "$claude_json_target" ] && mv "$claude_json_target" "$claude_json_target-$TIMESTAMP"
-      ln -s "$claude_json_source" "$claude_json_target"
+      if [ -e "$claude_json_target" ]; then
+        mkdir -p "$BACKUP_DIR"
+        mv "$claude_json_target" "$BACKUP_DIR/.claude.json-${TIMESTAMP}"
+        echo "Backed up .claude.json to $BACKUP_DIR/.claude.json-${TIMESTAMP}"
+      fi
+      ln -sf "$claude_json_source" "$claude_json_target"
       echo "Installed: .claude.json"
     fi
   else
-    [ -e "$claude_json_target" ] && mv "$claude_json_target" "$claude_json_target-$TIMESTAMP"
+    if [ -e "$claude_json_target" ]; then
+      mkdir -p "$BACKUP_DIR"
+      mv "$claude_json_target" "$BACKUP_DIR/.claude.json-${TIMESTAMP}"
+      echo "Backed up .claude.json to $BACKUP_DIR/.claude.json-${TIMESTAMP}"
+    fi
     ln -s "$claude_json_source" "$claude_json_target"
     echo "Installed: .claude.json"
   fi

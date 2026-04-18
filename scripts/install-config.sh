@@ -3,6 +3,7 @@ set -e
 
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%s)
+BACKUP_DIR="$HOME/.config/backups"
 # shellcheck source=install-claude.sh
 source "$DOTFILES_ROOT/scripts/install-claude.sh"
 
@@ -28,7 +29,16 @@ declare -A CONFIGS=(
   ["claude"]="claude:~/.config/claude"
 )
 
-# 通用安装函数
+backup_to() {
+  local src="$1"
+  local basename
+  basename=$(basename "$src")
+  local dest="$BACKUP_DIR/${basename}-${TIMESTAMP}"
+  mkdir -p "$BACKUP_DIR"
+  mv "$src" "$dest"
+  echo "Backed up $basename to $dest"
+}
+
 install_config() {
   local name="$1"
   local def="${CONFIGS[$name]}"
@@ -42,23 +52,28 @@ install_config() {
   IFS=':' read -r source target <<<"$def"
   target="${target/#\~/$HOME}"
   local expected_link="$DOTFILES_ROOT/$source"
+  local expected_abs
+  expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
 
-  # 检查是否已经是正确的符号链接
   if [ -L "$target" ]; then
     local current_link
     current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
-    local expected_abs
-    expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
     if [ "$current_link" = "$expected_abs" ]; then
       echo "Already installed: $name"
       return 0
     fi
+    if [ -e "$target" ]; then
+      backup_to "$target"
+    fi
+    ln -sf "$expected_link" "$target"
+    echo "Installed: $name"
+    return 0
   fi
 
-  # 备份已存在的文件/目录
-  [ -e "$target" ] && mv "$target" "$target-$TIMESTAMP"
+  if [ -e "$target" ]; then
+    backup_to "$target"
+  fi
 
-  # 创建符号链接
   ln -s "$expected_link" "$target"
   echo "Installed: $name"
 }
@@ -142,8 +157,6 @@ main() {
   --all | -a) install_all ;;
   zsh) install_zsh ;;
   claude) install_claude ;;
-  git) install_git ;;
-  git-global) install_git_global ;;
   *) install_config "$config" ;;
   esac
 }
