@@ -6,17 +6,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # 可用模块列表
 MODULES=(homebrew system sdk senv mdserve git fonts npm)
 
-# 模块描述
-declare -A MODULE_DESC=(
-  [homebrew]="安装 Homebrew 包管理器"
-  [system]="系统配置（软件源、依赖等）"
-  [sdk]="安装 SDK（Go/Python/Node via mise）"
-  [senv]="安装 senv 二进制工具"
-  [mdserve]="安装 mdserve 二进制工具"
-  [git]="配置 Git"
-  [fonts]="安装字体（Maple Mono NF CN）"
-  [npm]="安装 npm 全局包（docsify-cli 等）"
-)
+# 模块描述（兼容 bash 3.2，不使用关联数组）
+get_module_desc() {
+  case "$1" in
+  homebrew) echo "安装 Homebrew 包管理器" ;;
+  system) echo "系统配置（软件源、依赖等）" ;;
+  sdk) echo "安装 SDK（Go/Python/Node via mise）" ;;
+  senv) echo "安装 senv 二进制工具" ;;
+  mdserve) echo "安装 mdserve 二进制工具" ;;
+  git) echo "配置 Git" ;;
+  fonts) echo "安装字体（Maple Mono NF CN）" ;;
+  npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
+  *) echo "$1" ;;
+  esac
+}
 
 # 确认函数
 confirm() {
@@ -78,7 +81,7 @@ interactive_install() {
   load_modules
 
   for module in "${modules[@]}"; do
-    if confirm "安装 ${MODULE_DESC[$module]}?"; then
+    if confirm "安装 $(get_module_desc "$module")?"; then
       run_module "$module"
     else
       echo "跳过 $module"
@@ -92,7 +95,7 @@ show_help() {
   echo ""
   echo "模块:"
   for m in "${MODULES[@]}"; do
-    printf "  %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+    printf "  %-12s %s\n" "$m" "$(get_module_desc "$m")"
   done
   echo ""
   echo "选项:"
@@ -115,7 +118,7 @@ main() {
     echo ""
     echo "将安装以下模块:"
     for m in "${MODULES[@]}"; do
-      printf "  - %-12s %s\n" "$m" "${MODULE_DESC[$m]}"
+      printf "  - %-12s %s\n" "$m" "$(get_module_desc "$m")"
     done
     echo ""
 
