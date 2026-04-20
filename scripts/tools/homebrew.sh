@@ -72,6 +72,7 @@ init_homebrew() {
   # 开发工具
   brew install mise tmux zsh uv pkg-config mysql-connector-c
   brew install anomalyco/tap/opencode
+  brew install k9s
   # ghostty 仅在 macOS 上可用
   if [[ "$ID" == "darwin" ]]; then
     brew install --cask ghostty

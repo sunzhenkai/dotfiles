@@ -3,7 +3,7 @@
 # Prefer Homebrew bash (5.x) over system bash (3.2) for associative array support
 BASH := $(shell test -x /opt/homebrew/bin/bash && echo /opt/homebrew/bin/bash || echo /bin/bash)
 
-CONFIGS = starship nvim kitty tmux alacritty zellij ghostty wezterm zsh yazi hypr helix shell_gpt zed fcitx5 git opencode claude
+CONFIGS = starship nvim kitty k9s tmux alacritty zellij ghostty wezterm zsh yazi hypr helix shell_gpt zed fcitx5 git opencode claude
 
 init:
 	@$(BASH) scripts/init.sh

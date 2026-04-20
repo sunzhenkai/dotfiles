@@ -12,6 +12,7 @@ declare -A CONFIGS=(
   ["starship"]="starship/starship.toml:~/.config/starship.toml"
   ["nvim"]="nvim:~/.config/nvim"
   ["kitty"]="kitty:~/.config/kitty"
+  ["k9s"]="k9s:~/.config/k9s"
   ["tmux"]="tmux:~/.config/tmux"
   ["alacritty"]="alacritty:~/.config/alacritty"
   ["zellij"]="zellij:~/.config/zellij"
