@@ -12,10 +12,14 @@ fi
 source $_znap_dir/znap.zsh
 
 # Plugins
+
+##### zsh-history-substring-search
 # zsh-history-substring-search：按 ↑/↓ 主动过滤并选择历史。
 #zsh-autosuggestions：输入时灰色提示完整命令，按 → 补全。
-
 znap source zsh-users/zsh-history-substring-search
+bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
+
 znap source zsh-users/zsh-autosuggestions
 znap source zsh-users/zsh-syntax-highlighting
 znap source agkozak/zsh-z
