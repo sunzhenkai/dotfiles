@@ -54,5 +54,6 @@
         "Authorization": "Bearer {env:ZHIPU_API_KEY}"
       }
     }
-  }
+  },
+  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
 }
