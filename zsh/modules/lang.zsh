@@ -9,7 +9,7 @@ function _fix_lang_plugin_path() {
   local data_dir=$1; shift
   local ver
   for plugin in $@; do
-    ver=$(${mgr} current ${plugin} 2>/dev/null | awk '{print $2}')
+    ver=$(${mgr} current ${plugin} 2>/dev/null | awk 'END{if(NF>1) print $2; else print $1}')
     [[ -z "$ver" ]] && continue
     for d in "${data_dir}/installs/${plugin}/${ver}/bin" \
              "${data_dir}/installs/${plugin}/${ver}/packages/bin"; do
