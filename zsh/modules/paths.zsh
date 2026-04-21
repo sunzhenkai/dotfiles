@@ -18,3 +18,10 @@ if [[ -e "$_brew_macos" ]]; then
   znap eval brew-macos "$_brew_macos/bin/brew shellenv"
   export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:${DYLD_FALLBACK_LIBRARY_PATH}"
 fi
+
+# tiup
+local _tiup_path="${HOME}/.tiup/bin"
+if [[ -e "$_tiup_path" ]]; then
+  export PATH="${_tiup_path}:${PATH}"
+fi
+
