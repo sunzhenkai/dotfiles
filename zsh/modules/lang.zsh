@@ -55,6 +55,5 @@ elif [[ -d "$HOME/.cargo/bin" ]]; then
 fi
 
 # golang
-if [[ -n "$GOPATH" ]]; then
-  export PATH="$GOPATH/bin:$PATH"
-fi
+export GOPATH="${GOPATH:-$HOME/.go}"
+export PATH="$GOPATH/bin:$PATH"
