@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv mdserve git fonts npm)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -14,6 +14,7 @@ get_module_desc() {
   sdk) echo "安装 SDK（Go/Python/Node via mise）" ;;
   golang) echo "配置 Golang 环境（GOPATH 等）" ;;
   senv) echo "安装 senv 二进制工具" ;;
+  grepom) echo "安装 grepom 多仓库管理工具" ;;
   mdserve) echo "安装 mdserve 二进制工具" ;;
   git) echo "配置 Git" ;;
   fonts) echo "安装字体（Maple Mono NF CN）" ;;
@@ -43,6 +44,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/sdk.sh"
   source "$SCRIPT_DIR/scripts/tools/golang.sh"
   source "$SCRIPT_DIR/scripts/tools/senv.sh"
+  source "$SCRIPT_DIR/scripts/tools/grepom.sh"
   source "$SCRIPT_DIR/scripts/tools/mdserve.sh"
   source "$SCRIPT_DIR/scripts/tools/git.sh"
   source "$SCRIPT_DIR/scripts/tools/fonts.sh"
@@ -66,6 +68,7 @@ run_module() {
   system) setup_system ;;
   sdk) setup_sdk ;;
   senv) install_senv_binary ;;
+  grepom) install_grepom_binary ;;
   mdserve) install_mdserve_binary ;;
   golang) setup_golang ;;
   git)
