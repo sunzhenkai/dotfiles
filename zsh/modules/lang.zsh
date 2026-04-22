@@ -56,4 +56,7 @@ fi
 
 # golang
 export GOPATH="${GOPATH:-$HOME/.go}"
+export GO111MODULE=on
+export GOPROXY="https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct"
+export GOCACHE="$HOME/.cache/go-build"
 export PATH="$GOPATH/bin:$PATH"
