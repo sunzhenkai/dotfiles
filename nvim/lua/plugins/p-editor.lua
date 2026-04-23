@@ -128,37 +128,21 @@ return {
 	-- nvim-treesitter/nvim-treesitter
 	{
 		"nvim-treesitter/nvim-treesitter",
-		opts = {
-			highlight = { enable = true },
-			-- bugs found in cc file
-			indent = { enable = false },
-			ensure_installed = {
-				"bash",
-				"diff",
-				"html",
-				"lua",
-				"luadoc",
-				"luap",
-				"printf",
-				"query",
-				"regex",
-				"toml",
-				"vim",
-				"vimdoc",
-				"xml",
-				"yaml",
-				-- c/c++/cmake
-				"cmake",
-				"cpp",
-				"c",
-				"make",
-				"go",
-				"proto",
-				"typescript",
-				"tsx",
-				"python",
-			},
-		},
+		opts = function(_, opts)
+			if type(opts.ensure_installed) == "table" then
+				vim.list_extend(opts.ensure_installed, {
+					"bash",
+					"lua",
+					"vim",
+					"vimdoc",
+					"query",
+					"regex",
+					"markdown",
+					"markdown_inline",
+				})
+			end
+			opts.indent = { enable = false }
+		end,
 	},
 	-- mfussenegger/nvim-lint
 	{
@@ -210,9 +194,13 @@ return {
 	-- numToStr/Comment.nvim
 	{
 		"numToStr/Comment.nvim",
-		opts = {
-			-- add any options here
-		},
+		opts = function(_, opts)
+			local ok, integration = pcall(require, "ts_context_commentstring.integrations.comment_nvim")
+			if ok then
+				opts.pre_hook = integration.create_pre_hook()
+			end
+			return opts
+		end,
 	},
 	-- code folder
 	-- kevinhwang91/nvim-ufo
