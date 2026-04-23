@@ -5,3 +5,4 @@
 .opencode
 openspec/changes
 scripts/assets
+/opencode/package-lock.json
