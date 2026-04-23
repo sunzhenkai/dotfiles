@@ -38,3 +38,5 @@ if command -v starship >/dev/null; then
 fi
 
 [[ -e ~/.envrc ]] && source ~/.envrc
+
+source "$_mod_dir/post.zsh"
