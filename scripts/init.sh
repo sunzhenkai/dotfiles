@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor vcpkg)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor vcpkg ossutil)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -21,6 +21,7 @@ get_module_desc() {
   npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
   cursor) echo "安装 Cursor CLI" ;;
   vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
+  ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
   *) echo "$1" ;;
   esac
 }
@@ -54,6 +55,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/npm.sh"
   source "$SCRIPT_DIR/scripts/tools/cursor.sh"
   source "$SCRIPT_DIR/scripts/tools/vcpkg.sh"
+  source "$SCRIPT_DIR/scripts/tools/ossutil.sh"
 }
 
 # 执行单个模块
@@ -82,6 +84,7 @@ run_module() {
   npm) install_npm_packages ;;
   cursor) install_cursor_cli ;;
   vcpkg) setup_vcpkg ;;
+  ossutil) install_ossutil ;;
   esac
 }
 
