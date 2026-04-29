@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# dotf — Dotfiles CLI 轻量入口
+# 纯委托：参数解析 + 子命令路由，不含业务逻辑
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 检测 Homebrew bash（config.sh 的 declare -A 需要 bash 4+）
+get_bash() {
+  if [ -x /opt/homebrew/bin/bash ]; then
+    echo "/opt/homebrew/bin/bash"
+  else
+    echo "/bin/bash"
+  fi
+}
+
+# ============================================================
+# 子命令: pull（保护性 git pull）
+# ============================================================
+
+cmd_pull() {
+  cd "$SCRIPT_DIR" || exit 1
+
+  # 检查是否有未提交的改动
+  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null || \
+     [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+    echo "检测到未提交的改动，执行 stash..."
+    git stash || { echo "错误: git stash 失败"; exit 1; }
+    local stashed=1
+  fi
+
+  echo "拉取最新代码..."
+  if ! git pull; then
+    echo "错误: git pull 失败"
+    [ "${stashed:-0}" -eq 1 ] && echo "改动已 stash，请手动恢复: git stash pop"
+    exit 1
+  fi
+
+  # 恢复 stash
+  if [ "${stashed:-0}" -eq 1 ]; then
+    echo "恢复暂存的改动..."
+    if ! git stash pop; then
+      echo ""
+      echo "⚠️  stash pop 发生冲突，请手动解决："
+      echo "   1. 查看冲突文件: git status"
+      echo "   2. 解决冲突后: git stash drop"
+      exit 1
+    fi
+  fi
+
+  echo "✓ dotfiles 已更新"
+}
+
+# ============================================================
+# 子命令: __path（输出仓库路径）
+# ============================================================
+
+cmd_path() {
+  echo "$SCRIPT_DIR"
+}
+
+# ============================================================
+# 帮助信息
+# ============================================================
+
+show_help() {
+  echo "dotf — Dotfiles 管理工具"
+  echo ""
+  echo "用法: dotf <命令|选项> [参数...]"
+  echo ""
+  echo "命令:"
+  echo "  pull                    拉取 dotfiles 最新更新（保护性 pull）"
+  echo "  cd                      跳转到 dotfiles 目录（需 zsh wrapper）"
+  echo ""
+  echo "选项:"
+  echo "  -i, --install [模块...] 安装工具/SDK（委托 scripts/install.sh）"
+  echo "  -c, --config  [模块...] 配置/链接配置文件（委托 scripts/config.sh）"
+  echo "  -a, --all               安装全部 + 配置全部"
+  echo "  -h, --help              显示帮助"
+  echo ""
+  echo "示例:"
+  echo "  dotf pull               # 拉取更新"
+  echo "  dotf -i sdk             # 安装 SDK"
+  echo "  dotf -c nvim            # 配置 nvim"
+  echo "  dotf -i sdk -c nvim     # 安装 SDK + 配置 nvim"
+  echo "  dotf -a                 # 全部安装 + 配置"
+}
+
+# ============================================================
+# 参数解析
+# ============================================================
+
+main() {
+  # 无参数 → 显示帮助
+  if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+  fi
+
+  local mode=""
+  local install_args=()
+  local config_args=()
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    pull)
+      cmd_pull
+      exit $?
+      ;;
+    __path)
+      cmd_path
+      exit $?
+      ;;
+    -i | --install)
+      mode="install"
+      ;;
+    -c | --config)
+      mode="config"
+      ;;
+    -a | --all)
+      bash "$SCRIPT_DIR/scripts/install.sh" --all
+      local bash_bin
+      bash_bin="$(get_bash)"
+      "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
+      exit $?
+      ;;
+    -h | --help)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "错误: 未知选项 '$1'"
+      echo ""
+      show_help
+      exit 1
+      ;;
+    *)
+      # 非 flag 参数 → 归入当前模式
+      if [ "$mode" = "install" ]; then
+        install_args+=("$1")
+      elif [ "$mode" = "config" ]; then
+        config_args+=("$1")
+      else
+        echo "错误: 请先指定模式 (-i 或 -c)"
+        echo ""
+        show_help
+        exit 1
+      fi
+      ;;
+    esac
+    shift
+  done
+
+  # 执行委托
+  if [ "$mode" = "install" ]; then
+    exec bash "$SCRIPT_DIR/scripts/install.sh" "${install_args[@]}"
+  fi
+
+  if [ "$mode" = "config" ]; then
+    local bash_bin
+    bash_bin="$(get_bash)"
+    if [ ${#config_args[@]} -eq 0 ]; then
+      exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh"
+    fi
+    for mod in "${config_args[@]}"; do
+      "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$mod"
+    done
+    exit $?
+  fi
+}
+
+main "$@"
