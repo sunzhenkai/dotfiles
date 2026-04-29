@@ -44,6 +44,26 @@
 - **WHEN** 旧配置被备份
 - **THEN** 输出包含 "Backed up <name> to <backup_path>" 格式的信息
 
+#### Scenario: Logseq 配置备份时的输出
+- **WHEN** `~/.logseq` 已存在且需要备份
+- **THEN** 输出包含 "Backed up logseq to ~/.config/backups/logseq-<timestamp>" 格式的信息
+
+### Requirement: logseq 注册为可用配置项
+
+`logseq` SHALL 在 CONFIGS 映射和 Makefile CONFIGS 列表中注册，映射关系为 `logseq:~/.logseq`。
+
+#### Scenario: 通过 Makefile 安装
+- **WHEN** 运行 `make logseq`
+- **THEN** 调用 `scripts/install-config.sh logseq` 执行安装
+
+#### Scenario: 列出可用配置
+- **WHEN** 运行 `scripts/install-config.sh` 不带参数
+- **THEN** 输出的可用配置列表中 SHALL 包含 `logseq`
+
+#### Scenario: 全量安装包含 logseq
+- **WHEN** 运行 `make all` 或 `scripts/install-config.sh --all`
+- **THEN** logseq 配置 SHALL 被包含在安装流程中
+
 ### Requirement: install_claude.sh symlink 修复
 
 `install_claude.sh` 中处理 `.claude.json` symlink 的逻辑 SHALL 同步应用相同的检测和备份策略。

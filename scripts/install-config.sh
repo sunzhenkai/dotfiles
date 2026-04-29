@@ -28,6 +28,7 @@ declare -A CONFIGS=(
   ["git"]="git:~/.config/git"
   ["opencode"]="opencode:~/.config/opencode"
   ["claude"]="claude:~/.config/claude"
+  ["logseq"]="logseq:~/.logseq"
 )
 
 backup_to() {
