@@ -5,5 +5,11 @@
     "light": null,
     "dark": null
   },
-  "externals": []
+  "externals": [],
+  "pinnedToolbarItems": [
+    "logseq-heatmap:heatmap-plugin-open",
+    "logseq-journals-calendar:goto-today",
+    "logseq-agenda:Agenda3",
+    "logseq-journals-calendar:open-calendar"
+  ]
 }
