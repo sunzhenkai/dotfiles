@@ -1,0 +1,10 @@
+# 忽略所有
+*
+
+# 添加跟踪白名单
+!.gitignore
+!config/
+!config/**
+!preferences.json
+!settings/
+!settings/**
