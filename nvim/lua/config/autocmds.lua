@@ -3,6 +3,14 @@
 -- Add any additional autocmds here
 -- custom commands are preferred to start with 'I'
 
+-- 禁用 C/C++ 保存时自动格式化
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "c", "cpp", "objc", "objcpp", "cuda" },
+	callback = function()
+		vim.b.autoformat = false
+	end,
+})
+
 -- 大文件优化: 对大文件禁用耗性能的功能
 local big_file_group = vim.api.nvim_create_augroup("BigFileOptimization", { clear = true })
 vim.api.nvim_create_autocmd("BufReadPre", {
