@@ -6,6 +6,11 @@
 export PATH="${HOME}/.local/bin:${PATH}"
 export DEVELOPMENT_ENV=LOCAL
 
+# dotfiles (dotf command)
+if [[ -e "${HOME}/.config/dotfiles" ]]; then
+  export PATH="${HOME}/.config/dotfiles:${PATH}"
+fi
+
 # homebrew — linux
 local _brew_linux="/home/linuxbrew/.linuxbrew"
 if [[ -e "$_brew_linux" ]]; then

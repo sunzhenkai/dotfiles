@@ -28,6 +28,7 @@ declare -A CONFIGS=(
   ["git"]="git:~/.config/git"
   ["opencode"]="opencode:~/.config/opencode"
   ["claude"]="claude:~/.config/claude"
+  ["logseq"]="logseq:~/.logseq"
 )
 
 backup_to() {
@@ -155,6 +156,11 @@ main() {
   fi
 
   case "$config" in
+  --list)
+    for name in $(echo "${!CONFIGS[*]}" | tr ' ' '\n' | sort); do
+      echo "$name"
+    done
+    ;;
   --all | -a) install_all ;;
   zsh) install_zsh ;;
   claude) install_claude ;;

@@ -1,45 +1,54 @@
-# iConfig
+# Dotfiles
+
+Personal dotfiles managed with symlinks.
+
+## Quick Start
 
 ```shell
-# install
-git clone git@github.com:sunzhenkai/iconfig.git ~/.config/iconfig
-cd ~/.config/iconfig
-make all
+# clone
+git clone git@github.com:sunzhenkai/dotfiles.git ~/.config/dotfiles
 
-# config
-cd ~/.config/iconfig/init && git submodule update --init
-./activate
+# install tools + apply configs
+dotf -a
 
-# install programs
-ii homebrew -i
-ii homebrew -c
-
-ii asdf -i
-ii asdf -c
-
-ii zsh -c
-
-## config programs
-# config oh-my-zsh
-vim ~/.zshrc
-ZSH_CUSTOME=~/.config/zsh/oh-my-zsh
-
+# or step by step
+dotf -i sdk          # install SDK
+dotf -c nvim zsh     # config nvim & zsh
 ```
 
-# Workflow
+## Usage
+
+```
+dotf <command|option> [args...]
+
+Commands:
+  pull              Pull latest updates (with stash protection)
+
+Options:
+  -i [modules...]   Install tools/SDKs
+  -c [modules...]   Apply config symlinks
+  -a                Install all + config all
+  -h                Show help
+
+Examples:
+  dotf pull              # update dotfiles repo
+  dotf -i                # interactive install
+  dotf -i sdk golang     # install specific modules
+  dotf -c nvim           # config nvim
+  dotf -c                # interactive config
+  dotf -a                # full setup
+```
+
+## Workflow
 
 - Local
-  - Wezterm
-  - zsh
-    - Oh My Zsh
-    - Starship
-  - asdf
-  - Homebrew
-  - NVM
+  - Ghostty / Wezterm
+  - zsh + Starship
+  - Neovim
 - Remote
   - Tmux / Zellij
   - Neovim
 
-# ColorScheme
+## ColorScheme
 
 - [rose pine](https://rosepinetheme.com/)
