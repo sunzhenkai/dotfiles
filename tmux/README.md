@@ -13,7 +13,7 @@ tmux
 
 ## 主题
 
-默认使用 `themes/tmux2k.conf`。切换到 Catppuccin 时：`tmux.conf` 中的 `source-file ~/.config/tmux/themes/catppuccin.conf`，以及 **`run tpm` 之后** 对 `themes/catppuccin-status-post-tpm.conf` 的 `source-file`，两处需同时启用（换用 tmux2k 时对两处一齐注释）。保存后在 tmux 内执行 `prefix`+`I` 安装插件；大版本升级插件后可尝试 `killall tmux` 再起会话。
+默认使用 `themes/tmux2k.conf`。切换到 Catppuccin 时在 `tmux.conf` 中：**启用** `source-file ~/.config/tmux/themes/catppuccin.conf`，以及 **`run tpm` 之后** 的 `source-file ~/.config/tmux/themes/catppuccin-status-post-tpm.conf`。换用 tmux2k 时对上述 **两行一齐注释**，并改用 `themes/tmux2k.conf`。保存后在 tmux 内执行 `prefix`+`I` 安装插件；大版本升级插件后可尝试 `killall tmux` 再起会话。
 
 ### Catppuccin v2：根因（为何不生效）
 
@@ -21,7 +21,7 @@ tmux
 
 1. **旧选项被废弃**：`@catppuccin_status_modules_right` 这类「用字符串列出右侧模块」的方式在 v2 中不再生效；主题只负责注册各模块对应的用户选项（如 `@catppuccin_status_date_time` 等），**不会**再根据旧列表自动拼装 `status-right`。
 2. **v2 需显式拼装状态栏**：须在加载主题之后，用 tmux 自带的 `status-left` / `status-right`，按顺序接入 `#{E:@catppuccin_status_directory}`、`#{E:@catppuccin_status_session}`、`#{E:@catppuccin_status_date_time}` 等占位符（详见上游 [status-line 文档](https://github.com/catppuccin/tmux/blob/main/docs/reference/status-line.md)）。
-3. **顺序要求**：以 `@` 开头的 Catppuccin 选项在 **`run tpm`（插件实际执行 `catppuccin.tmux`）之前** 设置；普通 tmux 选项如 `status-right`、`status-left` 须在 **主题加载完成之后** 设置，否则要么引用未就绪，要么与官方说明不一致（参考上游 [Troubleshooting](https://github.com/catppuccin/tmux/blob/main/docs/guides/troubleshooting.md)）。因此本仓库把状态栏拼装单独放在 `themes/catppuccin-status-post-tpm.conf`，并在 `run tpm` 之后再 `source-file`。
+3. **顺序要求**：在 `catppuccin.conf` 里以 `@` 开头的 Catppuccin 选项必须在 **`run tpm` 之前** 写入配置（TPM 在这一步执行各插件的入口脚本，包括主题的 `catppuccin.tmux`）。`status-right` / `status-left` 等普通 tmux 选项须在 **上述脚本跑完之后** 再设置（参考上游 [Troubleshooting](https://github.com/catppuccin/tmux/blob/main/docs/guides/troubleshooting.md)）。因此本仓库把状态栏拼装放在 `themes/catppuccin-status-post-tpm.conf`，并在 `run tpm` **之后** `source-file`。
 
 # Keybindings
 
