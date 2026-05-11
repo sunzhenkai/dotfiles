@@ -1,10 +1,12 @@
 # NOTES:
 # [cmd+shift+,] / [ctrl+shift+,] to reload config
 
+config-file = auto/theme.ghostty
+
 # [font]
 font-family = "Maple Mono NF CN"
 font-family-bold = bold
-font-size = 18
+font-size = 16
 
 # [theme]
 # theme = GruvboxLight
@@ -14,6 +16,10 @@ font-size = 18
 
 # [window]
 fullscreen = true
+window-padding-x = 0
+window-padding-y = 0
+## macos
+#macos-titlebar-style = tabs
 
 # [scrollback]
 scrollback-limit = 100000

@@ -1,7 +1,3 @@
-# Important
-
-**STAY AWAY FROM KITTY**
-
 # kitty
 
 Kitty config.kkk
@@ -31,7 +27,9 @@ Command + Shift ]  # switch to right tab
 # https://github.com/sunzhenkai
 ctrl + shift + {click}
 ```
+
 # Config
+
 ```shell
 # generate default config
 kitty +runpy 'from kitty.config import *; print(commented_out_default_config())'
