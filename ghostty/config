@@ -59,8 +59,6 @@ keybind = ctrl+a>equal=equalize_splits
 keybind = ctrl+a>t=new_tab
 keybind = ctrl+a>n=next_tab
 keybind = ctrl+a>p=previous_tab
-keybind = ctrl+a>left_bracket=previous_tab
-keybind = ctrl+a>right_bracket=next_tab
 keybind = ctrl+a>one=goto_tab:1
 keybind = ctrl+a>two=goto_tab:2
 keybind = ctrl+a>three=goto_tab:3
@@ -80,7 +78,7 @@ keybind = ctrl+a>i=inspector:toggle
 
 # Font size
 keybind = ctrl+a>plus=increase_font_size:1
-keybind = ctrl+a>minus=decrease_font_size:1
+keybind = ctrl+a>ctrl+minus=decrease_font_size:1
 keybind = ctrl+a>zero=reset_font_size
 
 # Fullscreen toggle
