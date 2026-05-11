@@ -217,7 +217,7 @@ keybinds clear-defaults=true {
 // changing these requires a restart to take effect
 plugins {
     tab-bar location="zellij:tab-bar"
-    status-bar location="zellij:status-bar"
+    // status-bar location="zellij:status-bar"
     strider location="zellij:strider"
     compact-bar location="zellij:compact-bar"
     session-manager location="zellij:session-manager"
@@ -323,13 +323,12 @@ load_plugins {
 // Choose the theme that is specified in the themes section.
 // Default: default
 //
-theme "gruvbox-light"
+theme "gruvbox-dark-hard"
 
 // The name of the default layout to load on startup
 // Default: "default"
 // (Requires restart)
-//
-// default_layout "compact"
+default_layout "no-status-bar"
 
 // Choose the mode that zellij uses when starting up.
 // Default: normal
