@@ -29,13 +29,22 @@
 
 > **与 WezTerm 差异**：无内建 **vi 复制模式** 与 **矩形选区**；可在 pager 中搜索/复制，或配合鼠标与 `copy_on_select`。
 
+## 标签页
+
+| 快捷键 | 功能 |
+|--------|------|
+| `⌘+1` … `⌘+9`（macOS） | 跳到第 **1…9** 个标签（`goto_tab`） |
+| `Ctrl+a` → `h` / `l` | 上一标签 / 下一标签（`previous_tab` / `next_tab`，与标签栏左右一致） |
+| `Ctrl+a` → `t` / `d` | **显示** / **隐藏** 标签栏（`remote_control load-config -o tab_bar_style=fade` / `…=hidden`；与 `kitty.conf` 里 `tab_bar_style` 保持一致即可） |
+
 ## 窗格
 
 | 快捷键 | 功能 |
 |--------|------|
 | `Ctrl+a` → `\` | 左右分栏（`launch --location=vsplit`） |
 | `Ctrl+a` → `-` | 上下分栏（`launch --location=hsplit`） |
-| `Ctrl+a` → `h` / `j` / `k` / `l` | 焦点移到左 / 下 / 上 / 右邻窗 |
+| `Ctrl+a` → `j` / `k` | 焦点移到下 / 上邻窗 |
+| `Ctrl+a` → `p` 子模式内 `h` / `j` / `k` / `l` | 快速在邻窗间切换（含左右） |
 | `⌘+↩`（macOS） | 切换全屏 **`toggle_fullscreen`**（本仓库覆盖 Kitty 默认的「新窗口」，在 `splits` 下后者会像分屏） |
 
 ## 调整窗格大小（对应 WezTerm `Leader+r` 子模式）
