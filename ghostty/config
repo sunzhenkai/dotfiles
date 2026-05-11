@@ -7,9 +7,10 @@ font-family-bold = bold
 font-size = 18
 
 # [theme]
-#theme = GruvboxLight
+# theme = GruvboxLight
 # theme = GruvboxDark
-theme = Ayu
+# theme = Ayu
+# theme = Belafonte Day
 
 # [window]
 fullscreen = true
