@@ -78,6 +78,15 @@ return {
 		"stevearc/conform.nvim",
 		opts = {
 			notify_on_error = true,
+			format_on_save = function(bufnr)
+				local ft = vim.bo[bufnr].filetype
+				-- 禁用 C/C++ 保存时自动格式化
+				local disabled_ft = { c = true, cpp = true, objc = true, objcpp = true, cuda = true }
+				if disabled_ft[ft] then
+					return false
+				end
+				return { timeout_ms = 3000, lsp_format = "fallback" }
+			end,
 			formatters_by_ft = {
 				lua = { "stylua" },
 				sh = { "shfmt" },
