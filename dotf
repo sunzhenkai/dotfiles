@@ -14,6 +14,25 @@ get_bash() {
 }
 
 # ============================================================
+# 通用工具函数
+# ============================================================
+
+# 确认函数（Y/n 默认值）
+confirm() {
+  local prompt="$1"
+  local default="${2:-Y}"
+  local reply
+
+  if [[ "$default" == "Y" ]]; then
+    read -r -p "$prompt [Y/n]: " reply
+    [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
+  else
+    read -r -p "$prompt [y/N]: " reply
+    [[ "$reply" =~ ^[Yy] ]]
+  fi
+}
+
+# ============================================================
 # 子命令: pull（保护性 git pull）
 # ============================================================
 
@@ -51,6 +70,52 @@ cmd_pull() {
 }
 
 # ============================================================
+# 子命令: init（完整初始化流程）
+# ============================================================
+
+cmd_init() {
+  echo "============================================"
+  echo "  Dotfiles 初始化"
+  echo "============================================"
+  echo ""
+
+  # === Install 阶段 ===
+  echo "将安装以下模块:"
+  echo ""
+  bash "$SCRIPT_DIR/scripts/install.sh" --list-desc | while IFS=$'\t' read -r name desc; do
+    printf "  %-12s %s\n" "$name" "$desc"
+  done
+  echo ""
+
+  if confirm "是否开始安装?"; then
+    bash "$SCRIPT_DIR/scripts/install.sh" --all
+  else
+    echo "跳过安装。"
+  fi
+
+  echo ""
+
+  # === Config 阶段 ===
+  echo "将配置以下模块:"
+  echo ""
+  local bash_bin
+  bash_bin="$(get_bash)"
+  "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --list | while read -r name; do
+    printf "  %s\n" "$name"
+  done
+  echo ""
+
+  if confirm "是否开始配置?"; then
+    "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
+  else
+    echo "跳过配置。"
+  fi
+
+  echo ""
+  echo "✓ 初始化完成"
+}
+
+# ============================================================
 # 子命令: __path（输出仓库路径）
 # ============================================================
 
@@ -68,6 +133,7 @@ show_help() {
   echo "用法: dotf <命令|选项> [参数...]"
   echo ""
   echo "命令:"
+  echo "  init                    完整初始化（安装 + 配置，带交互确认）"
   echo "  pull                    拉取 dotfiles 最新更新（保护性 pull）"
   echo "  cd                      跳转到 dotfiles 目录（需 zsh wrapper）"
   echo ""
@@ -78,6 +144,7 @@ show_help() {
   echo "  -h, --help              显示帮助"
   echo ""
   echo "示例:"
+  echo "  dotf init               # 完整初始化（安装 + 配置）"
   echo "  dotf pull               # 拉取更新"
   echo "  dotf -i sdk             # 安装 SDK"
   echo "  dotf -c nvim            # 配置 nvim"
@@ -104,6 +171,10 @@ main() {
     case "$1" in
     pull)
       cmd_pull
+      exit $?
+      ;;
+    init)
+      cmd_init
       exit $?
       ;;
     __path)

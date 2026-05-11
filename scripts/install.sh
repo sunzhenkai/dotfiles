@@ -117,32 +117,15 @@ show_help() {
   echo "  --help, -h   显示此帮助"
   echo ""
   echo "示例:"
-  echo "  $0              # 交互式安装所有模块"
   echo "  $0 homebrew sdk # 只安装指定模块（仍需确认）"
   echo "  $0 --all        # 全部安装（跳过确认）"
 }
 
 # 主函数
 main() {
-  # 无参数：交互式安装所有模块
+  # 无参数：显示帮助
   if [[ $# -eq 0 ]]; then
-    echo "============================================"
-    echo "  Dotfiles 初始化脚本"
-    echo "============================================"
-    echo ""
-    echo "将安装以下模块:"
-    for m in "${MODULES[@]}"; do
-      printf "  - %-12s %s\n" "$m" "$(get_module_desc "$m")"
-    done
-    echo ""
-
-    if ! confirm "是否开始初始化流程?" "N"; then
-      echo "已取消初始化。"
-      echo "提示: 使用 '$0 --help' 查看更多选项。"
-      exit 0
-    fi
-
-    interactive_install "${MODULES[@]}"
+    show_help
     exit 0
   fi
 
@@ -160,6 +143,18 @@ main() {
       ;;
     --help | -h)
       show_help
+      exit 0
+      ;;
+    --list)
+      for m in "${MODULES[@]}"; do
+        echo "$m"
+      done
+      exit 0
+      ;;
+    --list-desc)
+      for m in "${MODULES[@]}"; do
+        printf "%s\t%s\n" "$m" "$(get_module_desc "$m")"
+      done
       exit 0
       ;;
     -*)
