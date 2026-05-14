@@ -91,3 +91,43 @@ alias arcl='arc land --onto main'
 
 # others
 alias rmf='rm -f'
+
+# fuzzy search by filename in current directory
+function findn() {
+  local cd_mode=0 pattern
+
+  [[ "$1" == "-c" ]] && { cd_mode=1; shift; }
+
+  pattern="$1"
+  if [[ -z "$pattern" ]]; then
+    echo "Usage: findn [-c] <pattern>  -- fuzzy search files/dirs by name" >&2
+    echo "       -c    fzf select and cd into the matched path" >&2
+    return 1
+  fi
+
+  local results
+  if command -v fd >/dev/null 2>&1; then
+    results=$(fd -i --glob "*${pattern}*" --hidden --no-ignore-vcs)
+  else
+    results=$(find . -iname "*${pattern}*" 2>/dev/null)
+  fi
+
+  if [[ -z "$results" ]]; then
+    echo "No matches found for: $pattern" >&2
+    return 1
+  fi
+
+  if [[ $cd_mode -eq 1 ]]; then
+    if ! command -v fzf >/dev/null 2>&1; then
+      echo "Error: fzf is not installed" >&2
+      return 1
+    fi
+    local selected target
+    selected=$(echo "$results" | fzf --preview 'bat --color=always --style=numbers --line-range=:500 {} 2>/dev/null || cat {} 2>/dev/null || ls -la {}') || return 0
+    [[ -z "$selected" ]] && return 0
+    target=$([[ -d "$selected" ]] && echo "$selected" || dirname "$selected")
+    cd "$target" && echo "cd: $target"
+  else
+    echo "$results" | sort
+  fi
+}
