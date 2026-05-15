@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor vcpkg ossutil)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor vcpkg ossutil aws aliyun gcp)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -22,6 +22,9 @@ get_module_desc() {
   cursor) echo "安装 Cursor CLI" ;;
   vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
   ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
+  aws) echo "安装 AWS CLI v2" ;;
+  aliyun) echo "安装阿里云 CLI" ;;
+  gcp) echo "安装 Google Cloud CLI + gke-gcloud-auth-plugin" ;;
   *) echo "$1" ;;
   esac
 }
@@ -56,6 +59,9 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/cursor.sh"
   source "$SCRIPT_DIR/scripts/tools/vcpkg.sh"
   source "$SCRIPT_DIR/scripts/tools/ossutil.sh"
+  source "$SCRIPT_DIR/scripts/tools/aws.sh"
+  source "$SCRIPT_DIR/scripts/tools/aliyun.sh"
+  source "$SCRIPT_DIR/scripts/tools/gcp.sh"
 }
 
 # 执行单个模块
@@ -85,6 +91,9 @@ run_module() {
   cursor) install_cursor_cli ;;
   vcpkg) setup_vcpkg ;;
   ossutil) install_ossutil ;;
+  aws) install_aws_cli ;;
+  aliyun) install_aliyun_cli ;;
+  gcp) install_gcp_cli ;;
   esac
 }
 
