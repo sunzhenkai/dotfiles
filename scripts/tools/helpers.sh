@@ -23,8 +23,8 @@ install_go_binary() {
   # 检查工具是否已存在
   if [ -f "$tool_path" ]; then
     echo "$tool_name is already installed at: $tool_path"
-    if ! confirm "Do you want to update/reinstall $tool_name?" "N"; then
-      echo "Skipping $tool_name installation."
+    if ! confirm "是否更新/重新安装 $tool_name?" "N"; then
+      echo "跳过 $tool_name 安装。"
       return 0
     fi
     echo "Updating $tool_name..."

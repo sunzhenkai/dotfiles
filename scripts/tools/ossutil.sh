@@ -12,8 +12,8 @@ install_ossutil() {
   # 检查是否已安装
   if [ -f "$tool_path" ]; then
     echo "ossutil is already installed at: $tool_path"
-    if ! confirm "Do you want to update/reinstall ossutil?" "N"; then
-      echo "Skipping ossutil installation."
+    if ! confirm "是否更新/重新安装 ossutil?" "N"; then
+      echo "跳过 ossutil 安装。"
       return 0
     fi
     echo "Updating ossutil..."

@@ -11,8 +11,8 @@ setup_vcpkg() {
   # 检查是否已安装
   if [ -f "$install_dir/vcpkg" ]; then
     echo "vcpkg is already installed at: $install_dir/vcpkg"
-    if ! confirm "Do you want to update/reinstall vcpkg?" "N"; then
-      echo "Skipping vcpkg installation."
+    if ! confirm "是否更新/重新安装 vcpkg?" "N"; then
+      echo "跳过 vcpkg 安装。"
       return 0
     fi
     echo "Updating vcpkg..."

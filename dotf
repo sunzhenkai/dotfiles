@@ -88,7 +88,7 @@ cmd_init() {
   done
   echo ""
 
-  if confirm "是否开始安装?"; then
+  if confirm "是否开始安装?" "N"; then
     bash "$SCRIPT_DIR/scripts/install.sh" --all
   else
     echo "跳过安装。"
@@ -106,7 +106,7 @@ cmd_init() {
   done
   echo ""
 
-  if confirm "是否开始配置?"; then
+  if confirm "是否开始配置?" "N"; then
     "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
   else
     echo "跳过配置。"

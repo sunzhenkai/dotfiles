@@ -28,8 +28,8 @@ init_docker() {
   if command -v docker &>/dev/null; then
     echo "Docker is already installed: $(docker --version)"
   else
-    if ! confirm "Do you want to install docker engine?" "N"; then
-      echo "Skipped docker installation."
+    if ! confirm "是否安装 Docker Engine?" "N"; then
+      echo "跳过 Docker 安装。"
       return 0
     fi
 
@@ -356,29 +356,34 @@ change_default_shell() {
 
   # 让用户确认是否更改 shell
   echo ""
-  echo "Current shell: $SHELL"
-  echo "Will change default shell to: $zsh_path"
+  echo "当前 Shell: $SHELL"
+  echo "将更改默认 Shell 为: $zsh_path"
   echo ""
-  if ! confirm "Do you want to change your default shell to zsh?" "N"; then
-    echo "Skipped changing default shell."
+  if ! confirm "是否将默认 Shell 更改为 zsh?" "N"; then
+    echo "跳过默认 Shell 更改。"
     return 0
   fi
 
   # 更改默认 shell
-  echo "Changing default shell to $zsh_path..."
+  echo "正在将默认 Shell 更改为 $zsh_path..."
   chsh -s "$zsh_path"
 
   if [ $? -eq 0 ]; then
-    echo "Default shell changed successfully!"
-    echo "Please restart your terminal or log out/in for the change to take effect."
+    echo "默认 Shell 更改成功！"
+    echo "请重启终端或重新登录以生效。"
   else
-    echo "Failed to change default shell. You may need to run: chsh -s $zsh_path"
+    echo "更改默认 Shell 失败，可尝试手动运行: chsh -s $zsh_path"
     return 1
   fi
 }
 
 # 配置 zsh
 config_zsh() {
+  if ! confirm "是否配置 zsh（oh-my-zsh/默认 Shell）?" "N"; then
+    echo "跳过 zsh 配置。"
+    return 0
+  fi
+
   echo "---- Configuring zsh ----"
 
   # 设置 ZSH_CUSTOM 路径
@@ -420,12 +425,12 @@ dispatch_init() {
   echo "  System: $ID"
   echo "============================================"
   echo ""
-  echo "This will install system packages using the package manager."
-  echo "Root/sudo privileges are required."
+  echo "将通过系统包管理器安装软件包。"
+  echo "需要 root/sudo 权限。"
   echo ""
 
-  if ! confirm "Do you want to install system packages?" "N"; then
-    echo "Skipped system packages installation."
+  if ! confirm "是否安装系统软件包?" "N"; then
+    echo "跳过系统软件包安装。"
     return 0
   fi
 

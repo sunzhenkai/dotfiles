@@ -11,8 +11,8 @@ install_aliyun_cli() {
 
   if [ -f "$tool_path" ]; then
     echo "Aliyun CLI is already installed: $("$tool_path" version 2>&1 | head -1)"
-    if ! confirm "Do you want to update/reinstall Aliyun CLI?" "N"; then
-      echo "Skipping Aliyun CLI installation."
+    if ! confirm "是否更新/重新安装 Aliyun CLI?" "N"; then
+      echo "跳过 Aliyun CLI 安装。"
       return 0
     fi
     echo "Updating Aliyun CLI..."

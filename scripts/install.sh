@@ -114,7 +114,7 @@ interactive_install() {
   load_modules
 
   for module in "${modules[@]}"; do
-    if confirm "安装 $(get_module_desc "$module")?"; then
+    if confirm "安装 $(get_module_desc "$module")?" "N"; then
       run_module "$module"
     else
       echo "跳过 $module"

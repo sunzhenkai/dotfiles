@@ -8,8 +8,8 @@ install_aws_cli() {
 
   if command -v aws &>/dev/null; then
     echo "AWS CLI is already installed: $(aws --version 2>&1)"
-    if ! confirm "Do you want to update/reinstall AWS CLI?" "N"; then
-      echo "Skipping AWS CLI installation."
+    if ! confirm "是否更新/重新安装 AWS CLI?" "N"; then
+      echo "跳过 AWS CLI 安装。"
       return 0
     fi
     echo "Updating AWS CLI..."

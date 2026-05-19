@@ -66,7 +66,7 @@ set_npm_registry() {
 
 # 安装 npm 全局包
 install_npm_packages() {
-  if ! confirm "是否安装 npm 全局包（docsify-cli/openspec 等）?"; then
+  if ! confirm "是否安装 npm 全局包（docsify-cli/openspec 等）?" "N"; then
     echo "跳过 npm 全局包安装"
     return 0
   fi

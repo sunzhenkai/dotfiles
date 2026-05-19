@@ -4,7 +4,7 @@
 source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 install_cursor_cli() {
-  if ! confirm "是否安装 Cursor CLI?"; then
+  if ! confirm "是否安装 Cursor CLI?" "N"; then
     echo "跳过 Cursor CLI 安装"
     return 0
   fi
