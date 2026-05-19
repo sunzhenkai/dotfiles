@@ -82,7 +82,13 @@ EOF
   # 将当前用户加入 docker 组（免密使用 docker）
   if ! groups | grep -q '\bdocker\b'; then
     echo "Adding current user '$USER' to docker group for passwordless docker access..."
-    sudo usermod -aG docker "$USER"
+    if [[ "$ID" == "darwin" ]]; then
+      # macOS 使用 dseditgroup 将用户加入 docker 组
+      sudo dseditgroup -o edit -a "$USER" -t user docker 2>/dev/null || \
+        echo "Note: On macOS, Docker Desktop manages group membership automatically."
+    else
+      sudo usermod -aG docker "$USER"
+    fi
     echo ""
     echo "IMPORTANT: You need to log out and log back in (or run 'newgrp docker') for group changes to take effect."
   else
@@ -134,7 +140,7 @@ init_debian() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip3 install mysqlclient
 }
 
 # Arch/Manjaro 系初始化
@@ -170,7 +176,7 @@ init_arch() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip3 install mysqlclient
 }
 
 # Fedora 系初始化
@@ -206,7 +212,7 @@ init_fedora() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip3 install mysqlclient
 }
 
 # RHEL/CentOS 系初始化
@@ -242,7 +248,7 @@ init_rhel() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip3 install mysqlclient
 }
 
 # macOS 初始化
@@ -268,7 +274,7 @@ init_darwin() {
   fi
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip3 install mysqlclient
 }
 
 # 更改用户默认 shell 为 zsh（优先使用 homebrew 安装的 zsh）
@@ -368,7 +374,11 @@ config_zsh() {
 
   # 设置 ZSH_CUSTOM 路径
   if [ -f ~/.zshrc ]; then
-    sed -i 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    if [[ "$ID" == "darwin" ]]; then
+      sed -i '' 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    else
+      sed -i 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    fi
   fi
 
   # 安装 oh-my-zsh
