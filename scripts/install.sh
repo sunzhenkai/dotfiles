@@ -132,6 +132,7 @@ main() {
     case "$1" in
     --all | -a)
       load_modules
+      export SKIP_CONFIRM=1
       echo "全部安装模式（跳过确认）"
       for m in "${MODULES[@]}"; do
         run_module "$m"

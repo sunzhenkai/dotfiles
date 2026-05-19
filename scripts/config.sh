@@ -1,35 +1,79 @@
 #!/bin/bash
+# dotfiles 配置安装脚本（兼容 Bash 3.2+）
 set -e
 
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%s)
 BACKUP_DIR="$HOME/.config/backups"
-# shellcheck source=install-claude.sh
-source "$DOTFILES_ROOT/scripts/install-claude.sh"
 
-# 配置映射：name="source:target"
-declare -A CONFIGS=(
-  ["starship"]="starship/starship.toml:~/.config/starship.toml"
-  ["nvim"]="nvim:~/.config/nvim"
-  ["kitty"]="kitty:~/.config/kitty"
-  ["k9s"]="k9s:~/.config/k9s"
-  ["tmux"]="tmux:~/.config/tmux"
-  ["alacritty"]="alacritty:~/.config/alacritty"
-  ["zellij"]="zellij:~/.config/zellij"
-  ["ghostty"]="ghostty:~/.config/ghostty"
-  ["wezterm"]="wezterm:~/.config/wezterm"
-  ["zsh"]="zsh:~/.config/zsh"
-  ["yazi"]="yazi:~/.config/yazi"
-  ["hypr"]="hypr:~/.config/hypr"
-  ["helix"]="helix:~/.config/helix"
-  ["shell_gpt"]="shell_gpt:~/.config/shell_gpt"
-  ["zed"]="zed:~/.config/zed"
-  ["fcitx5"]="fcitx5:~/.config/fcitx5"
-  ["git"]="git:~/.config/git"
-  ["opencode"]="opencode:~/.config/opencode"
-  ["claude"]="claude:~/.config/claude"
-  ["logseq"]="logseq:~/.logseq"
-)
+# ============================================================
+# 配置映射函数（兼容 Bash 3.2，不使用关联数组）
+# ============================================================
+
+# 获取配置定义 "source:target"，未知名称返回非零
+get_config_def() {
+  case "$1" in
+  starship)  echo "starship/starship.toml:~/.config/starship.toml" ;;
+  nvim)      echo "nvim:~/.config/nvim" ;;
+  kitty)     echo "kitty:~/.config/kitty" ;;
+  k9s)       echo "k9s:~/.config/k9s" ;;
+  tmux)      echo "tmux:~/.config/tmux" ;;
+  alacritty) echo "alacritty:~/.config/alacritty" ;;
+  zellij)    echo "zellij:~/.config/zellij" ;;
+  ghostty)   echo "ghostty:~/.config/ghostty" ;;
+  wezterm)   echo "wezterm:~/.config/wezterm" ;;
+  zsh)       echo "zsh:~/.config/zsh" ;;
+  yazi)      echo "yazi:~/.config/yazi" ;;
+  hypr)      echo "hypr:~/.config/hypr" ;;
+  helix)     echo "helix:~/.config/helix" ;;
+  shell_gpt) echo "shell_gpt:~/.config/shell_gpt" ;;
+  zed)       echo "zed:~/.config/zed" ;;
+  fcitx5)    echo "fcitx5:~/.config/fcitx5" ;;
+  git)       echo "git:~/.config/git" ;;
+  opencode)  echo "opencode:~/.config/opencode" ;;
+  claude)    echo "claude:~/.config/claude" ;;
+  logseq)    echo "logseq:~/.logseq" ;;
+  iterm2)    echo "iterm2:~/.config/iterm2" ;;
+  *)         return 1 ;;
+  esac
+}
+
+# 获取配置描述
+get_config_desc() {
+  case "$1" in
+  starship)  echo "Starship 终端提示符配置" ;;
+  nvim)      echo "Neovim 编辑器配置" ;;
+  kitty)     echo "Kitty 终端模拟器配置" ;;
+  k9s)       echo "K9s Kubernetes CLI 配置" ;;
+  tmux)      echo "Tmux 终端复用器配置" ;;
+  alacritty) echo "Alacritty 终端模拟器配置" ;;
+  zellij)    echo "Zellij 终端复用器配置" ;;
+  ghostty)   echo "Ghostty 终端模拟器配置" ;;
+  wezterm)   echo "WezTerm 终端模拟器配置" ;;
+  zsh)       echo "Zsh shell 配置" ;;
+  yazi)      echo "Yazi 文件管理器配置" ;;
+  hypr)      echo "Hyprland 窗口管理器配置" ;;
+  helix)     echo "Helix 编辑器配置" ;;
+  shell_gpt) echo "Shell-GPT 配置" ;;
+  zed)       echo "Zed 编辑器配置" ;;
+  fcitx5)    echo "Fcitx5 输入法配置" ;;
+  git)       echo "Git 版本控制配置" ;;
+  opencode)  echo "OpenCode 配置" ;;
+  claude)    echo "Claude Code 配置" ;;
+  logseq)    echo "Logseq 笔记配置" ;;
+  iterm2)    echo "iTerm2 终端模拟器配置" ;;
+  *)         echo "$1" ;;
+  esac
+}
+
+# 获取所有配置名（排序后，空格分隔）
+get_all_config_names() {
+  echo "alacritty claude fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+}
+
+# ============================================================
+# 备份与安装
+# ============================================================
 
 backup_to() {
   local src="$1"
@@ -38,18 +82,17 @@ backup_to() {
   local dest="$BACKUP_DIR/${basename}-${TIMESTAMP}"
   mkdir -p "$BACKUP_DIR"
   mv "$src" "$dest"
-  echo "Backed up $basename to $dest"
+  echo "已备份 $basename 到 $dest"
 }
 
 install_config() {
   local name="$1"
-  local def="${CONFIGS[$name]}"
-
-  if [ -z "$def" ]; then
-    echo "Unknown config: $name"
-    echo "Available: ${!CONFIGS[*]}"
-    exit 1
-  fi
+  local def
+  def=$(get_config_def "$name") || {
+    echo "未知配置: $name"
+    echo "可用配置: $(get_all_config_names)"
+    return 1
+  }
 
   IFS=':' read -r source target <<<"$def"
   target="${target/#\~/$HOME}"
@@ -57,28 +100,39 @@ install_config() {
   local expected_abs
   expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
 
+  # 状态 1: 目标已是正确 symlink → 跳过
   if [ -L "$target" ]; then
     local current_link
     current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
     if [ "$current_link" = "$expected_abs" ]; then
-      echo "Already installed: $name"
+      echo "已安装: $name"
       return 0
     fi
+    # 状态 2: symlink 指向错误位置且目标存在（非 broken）→ 备份后覆盖
     if [ -e "$target" ]; then
       backup_to "$target"
+      ln -s "$expected_link" "$target"
+    else
+      # 状态 3: broken symlink → 直接覆盖，无需备份
+      ln -sf "$expected_link" "$target"
     fi
-    ln -sf "$expected_link" "$target"
-    echo "Installed: $name"
+    echo "已安装: $name"
     return 0
   fi
 
+  # 状态 4: 普通文件/目录 → 备份后创建
   if [ -e "$target" ]; then
     backup_to "$target"
   fi
 
+  # 状态 5: 不存在 → 直接创建
   ln -s "$expected_link" "$target"
-  echo "Installed: $name"
+  echo "已安装: $name"
 }
+
+# ============================================================
+# 特殊配置
+# ============================================================
 
 # 特殊配置：zsh
 install_zsh() {
@@ -86,85 +140,73 @@ install_zsh() {
   if [ -e ~/.zshrc ]; then
     # 内容相同则跳过
     if diff -q "$DOTFILES_ROOT/zsh/zshrc" ~/.zshrc >/dev/null 2>&1; then
-      echo "~/.zshrc already up-to-date"
+      echo "~/.zshrc 已是最新"
       return
     fi
     mv ~/.zshrc ~/.zshrc-$TIMESTAMP
   fi
   cp "$DOTFILES_ROOT/zsh/zshrc" ~/.zshrc
-  echo "Installed: ~/.zshrc"
+  echo "已安装: ~/.zshrc"
 }
 
-# 特殊配置：git
-# install_git() {
-#   install_config "git"
-#   echo ""
-#   echo "⚠️  Add to ~/.gitconfig after [user]:"
-#   echo '[include]'
-#   echo '    path = ~/.config/git/gitconfig'
-# }
-#
-# # 特殊配置：git-global
-# install_git_global() {
-#   local expected_link="$DOTFILES_ROOT/git/gitconfig"
-#
-#   # 检查是否已经是正确的符号链接
-#   if [ -L ~/.gitconfig ]; then
-#     local current_link
-#     current_link=$(readlink -f ~/.gitconfig 2>/dev/null || readlink ~/.gitconfig)
-#     local expected_abs
-#     expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
-#     if [ "$current_link" = "$expected_abs" ]; then
-#       echo "Already installed: git-global"
-#       return 0
-#     fi
-#   fi
-#
-#   [ -e ~/.gitconfig ] && mv ~/.gitconfig ~/.gitconfig-$TIMESTAMP
-#   ln -s "$expected_link" ~/.gitconfig
-#   echo "Installed: git-global"
-# }
+# 特殊配置：claude（按需 source）
+install_claude() {
+  # shellcheck source=install-claude.sh
+  source "$DOTFILES_ROOT/scripts/install-claude.sh"
+  install_claude
+}
 
+# ============================================================
 # 安装全部
+# ============================================================
+
 install_all() {
-  for name in "${!CONFIGS[@]}"; do
+  for name in $(get_all_config_names); do
     case "$name" in
-    zsh) install_zsh ;;
+    zsh)    install_zsh ;;
     claude) install_claude ;;
-    # git) install_git ;;
-    *) install_config "$name" ;;
+    *)      install_config "$name" ;;
     esac
   done
 }
 
+# ============================================================
 # 主函数
+# ============================================================
+
 main() {
   local config="$1"
 
   if [ -z "$config" ]; then
-    echo "Usage: $0 <config_name|--all>"
+    echo "用法: $0 <配置名|--all>"
     echo ""
-    echo "Available configs:"
-    for name in $(echo "${!CONFIGS[*]}" | tr ' ' '\n' | sort); do
-      echo "  $name"
+    echo "可用配置:"
+    for name in $(get_all_config_names); do
+      printf "  %-12s %s\n" "$name" "$(get_config_desc "$name")"
     done
     echo ""
-    echo "Special:"
-    echo "  --all, -a     Install all configs"
-    echo "  git-global    Overwrite ~/.gitconfig"
+    echo "选项:"
+    echo "  --all, -a       安装所有配置"
+    echo "  --list          仅列出配置名"
+    echo "  --list-desc     列出配置名及描述"
     exit 1
   fi
 
   case "$config" in
   --list)
-    for name in $(echo "${!CONFIGS[*]}" | tr ' ' '\n' | sort); do
+    for name in $(get_all_config_names); do
       echo "$name"
     done
     ;;
+  --list-desc)
+    for name in $(get_all_config_names); do
+      printf "%s\t%s\n" "$name" "$(get_config_desc "$name")"
+    done
+    ;;
   --all | -a) install_all ;;
-  zsh) install_zsh ;;
+  zsh)    install_zsh ;;
   claude) install_claude ;;
-  *) install_config "$config" ;;
+  *)      install_config "$config" ;;
   esac
 }
 

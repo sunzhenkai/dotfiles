@@ -44,9 +44,19 @@ install_homebrew() {
 init_homebrew() {
   echo "---- Installing packages via Homebrew ----"
 
+  # 自包含 OS 检测（不依赖 system.sh 的全局 $ID）
+  local _os_id=""
+  if [[ "$OSTYPE" =~ ^darwin ]]; then
+    _os_id="darwin"
+  elif [ -f "/etc/os-release" ]; then
+    _os_id=$(. /etc/os-release && echo "$ID")
+  elif [ -f "/etc/arch-release" ]; then
+    _os_id="arch"
+  fi
+
   # 让用户确认
-  if ! confirm "Do you want to install packages via Homebrew?" "N"; then
-    echo "Skipped Homebrew packages installation."
+  if ! confirm "是否通过 Homebrew 安装常用软件包?" "N"; then
+    echo "跳过 Homebrew 软件包安装。"
     return 0
   fi
 
@@ -64,7 +74,7 @@ init_homebrew() {
   # 文件/媒体
   brew install yazi ffmpeg sevenzip jq zoxide chafa
   # pngpaste 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
+  if [[ "$_os_id" == "darwin" ]]; then
     brew install pngpaste
   fi
 
@@ -74,7 +84,7 @@ init_homebrew() {
   brew install codex
   brew install k9s
   # ghostty 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
+  if [[ "$_os_id" == "darwin" ]]; then
     brew install --cask ghostty
   fi
 
@@ -93,5 +103,5 @@ init_homebrew() {
   # Go (NOTE: Go 本体通过 mise 安装)
   brew install gotests
 
-  echo "Homebrew packages installed successfully!"
+  echo "Homebrew 软件包安装完成！"
 }

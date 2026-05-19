@@ -4,7 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 检测 Homebrew bash（config.sh 的 declare -A 需要 bash 4+）
+# 检测 Homebrew bash（优先使用更新版本）
 get_bash() {
   if [ -x /opt/homebrew/bin/bash ]; then
     echo "/opt/homebrew/bin/bash"
@@ -21,6 +21,13 @@ get_bash() {
 confirm() {
   local prompt="$1"
   local default="${2:-Y}"
+
+  # --all 模式：自动确认，跳过交互
+  if [ "${SKIP_CONFIRM:-}" = "1" ]; then
+    echo "自动确认: $prompt"
+    return 0
+  fi
+
   local reply
 
   if [[ "$default" == "Y" ]]; then
@@ -88,7 +95,7 @@ cmd_init() {
   echo ""
 
   if confirm "是否开始安装?"; then
-    bash "$SCRIPT_DIR/scripts/install.sh" --all
+    SKIP_CONFIRM=1 bash "$SCRIPT_DIR/scripts/install.sh" --all
   else
     echo "跳过安装。"
   fi
@@ -106,7 +113,7 @@ cmd_init() {
   echo ""
 
   if confirm "是否开始配置?"; then
-    "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
+    SKIP_CONFIRM=1 "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
   else
     echo "跳过配置。"
   fi
@@ -140,7 +147,7 @@ show_help() {
   echo "选项:"
   echo "  -i, --install [模块...] 安装工具/SDK（委托 scripts/install.sh）"
   echo "  -c, --config  [模块...] 配置/链接配置文件（委托 scripts/config.sh）"
-  echo "  -a, --all               安装全部 + 配置全部"
+  echo "  -a, --all               全部（需跟在 -i/-c 后，表示该模式全部模块）"
   echo "  -h, --help              显示帮助"
   echo ""
   echo "示例:"
@@ -148,8 +155,9 @@ show_help() {
   echo "  dotf pull               # 拉取更新"
   echo "  dotf -i sdk             # 安装 SDK"
   echo "  dotf -c nvim            # 配置 nvim"
+  echo "  dotf -c -a              # 配置全部"
+  echo "  dotf -i -a              # 安装全部"
   echo "  dotf -i sdk -c nvim     # 安装 SDK + 配置 nvim"
-  echo "  dotf -a                 # 全部安装 + 配置"
 }
 
 # ============================================================
@@ -188,11 +196,17 @@ main() {
       mode="config"
       ;;
     -a | --all)
-      bash "$SCRIPT_DIR/scripts/install.sh" --all
-      local bash_bin
-      bash_bin="$(get_bash)"
-      "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
-      exit $?
+      if [ "$mode" = "install" ]; then
+        exec env SKIP_CONFIRM=1 bash "$SCRIPT_DIR/scripts/install.sh" --all
+      elif [ "$mode" = "config" ]; then
+        local bash_bin
+        bash_bin="$(get_bash)"
+        exec env SKIP_CONFIRM=1 "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
+      else
+        echo "提示: 使用 'dotf init' 进行完整初始化（安装 + 配置）"
+        echo "      或指定模式: dotf -i -a / dotf -c -a"
+        exit 1
+      fi
       ;;
     -h | --help)
       show_help

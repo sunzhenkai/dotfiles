@@ -19,17 +19,17 @@ source "$_mod_dir/plugins.zsh"
 # oh-my-zsh lib toggle (ENABLE_OMZ=true)
 source "$_mod_dir/omz.zsh"
 
-# aliases
-if [[ -f "${0:a:h}/aliases.zsh" ]]; then
-  source "${0:a:h}/aliases.zsh"
-fi
-
 # vi mode, misc, paths, lang, private
 source "$_mod_dir/paths.zsh"
 source "$_mod_dir/vi-mode.zsh"
 source "$_mod_dir/misc.zsh"
 source "$_mod_dir/lang.zsh"
 source "$_mod_dir/export.zsh"
+
+# aliases — load after all modules to avoid being overridden
+if [[ -f "${0:a:h}/aliases.zsh" ]]; then
+  source "${0:a:h}/aliases.zsh"
+fi
 
 # =============================================================================
 # Prompt (starship)
