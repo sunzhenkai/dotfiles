@@ -6,7 +6,7 @@
 - 有 `-c` 前缀时：仅配置全部
 - 无前缀时：安装全部 + 配置全部
 
-所有 `--all` 调用 SHALL 设置 `SKIP_CONFIRM=1` 环境变量。
+`--all` 模式不再设置 `SKIP_CONFIRM=1`，每个模块仍需用户单独确认。
 
 #### Scenario: 显示帮助
 - **WHEN** 运行 `./dotf`（无参数）或 `./dotf -h`
@@ -26,15 +26,15 @@
 
 #### Scenario: 仅配置全部
 - **WHEN** 运行 `./dotf -c -a` 或 `./dotf --config --all`
-- **THEN** 仅调用 `scripts/config.sh --all`，不执行安装，且 `SKIP_CONFIRM=1`
+- **THEN** 仅调用 `scripts/config.sh --all`，不执行安装
 
 #### Scenario: 仅安装全部
 - **WHEN** 运行 `./dotf -i -a` 或 `./dotf --install --all`
-- **THEN** 仅调用 `scripts/install.sh --all`，不执行配置，且 `SKIP_CONFIRM=1`
+- **THEN** 仅调用 `scripts/install.sh --all`，不执行配置
 
 #### Scenario: 全部模式
 - **WHEN** 运行 `./dotf -a` 或 `./dotf --all`（无前缀）
-- **THEN** 调用 `scripts/install.sh --all`，再调用 `scripts/config.sh --all`，且 `SKIP_CONFIRM=1`
+- **THEN** 调用 `scripts/install.sh --all`，再调用 `scripts/config.sh --all`
 
 #### Scenario: 未知选项报错
 - **WHEN** 运行 `./dotf -x`

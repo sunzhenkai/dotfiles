@@ -124,12 +124,6 @@ confirm() {
   local prompt="$1"
   local default="${2:-Y}"
 
-  # --all 模式：自动确认，跳过交互
-  if [[ "${SKIP_CONFIRM:-}" == "1" ]]; then
-    echo "自动确认: $prompt"
-    return 0
-  fi
-
   local reply
 
   if [[ "$default" == "Y" ]]; then

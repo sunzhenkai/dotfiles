@@ -132,12 +132,12 @@ show_help() {
   done
   echo ""
   echo "选项:"
-  echo "  --all, -a    安装所有模块（跳过确认）"
+  echo "  --all, -a    安装所有模块"
   echo "  --help, -h   显示此帮助"
   echo ""
   echo "示例:"
   echo "  $0 homebrew sdk # 只安装指定模块（仍需确认）"
-  echo "  $0 --all        # 全部安装（跳过确认）"
+  echo "  $0 --all        # 全部安装"
 }
 
 # 主函数
@@ -154,8 +154,6 @@ main() {
     case "$1" in
     --all | -a)
       load_modules
-      export SKIP_CONFIRM=1
-      echo "全部安装模式（跳过确认）"
       for m in "${MODULES[@]}"; do
         run_module "$m"
       done
