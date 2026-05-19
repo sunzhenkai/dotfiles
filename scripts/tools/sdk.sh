@@ -1,8 +1,15 @@
 #!/bin/bash
 # SDK 管理（通过 mise）
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # 初始化 SDK（通过 mise 管理多版本）
 setup_sdk() {
+  if ! confirm "是否通过 mise 安装 SDK（Go/Python/Node）?"; then
+    echo "跳过 SDK 安装"
+    return 0
+  fi
+
   echo "---- Setting up SDKs via mise ----"
 
   # 检查 mise 是否安装

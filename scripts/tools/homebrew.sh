@@ -1,6 +1,8 @@
 #!/bin/bash
 # Homebrew 安装和配置
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # brew 可能的路径（支持 macOS 和 Linux）
 BREW_PATHS=(
   "/opt/homebrew/bin/brew"              # macOS Apple Silicon
@@ -43,10 +45,7 @@ init_homebrew() {
   echo "---- Installing packages via Homebrew ----"
 
   # 让用户确认
-  read -p "Do you want to install packages via Homebrew? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if ! confirm "Do you want to install packages via Homebrew?" "N"; then
     echo "Skipped Homebrew packages installation."
     return 0
   fi

@@ -1,6 +1,8 @@
 #!/bin/bash
 # ossutil 2.0 阿里云 OSS 命令行工具安装
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 install_ossutil() {
   echo "---- Installing ossutil 2.0 ----"
 
@@ -10,9 +12,7 @@ install_ossutil() {
   # 检查是否已安装
   if [ -f "$tool_path" ]; then
     echo "ossutil is already installed at: $tool_path"
-    local reply
-    read -r -p "Do you want to update/reinstall ossutil? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
+    if ! confirm "Do you want to update/reinstall ossutil?" "N"; then
       echo "Skipping ossutil installation."
       return 0
     fi

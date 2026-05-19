@@ -1,6 +1,8 @@
 #!/bin/bash
 # 探测系统信息，并安装必要软件，搭建开发环境
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # 检测操作系统
 detect_os() {
   if [ -f "/etc/os-release" ]; then
@@ -26,9 +28,7 @@ init_docker() {
   if command -v docker &>/dev/null; then
     echo "Docker is already installed: $(docker --version)"
   else
-    read -p "Do you want to install docker engine? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if ! confirm "Do you want to install docker engine?" "N"; then
       echo "Skipped docker installation."
       return 0
     fi
@@ -347,10 +347,7 @@ change_default_shell() {
   echo "Current shell: $SHELL"
   echo "Will change default shell to: $zsh_path"
   echo ""
-  read -p "Do you want to change your default shell to zsh? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if ! confirm "Do you want to change your default shell to zsh?" "N"; then
     echo "Skipped changing default shell."
     return 0
   fi
@@ -415,10 +412,7 @@ dispatch_init() {
   echo "Root/sudo privileges are required."
   echo ""
 
-  read -p "Do you want to install system packages? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if ! confirm "Do you want to install system packages?" "N"; then
     echo "Skipped system packages installation."
     return 0
   fi

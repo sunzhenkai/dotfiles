@@ -1,7 +1,14 @@
 #!/bin/bash
 # Golang 环境配置
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 setup_golang() {
+  if ! confirm "是否配置 Golang 环境（GOPATH/GOPROXY 等）?"; then
+    echo "跳过 Golang 配置"
+    return 0
+  fi
+
   echo "---- Setting up Golang environment ----"
 
   local gopath="${HOME}/.go"

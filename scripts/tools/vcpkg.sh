@@ -1,6 +1,8 @@
 #!/bin/bash
 # vcpkg C++ 包管理器安装
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 setup_vcpkg() {
   echo "---- Setting up vcpkg ----"
 
@@ -9,9 +11,7 @@ setup_vcpkg() {
   # 检查是否已安装
   if [ -f "$install_dir/vcpkg" ]; then
     echo "vcpkg is already installed at: $install_dir/vcpkg"
-    local reply
-    read -r -p "Do you want to update/reinstall vcpkg? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
+    if ! confirm "Do you want to update/reinstall vcpkg?" "N"; then
       echo "Skipping vcpkg installation."
       return 0
     fi

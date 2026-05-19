@@ -1,6 +1,8 @@
 #!/bin/bash
 # Google Cloud CLI (gcloud) 安装
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 install_gcp_cli() {
   echo "---- Installing Google Cloud CLI ----"
 
@@ -8,9 +10,7 @@ install_gcp_cli() {
 
   if [ -d "$install_dir" ] && command -v gcloud &>/dev/null; then
     echo "Google Cloud CLI is already installed: $(gcloud --version 2>&1 | head -1)"
-    local reply
-    read -r -p "Do you want to update/reinstall Google Cloud CLI? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
+    if ! confirm "Do you want to update/reinstall Google Cloud CLI?" "N"; then
       echo "Skipping Google Cloud CLI installation."
       _install_gke_auth_plugin
       return 0

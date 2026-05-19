@@ -29,20 +29,8 @@ get_module_desc() {
   esac
 }
 
-# 确认函数
-confirm() {
-  local prompt="$1"
-  local default="${2:-Y}"
-  local reply
-
-  if [[ "$default" == "Y" ]]; then
-    read -r -p "$prompt [Y/n]: " reply
-    [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
-  else
-    read -r -p "$prompt [y/N]: " reply
-    [[ "$reply" =~ ^[Yy] ]]
-  fi
-}
+# 确认函数（由 common.sh 提供，此处为独立运行时的兜底定义）
+source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 # 加载所有模块
 load_modules() {
