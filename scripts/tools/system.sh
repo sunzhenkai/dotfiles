@@ -24,11 +24,15 @@ common_init() {
 }
 
 init_docker() {
-  # 检查是否已安装
+  # 已安装：询问是否配置；未安装：询问是否安装并配置
   if command -v docker &>/dev/null; then
-    echo "Docker is already installed: $(docker --version)"
+    echo "Docker 已安装: $(docker --version)"
+    if ! confirm "是否配置 Docker（用户组/验证）?" "N"; then
+      echo "跳过 Docker 配置。"
+      return 0
+    fi
   else
-    if ! confirm "是否安装 Docker Engine?" "N"; then
+    if ! confirm "是否安装并配置 Docker Engine?" "N"; then
       echo "跳过 Docker 安装。"
       return 0
     fi
@@ -66,33 +70,33 @@ EOF
       ;;
 
     *)
-      echo "Unsupported OS for Docker installation: $ID"
-      echo "Please install Docker manually: https://docs.docker.com/engine/install/"
+      echo "不支持的操作系统，无法安装 Docker: $ID"
+      echo "请手动安装: https://docs.docker.com/engine/install/"
       return 1
       ;;
     esac
   fi
 
-  # 启动并启用 docker 服务
+  # 启动并启用 docker 服务（仅 Linux）
   if command -v systemctl &>/dev/null; then
-    echo "Enabling and starting docker service..."
+    echo "正在启用 Docker 服务..."
     sudo systemctl enable --now docker
   fi
 
   # 将当前用户加入 docker 组（免密使用 docker）
   if ! groups | grep -q '\bdocker\b'; then
-    echo "Adding current user '$USER' to docker group for passwordless docker access..."
+    echo "正在将用户 '$USER' 加入 docker 组..."
     if [[ "$ID" == "darwin" ]]; then
       # macOS 使用 dseditgroup 将用户加入 docker 组
       sudo dseditgroup -o edit -a "$USER" -t user docker 2>/dev/null || \
-        echo "Note: On macOS, Docker Desktop manages group membership automatically."
+        echo "注意: macOS 上 Docker Desktop 会自动管理组成员。"
     else
       sudo usermod -aG docker "$USER"
     fi
     echo ""
-    echo "IMPORTANT: You need to log out and log back in (or run 'newgrp docker') for group changes to take effect."
+    echo "注意: 需要登出后重新登录（或执行 'newgrp docker'）以使组成员变更生效。"
   else
-    echo "User '$USER' is already in the docker group."
+    echo "用户 '$USER' 已在 docker 组中。"
   fi
 
   # 验证安装
@@ -100,18 +104,18 @@ EOF
   if [[ "$ID" == "darwin" ]]; then
     # macOS (Docker Desktop): 不需要 sudo
     if docker run --rm hello-world &>/dev/null; then
-      echo "Docker installation verified successfully!"
+      echo "Docker 验证成功！"
     else
-      echo "⚠️  Docker verification failed."
-      echo "   Please make sure Docker Desktop is running: open -a Docker"
+      echo "⚠️  Docker 验证失败。"
+      echo "   请确保 Docker Desktop 正在运行: open -a Docker"
     fi
   else
     # Linux: 使用 sudo 验证
     if sudo docker run --rm hello-world &>/dev/null; then
-      echo "Docker installation verified successfully!"
+      echo "Docker 验证成功！"
     else
-      echo "⚠️  Docker verification failed."
-      echo "   Try: sudo systemctl start docker"
+      echo "⚠️  Docker 验证失败。"
+      echo "   请尝试: sudo systemctl start docker"
     fi
   fi
 }
