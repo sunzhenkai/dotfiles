@@ -52,13 +52,17 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/gcp.sh"
 }
 
-# 执行单个模块
+# 执行单个模块（带计时）
 run_module() {
   local module="$1"
   echo ""
   echo "========================================"
   echo "执行模块: $module"
   echo "========================================"
+
+  local _timer_start=$SECONDS
+  local _module_status="✓"
+
   case "$module" in
   homebrew)
     setup_brew_path
@@ -83,6 +87,24 @@ run_module() {
   aliyun) install_aliyun_cli ;;
   gcp) install_gcp_cli ;;
   esac
+
+  local _exit_code=$?
+  local _elapsed=$(( SECONDS - _timer_start ))
+
+  if [[ $_exit_code -ne 0 ]]; then
+    _module_status="✗"
+  fi
+
+  local _formatted
+  _formatted=$(timer_format "$_elapsed")
+
+  if [[ "$_module_status" == "✓" ]]; then
+    echo "✔ $module 完成 ($_formatted)"
+  else
+    echo "✗ $module 失败 ($_formatted)"
+  fi
+
+  _timing_record "$module" "$_elapsed" "$_module_status"
 }
 
 # 交互式安装（指定模块列表）
@@ -137,6 +159,7 @@ main() {
       for m in "${MODULES[@]}"; do
         run_module "$m"
       done
+      print_timing_summary
       exit 0
       ;;
     --help | -h)

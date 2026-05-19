@@ -97,10 +97,22 @@ EOF
 
   # 验证安装
   echo ""
-  if sudo docker run --rm hello-world &>/dev/null; then
-    echo "Docker installation verified successfully!"
+  if [[ "$ID" == "darwin" ]]; then
+    # macOS (Docker Desktop): 不需要 sudo
+    if docker run --rm hello-world &>/dev/null; then
+      echo "Docker installation verified successfully!"
+    else
+      echo "⚠️  Docker verification failed."
+      echo "   Please make sure Docker Desktop is running: open -a Docker"
+    fi
   else
-    echo "Docker installed but verification failed. Try running: docker run hello-world"
+    # Linux: 使用 sudo 验证
+    if sudo docker run --rm hello-world &>/dev/null; then
+      echo "Docker installation verified successfully!"
+    else
+      echo "⚠️  Docker verification failed."
+      echo "   Try: sudo systemctl start docker"
+    fi
   fi
 }
 
@@ -140,7 +152,7 @@ init_debian() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip3 install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # Arch/Manjaro 系初始化
@@ -176,7 +188,7 @@ init_arch() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip3 install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # Fedora 系初始化
@@ -212,7 +224,7 @@ init_fedora() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip3 install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # RHEL/CentOS 系初始化
@@ -248,7 +260,7 @@ init_rhel() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip3 install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # macOS 初始化
@@ -274,7 +286,7 @@ init_darwin() {
   fi
 
   # 安装 Python mysqlclient 包
-  pip3 install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # 更改用户默认 shell 为 zsh（优先使用 homebrew 安装的 zsh）

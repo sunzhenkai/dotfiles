@@ -2,19 +2,23 @@
 
 ### Requirement: 目标路径状态检测
 
-`install_config()` SHALL 在创建 symlink 前检测目标路径的完整状态，区分以下五种情况：不存在、正确 symlink、指向错误位置的 symlink、broken symlink、普通文件或目录。
+`install_config()` SHALL 在创建 symlink 前检测目标路径的完整状态，使用以下简化逻辑：
+
+1. 如果目标是 symlink：检查 readlink 是否指向正确路径。正确则跳过，否则 `ln -sf` 覆盖（broken symlink 无需备份）
+2. 如果目标是普通文件/目录：备份后 `ln -s` 创建
+3. 如果目标不存在：直接 `ln -s` 创建
 
 #### Scenario: 目标不存在
 - **WHEN** 目标路径不存在且不是 symlink
-- **THEN** 直接创建 symlink，不执行备份
+- **THEN** 直接 `ln -s` 创建 symlink，不执行备份
 
 #### Scenario: 目标是正确的 symlink
-- **WHEN** 目标是 symlink 且 `readlink -f` 解析结果与期望路径一致
-- **THEN** 输出 "Already installed" 并跳过
+- **WHEN** 目标是 symlink 且 readlink 解析结果与期望路径一致
+- **THEN** 输出 "Already installed: <name>" 并跳过
 
 #### Scenario: 目标是指向错误位置的 symlink
-- **WHEN** 目标是 symlink 且 `readlink -f` 解析结果与期望路径不一致，且 symlink 目标存在
-- **THEN** 将目标 mv 到 `~/.config/backups/<basename>-<timestamp>`，然后 `ln -sf` 创建新 symlink
+- **WHEN** 目标是 symlink 但 readlink 解析结果与期望路径不一致，且 symlink 目标存在（非 broken）
+- **THEN** 将 symlink 本身 mv 到备份目录，然后 `ln -s` 创建新 symlink
 
 #### Scenario: 目标是 broken symlink
 - **WHEN** 目标是 symlink 但指向的路径不存在
@@ -22,7 +26,7 @@
 
 #### Scenario: 目标是普通文件或目录
 - **WHEN** 目标路径存在且不是 symlink
-- **THEN** 将目标 mv 到 `~/.config/backups/<basename>-<timestamp>`，然后 `ln -s` 创建新 symlink
+- **THEN** 将目标 mv 到 `~/.config/backups/<basename>-<timestamp>`，然后 `ln -s` 创建 symlink
 
 ### Requirement: 集中备份目录
 
@@ -79,3 +83,22 @@
 #### Scenario: 连续两次安装同一配置
 - **WHEN** 运行 `make nvim` 后立即再次运行 `make nvim`
 - **THEN** 第二次输出 "Already installed"，不产生备份
+
+### Requirement: Docker 安装验证适配 Docker Desktop
+
+`init_docker()` 中的 Docker 验证步骤 SHALL 根据运行环境选择验证方式。在 macOS（Docker Desktop）上 SHALL 使用非 sudo 验证。
+
+#### Scenario: macOS Docker Desktop 验证
+- **WHEN** 平台为 darwin 且 Docker 已安装
+- **THEN** 使用 `docker run --rm hello-world`（不带 sudo）进行验证
+- **THEN** 验证成功时输出 "Docker installation verified successfully!"
+- **THEN** 验证失败时输出 "⚠️ Docker verification failed." 并提示启动 Docker Desktop
+
+#### Scenario: Linux Docker 验证
+- **WHEN** 平台非 darwin 且 Docker 已安装
+- **THEN** 使用 `sudo docker run --rm hello-world` 进行验证（保持现有行为）
+
+#### Scenario: Docker 未运行时的错误提示
+- **WHEN** Docker 已安装但 daemon 未运行
+- **THEN** 输出 SHALL 提示用户启动 Docker（macOS: "open -a Docker"；Linux: "sudo systemctl start docker"）
+- **THEN** 脚本继续执行（不退出）

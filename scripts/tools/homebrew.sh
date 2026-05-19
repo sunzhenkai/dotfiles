@@ -79,7 +79,7 @@ init_homebrew() {
   fi
 
   # 开发工具
-  brew install mise tmux zsh uv pkg-config mysql-connector-c
+  brew install mise tmux zsh uv pkg-config mysql-client
   brew install anomalyco/tap/opencode
   brew install codex
   brew install k9s
@@ -95,7 +95,7 @@ init_homebrew() {
   brew install lazygit gitui
 
   # C/C++
-  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc clangd
+  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc
 
   # Java
   brew install openjdk@17 bison flex
