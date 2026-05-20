@@ -1,6 +1,7 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 add_newline = false
+command_timeout = 2000
 # move the rest of the prompt to the right 
 #right_format = """$cmd_duration$memory_usage$time$battery$os$localip"""
 right_format = """$cmd_duration"""
