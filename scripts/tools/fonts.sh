@@ -2,6 +2,8 @@
 # Font installation script with system adaptation
 # Maple Mono NF CN https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 FONT_URL="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
 FONT_ZIP="MapleMono-NF-CN.zip"
 
@@ -134,6 +136,12 @@ install_fonts_macos() {
 }
 
 setup_fonts() {
+  # 确认是否安装字体
+  if ! confirm "是否下载并安装 Maple Mono NF CN 字体?" "N"; then
+    echo "跳过字体安装"
+    return 0
+  fi
+
   git submodule update --init
   detect_os
 

@@ -1,8 +1,15 @@
 #!/bin/bash
 # Git 配置
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # 初始化 git 配置
 setup_git() {
+  if ! confirm "是否配置 Git（pull.rebase/editor/defaultBranch）?" "N"; then
+    echo "跳过 Git 配置"
+    return 0
+  fi
+
   echo "---- Configuring git ----"
 
   # pull 冲突后默认 merge（不使用 rebase）

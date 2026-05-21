@@ -1,15 +1,15 @@
 #!/bin/bash
 # AWS CLI v2 安装
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 install_aws_cli() {
   echo "---- Installing AWS CLI v2 ----"
 
   if command -v aws &>/dev/null; then
     echo "AWS CLI is already installed: $(aws --version 2>&1)"
-    local reply
-    read -r -p "Do you want to update/reinstall AWS CLI? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
-      echo "Skipping AWS CLI installation."
+    if ! confirm "是否更新/重新安装 AWS CLI?" "N"; then
+      echo "跳过 AWS CLI 安装。"
       return 0
     fi
     echo "Updating AWS CLI..."

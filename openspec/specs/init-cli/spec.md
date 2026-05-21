@@ -1,34 +1,47 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: 参数解析
-脚本 SHALL 支持 `-i`/`--install`、`-c`/`--config`、`-a`/`--all`、`-h`/`--help` 四种选项。`-i` 和 `-c` 为模式切换开关，后续非 flag 参数 SHALL 归入当前模式的模块列表。
+脚本 SHALL 支持 `-i`/`--install`、`-c`/`--config`、`-a`/`--all`、`-h`/`--help` 四种选项。`-i` 和 `-c` 为模式切换开关，后续非 flag 参数 SHALL 归入当前模式的模块列表。`-a` 的行为 SHALL 根据当前模式决定：
+- 有 `-i` 前缀时：仅安装全部
+- 有 `-c` 前缀时：仅配置全部
+- 无前缀时：安装全部 + 配置全部
+
+`--all` 模式不再设置 `SKIP_CONFIRM=1`，每个模块仍需用户单独确认。所有确认提示 SHALL 默认 N（需显式输入 y/Y 才确认），用户不可通过直接回车跳过确认。
 
 #### Scenario: 显示帮助
-- **WHEN** 运行 `./init`（无参数）或 `./init -h`
+- **WHEN** 运行 `./dotf`（无参数）或 `./dotf -h`
 - **THEN** 显示帮助信息，包含用法、选项、模块列表、示例
 
 #### Scenario: 安装指定模块
-- **WHEN** 运行 `./init -i sdk golang`
-- **THEN** 调用 `scripts/init.sh sdk golang`
+- **WHEN** 运行 `./dotf -i sdk golang`
+- **THEN** 调用 `scripts/install.sh sdk golang`
 
 #### Scenario: 配置指定模块
-- **WHEN** 运行 `./init -c nvim kitty`
-- **THEN** 依次调用 `scripts/install-config.sh nvim` 和 `scripts/install-config.sh kitty`
+- **WHEN** 运行 `./dotf -c nvim kitty`
+- **THEN** 依次调用 `scripts/config.sh nvim` 和 `scripts/config.sh kitty`
 
 #### Scenario: 混合模式
-- **WHEN** 运行 `./init -i sdk -c nvim`
+- **WHEN** 运行 `./dotf -i sdk -c nvim`
 - **THEN** 先执行安装 sdk，再执行配置 nvim
 
+#### Scenario: 仅配置全部
+- **WHEN** 运行 `./dotf -c -a` 或 `./dotf --config --all`
+- **THEN** 仅调用 `scripts/config.sh --all`，不执行安装
+
+#### Scenario: 仅安装全部
+- **WHEN** 运行 `./dotf -i -a` 或 `./dotf --install --all`
+- **THEN** 仅调用 `scripts/install.sh --all`，不执行配置
+
 #### Scenario: 全部模式
-- **WHEN** 运行 `./init -a` 或 `./init --all`
-- **THEN** 调用 `scripts/init.sh --all`，再调用 `scripts/install-config.sh --all`
+- **WHEN** 运行 `./dotf -a` 或 `./dotf --all`（无前缀）
+- **THEN** 调用 `scripts/install.sh --all`，再调用 `scripts/config.sh --all`
 
 #### Scenario: 未知选项报错
-- **WHEN** 运行 `./init -x`
+- **WHEN** 运行 `./dotf -x`
 - **THEN** 显示错误信息和帮助，以非零退出码退出
 
 #### Scenario: 未知模块名报错
-- **WHEN** 运行 `./init -i nonexistent`
+- **WHEN** 运行 `./dotf -i nonexistent`
 - **THEN** 显示错误信息和可用模块列表，以非零退出码退出
 
 ### Requirement: 交互选择

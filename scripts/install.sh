@@ -29,20 +29,8 @@ get_module_desc() {
   esac
 }
 
-# 确认函数
-confirm() {
-  local prompt="$1"
-  local default="${2:-Y}"
-  local reply
-
-  if [[ "$default" == "Y" ]]; then
-    read -r -p "$prompt [Y/n]: " reply
-    [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
-  else
-    read -r -p "$prompt [y/N]: " reply
-    [[ "$reply" =~ ^[Yy] ]]
-  fi
-}
+# 确认函数（由 common.sh 提供，此处为独立运行时的兜底定义）
+source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 # 加载所有模块
 load_modules() {
@@ -64,13 +52,17 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/gcp.sh"
 }
 
-# 执行单个模块
+# 执行单个模块（带计时）
 run_module() {
   local module="$1"
   echo ""
   echo "========================================"
   echo "执行模块: $module"
   echo "========================================"
+
+  local _timer_start=$SECONDS
+  local _module_status="✓"
+
   case "$module" in
   homebrew)
     setup_brew_path
@@ -95,6 +87,24 @@ run_module() {
   aliyun) install_aliyun_cli ;;
   gcp) install_gcp_cli ;;
   esac
+
+  local _exit_code=$?
+  local _elapsed=$(( SECONDS - _timer_start ))
+
+  if [[ $_exit_code -ne 0 ]]; then
+    _module_status="✗"
+  fi
+
+  local _formatted
+  _formatted=$(timer_format "$_elapsed")
+
+  if [[ "$_module_status" == "✓" ]]; then
+    echo "✔ $module 完成 ($_formatted)"
+  else
+    echo "✗ $module 失败 ($_formatted)"
+  fi
+
+  _timing_record "$module" "$_elapsed" "$_module_status"
 }
 
 # 交互式安装（指定模块列表）
@@ -104,7 +114,7 @@ interactive_install() {
   load_modules
 
   for module in "${modules[@]}"; do
-    if confirm "安装 $(get_module_desc "$module")?"; then
+    if confirm "安装 $(get_module_desc "$module")?" "N"; then
       run_module "$module"
     else
       echo "跳过 $module"
@@ -122,12 +132,12 @@ show_help() {
   done
   echo ""
   echo "选项:"
-  echo "  --all, -a    安装所有模块（跳过确认）"
+  echo "  --all, -a    安装所有模块"
   echo "  --help, -h   显示此帮助"
   echo ""
   echo "示例:"
   echo "  $0 homebrew sdk # 只安装指定模块（仍需确认）"
-  echo "  $0 --all        # 全部安装（跳过确认）"
+  echo "  $0 --all        # 全部安装"
 }
 
 # 主函数
@@ -144,10 +154,10 @@ main() {
     case "$1" in
     --all | -a)
       load_modules
-      echo "全部安装模式（跳过确认）"
       for m in "${MODULES[@]}"; do
         run_module "$m"
       done
+      print_timing_summary
       exit 0
       ;;
     --help | -h)

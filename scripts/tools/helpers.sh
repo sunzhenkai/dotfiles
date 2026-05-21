@@ -1,6 +1,8 @@
 #!/bin/bash
 # Go 二进制工具通用安装函数
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # 通用 Go 项目编译安装
 # 参数: $1=工具名称, $2=git仓库地址, $3=安装目录(可选,默认~/.local/bin)
 install_go_binary() {
@@ -21,10 +23,8 @@ install_go_binary() {
   # 检查工具是否已存在
   if [ -f "$tool_path" ]; then
     echo "$tool_name is already installed at: $tool_path"
-    local reply
-    read -r -p "Do you want to update/reinstall $tool_name? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
-      echo "Skipping $tool_name installation."
+    if ! confirm "是否更新/重新安装 $tool_name?" "N"; then
+      echo "跳过 $tool_name 安装。"
       return 0
     fi
     echo "Updating $tool_name..."

@@ -1,6 +1,8 @@
 #!/bin/bash
 # 阿里云 CLI 安装
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 install_aliyun_cli() {
   echo "---- Installing Aliyun CLI ----"
 
@@ -9,10 +11,8 @@ install_aliyun_cli() {
 
   if [ -f "$tool_path" ]; then
     echo "Aliyun CLI is already installed: $("$tool_path" version 2>&1 | head -1)"
-    local reply
-    read -r -p "Do you want to update/reinstall Aliyun CLI? [y/N]: " reply
-    if [[ ! "$reply" =~ ^[Yy] ]]; then
-      echo "Skipping Aliyun CLI installation."
+    if ! confirm "是否更新/重新安装 Aliyun CLI?" "N"; then
+      echo "跳过 Aliyun CLI 安装。"
       return 0
     fi
     echo "Updating Aliyun CLI..."

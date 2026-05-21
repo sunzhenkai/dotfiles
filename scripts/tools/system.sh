@@ -1,6 +1,8 @@
 #!/bin/bash
 # 探测系统信息，并安装必要软件，搭建开发环境
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # 检测操作系统
 detect_os() {
   if [ -f "/etc/os-release" ]; then
@@ -22,14 +24,16 @@ common_init() {
 }
 
 init_docker() {
-  # 检查是否已安装
+  # 已安装：询问是否配置；未安装：询问是否安装并配置
   if command -v docker &>/dev/null; then
-    echo "Docker is already installed: $(docker --version)"
+    echo "Docker 已安装: $(docker --version)"
+    if ! confirm "是否配置 Docker（用户组/验证）?" "N"; then
+      echo "跳过 Docker 配置。"
+      return 0
+    fi
   else
-    read -p "Do you want to install docker engine? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      echo "Skipped docker installation."
+    if ! confirm "是否安装并配置 Docker Engine?" "N"; then
+      echo "跳过 Docker 安装。"
       return 0
     fi
 
@@ -66,35 +70,53 @@ EOF
       ;;
 
     *)
-      echo "Unsupported OS for Docker installation: $ID"
-      echo "Please install Docker manually: https://docs.docker.com/engine/install/"
+      echo "不支持的操作系统，无法安装 Docker: $ID"
+      echo "请手动安装: https://docs.docker.com/engine/install/"
       return 1
       ;;
     esac
   fi
 
-  # 启动并启用 docker 服务
+  # 启动并启用 docker 服务（仅 Linux）
   if command -v systemctl &>/dev/null; then
-    echo "Enabling and starting docker service..."
+    echo "正在启用 Docker 服务..."
     sudo systemctl enable --now docker
   fi
 
   # 将当前用户加入 docker 组（免密使用 docker）
   if ! groups | grep -q '\bdocker\b'; then
-    echo "Adding current user '$USER' to docker group for passwordless docker access..."
-    sudo usermod -aG docker "$USER"
+    echo "正在将用户 '$USER' 加入 docker 组..."
+    if [[ "$ID" == "darwin" ]]; then
+      # macOS 使用 dseditgroup 将用户加入 docker 组
+      sudo dseditgroup -o edit -a "$USER" -t user docker 2>/dev/null || \
+        echo "注意: macOS 上 Docker Desktop 会自动管理组成员。"
+    else
+      sudo usermod -aG docker "$USER"
+    fi
     echo ""
-    echo "IMPORTANT: You need to log out and log back in (or run 'newgrp docker') for group changes to take effect."
+    echo "注意: 需要登出后重新登录（或执行 'newgrp docker'）以使组成员变更生效。"
   else
-    echo "User '$USER' is already in the docker group."
+    echo "用户 '$USER' 已在 docker 组中。"
   fi
 
   # 验证安装
   echo ""
-  if sudo docker run --rm hello-world &>/dev/null; then
-    echo "Docker installation verified successfully!"
+  if [[ "$ID" == "darwin" ]]; then
+    # macOS (Docker Desktop): 不需要 sudo
+    if docker run --rm hello-world &>/dev/null; then
+      echo "Docker 验证成功！"
+    else
+      echo "⚠️  Docker 验证失败。"
+      echo "   请确保 Docker Desktop 正在运行: open -a Docker"
+    fi
   else
-    echo "Docker installed but verification failed. Try running: docker run hello-world"
+    # Linux: 使用 sudo 验证
+    if sudo docker run --rm hello-world &>/dev/null; then
+      echo "Docker 验证成功！"
+    else
+      echo "⚠️  Docker 验证失败。"
+      echo "   请尝试: sudo systemctl start docker"
+    fi
   fi
 }
 
@@ -134,7 +156,7 @@ init_debian() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # Arch/Manjaro 系初始化
@@ -170,7 +192,7 @@ init_arch() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # Fedora 系初始化
@@ -206,7 +228,7 @@ init_fedora() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # RHEL/CentOS 系初始化
@@ -242,7 +264,7 @@ init_rhel() {
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # macOS 初始化
@@ -268,7 +290,7 @@ init_darwin() {
   fi
 
   # 安装 Python mysqlclient 包
-  pip install mysqlclient
+  pip_install_system mysqlclient
 }
 
 # 更改用户默认 shell 为 zsh（优先使用 homebrew 安装的 zsh）
@@ -338,37 +360,43 @@ change_default_shell() {
 
   # 让用户确认是否更改 shell
   echo ""
-  echo "Current shell: $SHELL"
-  echo "Will change default shell to: $zsh_path"
+  echo "当前 Shell: $SHELL"
+  echo "将更改默认 Shell 为: $zsh_path"
   echo ""
-  read -p "Do you want to change your default shell to zsh? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Skipped changing default shell."
+  if ! confirm "是否将默认 Shell 更改为 zsh?" "N"; then
+    echo "跳过默认 Shell 更改。"
     return 0
   fi
 
   # 更改默认 shell
-  echo "Changing default shell to $zsh_path..."
+  echo "正在将默认 Shell 更改为 $zsh_path..."
   chsh -s "$zsh_path"
 
   if [ $? -eq 0 ]; then
-    echo "Default shell changed successfully!"
-    echo "Please restart your terminal or log out/in for the change to take effect."
+    echo "默认 Shell 更改成功！"
+    echo "请重启终端或重新登录以生效。"
   else
-    echo "Failed to change default shell. You may need to run: chsh -s $zsh_path"
+    echo "更改默认 Shell 失败，可尝试手动运行: chsh -s $zsh_path"
     return 1
   fi
 }
 
 # 配置 zsh
 config_zsh() {
+  if ! confirm "是否配置 zsh（oh-my-zsh/默认 Shell）?" "N"; then
+    echo "跳过 zsh 配置。"
+    return 0
+  fi
+
   echo "---- Configuring zsh ----"
 
   # 设置 ZSH_CUSTOM 路径
   if [ -f ~/.zshrc ]; then
-    sed -i 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    if [[ "$ID" == "darwin" ]]; then
+      sed -i '' 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    else
+      sed -i 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
+    fi
   fi
 
   # 安装 oh-my-zsh
@@ -401,15 +429,12 @@ dispatch_init() {
   echo "  System: $ID"
   echo "============================================"
   echo ""
-  echo "This will install system packages using the package manager."
-  echo "Root/sudo privileges are required."
+  echo "将通过系统包管理器安装软件包。"
+  echo "需要 root/sudo 权限。"
   echo ""
 
-  read -p "Do you want to install system packages? [y/N] " -n 1 -r
-  echo ""
-
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Skipped system packages installation."
+  if ! confirm "是否安装系统软件包?" "N"; then
+    echo "跳过系统软件包安装。"
     return 0
   fi
 

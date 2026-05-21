@@ -1,6 +1,8 @@
 #!/bin/bash
 # Homebrew 安装和配置
 
+source "$SCRIPT_DIR/scripts/tools/common.sh"
+
 # brew 可能的路径（支持 macOS 和 Linux）
 BREW_PATHS=(
   "/opt/homebrew/bin/brew"              # macOS Apple Silicon
@@ -42,12 +44,19 @@ install_homebrew() {
 init_homebrew() {
   echo "---- Installing packages via Homebrew ----"
 
-  # 让用户确认
-  read -p "Do you want to install packages via Homebrew? [y/N] " -n 1 -r
-  echo ""
+  # 自包含 OS 检测（不依赖 system.sh 的全局 $ID）
+  local _os_id=""
+  if [[ "$OSTYPE" =~ ^darwin ]]; then
+    _os_id="darwin"
+  elif [ -f "/etc/os-release" ]; then
+    _os_id=$(. /etc/os-release && echo "$ID")
+  elif [ -f "/etc/arch-release" ]; then
+    _os_id="arch"
+  fi
 
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Skipped Homebrew packages installation."
+  # 让用户确认
+  if ! confirm "是否通过 Homebrew 安装常用软件包?" "N"; then
+    echo "跳过 Homebrew 软件包安装。"
     return 0
   fi
 
@@ -65,17 +74,17 @@ init_homebrew() {
   # 文件/媒体
   brew install yazi ffmpeg sevenzip jq zoxide chafa
   # pngpaste 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
+  if [[ "$_os_id" == "darwin" ]]; then
     brew install pngpaste
   fi
 
   # 开发工具
-  brew install mise tmux zsh uv pkg-config mysql-connector-c
+  brew install mise tmux zsh uv pkg-config mysql-client
   brew install anomalyco/tap/opencode
   brew install codex
   brew install k9s
   # ghostty 仅在 macOS 上可用
-  if [[ "$ID" == "darwin" ]]; then
+  if [[ "$_os_id" == "darwin" ]]; then
     brew install --cask ghostty
   fi
 
@@ -86,7 +95,7 @@ init_homebrew() {
   brew install lazygit gitui
 
   # C/C++
-  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc clangd
+  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc
 
   # Java
   brew install openjdk@17 bison flex
@@ -94,5 +103,5 @@ init_homebrew() {
   # Go (NOTE: Go 本体通过 mise 安装)
   brew install gotests
 
-  echo "Homebrew packages installed successfully!"
+  echo "Homebrew 软件包安装完成！"
 }
