@@ -3,6 +3,10 @@
 -- Add any additional options here
 vim.g.mapleader = " "
 
+-- LazyVim root dir: lsp → git/markers/lua → cwd
+-- put .git in the same detector to avoid matching ~/.cursor first
+vim.g.root_spec = { "lsp", { ".git", ".cursor", ".opencode", "openspec", "lua" }, "cwd" }
+
 vim.opt.encoding = "utf-8"
 vim.opt.fileencoding = "utf-8"
 
