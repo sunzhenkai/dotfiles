@@ -1,0 +1,238 @@
+return {
+	{
+		"folke/snacks.nvim",
+		keys = {
+			{
+				"<leader><space>",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.picker.files({ cwd = root })
+				end,
+				desc = "Find Files (Neo-tree Root)",
+			},
+			{
+				"<leader>ff",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.picker.files({ cwd = root })
+				end,
+				desc = "Find Files (Neo-tree Root)",
+			},
+			{
+				"<c-/>",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.terminal(nil, { cwd = root })
+				end,
+				mode = { "n", "t" },
+				desc = "Terminal (Neo-tree Root)",
+			},
+			{
+				"<leader>ft",
+				function()
+					local root = vim.uv.cwd()
+					local ok, manager = pcall(require, "neo-tree.sources.manager")
+					if ok then
+						local state = manager.get_state("filesystem")
+						if state and state.path and state.path ~= "" then
+							root = state.path
+						end
+					end
+					Snacks.terminal(nil, { cwd = root })
+				end,
+				desc = "Terminal (Neo-tree Root)",
+			},
+		},
+		opts = {
+			terminal = {
+				win = {
+					style = "float",
+					border = "rounded",
+				},
+			},
+		},
+	},
+	-- auto-formatter
+	{
+		"stevearc/conform.nvim",
+		opts = {
+			notify_on_error = true,
+			format_on_save = function(bufnr)
+				local ft = vim.bo[bufnr].filetype
+				-- 禁用 C/C++ 保存时自动格式化
+				local disabled_ft = { c = true, cpp = true, objc = true, objcpp = true, cuda = true }
+				if disabled_ft[ft] then
+					return false
+				end
+				return { timeout_ms = 3000, lsp_format = "fallback" }
+			end,
+			formatters_by_ft = {
+				lua = { "stylua" },
+				sh = { "shfmt" },
+				c = { "clang_format" },
+				cpp = { "clang_format" },
+				go = { "gofumpt", "goimports" },
+				markdown = { "prettier", "markdownlint-cli2" },
+				yaml = { "yamlfmt" },
+				toml = { "taplo" },
+				json = { "prettier" },
+				css = { "prettier" },
+				python = { "ruff_format" },
+				typescriptreact = { "eslint_d" },
+				typescript = { "eslint_d" },
+				javascript = { "eslint_d" },
+				javascriptreact = { "eslint_d" },
+				proto = { "buf" },
+			},
+			formatters = {
+				shfmt = {
+					prepend_args = { "-i", "2" },
+				},
+				clang_format = {
+					prepend_args = { "--style=file", "--fallback-style=google" },
+				},
+				-- python: ruff_format 替代 black + isort（ruff 内置 isort 功能）
+				ruff_format = {
+					prepend_args = { "--line-length", "100" },
+				},
+			},
+		},
+	},
+	-- andymass/vim-matchup
+	-- code block match up
+	{
+		"andymass/vim-matchup",
+		event = "BufReadPost",
+		config = function()
+			vim.g.matchup_matchparen_enabled = 1
+			vim.g.matchup_matchparen_hi_surround_always = 1
+			vim.g.matchup_matchparen_deferred = 1
+			vim.g.matchup_matchparen_deferred_show_delay = 100 -- 延迟匹配显示，减少 CPU
+			vim.g.matchup_matchparen_deferred_hide_delay = 500
+			vim.g.matchup_matchparen_timeout = 300 -- 匹配超时（毫秒）
+			vim.g.matchup_matchparen_insert_timeout = 60 -- 插入模式下更短的超时
+		end,
+	},
+	-- nvim-treesitter/nvim-treesitter
+	{
+		"nvim-treesitter/nvim-treesitter",
+		opts = function(_, opts)
+			if type(opts.ensure_installed) == "table" then
+				vim.list_extend(opts.ensure_installed, {
+					"bash",
+					"c",
+					"lua",
+					"vim",
+					"vimdoc",
+					"query",
+					"regex",
+					"markdown",
+					"markdown_inline",
+				})
+			end
+			opts.indent = { enable = false }
+		end,
+	},
+	-- mfussenegger/nvim-lint
+	{
+		"mfussenegger/nvim-lint",
+		event = "LazyFile",
+		opts = {
+			-- Event to trigger linters
+			-- 在保存和读取文件时触发，保持实时反馈
+			events = { "BufWritePost", "BufReadPost" },
+			linters_by_ft = {
+				-- c/c++/cmake
+				c = { "cpplint" },
+				cpp = { "cpplint" },
+				-- fish
+				fish = { "fish" },
+				-- go: 只在保存时 lint，避免频繁触发
+				go = { "golangcilint" },
+				proto = { "protolint" },
+				-- python
+				python = { "ruff" },
+				typescriptreact = { "eslint_d" },
+				typescript = { "eslint_d" },
+				javascript = { "eslint_d" },
+				javascriptreact = { "eslint_d" },
+			},
+			-- LazyVim extension to easily override linter options
+			-- or add custom linters.
+			-- 注意：使用 prepend_args 追加参数，而非 args 覆盖（覆盖会丢失默认参数导致报错）
+			---@type table<string,table>
+			linters = {
+				-- c/c++/cmake
+				cpplint = {
+					prepend_args = {
+						"--filter=-legal/copyright,-build/include_subdir,-runtime/indentation_namespace",
+						-- set line length, the default value is 80
+						"--linelength=120",
+					},
+				},
+				-- Go: 优化 golangci-lint 性能
+				["golangcilint"] = {
+					-- 使用 prepend_args 追加参数，保留默认的 run/--out-format 等必要参数
+					prepend_args = {
+						-- "--timeout=60s",
+					},
+				},
+			},
+		},
+	},
+	-- numToStr/Comment.nvim
+	{
+		"numToStr/Comment.nvim",
+		opts = function(_, opts)
+			local ok, integration = pcall(require, "ts_context_commentstring.integrations.comment_nvim")
+			if ok then
+				opts.pre_hook = integration.create_pre_hook()
+			end
+			return opts
+		end,
+	},
+	-- code folder
+	-- kevinhwang91/nvim-ufo
+	{
+		"kevinhwang91/nvim-ufo",
+		event = "LazyFile",
+		dependencies = {
+			"kevinhwang91/promise-async",
+			"neovim/nvim-lspconfig",
+		},
+		init = function()
+			vim.o.foldcolumn = "1"
+			vim.o.foldlevel = 99
+			vim.o.foldlevelstart = 99
+			vim.o.foldenable = true
+		end,
+		config = function()
+			require("ufo").setup({
+				provider_selector = function()
+					return { "lsp", "indent" }
+				end,
+			})
+		end,
+	},
+}
