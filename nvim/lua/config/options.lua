@@ -15,6 +15,8 @@ vim.opt.textwidth = 100
 vim.opt.ignorecase = false
 vim.opt.relativenumber = false
 vim.opt.termguicolors = true
+-- theme
+vim.o.background = "dark"
 
 -- 性能优化
 vim.opt.updatetime = 300 -- 减少 CursorHold 触发延迟（默认 4000ms）
@@ -29,20 +31,20 @@ vim.opt.clipboard = "unnamedplus"
 
 -- fix: Waiting for OSC 52 response from the terminal. Press Ctrl-C to interrupt...
 local function paste()
-	return {
-		vim.fn.split(vim.fn.getreg(""), "\n"),
-		vim.fn.getregtype(""),
-	}
+  return {
+    vim.fn.split(vim.fn.getreg(""), "\n"),
+    vim.fn.getregtype(""),
+  }
 end
 
 vim.g.clipboard = {
-	name = "OSC 52",
-	copy = {
-		["+"] = require("vim.ui.clipboard.osc52").copy("+"),
-		["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-	},
-	paste = {
-		["+"] = paste,
-		["*"] = paste,
-	},
+  name = "OSC 52",
+  copy = {
+    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+  },
+  paste = {
+    ["+"] = paste,
+    ["*"] = paste,
+  },
 }
