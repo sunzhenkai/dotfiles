@@ -1,0 +1,50 @@
+-- Options are automatically loaded before lazy.nvim startup
+-- Default options that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
+-- Add any additional options here
+vim.g.mapleader = " "
+
+-- LazyVim root dir: lsp → git/markers/lua → cwd
+-- put .git in the same detector to avoid matching ~/.cursor first
+vim.g.root_spec = { "lsp", { ".git", ".cursor", ".opencode", "openspec", "lua" }, "cwd" }
+
+vim.opt.encoding = "utf-8"
+vim.opt.fileencoding = "utf-8"
+
+vim.opt.softtabstop = 2
+vim.opt.textwidth = 100
+vim.opt.ignorecase = false
+vim.opt.relativenumber = false
+vim.opt.termguicolors = true
+-- theme
+vim.o.background = "dark"
+
+-- 性能优化
+vim.opt.updatetime = 300 -- 减少 CursorHold 触发延迟（默认 4000ms）
+vim.opt.timeoutlen = 500 -- 按键序列超时（默认 1000ms）
+vim.opt.redrawtime = 1500 -- 语法高亮超时（默认 2000ms），防止大文件卡死
+vim.opt.maxmempattern = 1000 -- 限制正则匹配内存（默认 1000，显式设置）
+vim.opt.synmaxcol = 300 -- 限制语法高亮的列数，避免长行卡顿
+vim.opt.lazyredraw = false -- LazyVim 需要 false，不要改为 true
+
+-- Clipboard
+vim.opt.clipboard = "unnamedplus"
+
+-- fix: Waiting for OSC 52 response from the terminal. Press Ctrl-C to interrupt...
+local function paste()
+  return {
+    vim.fn.split(vim.fn.getreg(""), "\n"),
+    vim.fn.getregtype(""),
+  }
+end
+
+vim.g.clipboard = {
+  name = "OSC 52",
+  copy = {
+    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+  },
+  paste = {
+    ["+"] = paste,
+    ["*"] = paste,
+  },
+}
