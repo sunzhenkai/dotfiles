@@ -1,1 +1,0 @@
-/home/wii/.gstack/repo/review/design-checklist.md
