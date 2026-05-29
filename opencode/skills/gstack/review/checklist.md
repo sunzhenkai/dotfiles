@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/review/checklist.md
+/home/wii/.gstack/repo/review/checklist.md

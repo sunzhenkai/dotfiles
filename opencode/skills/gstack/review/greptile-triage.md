@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/review/greptile-triage.md
+/home/wii/.gstack/repo/review/greptile-triage.md

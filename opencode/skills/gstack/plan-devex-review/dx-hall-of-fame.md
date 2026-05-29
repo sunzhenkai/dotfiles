@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/plan-devex-review/dx-hall-of-fame.md
+/home/wii/.gstack/repo/plan-devex-review/dx-hall-of-fame.md

@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/ETHOS.md
+/home/wii/.gstack/repo/ETHOS.md

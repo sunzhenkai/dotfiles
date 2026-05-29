@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/.opencode/skills/gstack-upgrade/SKILL.md
+/home/wii/.gstack/repo/.opencode/skills/gstack-upgrade/SKILL.md

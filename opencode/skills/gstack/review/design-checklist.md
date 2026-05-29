@@ -1,1 +1,1 @@
-/Users/wii/.gstack/repo/review/design-checklist.md
+/home/wii/.gstack/repo/review/design-checklist.md
