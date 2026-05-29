@@ -33,7 +33,6 @@ get_config_def() {
   opencode)  echo "opencode:~/.config/opencode" ;;
   claude)    echo "claude:~/.config/claude" ;;
   cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
-  gstack)    echo "gstack:~/.gstack" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
   *)         return 1 ;;
@@ -63,7 +62,6 @@ get_config_desc() {
   opencode)  echo "OpenCode 配置" ;;
   claude)    echo "Claude Code 配置" ;;
   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
-  gstack)    echo "GStack AI 工程 Skills (Claude Code + OpenCode)" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
   *)         echo "$1" ;;
@@ -72,7 +70,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "alacritty claude cursor fcitx5 ghostty git gstack helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "alacritty claude cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -187,50 +185,6 @@ install_cursor() {
   fi
 }
 
-# 特殊配置：gstack（安装 AI 工程 skills 到 Claude Code / OpenCode / Cursor）
-install_gstack() {
-  local repo_dir="$HOME/.gstack/repo"
-  local repo_url="https://github.com/garrytan/gstack.git"
-
-  # 自动安装 bun 依赖
-  if ! command -v bun >/dev/null 2>&1; then
-    echo "bun 未安装，正在自动安装..."
-    if command -v brew >/dev/null 2>&1; then
-      brew install oven-sh/bun/bun
-    elif command -v curl >/dev/null 2>&1; then
-      curl -fsSL https://bun.sh/install | bash
-      export PATH="$HOME/.bun/bin:$PATH"
-    else
-      echo "⚠️  错误: 无法自动安装 bun，请手动安装: https://bun.sh"
-      return 1
-    fi
-  fi
-
-  # Clone 或更新 gstack 仓库
-  if [ -d "$repo_dir/.git" ]; then
-    echo "更新 gstack 仓库..."
-    git -C "$repo_dir" pull --ff-only || {
-      echo "⚠️  警告: gstack 仓库更新失败，使用现有版本"
-    }
-  else
-    echo "克隆 gstack 仓库..."
-    rm -rf "$repo_dir"
-    git clone --single-branch --depth 1 "$repo_url" "$repo_dir"
-  fi
-
-  # 为每个 host 运行 setup
-  local hosts="claude opencode"
-  for host in $hosts; do
-    echo ""
-    echo "── 安装 gstack skills for $host ──"
-    (cd "$repo_dir" && ./setup --host "$host" --no-prefix) || {
-      echo "⚠️  警告: gstack setup --host $host 失败"
-    }
-  done
-
-  echo ""
-  echo "✅ gstack 安装完成 (claude + opencode)"
-}
 
 install_all() {
   for name in $(get_all_config_names); do
@@ -238,7 +192,6 @@ install_all() {
     zsh)    install_zsh ;;
     claude) install_claude ;;
     cursor) install_cursor ;;
-    gstack) install_gstack ;;
     *)      install_config "$name" ;;
     esac
   done
@@ -281,7 +234,6 @@ main() {
   zsh)    install_zsh ;;
   claude) install_claude ;;
   cursor) install_cursor ;;
-  gstack) install_gstack ;;
   *)      install_config "$config" ;;
   esac
 }
