@@ -158,6 +158,12 @@ install_claude() {
   install_claude
 }
 
+# 特殊配置：tmux（依赖 submodule tpm）
+install_tmux() {
+  git -C "$DOTFILES_ROOT" submodule update --init tmux/3rd/tpm
+  install_config "tmux"
+}
+
 # 特殊配置：cursor
 install_cursor() {
   local target="$HOME/.cursor/mcp.json"
@@ -192,6 +198,7 @@ install_all() {
     zsh)    install_zsh ;;
     claude) install_claude ;;
     cursor) install_cursor ;;
+    tmux)   install_tmux ;;
     *)      install_config "$name" ;;
     esac
   done
@@ -234,6 +241,7 @@ main() {
   zsh)    install_zsh ;;
   claude) install_claude ;;
   cursor) install_cursor ;;
+  tmux)   install_tmux ;;
   *)      install_config "$config" ;;
   esac
 }
