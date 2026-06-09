@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor vcpkg ossutil aws aliyun gcp)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli vcpkg ossutil aws aliyun gcp)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -20,6 +20,8 @@ get_module_desc() {
   fonts) echo "安装字体（Maple Mono NF CN）" ;;
   npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
   cursor) echo "安装 Cursor CLI" ;;
+  qoder) echo "安装 Qoder CLI" ;;
+  trae-cli) echo "安装 Trae CLI" ;;
   vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
   ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
   aws) echo "安装 AWS CLI v2" ;;
@@ -45,6 +47,8 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/system.sh"
   source "$SCRIPT_DIR/scripts/tools/npm.sh"
   source "$SCRIPT_DIR/scripts/tools/cursor.sh"
+  source "$SCRIPT_DIR/scripts/tools/qoder.sh"
+  source "$SCRIPT_DIR/scripts/tools/trae-cli.sh"
   source "$SCRIPT_DIR/scripts/tools/vcpkg.sh"
   source "$SCRIPT_DIR/scripts/tools/ossutil.sh"
   source "$SCRIPT_DIR/scripts/tools/aws.sh"
@@ -81,6 +85,8 @@ run_module() {
   fonts) setup_fonts ;;
   npm) install_npm_packages ;;
   cursor) install_cursor_cli ;;
+  qoder) install_qoder ;;
+  trae-cli) install_trae_cli ;;
   vcpkg) setup_vcpkg ;;
   ossutil) install_ossutil ;;
   aws) install_aws_cli ;;
