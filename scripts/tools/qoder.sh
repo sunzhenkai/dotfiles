@@ -10,5 +10,6 @@ install_qoder() {
   fi
 
   echo "正在安装 Qoder CLI..."
-  curl -fsSL https://qoder.com/install | bash
+  curl -fsSL https://qoder.com.cn/install | bash
+  # curl -fsSL https://qoder.com/install | bash
 }
