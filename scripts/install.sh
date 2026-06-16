@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli vcpkg ossutil aws aliyun gcp)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli codebuddy-code kimi-code vcpkg ossutil aws aliyun gcp d2)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -22,11 +22,14 @@ get_module_desc() {
   cursor) echo "安装 Cursor CLI" ;;
   qoder) echo "安装 Qoder CLI" ;;
   trae-cli) echo "安装 Trae CLI" ;;
+  codebuddy-code) echo "安装 CodeBuddy Code CLI" ;;
+  kimi-code) echo "安装 Kimi Code CLI" ;;
   vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
   ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
   aws) echo "安装 AWS CLI v2" ;;
   aliyun) echo "安装阿里云 CLI" ;;
   gcp) echo "安装 Google Cloud CLI + gke-gcloud-auth-plugin" ;;
+  d2) echo "安装 D2 图描述语言" ;;
   *) echo "$1" ;;
   esac
 }
@@ -49,11 +52,14 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/cursor.sh"
   source "$SCRIPT_DIR/scripts/tools/qoder.sh"
   source "$SCRIPT_DIR/scripts/tools/trae-cli.sh"
+  source "$SCRIPT_DIR/scripts/tools/codebuddy-code.sh"
+  source "$SCRIPT_DIR/scripts/tools/kimi-code.sh"
   source "$SCRIPT_DIR/scripts/tools/vcpkg.sh"
   source "$SCRIPT_DIR/scripts/tools/ossutil.sh"
   source "$SCRIPT_DIR/scripts/tools/aws.sh"
   source "$SCRIPT_DIR/scripts/tools/aliyun.sh"
   source "$SCRIPT_DIR/scripts/tools/gcp.sh"
+  source "$SCRIPT_DIR/scripts/tools/d2.sh"
 }
 
 # 执行单个模块（带计时）
@@ -87,11 +93,14 @@ run_module() {
   cursor) install_cursor_cli ;;
   qoder) install_qoder ;;
   trae-cli) install_trae_cli ;;
+  codebuddy-code) install_codebuddy_code ;;
+  kimi-code) install_kimi_code ;;
   vcpkg) setup_vcpkg ;;
   ossutil) install_ossutil ;;
   aws) install_aws_cli ;;
   aliyun) install_aliyun_cli ;;
   gcp) install_gcp_cli ;;
+  d2) install_d2 ;;
   esac
 
   local _exit_code=$?
