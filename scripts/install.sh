@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli codebuddy-code kimi-code vcpkg ossutil aws aliyun gcp d2)
+MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -23,6 +23,7 @@ get_module_desc() {
   qoder) echo "安装 Qoder CLI" ;;
   trae-cli) echo "安装 Trae CLI" ;;
   codebuddy-code) echo "安装 CodeBuddy Code CLI" ;;
+  codex) echo "安装 Codex CLI" ;;
   kimi-code) echo "安装 Kimi Code CLI" ;;
   vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
   ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
@@ -53,6 +54,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/qoder.sh"
   source "$SCRIPT_DIR/scripts/tools/trae-cli.sh"
   source "$SCRIPT_DIR/scripts/tools/codebuddy-code.sh"
+  source "$SCRIPT_DIR/scripts/tools/codex.sh"
   source "$SCRIPT_DIR/scripts/tools/kimi-code.sh"
   source "$SCRIPT_DIR/scripts/tools/vcpkg.sh"
   source "$SCRIPT_DIR/scripts/tools/ossutil.sh"
@@ -94,6 +96,7 @@ run_module() {
   qoder) install_qoder ;;
   trae-cli) install_trae_cli ;;
   codebuddy-code) install_codebuddy_code ;;
+  codex) install_codex ;;
   kimi-code) install_kimi_code ;;
   vcpkg) setup_vcpkg ;;
   ossutil) install_ossutil ;;
@@ -146,6 +149,8 @@ show_help() {
     printf "  %-12s %s\n" "$m" "$(get_module_desc "$m")"
   done
   echo ""
+  echo "别名: codebuddy -> codebuddy-code"
+  echo ""
   echo "选项:"
   echo "  --all, -a    安装所有模块"
   echo "  --help, -h   显示此帮助"
@@ -197,7 +202,12 @@ main() {
       exit 1
       ;;
     *)
-      modules+=("$1")
+      # 兼容别名: codebuddy -> codebuddy-code
+      if [[ "$1" == "codebuddy" ]]; then
+        modules+=("codebuddy-code")
+      else
+        modules+=("$1")
+      fi
       ;;
     esac
     shift
