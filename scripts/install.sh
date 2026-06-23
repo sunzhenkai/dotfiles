@@ -126,17 +126,15 @@ run_module() {
 }
 
 # 交互式安装（指定模块列表）
+# 注：确认由各模块内部负责（与 --all 路径一致），避免与 interactive_install
+#     产生双重确认。例如 install_codex 已自带 "是否安装 Codex CLI?" 确认。
 interactive_install() {
   local modules=("$@")
 
   load_modules
 
   for module in "${modules[@]}"; do
-    if confirm "安装 $(get_module_desc "$module")?" "N"; then
-      run_module "$module"
-    else
-      echo "跳过 $module"
-    fi
+    run_module "$module"
   done
 }
 

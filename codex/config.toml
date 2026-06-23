@@ -9,7 +9,8 @@
 #   https://open.bigmodel.cn/api/coding/paas/v4
 # 可选模型: glm-4.7 / glm-4.6 / glm-5-turbo / glm-5.1 / glm-5.2 等
 model = "glm-5.2"
-model_provider = "zhipu"
+# oneapi / zhipu
+model_provider = "oneapi"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
@@ -23,12 +24,30 @@ hide_agent_reasoning = true
 # 自定义模型提供商 - 智谱 AI
 # ============================================================
 # 认证通过 env_key 从 ZHIPU_API_KEY 环境变量读取，无需在此硬编码密钥。
-# wire_api = "chat"：智谱当前提供的是 OpenAI Chat Completion 协议。
+# 注意：Codex 已于 2026-02 彻底移除 chat/completions（wire_api="chat"）支持，
+#       现仅支持 wire_api="responses"（/v1/responses 协议）。
+#       但智谱 coding 端点目前只实现 /chat/completions（实测 /responses 返回 404），
+#       故该配置虽能通过 Codex 解析，但实际请求模型时会失败。
+#       兼容方案：降级旧版 Codex / 本地 responses→chat 代理 / 改用 OpenCode。
+#       跟踪：https://github.com/zai-org/GLM-5/issues/39
 [model_providers.zhipu]
 name = "Zhipu AI"
 base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
 env_key = "ZHIPU_API_KEY"
-wire_api = "chat"
+wire_api = "responses"
+
+# ============================================================
+# 自定义模型提供商 - OneAPI 网关
+# ============================================================
+# 自建 OneAPI 聚合网关（OpenAI 兼容），token 从 ONEAPI_API_KEY 读取。
+# 注意：Codex 现仅支持 wire_api="responses"；而 OneAPI 通常只代理
+#       /v1/chat/completions，/v1/responses 多半返回 404，与智谱端点同理。
+#       使用前请先确认网关是否实现了 /responses（或后端是否支持）。
+[model_providers.oneapi]
+name = "OneAPI"
+base_url = "https://oneapi.wii.pub/v1"
+env_key = "ONEAPI_API_KEY"
+wire_api = "responses"
 
 # ============================================================
 # 子进程环境变量策略
@@ -41,3 +60,9 @@ inherit = "core"
 # ============================================================
 [tui]
 notifications = ["agent-turn-complete", "approval-requested"]
+
+[tui.model_availability_nux]
+"gpt-5.5" = 1
+
+[projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]
+trust_level = "trusted"
