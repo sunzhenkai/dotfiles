@@ -31,8 +31,9 @@ get_config_def() {
   fcitx5)    echo "fcitx5:~/.config/fcitx5" ;;
   git)       echo "git:~/.config/git" ;;
   opencode)  echo "opencode:~/.config/opencode" ;;
-  claude)    echo "claude:~/.config/claude" ;;
-  cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
+   claude)    echo "claude:~/.config/claude" ;;
+   codex)     echo "codex/config.toml:~/.codex/config.toml" ;;
+   cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
   *)         return 1 ;;
@@ -60,8 +61,9 @@ get_config_desc() {
   fcitx5)    echo "Fcitx5 输入法配置" ;;
   git)       echo "Git 版本控制配置" ;;
   opencode)  echo "OpenCode 配置" ;;
-  claude)    echo "Claude Code 配置" ;;
-  cursor)    echo "Cursor 编辑器 MCP 配置" ;;
+   claude)    echo "Claude Code 配置" ;;
+   codex)     echo "Codex CLI 配置（智谱 GLM）" ;;
+   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
   *)         echo "$1" ;;
@@ -70,7 +72,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "alacritty claude cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -158,6 +160,16 @@ install_claude() {
   install_claude
 }
 
+# 特殊配置：codex（认证依赖 ZHIPU_API_KEY 环境变量）
+install_codex() {
+  if [ -z "$ZHIPU_API_KEY" ]; then
+    echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
+    echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
+  fi
+  mkdir -p "$HOME/.codex"
+  install_config "codex"
+}
+
 # 特殊配置：tmux（依赖 submodule tpm）
 install_tmux() {
   git -C "$DOTFILES_ROOT" submodule update --init tmux/3rd/tpm
@@ -197,6 +209,7 @@ install_all() {
     case "$name" in
     zsh)    install_zsh ;;
     claude) install_claude ;;
+    codex)  install_codex ;;
     cursor) install_cursor ;;
     tmux)   install_tmux ;;
     *)      install_config "$name" ;;
@@ -240,6 +253,7 @@ main() {
   --all | -a) install_all ;;
   zsh)    install_zsh ;;
   claude) install_claude ;;
+  codex)  install_codex ;;
   cursor) install_cursor ;;
   tmux)   install_tmux ;;
   *)      install_config "$config" ;;

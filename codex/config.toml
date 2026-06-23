@@ -1,0 +1,43 @@
+# Codex 配置 - 通过智谱 GLM Coding Plan 接入
+# 文档: https://developers.openai.com/codex/config-reference
+#       https://docs.bigmodel.cn/cn/coding-plan/tool/others
+
+# ============================================================
+# 顶级配置（必须在任何 [table] 头之前）
+# ============================================================
+# 智谱 Coding Plan 编程端点（OpenAI Chat Completion 协议）：
+#   https://open.bigmodel.cn/api/coding/paas/v4
+# 可选模型: glm-4.7 / glm-4.6 / glm-5-turbo / glm-5.1 / glm-5.2 等
+model = "glm-5.2"
+model_provider = "zhipu"
+
+# 审批策略: untrusted | on-request | never
+approval_policy = "on-request"
+# 沙箱模式: read-only | workspace-write | danger-full-access
+sandbox_mode = "workspace-write"
+
+# 隐藏冗长的推理输出（CI 日志更清爽）
+hide_agent_reasoning = true
+
+# ============================================================
+# 自定义模型提供商 - 智谱 AI
+# ============================================================
+# 认证通过 env_key 从 ZHIPU_API_KEY 环境变量读取，无需在此硬编码密钥。
+# wire_api = "chat"：智谱当前提供的是 OpenAI Chat Completion 协议。
+[model_providers.zhipu]
+name = "Zhipu AI"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+env_key = "ZHIPU_API_KEY"
+wire_api = "chat"
+
+# ============================================================
+# 子进程环境变量策略
+# ============================================================
+[shell_environment_policy]
+inherit = "core"
+
+# ============================================================
+# TUI 通知
+# ============================================================
+[tui]
+notifications = ["agent-turn-complete", "approval-requested"]
