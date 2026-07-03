@@ -62,7 +62,7 @@ get_config_desc() {
   git)       echo "Git 版本控制配置" ;;
   opencode)  echo "OpenCode 配置" ;;
    claude)    echo "Claude Code 配置" ;;
-   codex)     echo "Codex CLI 配置（智谱 GLM）" ;;
+   codex)     echo "Codex CLI 配置（MiniMax / 智谱）" ;;
    cursor)    echo "Cursor 编辑器 MCP 配置" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
@@ -160,11 +160,12 @@ install_claude() {
   install_claude
 }
 
-# 特殊配置：codex（认证依赖 ZHIPU_API_KEY 环境变量）
+# 特殊配置：codex（默认依赖 MINIMAX_API_KEY，备选 ZHIPU_API_KEY）
 install_codex() {
-  if [ -z "$ZHIPU_API_KEY" ]; then
-    echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
+  if [ -z "$MINIMAX_API_KEY" ]; then
+    echo "⚠️  警告: MINIMAX_API_KEY 环境变量未设置（当前默认模型为 MiniMax-M3）"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
+    echo "若仅使用智谱备选，可忽略此警告并在运行时通过 --model-provider zhipu 切换"
   fi
   mkdir -p "$HOME/.codex"
   install_config "codex"

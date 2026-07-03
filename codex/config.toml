@@ -1,15 +1,16 @@
-# Codex 配置 - 通过智谱 GLM Coding Plan 接入
+# Codex 配置 - 默认接入 MiniMax（MiniMax-M3），同时保留智谱 GLM 作为备选
 # 文档: https://developers.openai.com/codex/config-reference
+#       https://platform.minimaxi.com/document/Code%20Companion
 #       https://docs.bigmodel.cn/cn/coding-plan/tool/others
 
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
 # ============================================================
-# 智谱 Coding Plan 编程端点（OpenAI Chat Completion 协议）：
-#   https://open.bigmodel.cn/api/coding/paas/v4
-# 可选模型: glm-4.7 / glm-4.6 / glm-5-turbo / glm-5.1 / glm-5.2 等
-model = "glm-5.2"
-model_provider = "zhipu"
+# 默认使用 MiniMax-M3（1M 上下文窗口，Responses API 协议）。
+# 临时切换回智谱可用: codex --model-provider zhipu --model glm-5.2
+model = "MiniMax-M3"
+model_provider = "minimax"
+model_context_window = 1000000
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
@@ -20,7 +21,18 @@ sandbox_mode = "workspace-write"
 hide_agent_reasoning = true
 
 # ============================================================
-# 自定义模型提供商 - 智谱 AI
+# 自定义模型提供商 - MiniMax（默认）
+# ============================================================
+# 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
+# wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
+[model_providers.minimax]
+name = "MiniMax"
+base_url = "https://api.minimaxi.com/v1"
+env_key = "MINIMAX_API_KEY"
+wire_api = "responses"
+
+# ============================================================
+# 自定义模型提供商 - 智谱 AI（备选）
 # ============================================================
 # 认证通过 env_key 从 ZHIPU_API_KEY 环境变量读取，无需在此硬编码密钥。
 # wire_api = "chat"：智谱当前提供的是 OpenAI Chat Completion 协议。
