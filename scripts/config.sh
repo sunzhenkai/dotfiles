@@ -62,7 +62,7 @@ get_config_desc() {
   git)       echo "Git 版本控制配置" ;;
   opencode)  echo "OpenCode 配置" ;;
    claude)    echo "Claude Code 配置" ;;
-   codex)     echo "Codex CLI 配置（MiniMax / 智谱）" ;;
+   codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
    cursor)    echo "Cursor 编辑器 MCP 配置" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
@@ -87,6 +87,32 @@ backup_to() {
   mkdir -p "$BACKUP_DIR"
   mv "$src" "$dest"
   echo "已备份 $basename 到 $dest"
+}
+
+# 创建 symlink（带备份），source 为仓库内相对路径，target 为绝对路径。
+# 与 install_config 同样的 symlink+backup 策略，供需要安装到子目录的额外文件复用。
+link_file() {
+  local source="$1"
+  local target="$2"
+  local expected_link="$DOTFILES_ROOT/$source"
+  local expected_abs
+  expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
+
+  # 已是正确 symlink → 跳过
+  if [ -L "$target" ]; then
+    local current_link
+    current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
+    if [ "$current_link" = "$expected_abs" ]; then
+      return 0
+    fi
+    ln -sf "$expected_link" "$target"
+    return 0
+  fi
+  # 普通文件/目录存在 → 备份后创建
+  if [ -e "$target" ]; then
+    backup_to "$target"
+  fi
+  ln -s "$expected_link" "$target"
 }
 
 install_config() {
@@ -160,15 +186,20 @@ install_claude() {
   install_claude
 }
 
-# 特殊配置：codex（默认依赖 MINIMAX_API_KEY，备选 ZHIPU_API_KEY）
+# 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
 install_codex() {
   if [ -z "$MINIMAX_API_KEY" ]; then
-    echo "⚠️  警告: MINIMAX_API_KEY 环境变量未设置（当前默认模型为 MiniMax-M3）"
+    echo "⚠️  警告: MINIMAX_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
-    echo "若仅使用智谱备选，可忽略此警告并在运行时通过 --model-provider zhipu 切换"
+    echo "（本配置使用自定义 provider，无需 codex login / OPENAI_API_KEY）"
   fi
+  # 主配置
   mkdir -p "$HOME/.codex"
   install_config "codex"
+  # 模型能力目录（model catalog）
+  mkdir -p "$HOME/.codex/model-catalogs"
+  link_file "codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
+  echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"
 }
 
 # 特殊配置：tmux（依赖 submodule tpm）

@@ -1,16 +1,26 @@
-# Codex 配置 - 默认接入 MiniMax（MiniMax-M3），同时保留智谱 GLM 作为备选
+# Codex 配置 - 接入 MiniMax（MiniMax-M3），无需 OpenAI 登录
 # 文档: https://developers.openai.com/codex/config-reference
 #       https://platform.minimaxi.com/document/Code%20Companion
-#       https://docs.bigmodel.cn/cn/coding-plan/tool/others
+#
+# 本配置使用自定义 provider（MiniMax），不依赖 OpenAI 账号：
+#   - 启动 `codex` 时不会弹出 ChatGPT 登录选择器
+#     （provider 的 requires_openai_auth = false，见下方）
+#   - 只需设置 MINIMAX_API_KEY 环境变量即可使用
+#
+# 注意: codex 0.130+ 已移除 wire_api = "chat" 支持（仅支持 Responses API）。
+#       智谱 GLM Coding Plan 目前仅提供 Chat / Anthropic 协议，暂不兼容新版 codex，
+#       故本配置暂不保留智谱备选（待智谱支持 /responses 端点后可恢复）。
 
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
 # ============================================================
-# 默认使用 MiniMax-M3（1M 上下文窗口，Responses API 协议）。
-# 临时切换回智谱可用: codex --model-provider zhipu --model glm-5.2
 model = "MiniMax-M3"
 model_provider = "minimax"
 model_context_window = 1000000
+# 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
+# 安装后位于 ~/.codex/model-catalogs/custom-catalog.json（symlink 到本仓库文件）。
+# 生效后在 Codex 中输入 /model 可看到 MiniMax-M3 及其可选 reasoning level。
+model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
@@ -19,28 +29,21 @@ sandbox_mode = "workspace-write"
 
 # 隐藏冗长的推理输出（CI 日志更清爽）
 hide_agent_reasoning = true
+model_reasoning_effort = "high"
 
 # ============================================================
-# 自定义模型提供商 - MiniMax（默认）
+# 自定义模型提供商 - MiniMax
 # ============================================================
 # 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
 # wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
+# requires_openai_auth = false：显式声明不要求 OpenAI 登录（默认即 false，
+#   启动时直接跳过 ChatGPT 登录选择器）。
 [model_providers.minimax]
 name = "MiniMax"
 base_url = "https://api.minimaxi.com/v1"
 env_key = "MINIMAX_API_KEY"
 wire_api = "responses"
-
-# ============================================================
-# 自定义模型提供商 - 智谱 AI（备选）
-# ============================================================
-# 认证通过 env_key 从 ZHIPU_API_KEY 环境变量读取，无需在此硬编码密钥。
-# wire_api = "chat"：智谱当前提供的是 OpenAI Chat Completion 协议。
-[model_providers.zhipu]
-name = "Zhipu AI"
-base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
-env_key = "ZHIPU_API_KEY"
-wire_api = "chat"
+requires_openai_auth = false
 
 # ============================================================
 # 子进程环境变量策略
@@ -53,3 +56,9 @@ inherit = "core"
 # ============================================================
 [tui]
 notifications = ["agent-turn-complete", "approval-requested"]
+
+[projects."/home/wii/work"]
+trust_level = "trusted"
+
+[projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]
+trust_level = "trusted"
