@@ -62,3 +62,9 @@ trust_level = "trusted"
 
 [projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]
 trust_level = "trusted"
+
+[projects."/Users/wii/code/repos/github/sunzhenkai/dotfiles"]
+trust_level = "trusted"
+
+[projects."/Users/wii/code/repos/github/solo-kingdom/uniface"]
+trust_level = "trusted"
