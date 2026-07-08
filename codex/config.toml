@@ -68,3 +68,12 @@ trust_level = "trusted"
 
 [projects."/Users/wii/code/repos/github/solo-kingdom/uniface"]
 trust_level = "trusted"
+
+[projects."/Users/wii/code"]
+trust_level = "trusted"
+
+[projects."/Users/wii/code/repos/github/sunzhenkai/worktide"]
+trust_level = "trusted"
+
+[projects."/Users/wii/code/repos/codeup/vela"]
+trust_level = "trusted"

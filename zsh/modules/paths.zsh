@@ -6,9 +6,9 @@
 export PATH="${HOME}/.local/bin:${PATH}"
 export DEVELOPMENT_ENV=LOCAL
 
-# dotfiles (dotf command)
-if [[ -e "${HOME}/.config/dotfiles" ]]; then
-  export PATH="${HOME}/.config/dotfiles:${PATH}"
+# dotfiles (dotf command) — 只把 bin/ 暴露到 PATH，避免仓库根目录污染
+if [[ -d "${HOME}/.config/dotfiles/bin" ]]; then
+  export PATH="${HOME}/.config/dotfiles/bin:${PATH}"
 fi
 
 # homebrew — linux
