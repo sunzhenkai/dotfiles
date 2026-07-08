@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git fonts npm cursor qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
+MODULES=(homebrew system sdk golang senv grepom mdserve git delta fonts npm cursor qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -17,6 +17,7 @@ get_module_desc() {
   grepom) echo "安装 grepom 多仓库管理工具" ;;
   mdserve) echo "安装 mdserve 二进制工具" ;;
   git) echo "配置 Git" ;;
+  delta) echo "安装并配置 git-delta（git diff 高亮分页器）" ;;
   fonts) echo "安装字体（Maple Mono NF CN）" ;;
   npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
   cursor) echo "安装 Cursor CLI" ;;
@@ -47,6 +48,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/grepom.sh"
   source "$SCRIPT_DIR/scripts/tools/mdserve.sh"
   source "$SCRIPT_DIR/scripts/tools/git.sh"
+  source "$SCRIPT_DIR/scripts/tools/delta.sh"
   source "$SCRIPT_DIR/scripts/tools/fonts.sh"
   source "$SCRIPT_DIR/scripts/tools/system.sh"
   source "$SCRIPT_DIR/scripts/tools/npm.sh"
@@ -89,6 +91,9 @@ run_module() {
   golang) setup_golang ;;
   git)
     setup_git
+    ;;
+  delta)
+    install_delta
     ;;
   fonts) setup_fonts ;;
   npm) install_npm_packages ;;
