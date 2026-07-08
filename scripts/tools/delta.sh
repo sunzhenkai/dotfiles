@@ -6,7 +6,7 @@
 source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 install_delta() {
-  if ! confirm "是否安装并配置 git-delta（git diff 高亮分页器）?" "Y"; then
+  if ! confirm "是否安装并配置 git-delta（git diff 高亮分页器）?" "N"; then
     echo "跳过 git-delta 安装"
     return 0
   fi

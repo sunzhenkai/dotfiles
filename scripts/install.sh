@@ -131,17 +131,14 @@ run_module() {
 }
 
 # 交互式安装（指定模块列表）
+# 注：确认职责由各模块内部函数承担，此处不再做外层逐模块确认，避免双重确认。
 interactive_install() {
   local modules=("$@")
 
   load_modules
 
   for module in "${modules[@]}"; do
-    if confirm "安装 $(get_module_desc "$module")?" "N"; then
-      run_module "$module"
-    else
-      echo "跳过 $module"
-    fi
+    run_module "$module"
   done
 }
 
