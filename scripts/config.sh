@@ -187,16 +187,42 @@ install_claude() {
 }
 
 # 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
+#
+# ~/.codex/config.toml 不再使用软链，而是由「仓库 base + 本地 local」合并生成
+# 的真实文件。原因：codex 会把 [projects."<path>"] 自动写进该文件，软链会穿透
+# 污染仓库。projects 维护在 codex/config.local.toml（gitignore），安装时合并。
+#
+# 注意：每次安装都用 base + local 重新覆盖 ~/.codex/config.toml。codex 新增的
+#       信任不会自动回抽——需手动把对应 [projects."<path>"] 块加入 local 后重跑。
 install_codex() {
   if [ -z "$MINIMAX_API_KEY" ]; then
     echo "⚠️  警告: MINIMAX_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
     echo "（本配置使用自定义 provider，无需 codex login / OPENAI_API_KEY）"
   fi
-  # 主配置
+
   mkdir -p "$HOME/.codex"
-  install_config "codex"
-  # 模型能力目录（model catalog）
+
+  local base="$DOTFILES_ROOT/codex/config.toml"
+  local local_cfg="$DOTFILES_ROOT/codex/config.local.toml"
+  local target="$HOME/.codex/config.toml"
+
+  # 旧机制遗留：target 若是软链则移除，改用合并生成
+  [ -L "$target" ] && rm "$target" && echo "已移除旧的 config.toml 软链"
+
+  # 合并 base + local → target（真实文件，非软链；每次覆盖生成）
+  {
+    cat "$base"
+    if [ -f "$local_cfg" ]; then
+      echo ""
+      echo "# ============================================================"
+      echo "# ↓↓↓ 以下来自 codex/config.local.toml（机器特定，不纳入 git） ↓↓↓"
+      cat "$local_cfg"
+    fi
+  } > "$target"
+  echo "已安装: ~/.codex/config.toml（base + local 合并生成）"
+
+  # 模型能力目录（model catalog，只读，仍用软链）
   mkdir -p "$HOME/.codex/model-catalogs"
   link_file "codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
   echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"

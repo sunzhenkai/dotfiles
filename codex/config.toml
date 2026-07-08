@@ -57,23 +57,13 @@ inherit = "core"
 [tui]
 notifications = ["agent-turn-complete", "approval-requested"]
 
-[projects."/home/wii/work"]
-trust_level = "trusted"
-
-[projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]
-trust_level = "trusted"
-
-[projects."/Users/wii/code/repos/github/sunzhenkai/dotfiles"]
-trust_level = "trusted"
-
-[projects."/Users/wii/code/repos/github/solo-kingdom/uniface"]
-trust_level = "trusted"
-
-[projects."/Users/wii/code"]
-trust_level = "trusted"
-
-[projects."/Users/wii/code/repos/github/sunzhenkai/worktide"]
-trust_level = "trusted"
-
-[projects."/Users/wii/code/repos/codeup/vela"]
-trust_level = "trusted"
+# ============================================================
+# projects（信任的项目列表）不在本文件管理
+# ============================================================
+# codex 运行时会把"首次信任的项目"以 [projects."<path>"] 形式自动写入
+# ~/.codex/config.toml。这类内容机器特定、动态变化，放进本仓库会污染 git。
+#
+# 方案：projects 由本地文件 codex/config.local.toml 维护（已 .gitignore），
+# 安装时（`dotf codex`）自动与本文件（base）合并生成 ~/.codex/config.toml。
+# codex 新增的信任会在下次安装时自动回抽到 config.local.toml，不丢也不入库。
+# 详见 codex/README.md「projects 本地化」一节。

@@ -6,3 +6,4 @@
 openspec/changes
 scripts/assets
 /opencode/package-lock.json
+/codex/config.local.toml
