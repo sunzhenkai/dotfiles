@@ -69,9 +69,8 @@ ${context}
 
 请使用简体中文完成以下任务：
 1. 检查 git diff（包括已暂存和未暂存的变更）
-2. 如有需要，将变更拆分为多个逻辑清晰的 commit
-3. 编写符合 Conventional Commits 规范的 commit message
-4. 执行 git commit
+2. 编写符合 Conventional Commits 规范的 commit message
+3. 执行 git commit
 
 不要修改源代码，仅提交现有变更。所有输出和 commit message 均使用简体中文。"
 
@@ -99,10 +98,9 @@ ${context}
 
 请使用简体中文完成以下任务：
 1. 检查 git diff（包括已暂存和未暂存的变更）
-2. 如有需要，将变更拆分为多个逻辑清晰的 commit
-3. 编写符合 Conventional Commits 规范的 commit message
-4. 执行 git commit
-5. 执行 git push origin ${branch}
+2. 编写符合 Conventional Commits 规范的 commit message
+3. 执行 git commit
+4. 执行 git push origin ${branch}
 
 不要修改源代码，仅提交并推送现有变更。所有输出和 commit message 均使用简体中文。"
 
