@@ -16,9 +16,9 @@ _ai_git_context() {
   repo=$(basename "$toplevel")
   branch=$(git branch --show-current)
   cat <<EOF
-Repository: ${repo}
-Repository path: ${toplevel}
-Current branch: ${branch}
+仓库名称：${repo}
+仓库路径：${toplevel}
+当前分支：${branch}
 EOF
 }
 
@@ -63,22 +63,22 @@ agc() {
   local context prompt
   context=$(_ai_git_context) || return 1
 
-  prompt="You are in a Git repository.
+  prompt="你正在一个 Git 仓库中工作。
 
 ${context}
 
-Please:
-1. Inspect git diff (staged and unstaged)
-2. Split into logical commits if needed
-3. Write Conventional Commits compliant commit messages
-4. git commit
+请使用简体中文完成以下任务：
+1. 检查 git diff（包括已暂存和未暂存的变更）
+2. 如有需要，将变更拆分为多个逻辑清晰的 commit
+3. 编写符合 Conventional Commits 规范的 commit message
+4. 执行 git commit
 
-Do NOT modify source code. Only commit existing changes."
+不要修改源代码，仅提交现有变更。所有输出和 commit message 均使用简体中文。"
 
   if [[ -n "$hint" ]]; then
     prompt="${prompt}
 
-User hint for commit message: ${hint}"
+用户对 commit message 的补充说明：${hint}"
   fi
 
   _ai_git_invoke "$prompt"
@@ -93,23 +93,23 @@ agcp() {
   context=$(_ai_git_context) || return 1
   branch=$(git branch --show-current)
 
-  prompt="You are in a Git repository.
+  prompt="你正在一个 Git 仓库中工作。
 
 ${context}
 
-Please:
-1. Inspect git diff (staged and unstaged)
-2. Split into logical commits if needed
-3. Write Conventional Commits compliant commit messages
-4. git commit
-5. git push origin ${branch}
+请使用简体中文完成以下任务：
+1. 检查 git diff（包括已暂存和未暂存的变更）
+2. 如有需要，将变更拆分为多个逻辑清晰的 commit
+3. 编写符合 Conventional Commits 规范的 commit message
+4. 执行 git commit
+5. 执行 git push origin ${branch}
 
-Do NOT modify source code. Only commit and push existing changes."
+不要修改源代码，仅提交并推送现有变更。所有输出和 commit message 均使用简体中文。"
 
   if [[ -n "$hint" ]]; then
     prompt="${prompt}
 
-User hint for commit message: ${hint}"
+用户对 commit message 的补充说明：${hint}"
   fi
 
   _ai_git_invoke "$prompt"
@@ -123,23 +123,23 @@ agrv() {
   local context prompt
   context=$(_ai_git_context) || return 1
 
-  prompt="You are in a Git repository.
+  prompt="你正在一个 Git 仓库中工作。
 
 ${context}
 
-Please review the current git diff (staged and unstaged).
+请使用简体中文审查当前的 git diff（包括已暂存和未暂存的变更）。
 
-Provide:
-1. Summary of changes
-2. Potential issues (bugs, edge cases, security)
-3. Suggestions for improvement
+请提供：
+1. 变更摘要
+2. 潜在问题（bug、边界情况、安全等）
+3. 改进建议
 
-Do NOT modify any files, commit, or push."
+不要修改任何文件，不要 commit 或 push。所有输出均使用简体中文。"
 
   if [[ -n "$focus" ]]; then
     prompt="${prompt}
 
-Focus areas: ${focus}"
+重点关注：${focus}"
   fi
 
   _ai_git_invoke "$prompt"
