@@ -22,6 +22,23 @@ _ai_git_context() {
 EOF
 }
 
+# 探测并缓存 opencode 自动批准权限的 flag（不同版本名称不同）
+# 新版: --auto；旧版: --dangerously-skip-permissions
+# 传入未知 flag 时 opencode 会直接打印 help 后退出，因此必须按版本选择
+# 注意：不要用 $() 调用本函数，否则缓存赋值会在子 shell 中丢失
+_ai_git_detect_opencode_auto_flag() {
+  [[ -n ${_AI_GIT_OPENCODE_AUTO_FLAG+x} ]] && return 0
+  local help
+  help=$(opencode run --help 2>&1) || true
+  if print -r -- "$help" | grep -qE -- '(^|[[:space:]])--auto([[:space:]]|$)'; then
+    _AI_GIT_OPENCODE_AUTO_FLAG=--auto
+  elif print -r -- "$help" | grep -qF -- '--dangerously-skip-permissions'; then
+    _AI_GIT_OPENCODE_AUTO_FLAG=--dangerously-skip-permissions
+  else
+    _AI_GIT_OPENCODE_AUTO_FLAG=
+  fi
+}
+
 _ai_git_invoke() {
   local prompt="$1"
   local agent="$AI_GIT_AGENT"
@@ -32,7 +49,12 @@ _ai_git_invoke() {
         echo "Error: opencode 未安装" >&2
         return 1
       }
-      opencode run --auto "$prompt"
+      _ai_git_detect_opencode_auto_flag
+      if [[ -n $_AI_GIT_OPENCODE_AUTO_FLAG ]]; then
+        opencode run "$_AI_GIT_OPENCODE_AUTO_FLAG" "$prompt"
+      else
+        opencode run "$prompt"
+      fi
       ;;
     codex)
       command -v codex >/dev/null || {
