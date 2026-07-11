@@ -31,23 +31,21 @@ sandbox_mode = "workspace-write"
 hide_agent_reasoning = true
 model_reasoning_effort = "high"
 
-
-name = "OneAPI"
-base_url = "https://oneapi.wii.pub/v1"
-env_key = "ONEAPI_API_KEY"
-wire_api = "responses"
+# ============================================================
+# 自定义模型提供商 - MiniMax
+# ============================================================
 # 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
 # wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
 # requires_openai_auth = false：显式声明不要求 OpenAI 登录（默认即 false，
 #   启动时直接跳过 ChatGPT 登录选择器）。
 [model_providers.minimax]
-
-
-# ============================================================name = "MiniMax"
+name = "MiniMax"
 base_url = "https://api.minimaxi.com/v1"
 env_key = "MINIMAX_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
+
+# ============================================================
 # 子进程环境变量策略
 # ============================================================
 [shell_environment_policy]
@@ -57,8 +55,6 @@ inherit = "core"
 # TUI 通知
 # ============================================================
 [tui]
-
-
 notifications = ["agent-turn-complete", "approval-requested"]
 
 # ============================================================
