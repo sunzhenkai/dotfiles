@@ -1,16 +1,26 @@
-# Codex 配置 - 通过智谱 GLM Coding Plan 接入
+# Codex 配置 - 接入 MiniMax（MiniMax-M3），无需 OpenAI 登录
 # 文档: https://developers.openai.com/codex/config-reference
-#       https://docs.bigmodel.cn/cn/coding-plan/tool/others
+#       https://platform.minimaxi.com/document/Code%20Companion
+#
+# 本配置使用自定义 provider（MiniMax），不依赖 OpenAI 账号：
+#   - 启动 `codex` 时不会弹出 ChatGPT 登录选择器
+#     （provider 的 requires_openai_auth = false，见下方）
+#   - 只需设置 MINIMAX_API_KEY 环境变量即可使用
+#
+# 注意: codex 0.130+ 已移除 wire_api = "chat" 支持（仅支持 Responses API）。
+#       智谱 GLM Coding Plan 目前仅提供 Chat / Anthropic 协议，暂不兼容新版 codex，
+#       故本配置暂不保留智谱备选（待智谱支持 /responses 端点后可恢复）。
 
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
 # ============================================================
-# 智谱 Coding Plan 编程端点（OpenAI Chat Completion 协议）：
-#   https://open.bigmodel.cn/api/coding/paas/v4
-# 可选模型: glm-4.7 / glm-4.6 / glm-5-turbo / glm-5.1 / glm-5.2 等
-model = "glm-5.2"
-# oneapi / zhipu
-model_provider = "oneapi"
+model = "MiniMax-M3"
+model_provider = "minimax"
+model_context_window = 1000000
+# 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
+# 安装后位于 ~/.codex/model-catalogs/custom-catalog.json（symlink 到本仓库文件）。
+# 生效后在 Codex 中输入 /model 可看到 MiniMax-M3 及其可选 reasoning level。
+model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
@@ -19,37 +29,25 @@ sandbox_mode = "workspace-write"
 
 # 隐藏冗长的推理输出（CI 日志更清爽）
 hide_agent_reasoning = true
+model_reasoning_effort = "high"
 
-# ============================================================
-# 自定义模型提供商 - 智谱 AI
-# ============================================================
-# 认证通过 env_key 从 ZHIPU_API_KEY 环境变量读取，无需在此硬编码密钥。
-# 注意：Codex 已于 2026-02 彻底移除 chat/completions（wire_api="chat"）支持，
-#       现仅支持 wire_api="responses"（/v1/responses 协议）。
-#       但智谱 coding 端点目前只实现 /chat/completions（实测 /responses 返回 404），
-#       故该配置虽能通过 Codex 解析，但实际请求模型时会失败。
-#       兼容方案：降级旧版 Codex / 本地 responses→chat 代理 / 改用 OpenCode。
-#       跟踪：https://github.com/zai-org/GLM-5/issues/39
-[model_providers.zhipu]
-name = "Zhipu AI"
-base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
-env_key = "ZHIPU_API_KEY"
-wire_api = "responses"
 
-# ============================================================
-# 自定义模型提供商 - OneAPI 网关
-# ============================================================
-# 自建 OneAPI 聚合网关（OpenAI 兼容），token 从 ONEAPI_API_KEY 读取。
-# 注意：Codex 现仅支持 wire_api="responses"；而 OneAPI 通常只代理
-#       /v1/chat/completions，/v1/responses 多半返回 404，与智谱端点同理。
-#       使用前请先确认网关是否实现了 /responses（或后端是否支持）。
-[model_providers.oneapi]
 name = "OneAPI"
 base_url = "https://oneapi.wii.pub/v1"
 env_key = "ONEAPI_API_KEY"
 wire_api = "responses"
+# 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
+# wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
+# requires_openai_auth = false：显式声明不要求 OpenAI 登录（默认即 false，
+#   启动时直接跳过 ChatGPT 登录选择器）。
+[model_providers.minimax]
 
-# ============================================================
+
+# ============================================================name = "MiniMax"
+base_url = "https://api.minimaxi.com/v1"
+env_key = "MINIMAX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
 # 子进程环境变量策略
 # ============================================================
 [shell_environment_policy]
@@ -59,10 +57,12 @@ inherit = "core"
 # TUI 通知
 # ============================================================
 [tui]
+
+
 notifications = ["agent-turn-complete", "approval-requested"]
-
-[tui.model_availability_nux]
 "gpt-5.5" = 1
+[projects."/home/wii/work"]
 
-[projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]
+
+[projects."/home/wii/code/repos/github/sunzhenkai/dotfiles"]trust_level = "trusted"
 trust_level = "trusted"
