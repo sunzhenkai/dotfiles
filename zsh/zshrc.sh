@@ -25,6 +25,7 @@ source "$_mod_dir/vi-mode.zsh"
 source "$_mod_dir/misc.zsh"
 source "$_mod_dir/lang.zsh"
 source "$_mod_dir/export.zsh"
+source "$_mod_dir/ai-git.zsh"
 
 # aliases — load after all modules to avoid being overridden
 if [[ -f "${0:a:h}/aliases.zsh" ]]; then

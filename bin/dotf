@@ -2,7 +2,8 @@
 # dotf — Dotfiles CLI 轻量入口
 # 纯委托：参数解析 + 子命令路由，不含业务逻辑
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 脚本位于 bin/，仓库根为其上一级
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 检测 Homebrew bash（优先使用更新版本）
 get_bash() {
