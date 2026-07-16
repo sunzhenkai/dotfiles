@@ -115,6 +115,10 @@ PY
     chown "$SUDO_USER:" "$claude_state" 2>/dev/null || true
     echo "已为 \$SUDO_USER 调整 ~/.claude 和 ~/.claude.json 的所有者"
   fi
+
+  if [ -x "$DOTFILES_ROOT/scripts/agents/sync.sh" ]; then
+    "$DOTFILES_ROOT/scripts/agents/sync.sh" claude
+  fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

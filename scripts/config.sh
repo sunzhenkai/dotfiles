@@ -31,9 +31,10 @@ get_config_def() {
   fcitx5)    echo "fcitx5:~/.config/fcitx5" ;;
   git)       echo "git:~/.config/git" ;;
   opencode)  echo "opencode:~/.config/opencode" ;;
-   claude)    echo "claude:~/.config/claude" ;;
-   codex)     echo "codex/config.toml:~/.codex/config.toml" ;;
-   cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
+  claude)    echo "claude:~/.config/claude" ;;
+  codex)     echo "codex/config.toml:~/.codex/config.toml" ;;
+  cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
+  agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
   *)         return 1 ;;
@@ -61,9 +62,10 @@ get_config_desc() {
   fcitx5)    echo "Fcitx5 输入法配置" ;;
   git)       echo "Git 版本控制配置" ;;
   opencode)  echo "OpenCode 配置" ;;
-   claude)    echo "Claude Code 配置" ;;
-   codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
-   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
+  claude)    echo "Claude Code 配置" ;;
+  codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
+  cursor)    echo "Cursor 编辑器 MCP 配置" ;;
+  agents)    echo "同步共享 agents skills/commands 到各工具（不重装 MCP/settings）" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
   *)         echo "$1" ;;
@@ -72,7 +74,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -179,11 +181,22 @@ install_zsh() {
   echo "已安装: ~/.zshrc"
 }
 
+# 同步共享 agents skills/commands（可单独调用，不重装 MCP/settings）
+sync_agents() {
+  local tool="${1:-all}"
+  "$DOTFILES_ROOT/scripts/agents/sync.sh" "$tool"
+}
+
+install_agents() {
+  sync_agents all
+}
+
 # 特殊配置：claude（按需 source）
 install_claude() {
   # shellcheck source=install-claude.sh
   source "$DOTFILES_ROOT/scripts/install-claude.sh"
   install_claude
+  sync_agents claude
 }
 
 # 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
@@ -226,6 +239,8 @@ install_codex() {
   mkdir -p "$HOME/.codex/model-catalogs"
   link_file "codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
   echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"
+
+  sync_agents codex
 }
 
 # 特殊配置：tmux（依赖 submodule tpm）
@@ -259,20 +274,31 @@ install_cursor() {
     cp "$template" "$target"
     echo "已安装: ~/.cursor/mcp.json (请手动设置 ZHIPU_API_KEY)"
   fi
+
+  sync_agents cursor
 }
 
+
+install_opencode() {
+  install_config "opencode"
+  # skills/commands 生成进仓库 opencode/，随 symlink 对用户可见
+  sync_agents opencode
+}
 
 install_all() {
   for name in $(get_all_config_names); do
     case "$name" in
-    zsh)    install_zsh ;;
-    claude) install_claude ;;
-    codex)  install_codex ;;
-    cursor) install_cursor ;;
-    tmux)   install_tmux ;;
-    *)      install_config "$name" ;;
+    agents)   ;; # 各工具安装时已 sync；全量末尾再统一跑一次
+    zsh)      install_zsh ;;
+    claude)   install_claude ;;
+    codex)    install_codex ;;
+    cursor)   install_cursor ;;
+    opencode) install_opencode ;;
+    tmux)     install_tmux ;;
+    *)        install_config "$name" ;;
     esac
   done
+  sync_agents all
 }
 
 # ============================================================
@@ -309,12 +335,14 @@ main() {
     done
     ;;
   --all | -a) install_all ;;
-  zsh)    install_zsh ;;
-  claude) install_claude ;;
-  codex)  install_codex ;;
-  cursor) install_cursor ;;
-  tmux)   install_tmux ;;
-  *)      install_config "$config" ;;
+  agents)   install_agents ;;
+  zsh)      install_zsh ;;
+  claude)   install_claude ;;
+  codex)    install_codex ;;
+  cursor)   install_cursor ;;
+  opencode) install_opencode ;;
+  tmux)     install_tmux ;;
+  *)        install_config "$config" ;;
   esac
 }
 
