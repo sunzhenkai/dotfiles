@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agent-env 环境诊断：env / tools / mcp / browser / security / agents。"""
+"""agents/env 环境诊断：env / tools / mcp / browser / security / agents。"""
 
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ class DoctorReport:
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Diagnose agent-env installation")
+    p = argparse.ArgumentParser(description="Diagnose agents/env installation")
     p.add_argument("--profile", default=None, help="指定 profile")
     p.add_argument(
         "--tool",
@@ -237,8 +237,8 @@ def check_mcp(
                 "mcp",
                 f"{t}-drift",
                 STATUS_WARN,
-                f"{t}: 托管 MCP 与 agent-env 不一致: {', '.join(drift)}",
-                hint="运行 scripts/agent-env/sync.sh " + t,
+                f"{t}: 托管 MCP 与 agents/env 不一致: {', '.join(drift)}",
+                hint="运行 scripts/agents/sync.sh --env-only " + t,
             )
         else:
             report.add("mcp", f"{t}-drift", STATUS_PASS, f"{t}: 托管 MCP 与源一致")
@@ -626,7 +626,7 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
 
 def format_text(report: DoctorReport) -> str:
     lines = [
-        f"agent-env doctor  profile={report.profile}  risk={report.risk}  tool={report.tool or '*'}",
+        f"agents doctor  profile={report.profile}  risk={report.risk}  tool={report.tool or '*'}",
         "",
     ]
     groups: Dict[str, List[CheckItem]] = {}

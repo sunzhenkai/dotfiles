@@ -1,20 +1,20 @@
-# agent-env-catalog Specification
+# agents-catalog Specification
 
 ## Purpose
 TBD - created by archiving change agent-env. Update Purpose after archive.
 ## Requirements
 ### Requirement: Agent environment source catalog
-The system SHALL provide `agent-env/` as the single handwritten source for reusable agent runtime environment definitions, separate from `agents/` skills and commands.
+The system SHALL provide `agents/env/` as the single handwritten source for reusable agent runtime environment definitions, separate from `agents/` skills and commands.
 
 #### Scenario: Catalog directory exists
 - **WHEN** the change is implemented
-- **THEN** `agent-env/` SHALL exist at the repository root
+- **THEN** `agents/env/` SHALL exist under `agents/`
 - **THEN** it SHALL contain documented sources for MCP servers, profiles, environment variables, tool dependencies, browser settings, and security policy
 
 #### Scenario: Skills remain outside agent environment catalog
 - **WHEN** a maintainer adds or edits a shared skill or command
 - **THEN** the maintainer SHALL continue to use `agents/`
-- **THEN** `agent-env/` SHALL NOT become the handwritten source for skills or slash commands
+- **THEN** `agents/env/` SHALL NOT become the handwritten source for skills or slash commands
 
 ### Requirement: Environment manifest declares supported modules
 The system SHALL define an agent environment manifest that declares supported target tools, enabled environment modules, default profiles, and per-tool include/exclude rules.

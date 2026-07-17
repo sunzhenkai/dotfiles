@@ -273,13 +273,13 @@ main() {
     if [ ${#config_args[@]} -eq 0 ]; then
       exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh"
     fi
-    # agents / agent-env：整组参数一次交给 config.sh（支持 --doctor 等）
-    if [[ "${config_args[0]}" == "agents" || "${config_args[0]}" == "agent-env" ]]; then
+    # agents：整组参数一次交给 config.sh（支持 --doctor 等）
+    if [[ "${config_args[0]}" == "agents" ]]; then
       exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "${config_args[@]}"
     fi
     for mod in "${config_args[@]}"; do
       if [[ "$mod" == --* ]]; then
-        echo "错误: 选项 '$mod' 仅支持与 agents/agent-env 一起使用（如: dotf -c agents --doctor）"
+        echo "错误: 选项 '$mod' 仅支持与 agents 一起使用（如: dotf -c agents --doctor）"
         exit 1
       fi
       "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$mod"

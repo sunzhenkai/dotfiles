@@ -62,11 +62,11 @@ python3 scripts/agents/doctor.py --json --verbose
 scripts/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/`（skills/commands + `vendors/` 工具专属）+ `agent-env/`（MCP/env 真相源，由统一 CLI 调用）
-- 兼容：`dotf -c agent-env` 仍可用，但会提示迁移到 `agents`
-- 工具专属路径：`agents/vendors/{claude,cursor,opencode,codex,kimi-code}/`（原顶层目录已迁入）
+- 源码：`agents/{skills,commands,vendors,env}`（skills/commands + 工具专属 vendors + MCP/env 真相源）
+- 脚本：单一包 `scripts/agents/`（`sync.sh` / `doctor.py` / `env_sync.py`）
+- 工具专属路径：`agents/vendors/{claude,cursor,opencode,codex,kimi-code}/`
 
-详见 `agents/README.md`、`agent-env/README.md`。
+详见 `agents/README.md`、`agents/env/README.md`。
 
 ## ColorScheme
 

@@ -1,4 +1,4 @@
-# agent-skills-adapters Specification
+# agents-skills-adapters Specification
 
 ## Purpose
 TBD - created by archiving change unified-agent-skills. Update Purpose after archive.

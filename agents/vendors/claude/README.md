@@ -11,13 +11,13 @@
 
 - `~/.claude/settings.json` — 主配置（安装时可用 `ZHIPU_API_KEY` 填充）
 - `~/.claude.json` — 应用状态；MCP 也会合并到此
-- `~/.claude/.mcp.json` — MCP（由 **agent-env** 生成）
+- `~/.claude/.mcp.json` — MCP（由 **agents/env** 生成）
 
 ## MCP 来源
 
-仓库内 `claude/.mcp.json` 是 **agent-env 生成物 / 薄模板**，请勿手写多源漂移。
+仓库内 `claude/.mcp.json` 是 **agents/env 生成物 / 薄模板**，请勿手写多源漂移。
 
-真相源：`agent-env/mcp/servers.yaml` + profiles。
+真相源：`agents/env/mcp/servers.yaml` + profiles。
 
 本目录位于 `agents/vendors/claude/`（工具专属配置）。
 

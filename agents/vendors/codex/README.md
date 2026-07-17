@@ -13,7 +13,7 @@ scripts/agents/sync.sh codex   # skills 同步；MCP skip
 python3 scripts/agents/doctor.py
 ```
 
-详见 `agent-env/README.md`。
+详见 `agents/env/README.md`。
 
 ## 为什么不需要登录
 

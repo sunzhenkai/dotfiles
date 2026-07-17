@@ -36,7 +36,6 @@ get_config_def() {
   cursor)    echo "agents/vendors/cursor/mcp.json:~/.cursor/mcp.json" ;;
   kimi-code) echo "agents/vendors/kimi-code/config.toml:~/.kimi-code/config.toml" ;;
   agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
-  agent-env) echo "agent-env:~/.local/share/dotfiles-agent-env" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
   *)         return 1 ;;
@@ -69,7 +68,6 @@ get_config_desc() {
   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
   kimi-code) echo "Kimi Code CLI 配置（首次安装；已有则跳过以免覆盖登录凭证）" ;;
   agents)    echo "同步 agents：skills/commands + MCP/profiles（可用 --doctor）" ;;
-  agent-env) echo "[兼容别名] 请改用 agents；等价于 agents --env-only" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
   *)         echo "$1" ;;
@@ -78,7 +76,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "agent-env agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -195,25 +193,76 @@ install_agents() {
   sync_agents all "$@"
 }
 
-# 兼容别名：agent-env → agents --env-only
-sync_agent_env() {
-  echo "提示: 'agent-env' 已合并到 'agents'，请改用: dotf -c agents （或 sync.sh --env-only）" >&2
-  sync_agents --env-only "$@"
-}
-
-install_agent_env() {
-  echo "提示: 'dotf -c agent-env' 已弃用，请改用: dotf -c agents" >&2
-  sync_agents all --env-only "$@"
-  if ! python3 "$DOTFILES_ROOT/scripts/agents/doctor.py" 2>/dev/null; then
-    echo "⚠️  agents doctor 发现问题；可运行: python3 scripts/agents/doctor.py"
-  fi
-}
-
-# 特殊配置：claude（按需 source；内部已统一 sync）
+# 特殊配置：claude（settings / .claude.json；MCP/skills 走统一 agents sync）
 install_claude() {
-  # shellcheck source=install-claude.sh
-  source "$DOTFILES_ROOT/scripts/install-claude.sh"
-  install_claude
+  local claude_dir="$HOME/.claude"
+  if [ ! -d "$claude_dir" ]; then
+    mkdir -p "$claude_dir"
+  fi
+
+  if [ -z "$ZHIPU_API_KEY" ]; then
+    echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
+    echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
+  fi
+
+  local settings_target="$claude_dir/settings.json"
+  local settings_template="$DOTFILES_ROOT/agents/vendors/claude/settings.json"
+
+  if [ -e "$settings_target" ]; then
+    mv "$settings_target" "$settings_target-$TIMESTAMP"
+  fi
+
+  if [ -n "$ZHIPU_API_KEY" ]; then
+    sed "s|\${ZHIPU_API_KEY}|$ZHIPU_API_KEY|g" "$settings_template" >"$settings_target"
+    echo "已安装: settings.json (已使用 ZHIPU_API_KEY)"
+  else
+    cp "$settings_template" "$settings_target"
+    echo "已安装: settings.json (请手动设置 ZHIPU_API_KEY)"
+  fi
+
+  local claude_json_target="$HOME/.claude.json"
+  local claude_json_source="$DOTFILES_ROOT/agents/vendors/claude/.claude.json"
+
+  if [ ! -f "$claude_json_source" ]; then
+    echo "⚠️  跳过 ~/.claude.json symlink: dotfiles 中不存在 $claude_json_source"
+  elif [ -L "$claude_json_target" ]; then
+    local current_link
+    current_link=$(readlink -f "$claude_json_target" 2>/dev/null || readlink "$claude_json_target")
+    local expected_abs
+    expected_abs=$(readlink -f "$claude_json_source" 2>/dev/null || echo "$claude_json_source")
+    if [ "$current_link" = "$expected_abs" ]; then
+      echo "已安装: .claude.json"
+    else
+      if [ -e "$claude_json_target" ]; then
+        mkdir -p "$BACKUP_DIR"
+        mv "$claude_json_target" "$BACKUP_DIR/.claude.json-${TIMESTAMP}"
+        echo "已备份 .claude.json 到 $BACKUP_DIR/.claude.json-${TIMESTAMP}"
+      fi
+      ln -sf "$claude_json_source" "$claude_json_target"
+      echo "已安装: .claude.json"
+    fi
+  else
+    if [ -e "$claude_json_target" ]; then
+      mkdir -p "$BACKUP_DIR"
+      mv "$claude_json_target" "$BACKUP_DIR/.claude.json-${TIMESTAMP}"
+      echo "已备份 .claude.json 到 $BACKUP_DIR/.claude.json-${TIMESTAMP}"
+    fi
+    ln -s "$claude_json_source" "$claude_json_target"
+    echo "已安装: .claude.json"
+  fi
+
+  if [ -x "$DOTFILES_ROOT/scripts/agents/sync.sh" ]; then
+    "$DOTFILES_ROOT/scripts/agents/sync.sh" claude
+  else
+    echo "⚠️  跳过 agents sync：找不到 scripts/agents/sync.sh"
+  fi
+
+  if [ -n "${SUDO_USER:-}" ] && [ "$(id -u)" -eq 0 ]; then
+    local claude_state="$HOME/.claude.json"
+    chown -R "$SUDO_USER:" "$claude_dir" 2>/dev/null || true
+    chown "$SUDO_USER:" "$claude_state" 2>/dev/null || true
+    echo "已为 \$SUDO_USER 调整 ~/.claude 和 ~/.claude.json 的所有者"
+  fi
 }
 
 # 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
@@ -314,7 +363,6 @@ install_all() {
   for name in $(get_all_config_names); do
     case "$name" in
     agents)   ;; # 各工具安装时已 sync；全量末尾再统一跑一次
-    agent-env) ;; # 各工具安装时已 sync MCP；全量末尾再统一跑一次
     zsh)      install_zsh ;;
     claude)   install_claude ;;
     codex)    install_codex ;;
@@ -348,7 +396,7 @@ main() {
     echo "  --list          仅列出配置名"
     echo "  --list-desc     列出配置名及描述"
     echo ""
-    echo "agents 附加选项（仅 agents/agent-env）:"
+    echo "agents 附加选项（仅 agents）:"
     echo "  --doctor --profile NAME --skills-only --env-only --dry-run --strict"
     exit 1
   fi
@@ -368,10 +416,6 @@ main() {
   agents)
     shift
     install_agents "$@"
-    ;;
-  agent-env)
-    shift
-    install_agent_env "$@"
     ;;
   zsh)      install_zsh ;;
   claude)   install_claude ;;

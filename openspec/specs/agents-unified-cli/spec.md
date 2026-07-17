@@ -30,14 +30,6 @@ The system SHALL allow users to restrict sync scope without abandoning the unifi
 - **THEN** the system SHALL sync MCP/profile configuration
 - **THEN** the system SHALL NOT rewrite skills/commands outputs
 
-### Requirement: Compatibility alias for agent-env
-The system SHALL keep `agent-env` as a compatibility alias that delegates to the unified `agents` implementation.
-
-#### Scenario: Legacy agent-env config is invoked
-- **WHEN** the user runs `dotf -c agent-env`
-- **THEN** the system SHALL delegate to the unified agents env/MCP sync path
-- **THEN** the system SHALL emit a deprecation or migration hint recommending `agents`
-
 ### Requirement: Per-tool installers use unified sync
 The system SHALL route Claude/Cursor/OpenCode/Codex config flows through the unified agents sync helper rather than calling divergent skills-only and env-only entrypoints independently in a conflicting way.
 
@@ -48,10 +40,14 @@ The system SHALL route Claude/Cursor/OpenCode/Codex config flows through the uni
 - **THEN** repeated runs SHALL remain idempotent
 
 ### Requirement: Scripts expose a single agents CLI surface
-The system SHALL provide scripts under `scripts/agents/` as the preferred direct CLI for sync and doctor orchestration.
+The system SHALL provide scripts under `scripts/agents/` as the single CLI surface for sync and doctor orchestration, implemented as one self-contained Python package with no reverse dependency on any other agent script directory.
 
 #### Scenario: User invokes scripts directly
 - **WHEN** the user runs `scripts/agents/sync.sh` without going through `dotf`
 - **THEN** the command SHALL support the same core scopes as `dotf -c agents`
 - **THEN** documentation SHALL present this path as equivalent to the config module
 
+#### Scenario: No parallel agent script directory
+- **WHEN** the sync/doctor logic is loaded
+- **THEN** all core implementation modules SHALL reside under `scripts/agents/`
+- **THEN** the code SHALL NOT import agent logic from a separate `scripts/agent-env/` directory

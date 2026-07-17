@@ -89,7 +89,7 @@ if [ "$ENV" -eq 1 ]; then
   if [ "$DRY_RUN" -eq 1 ]; then
     env_args+=(--dry-run)
   fi
-  python3 "$ROOT/scripts/agent-env/sync.py" "${env_args[@]}"
+  python3 "$SCRIPT_DIR/env_sync.py" "${env_args[@]}"
 fi
 
 if [ "$DOCTOR" -eq 1 ]; then

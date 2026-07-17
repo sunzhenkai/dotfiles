@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""将 agent-env MCP 声明同步到 Claude / Cursor / OpenCode / Codex。"""
+"""将 agents/env MCP 声明同步到 Claude / Cursor / OpenCode / Codex。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from common import (
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Sync agent-env MCP to target tools")
+    p = argparse.ArgumentParser(description="Sync agents/env MCP to target tools")
     p.add_argument(
         "tool",
         nargs="?",

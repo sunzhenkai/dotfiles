@@ -4,11 +4,11 @@
 
 工具专属内容（如 `agents/` 人格）请继续在本目录手写维护。
 
-**MCP**：`opencode.json` 的 `mcp` 字段由统一 `agents` sync 合并。请改 `agent-env/mcp/` 后运行：
+**MCP**：`opencode.json` 的 `mcp` 字段由统一 `agents` sync 合并。请改 `agents/env/mcp/` 后运行：
 
 ```shell
 dotf -c agents
 scripts/agents/sync.sh opencode
 ```
 
-不要手写维护多份 MCP 配置。详见 `agent-env/README.md`。
+不要手写维护多份 MCP 配置。详见 `agents/env/README.md`。

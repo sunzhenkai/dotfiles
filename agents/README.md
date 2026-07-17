@@ -14,8 +14,6 @@ scripts/agents/sync.sh all
 python3 scripts/agents/doctor.py
 ```
 
-`agent-env` 配置名已作为兼容别名；请优先使用 `agents`。
-
 ## 布局
 
 ```text
@@ -23,11 +21,12 @@ agents/
   skills/<skill-id>/SKILL.md   # skill 源
   commands/<command-id>.md     # command 源
   vendors/<tool>/              # 工具专属 settings / 人格 / 生成物
+  env/                         # MCP / profiles / browser / security 真相源
   README.md
 ```
 
 工具专属 settings、OpenCode 人格等放在 `agents/vendors/<tool>/`。  
-MCP / env / browser 真相源在 `agent-env/`，由 `scripts/agents/sync.sh` 统一编排，不要手写多源漂移。
+MCP / env / browser 真相源在 `agents/env/`，由单一脚本包 `scripts/agents/` 编排，不要手写多源漂移。
 
 ## Frontmatter（源）
 

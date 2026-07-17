@@ -1,4 +1,4 @@
-# agent-env-mcp-adapters Specification
+# agents-mcp-adapters Specification
 
 ## Purpose
 TBD - created by archiving change agent-env. Update Purpose after archive.
@@ -40,7 +40,7 @@ The system SHALL adapt shared MCP declarations into the configuration format use
 - **THEN** doctor SHALL report MCP support for Codex as unsupported or skipped rather than failed
 
 ### Requirement: MCP sync is idempotent and scoped
-The system SHALL update only MCP server ids managed by `agent-env` and SHALL preserve unrelated user or tool-managed configuration where possible.
+The system SHALL update only MCP server ids managed by `agents/env` and SHALL preserve unrelated user or tool-managed configuration where possible.
 
 #### Scenario: Repeated sync has no changes
 - **WHEN** sync runs twice with the same shared MCP source and selected profile
@@ -48,7 +48,7 @@ The system SHALL update only MCP server ids managed by `agent-env` and SHALL pre
 - **THEN** managed MCP output SHALL remain equivalent after both runs
 
 #### Scenario: Existing unmanaged MCP server is present
-- **WHEN** a target configuration contains an MCP server id not declared by `agent-env`
+- **WHEN** a target configuration contains an MCP server id not declared by `agents/env`
 - **THEN** sync SHALL preserve that unmanaged server unless the target tool requires full file replacement
 - **THEN** any full replacement SHALL first create a backup
 

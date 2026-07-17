@@ -1,17 +1,20 @@
 .DS_Store
 *.zwc
+# agent 运行时目录（由 sync 生成到本机 / 仓库内可再生）
 .claude
 .cursor
 .opencode
+# .codex 例外：仓库内 openspec-* skills 为项目真相源（非 sync 生成），继续跟踪
+.qoder/
 openspec/changes
 scripts/assets
 /agents/vendors/opencode/package-lock.json
 /agents/vendors/codex/config.local.toml
 __pycache__
 
-# agent-env 本机覆盖与浏览器产物（勿提交密钥/路径/状态）
-/agent-env/local.yaml
-/agent-env/local/
+# agents/env 本机覆盖与浏览器产物（勿提交密钥/路径/状态）
+/agents/env/local.yaml
+/agents/env/local/
 **/browser-profile/
 **/playwright-report/
 **/*screenshot*.png

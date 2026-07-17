@@ -12,13 +12,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-# 复用 agent-env 检查实现（doctor_impl，避免与兼容入口循环导入）
-_ENV_DIR = Path(__file__).resolve().parent.parent / "agent-env"
-if str(_ENV_DIR) not in sys.path:
-    sys.path.insert(0, str(_ENV_DIR))
-
-from common import Catalog, TOOLS  # type: ignore  # noqa: E402
-import doctor_impl as env_doctor  # type: ignore  # noqa: E402
+from common import Catalog, TOOLS
+import doctor_impl as env_doctor
 
 STATUS_PASS = env_doctor.STATUS_PASS
 STATUS_WARN = env_doctor.STATUS_WARN

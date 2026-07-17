@@ -47,8 +47,8 @@ browser_state:
 
 private_boundary:
   local_override_files:
-    - agent-env/local.yaml
-    - agent-env/local/*.yaml
+    - agents/env/local.yaml
+    - agents/env/local/*.yaml
   allowed_in_local_only:
     - browser executable paths
     - browser profile paths

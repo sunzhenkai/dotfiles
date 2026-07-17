@@ -1,4 +1,4 @@
-# agent-env-security Specification
+# agents-security Specification
 
 ## Purpose
 TBD - created by archiving change agent-env. Update Purpose after archive.
@@ -20,7 +20,7 @@ The system SHALL manage only secret references and validation rules in repositor
 The system SHALL keep machine-specific paths, browser profiles, private overrides, and experimental local settings in gitignored local files.
 
 #### Scenario: Local override file is created
-- **WHEN** a user creates an `agent-env` local override file
+- **WHEN** a user creates an `agents/env` local override file
 - **THEN** the file SHALL be ignored by git
 - **THEN** sync and doctor SHALL be able to read it on that machine
 
@@ -73,7 +73,7 @@ The system SHALL make generated or managed agent environment configuration audit
 
 #### Scenario: Sync writes managed MCP configuration
 - **WHEN** sync writes target MCP configuration
-- **THEN** managed server ids SHALL be traceable back to `agent-env` source declarations
+- **THEN** managed server ids SHALL be traceable back to `agents/env` source declarations
 - **THEN** generated files SHALL not contain expanded secret values unless the target tool has no safe placeholder mechanism and the write is explicitly documented
 
 #### Scenario: Secret expansion is unavoidable
@@ -82,10 +82,10 @@ The system SHALL make generated or managed agent environment configuration audit
 - **THEN** the written file SHALL be treated as user-level private state, not repository content
 
 ### Requirement: Repository scans catch obvious sensitive leakage
-The system SHALL provide checks that catch obvious sensitive data patterns in `agent-env` source files and generated repository files.
+The system SHALL provide checks that catch obvious sensitive data patterns in `agents/env` source files and generated repository files.
 
 #### Scenario: Potential secret pattern is detected
-- **WHEN** doctor or validation detects a likely secret in a committed `agent-env` source path
+- **WHEN** doctor or validation detects a likely secret in a committed `agents/env` source path
 - **THEN** it SHALL report a failure or high-severity warning
 - **THEN** it SHALL identify the file path without printing the full sensitive value
 

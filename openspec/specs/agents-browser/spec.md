@@ -1,4 +1,4 @@
-# agent-env-browser Specification
+# agents-browser Specification
 
 ## Purpose
 TBD - created by archiving change agent-env. Update Purpose after archive.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agent-env 共享加载、合并与校验逻辑。"""
+"""agents/env 共享加载、合并与校验逻辑。"""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def repo_root_from(here: Path) -> Path:
 
 
 def agent_env_dir(root: Path) -> Path:
-    return root / "agent-env"
+    return root / "agents" / "env"
 
 
 def load_yaml(path: Path) -> Any:

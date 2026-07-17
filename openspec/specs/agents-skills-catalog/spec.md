@@ -1,4 +1,4 @@
-# agent-skills-catalog Specification
+# agents-skills-catalog Specification
 
 ## Purpose
 TBD - created by archiving change unified-agent-skills. Update Purpose after archive.

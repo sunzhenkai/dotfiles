@@ -1,4 +1,4 @@
-# agent-env 环境清单：支持工具、默认 profile、模块范围
+# agents/env 环境清单：支持工具、默认 profile、模块范围
 version: 1
 
 tools:

@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(bash -n /home/wii/code/repos/github/sunzhenkai/dotfiles/scripts/install.sh && echo \"syntax ok\")",
-      "Bash(bash -n /home/wii/code/repos/github/sunzhenkai/dotfiles/scripts/tools/codebuddy-code.sh && echo \"syntax ok\")",
-      "Bash(bash -n /home/wii/code/repos/github/sunzhenkai/dotfiles/scripts/tools/kimi-code.sh && echo \"syntax ok\")"
-    ]
-  }
-}
