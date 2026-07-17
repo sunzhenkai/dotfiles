@@ -1,0 +1,6 @@
+# coding：本地开发工具检查为主，不含远程 web / browser MCP
+id: coding
+description: "仓库协作与本地 CLI/runtime 基线"
+risk: low
+mcp_servers: []
+modules: [tools, env, security, agents]

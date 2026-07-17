@@ -2,6 +2,18 @@
 
 跨 Claude Code / Cursor / OpenCode / Codex 的 **skills / commands 唯一真相源**。
 
+## 统一入口（推荐）
+
+```shell
+dotf -i agents                 # 安装 CLI 工具包
+dotf -c agents                 # 同步 skills + MCP
+dotf -c agents --doctor        # 同步 + 诊断摘要
+scripts/agents/sync.sh all
+python3 scripts/agents/doctor.py
+```
+
+`agent-env` 配置名已作为兼容别名；请优先使用 `agents`。
+
 ## 布局
 
 ```text
@@ -11,7 +23,8 @@ agents/
   README.md
 ```
 
-工具专属配置（MCP、settings、`opencode.json`、agents 人格等）仍放在各自目录，不放这里。
+工具专属 settings 仍放在各自目录。  
+MCP / env / browser 真相源在 `agent-env/`，由 `scripts/agents/sync.sh` 统一编排，不要手写多源漂移。
 
 ## Frontmatter（源）
 

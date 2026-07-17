@@ -14,7 +14,7 @@ dotf -i kimi-code
 curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
 ```
 
-安装后确保 `~/.local/bin` 在 `PATH` 中（zsh 配置已包含），然后验证：
+安装后二进制在 `~/.kimi-code/bin`（zsh `paths.zsh` 已自动加入 `PATH`），验证：
 
 ```shell
 kimi --version

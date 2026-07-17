@@ -1,0 +1,60 @@
+# 安全策略：风险等级、敏感模式、浏览器状态与本机私有边界
+version: 1
+
+risk_levels:
+  low:
+    description: "远程只读能力（如网页搜索/阅读），不接触本机浏览器状态"
+  medium:
+    description: "本地进程或文件系统相关能力，需注意工作区范围"
+  high:
+    description: "浏览器自动化、真实登录态、本机 profile；必须显式 profile 启用"
+
+defaults:
+  enable_high_risk: false
+  isolate_browser_profile: true
+  never_commit_secrets: true
+  never_commit_browser_state: true
+
+sensitive_patterns:
+  # doctor 扫描用；匹配时只报告路径与模式名，不打印完整匹配值
+  - name: api_key_assignment
+    pattern: '(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*["\x27]?[A-Za-z0-9_\-]{16,}'
+    severity: fail
+  - name: bearer_literal
+    pattern: '(?i)Bearer\s+[A-Za-z0-9\-._~+/]+=*'
+    severity: fail
+  - name: internal_url
+    pattern: '(?i)https?://[a-z0-9.-]*\.(internal|local|corp|intranet)(/|\b)'
+    severity: warn
+  - name: codeup_private
+    pattern: '(?i)codeup\.aliyun\.com'
+    severity: warn
+
+browser_state:
+  protected_kinds:
+    - cookies
+    - sessions
+    - downloads
+    - screenshots
+    - traces
+    - profiles
+  forbidden_in_repo:
+    - "**/browser-profile/**"
+    - "**/playwright-report/**"
+    - "**/*screenshot*.png"
+    - "**/trace.zip"
+  artifact_hint: "~/.cache/agent-env/browser/ 或系统临时目录；不要提交截图/trace"
+
+private_boundary:
+  local_override_files:
+    - agent-env/local.yaml
+    - agent-env/local/*.yaml
+  allowed_in_local_only:
+    - browser executable paths
+    - browser profile paths
+    - CDP endpoints
+    - private workspace paths
+  never_in_repo:
+    - API keys / tokens / cookies
+    - real browser profile contents
+    - company-internal URLs or credentials

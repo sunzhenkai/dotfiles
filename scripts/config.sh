@@ -36,6 +36,7 @@ get_config_def() {
   cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
   kimi-code) echo "kimi-code/config.toml:~/.kimi-code/config.toml" ;;
   agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
+  agent-env) echo "agent-env:~/.local/share/dotfiles-agent-env" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
   *)         return 1 ;;
@@ -67,7 +68,8 @@ get_config_desc() {
   codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
   kimi-code) echo "Kimi Code CLI 配置（首次安装；已有则跳过以免覆盖登录凭证）" ;;
-  agents)    echo "同步共享 agents skills/commands 到各工具（不重装 MCP/settings）" ;;
+  agents)    echo "同步 agents：skills/commands + MCP/profiles（可用 --doctor）" ;;
+  agent-env) echo "[兼容别名] 请改用 agents；等价于 agents --env-only" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
   *)         echo "$1" ;;
@@ -76,7 +78,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "agent-env agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -183,22 +185,35 @@ install_zsh() {
   echo "已安装: ~/.zshrc"
 }
 
-# 同步共享 agents skills/commands（可单独调用，不重装 MCP/settings）
+# 统一 agents sync（skills + MCP/env；可传 --skills-only/--env-only/--profile/--doctor）
 sync_agents() {
-  local tool="${1:-all}"
-  "$DOTFILES_ROOT/scripts/agents/sync.sh" "$tool"
+  "$DOTFILES_ROOT/scripts/agents/sync.sh" "$@"
 }
 
 install_agents() {
-  sync_agents all
+  # 其余参数透传（如 --doctor --profile research）
+  sync_agents all "$@"
 }
 
-# 特殊配置：claude（按需 source）
+# 兼容别名：agent-env → agents --env-only
+sync_agent_env() {
+  echo "提示: 'agent-env' 已合并到 'agents'，请改用: dotf -c agents （或 sync.sh --env-only）" >&2
+  sync_agents --env-only "$@"
+}
+
+install_agent_env() {
+  echo "提示: 'dotf -c agent-env' 已弃用，请改用: dotf -c agents" >&2
+  sync_agents all --env-only "$@"
+  if ! python3 "$DOTFILES_ROOT/scripts/agents/doctor.py" 2>/dev/null; then
+    echo "⚠️  agents doctor 发现问题；可运行: python3 scripts/agents/doctor.py"
+  fi
+}
+
+# 特殊配置：claude（按需 source；内部已统一 sync）
 install_claude() {
   # shellcheck source=install-claude.sh
   source "$DOTFILES_ROOT/scripts/install-claude.sh"
   install_claude
-  sync_agents claude
 }
 
 # 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
@@ -255,39 +270,21 @@ install_tmux() {
   install_tmux_clipboard_deps || true
 }
 
-# 特殊配置：cursor
+# 特殊配置：cursor（MCP + skills 由统一 agents sync）
 install_cursor() {
-  local target="$HOME/.cursor/mcp.json"
-  local template="$DOTFILES_ROOT/cursor/mcp.json"
-
   if [ -z "$ZHIPU_API_KEY" ]; then
     echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
   fi
 
-  # 备份已存在的文件
-  if [ -e "$target" ]; then
-    backup_to "$target"
-  fi
-
-  # 确保目标目录存在
   mkdir -p "$HOME/.cursor"
-
-  if [ -n "$ZHIPU_API_KEY" ]; then
-    sed "s|\${ZHIPU_API_KEY}|$ZHIPU_API_KEY|g" "$template" >"$target"
-    echo "已安装: ~/.cursor/mcp.json (已使用 ZHIPU_API_KEY)"
-  else
-    cp "$template" "$target"
-    echo "已安装: ~/.cursor/mcp.json (请手动设置 ZHIPU_API_KEY)"
-  fi
-
   sync_agents cursor
 }
 
 
 install_opencode() {
   install_config "opencode"
-  # skills/commands 生成进仓库 opencode/，随 symlink 对用户可见
+  # skills + MCP 一并同步；MCP 写入仓库 opencode/opencode.json
   sync_agents opencode
 }
 
@@ -315,6 +312,7 @@ install_all() {
   for name in $(get_all_config_names); do
     case "$name" in
     agents)   ;; # 各工具安装时已 sync；全量末尾再统一跑一次
+    agent-env) ;; # 各工具安装时已 sync MCP；全量末尾再统一跑一次
     zsh)      install_zsh ;;
     claude)   install_claude ;;
     codex)    install_codex ;;
@@ -333,10 +331,10 @@ install_all() {
 # ============================================================
 
 main() {
-  local config="$1"
+  local config="${1:-}"
 
   if [ -z "$config" ]; then
-    echo "用法: $0 <配置名|--all>"
+    echo "用法: $0 <配置名|--all> [agents 选项...]"
     echo ""
     echo "可用配置:"
     for name in $(get_all_config_names); do
@@ -347,6 +345,9 @@ main() {
     echo "  --all, -a       安装所有配置"
     echo "  --list          仅列出配置名"
     echo "  --list-desc     列出配置名及描述"
+    echo ""
+    echo "agents 附加选项（仅 agents/agent-env）:"
+    echo "  --doctor --profile NAME --skills-only --env-only --dry-run --strict"
     exit 1
   fi
 
@@ -362,7 +363,14 @@ main() {
     done
     ;;
   --all | -a) install_all ;;
-  agents)   install_agents ;;
+  agents)
+    shift
+    install_agents "$@"
+    ;;
+  agent-env)
+    shift
+    install_agent_env "$@"
+    ;;
   zsh)      install_zsh ;;
   claude)   install_claude ;;
   codex)    install_codex ;;

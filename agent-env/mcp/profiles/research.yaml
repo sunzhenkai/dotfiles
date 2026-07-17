@@ -1,0 +1,9 @@
+# research：低风险编码能力 + 网页搜索/阅读（默认推荐）
+id: research
+description: "coding 工具检查 + 智谱 web-search / web-reader / zread"
+risk: low
+mcp_servers:
+  - web-search-prime
+  - web-reader
+  - zread
+modules: [mcp, tools, env, security, agents]

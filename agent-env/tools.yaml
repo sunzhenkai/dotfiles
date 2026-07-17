@@ -1,0 +1,66 @@
+# Agent 常用 CLI / runtime 依赖清单
+version: 1
+
+tools:
+  git:
+    command: git
+    version_cmd: ["git", "--version"]
+    required: true
+    profiles: [coding, research, browser, full]
+    install_hint: "安装 git（apt install git / brew install git）"
+
+  gh:
+    command: gh
+    version_cmd: ["gh", "--version"]
+    required: false
+    profiles: [coding, research, browser, full]
+    install_hint: "安装 GitHub CLI：https://cli.github.com/"
+
+  node:
+    command: node
+    version_cmd: ["node", "--version"]
+    required: false
+    profiles: [coding, research, browser, full]
+    install_hint: "安装 Node.js 18+（mise / nvm / 包管理器）"
+
+  python3:
+    command: python3
+    version_cmd: ["python3", "--version"]
+    required: true
+    profiles: [coding, research, browser, full]
+    install_hint: "安装 Python 3.10+（apt install python3 / brew install python）"
+
+  go:
+    command: go
+    version_cmd: ["go", "version"]
+    required: false
+    profiles: [coding, full]
+    install_hint: "安装 Go（mise install go / 官方安装包）"
+
+  docker:
+    command: docker
+    version_cmd: ["docker", "--version"]
+    required: false
+    profiles: [coding, full]
+    install_hint: "安装 Docker Desktop 或 docker engine"
+
+  openspec:
+    command: openspec
+    version_cmd: ["openspec", "--version"]
+    required: false
+    profiles: [coding, research, browser, full]
+    install_hint: "安装 OpenSpec CLI（见项目文档）"
+
+  grepom:
+    command: grepom
+    version_cmd: ["grepom", "--version"]
+    required: false
+    profiles: [coding, full]
+    install_hint: "安装 grepom（go install 或见仓库 README）"
+
+  npx:
+    command: npx
+    version_cmd: ["npx", "--version"]
+    required: false
+    profiles: [browser, full]
+    install_hint: "随 Node.js 提供；browser profile 需要 npx 启动 Playwright MCP"

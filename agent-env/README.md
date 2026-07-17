@@ -1,0 +1,109 @@
+# agent-env
+
+Agent **运行环境**真相源（MCP、依赖、env schema、browser、安全策略）。
+
+## 统一入口（请用这个）
+
+对外模块名已合并为 `agents`：
+
+```shell
+dotf -c agents
+dotf -c agents --doctor
+scripts/agents/sync.sh all
+python3 scripts/agents/doctor.py
+```
+
+`dotf -c agent-env` / `scripts/agent-env/sync.sh` 仅为兼容别名。
+
+## 与 `agents/` 的边界
+
+| 目录 | 职责 |
+|------|------|
+| `agents/` | skills / commands（提示词与工作流） |
+| `agent-env/` | MCP、CLI/runtime、env 检查、browser、安全边界（被统一 CLI 读取） |
+
+不要把 skill/command 写进本目录；也不要把 API Key、cookie、浏览器 profile 提交到仓库。
+
+## 布局
+
+```text
+agent-env/
+  README.md
+  manifest.yaml           # 工具范围、默认 profile、模块启用
+  env.schema.yaml         # 变量名 / 用途 / 敏感等级（无真实密钥）
+  tools.yaml              # CLI/runtime 检查与安装提示
+  security.yaml           # 风险等级与敏感扫描规则
+  browser.yaml            # Playwright 默认 + Chrome DevTools 可选
+  local.yaml.example      # 本机覆盖示例
+  local.yaml              # gitignored 本机覆盖
+  mcp/
+    servers.yaml          # MCP server 真相源
+    profiles/             # coding | research | browser | full
+```
+
+## Profiles
+
+| Profile | 内容 | 风险 |
+|---------|------|------|
+| `coding` | 本地 CLI/runtime 检查 | low |
+| `research`（默认） | coding 检查 + 智谱 web MCP | low |
+| `browser` | research + Playwright 自动化 | high |
+| `full` | 完整能力（含 browser） | high |
+
+浏览器自动化**不会**随默认 `research` 启用。
+
+## 快速使用
+
+```shell
+# 推荐：统一入口
+dotf -c agents
+scripts/agents/sync.sh cursor --profile research
+scripts/agents/sync.sh all --dry-run
+python3 scripts/agents/doctor.py
+python3 scripts/agents/doctor.py --profile browser --verbose
+
+# 兼容（将提示迁移）
+dotf -c agent-env
+scripts/agent-env/sync.sh all --dry-run
+```
+
+## 本机覆盖
+
+```shell
+cp agent-env/local.yaml.example agent-env/local.yaml
+```
+
+可覆盖：默认 profile、禁用/启用 server、headed 模式、浏览器路径、CDP endpoint。  
+`local.yaml` 与 `local/` 已被 gitignore。
+
+## Browser MCP
+
+- 默认 provider：`@playwright/mcp`（`npx -y @playwright/mcp@latest`）
+- 默认 **隔离** user-data-dir：`~/.cache/agent-env/browser/profile`
+- 截图 / trace 建议目录：`~/.cache/agent-env/browser/artifacts`（**不要提交**）
+- Chrome DevTools / 真实主 profile：仅 local override 显式 opt-in，doctor 会标 high risk
+
+启用：
+
+```shell
+scripts/agent-env/sync.sh all --profile browser
+```
+
+## 安全
+
+- 仓库只存变量**名**与占位符（`${ZHIPU_API_KEY}` / `{env:ZHIPU_API_KEY}`）
+- 真实密钥只放环境变量或系统 keychain
+- 本机路径只放 `local.yaml`
+- doctor 会扫描明显 secret / 内网 URL，且**永不打印** secret 值
+
+## 与工具配置的关系
+
+Claude / Cursor / OpenCode 的 MCP 片段由本目录生成或合并：
+
+```shell
+scripts/agent-env/sync.sh claude|cursor|opencode
+```
+
+Codex 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills 仍走 `agents/`）。
+
+仓库内 `claude/.mcp.json`、`cursor/mcp.json`、`opencode/opencode.json` 的 MCP 段视为**生成物**；请改 `agent-env/mcp/` 后重新 sync，不要手写多源漂移。

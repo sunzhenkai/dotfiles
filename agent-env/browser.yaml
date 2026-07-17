@@ -1,0 +1,75 @@
+# 浏览器自动化策略：默认 Playwright，可选 Chrome DevTools
+version: 1
+
+risk: high
+
+default_provider: playwright
+default_mode: headless
+isolate_profile: true
+# 默认隔离目录（用户级缓存，不进仓库）
+isolated_user_data_dir: "~/.cache/agent-env/browser/profile"
+artifact_dir: "~/.cache/agent-env/browser/artifacts"
+
+providers:
+  playwright:
+    risk: high
+    package: "@playwright/mcp"
+    launch:
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+    # headless 时追加 --headless；headed 由 local override 控制
+    headless_arg: "--headless"
+    # 隔离 user data（避免读取主浏览器 profile）
+    user_data_arg: "--user-data-dir"
+    tools: [claude, cursor, opencode]
+    profiles: [browser, full]
+    required_tools: [node, npx]
+    checks:
+      - id: node
+        kind: command
+        command: node
+        hint: "需要 Node.js 18+"
+      - id: npx
+        kind: command
+        command: npx
+        hint: "需要 npx（随 Node.js 安装）"
+      - id: package
+        kind: hint
+        hint: "首次运行会通过 npx 拉取 @playwright/mcp@latest 并下载浏览器二进制"
+      - id: browser_binary
+        kind: hint
+        hint: "若启动失败，可执行 npx playwright install chromium"
+    deep_check:
+      kind: launch_help
+      command: ["npx", "-y", "@playwright/mcp@latest", "--help"]
+
+  chrome-devtools:
+    risk: high
+    enabled_by_default: false
+    opt_in: true
+    tools: [claude, cursor, opencode]
+    profiles: [browser, full]
+    notes: "连接真实 Chrome 调试端口可能暴露登录态与个人浏览数据；仅在 local override 显式启用"
+    checks:
+      - id: cdp_endpoint
+        kind: env_or_local
+        keys: [AGENT_ENV_CDP_ENDPOINT, cdp_endpoint]
+        hint: "在 local.yaml 设置 cdp_endpoint 或 export AGENT_ENV_CDP_ENDPOINT"
+      - id: browser_executable
+        kind: optional_path
+        keys: [AGENT_ENV_BROWSER_EXECUTABLE, browser_executable]
+        hint: "可选：指定 Chrome/Chromium 可执行文件路径"
+
+local_override_keys:
+  - provider          # playwright | chrome-devtools
+  - headed            # true → headed 模式
+  - browser_executable
+  - user_data_dir     # 仅隔离目录；主浏览器 profile 需额外 opt-in
+  - cdp_endpoint
+  - use_real_profile  # true 时 doctor 标 high risk
+
+warnings:
+  - "浏览器自动化为 high risk，默认不随 research/coding profile 启用"
+  - "默认使用隔离 profile，不读取用户主浏览器 cookie/扩展"
+  - "截图、trace、downloads 放到 artifact_dir，不要提交到仓库"
+  - "Chrome DevTools / 真实 profile 需 local override 显式 opt-in"

@@ -1,0 +1,10 @@
+# browser：research + Playwright 浏览器自动化（high risk）
+id: browser
+description: "网页研究 + 隔离浏览器自动化"
+risk: high
+mcp_servers:
+  - web-search-prime
+  - web-reader
+  - zread
+  - playwright
+modules: [mcp, browser, tools, env, security, agents]

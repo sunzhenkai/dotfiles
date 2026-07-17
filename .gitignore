@@ -8,3 +8,11 @@ scripts/assets
 /opencode/package-lock.json
 /codex/config.local.toml
 __pycache__
+
+# agent-env 本机覆盖与浏览器产物（勿提交密钥/路径/状态）
+/agent-env/local.yaml
+/agent-env/local/
+**/browser-profile/
+**/playwright-report/
+**/*screenshot*.png
+**/trace.zip

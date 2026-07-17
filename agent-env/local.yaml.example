@@ -1,0 +1,29 @@
+# 本机覆盖示例（复制为 local.yaml；该文件已被 gitignore）
+#
+# cp agent-env/local.yaml.example agent-env/local.yaml
+
+# 覆盖默认 profile（仓库默认 research）
+# profile: browser
+
+# 禁用某些托管 MCP server
+# disabled_servers:
+#   - zread
+
+# 额外启用（须在 servers.yaml 中已声明）
+# enabled_servers:
+#   - playwright
+
+# 浏览器本机设置（仅放路径/开关，不要放密钥）
+# browser:
+#   provider: playwright          # playwright | chrome-devtools
+#   headed: true                  # 可视化调试
+#   browser_executable: /usr/bin/google-chrome
+#   user_data_dir: ~/.cache/agent-env/browser/profile
+#   # 危险：连接真实浏览器 / 主 profile
+#   # use_real_profile: true
+#   # cdp_endpoint: http://127.0.0.1:9222
+
+# 按工具排除模块（可选）
+# exclude:
+#   opencode:
+#     servers: [playwright]

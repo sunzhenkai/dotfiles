@@ -1,5 +1,5 @@
-#!/bin/bash
-# Claude Code / Desktop：settings、.mcp.json、合并 MCP 到 ~/.claude.json。
+#!/usr/bin/env bash
+# Claude Code / Desktop：settings、.claude.json；MCP/skills 由统一 agents sync。
 # 由 config.sh source，也可直接执行（会自行设置 DOTFILES_ROOT）。
 
 install_claude() {
@@ -59,65 +59,18 @@ install_claude() {
     echo "已安装: .claude.json"
   fi
 
-  local mcp_target="$claude_dir/.mcp.json"
-  local mcp_template="$DOTFILES_ROOT/claude/.mcp.json"
-
-  if [ -e "$mcp_target" ]; then
-    mv "$mcp_target" "$mcp_target-$TIMESTAMP"
-  fi
-
-  if [ -n "$ZHIPU_API_KEY" ]; then
-    sed "s|\${ZHIPU_API_KEY}|$ZHIPU_API_KEY|g" "$mcp_template" >"$mcp_target"
-    echo "已安装: .mcp.json (已使用 ZHIPU_API_KEY)"
+  # skills + MCP：统一入口
+  if [ -x "$DOTFILES_ROOT/scripts/agents/sync.sh" ]; then
+    "$DOTFILES_ROOT/scripts/agents/sync.sh" claude
   else
-    cp "$mcp_template" "$mcp_target"
-    echo "已安装: .mcp.json (请手动设置 ZHIPU_API_KEY)"
-  fi
-
-  local claude_state="$HOME/.claude.json"
-  if [ -L "$claude_state" ] && [ ! -e "$claude_state" ]; then
-    echo "⚠️  警告: ~/.claude.json 是一个损坏的 symlink，请先修复后再运行 MCP 合并"
-  else
-    python3 - "$mcp_target" "$claude_state" <<'PY'
-import json, os, sys, tempfile
-from pathlib import Path
-
-mcp_path = Path(sys.argv[1])
-dest = Path(os.path.expanduser(sys.argv[2]))
-incoming = json.loads(mcp_path.read_text(encoding="utf-8"))["mcpServers"]
-if dest.exists():
-    data = json.loads(dest.read_text(encoding="utf-8"))
-else:
-    data = {}
-data.setdefault("mcpServers", {})
-data["mcpServers"].update(incoming)
-text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-dest.parent.mkdir(parents=True, exist_ok=True)
-fd, tmp = tempfile.mkstemp(
-    dir=str(dest.parent), prefix=".claude.json.", suffix=".tmp", text=True
-)
-try:
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(text)
-    os.replace(tmp, dest)
-except Exception:
-    try:
-        os.unlink(tmp)
-    except OSError:
-        pass
-    raise
-PY
-    echo "已合并 MCP 服务器到 ~/.claude.json"
+    echo "⚠️  跳过 agents sync：找不到 scripts/agents/sync.sh"
   fi
 
   if [ -n "${SUDO_USER:-}" ] && [ "$(id -u)" -eq 0 ]; then
+    local claude_state="$HOME/.claude.json"
     chown -R "$SUDO_USER:" "$claude_dir" 2>/dev/null || true
     chown "$SUDO_USER:" "$claude_state" 2>/dev/null || true
     echo "已为 \$SUDO_USER 调整 ~/.claude 和 ~/.claude.json 的所有者"
-  fi
-
-  if [ -x "$DOTFILES_ROOT/scripts/agents/sync.sh" ]; then
-    "$DOTFILES_ROOT/scripts/agents/sync.sh" claude
   fi
 }
 

@@ -1,0 +1,47 @@
+# 共享 MCP server 真相源（不内联密钥）
+version: 1
+
+servers:
+  web-search-prime:
+    transport: streamable-http
+    url: https://open.bigmodel.cn/api/mcp/web_search_prime/mcp
+    auth:
+      type: bearer-env
+      env: ZHIPU_API_KEY
+    tools: [claude, cursor, opencode]
+    profiles: [research, browser, full]
+    risk: low
+    required_tools: []
+
+  web-reader:
+    transport: streamable-http
+    url: https://open.bigmodel.cn/api/mcp/web_reader/mcp
+    auth:
+      type: bearer-env
+      env: ZHIPU_API_KEY
+    tools: [claude, cursor, opencode]
+    profiles: [research, browser, full]
+    risk: low
+    required_tools: []
+
+  zread:
+    transport: streamable-http
+    url: https://open.bigmodel.cn/api/mcp/zread/mcp
+    auth:
+      type: bearer-env
+      env: ZHIPU_API_KEY
+    tools: [claude, cursor, opencode]
+    profiles: [research, browser, full]
+    risk: low
+    required_tools: []
+
+  playwright:
+    transport: stdio
+    command: npx
+    args: ["-y", "@playwright/mcp@latest"]
+    tools: [claude, cursor, opencode]
+    profiles: [browser, full]
+    risk: high
+    required_tools: [node, npx]
+    # 默认追加参数由 sync 根据 browser.yaml / local override 生成
+    browser_provider: playwright

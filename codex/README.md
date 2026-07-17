@@ -2,6 +2,19 @@
 
 此配置用于 [OpenAI Codex](https://developers.openai.com/codex) CLI，通过 **MiniMax（MiniMax-M3）** 接入。**无需 OpenAI 账号登录**，只需设置 `MINIMAX_API_KEY` 环境变量即可使用。
 
+## MCP 说明
+
+当前 Codex **无稳定 MCP 配置入口**。统一 `agents` sync 对 Codex MCP 记为 `skip`。
+
+```shell
+dotf -c codex
+dotf -c agents
+scripts/agents/sync.sh codex   # skills 同步；MCP skip
+python3 scripts/agents/doctor.py
+```
+
+详见 `agent-env/README.md`。
+
 ## 为什么不需要登录
 
 Codex 默认走 OpenAI 登录流程（ChatGPT / API Key）。但本配置使用的是**自定义 provider**（MiniMax），其在配置中显式声明 `requires_openai_auth = false`。因此启动 `codex` 时会**直接跳过 ChatGPT 登录选择器**，转而用 `MINIMAX_API_KEY` 向 MiniMax 端点鉴权。

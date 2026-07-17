@@ -1,0 +1,38 @@
+# agent-env 环境清单：支持工具、默认 profile、模块范围
+version: 1
+
+tools:
+  - claude
+  - cursor
+  - opencode
+  - codex
+
+default_profile: research
+
+modules:
+  mcp:
+    enabled: true
+    tools: [claude, cursor, opencode]
+    exclude: [codex]
+  browser:
+    enabled: true
+    tools: [claude, cursor, opencode]
+    exclude: [codex]
+  tools:
+    enabled: true
+    tools: [claude, cursor, opencode, codex]
+  env:
+    enabled: true
+    tools: [claude, cursor, opencode, codex]
+  security:
+    enabled: true
+    tools: [claude, cursor, opencode, codex]
+  agents:
+    enabled: true
+    tools: [claude, cursor, opencode, codex]
+
+# Codex 当前无稳定 MCP 配置入口，显式降级
+unsupported:
+  codex:
+    mcp: skip
+    reason: "Codex 当前无稳定 MCP 配置入口；skills/commands 仍由 agents/ 同步"

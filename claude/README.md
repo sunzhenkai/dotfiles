@@ -4,45 +4,24 @@
 
 ## 安装
 
-1. 在你的 shell 配置文件中设置 `ZHIPU_API_KEY` 环境变量：
-
-   在 `~/.envrc` 中添加：
-   ```bash
-   export ZHIPU_API_KEY="your_actual_api_key_here"
-   ```
-
-   或者在 `~/.zshrc` 中添加相同内容。
-
-2. 重新加载 shell 配置：
-   ```bash
-   source ~/.envrc
-   ```
-
-3. 运行安装脚本：
-   ```bash
-   make claude
-   ```
-
-   或者直接运行：
-   ```bash
-   bash scripts/install-config.sh claude
-   ```
+1. 在 shell 配置中设置 `ZHIPU_API_KEY`（如 `~/.envrc`）。
+2. 运行：`dotf -c claude` 或 `bash scripts/config.sh claude`。
 
 ## 配置文件
 
-- `~/.claude/settings.json` - Claude Desktop 主配置文件
-  - `ANTHROPIC_AUTH_TOKEN` - API 密钥（从 `ZHIPU_API_KEY` 环境变量读取）
-  - `ANTHROPIC_BASE_URL` - API 基础 URL（智谱 AI）
-  - `API_TIMEOUT_MS` - API 超时时间
-  - `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` - 禁用非必要流量
-  - `ANTHROPIC_DEFAULT_HAIKU_MODEL` - 默认 Haiku 模型（glm-5.1）
-  - `ANTHROPIC_DEFAULT_SONNET_MODEL` - 默认 Sonnet 模型（glm-5.1）
-  - `ANTHROPIC_DEFAULT_OPUS_MODEL` - 默认 Opus 模型（glm-5.1）
+- `~/.claude/settings.json` — 主配置（安装时可用 `ZHIPU_API_KEY` 填充）
+- `~/.claude.json` — 应用状态；MCP 也会合并到此
+- `~/.claude/.mcp.json` — MCP（由 **agent-env** 生成）
 
-- `~/.claude.json` - Claude Desktop 应用配置
-  - `hasCompletedOnboarding` - 跳过初始设置向导
+## MCP 来源
 
-## 注意事项
+仓库内 `claude/.mcp.json` 是 **agent-env 生成物 / 薄模板**，请勿手写多源漂移。
 
-- 如果 `ZHIPU_API_KEY` 环境变量未设置，安装脚本会显示警告，但仍然会安装配置文件。你需要手动编辑 `~/.claude/settings.json` 中的 `ANTHROPIC_AUTH_TOKEN` 字段。
-- 每次修改环境变量后，需要重新运行安装脚本来更新配置文件。
+真相源：`agent-env/mcp/servers.yaml` + profiles。
+
+```shell
+dotf -c agents
+scripts/agents/sync.sh claude
+```
+
+占位符保持 `${ZHIPU_API_KEY}`。skills/commands 仍由 `agents/` 同步。

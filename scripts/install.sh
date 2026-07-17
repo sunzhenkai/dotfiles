@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git delta fonts npm cursor qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
+MODULES=(homebrew system sdk golang senv grepom mdserve git delta fonts npm agents cursor qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
 
 # 模块描述（兼容 bash 3.2，不使用关联数组）
 get_module_desc() {
@@ -20,6 +20,7 @@ get_module_desc() {
   delta) echo "安装并配置 git-delta（git diff 高亮分页器）" ;;
   fonts) echo "安装字体（Maple Mono NF CN）" ;;
   npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
+  agents) echo "安装 agents CLI 工具包（cursor/codex/kimi-code；不写 MCP/skills）" ;;
   cursor) echo "安装 Cursor Agent CLI（cursor-agent）" ;;
   qoder) echo "安装 Qoder CLI" ;;
   trae-cli) echo "安装 Trae CLI" ;;
@@ -52,6 +53,7 @@ load_modules() {
   source "$SCRIPT_DIR/scripts/tools/fonts.sh"
   source "$SCRIPT_DIR/scripts/tools/system.sh"
   source "$SCRIPT_DIR/scripts/tools/npm.sh"
+  source "$SCRIPT_DIR/scripts/tools/agents.sh"
   source "$SCRIPT_DIR/scripts/tools/cursor.sh"
   source "$SCRIPT_DIR/scripts/tools/qoder.sh"
   source "$SCRIPT_DIR/scripts/tools/trae-cli.sh"
@@ -97,6 +99,7 @@ run_module() {
     ;;
   fonts) setup_fonts ;;
   npm) install_npm_packages ;;
+  agents) install_agents_bundle ;;
   cursor) install_cursor_cli ;;
   qoder) install_qoder ;;
   trae-cli) install_trae_cli ;;

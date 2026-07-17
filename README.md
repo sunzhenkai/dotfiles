@@ -49,17 +49,23 @@ Examples:
   - Tmux / Zellij
   - Neovim
 
-## Agent skills / commands
+## Agents（统一入口）
 
-跨 Claude / Cursor / OpenCode / Codex 的 skills 与 commands 维护在 `agents/`，配置时适配安装：
+skills/commands、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
 
 ```shell
-dotf -c agents              # 仅同步 skills/commands
-dotf -c claude cursor       # 配置工具时也会自动 sync
-scripts/agents/sync.sh all  # 直接同步
+dotf -i agents                 # 安装 agent CLI 工具包（cursor/codex/kimi-code）
+dotf -c agents                 # 同步 skills + MCP
+dotf -c agents --doctor        # 同步后输出诊断摘要
+python3 scripts/agents/doctor.py
+python3 scripts/agents/doctor.py --json --verbose
+scripts/agents/sync.sh all --dry-run
 ```
 
-详见 `agents/README.md`。
+- 源码：`agents/`（skills/commands）+ `agent-env/`（MCP/env 真相源，由统一 CLI 调用）
+- 兼容：`dotf -c agent-env` 仍可用，但会提示迁移到 `agents`
+
+详见 `agents/README.md`、`agent-env/README.md`。
 
 ## ColorScheme
 

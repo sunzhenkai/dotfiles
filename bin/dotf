@@ -145,6 +145,12 @@ show_help() {
   echo "  -a, --all               全部（遍历该模式所有模块，每项仍需确认）"
   echo "  -h, --help              显示帮助"
   echo ""
+  echo "agents 示例:"
+  echo "  dotf -i agents          # 安装 agent CLI 工具包"
+  echo "  dotf -c agents          # 同步 skills + MCP"
+  echo "  dotf -c agents --doctor # 同步后输出 doctor 摘要"
+  echo "  python3 scripts/agents/doctor.py"
+  echo ""
   echo "示例:"
   echo "  dotf init               # 完整初始化（安装 + 配置）"
   echo "  dotf pull               # 拉取更新"
@@ -189,6 +195,32 @@ main() {
       ;;
     -c | --config)
       mode="config"
+      ;;
+    --doctor | --skills-only | --env-only | --dry-run | --strict | --verbose | --json | --deep)
+      if [ "$mode" = "config" ]; then
+        config_args+=("$1")
+      elif [ "$mode" = "install" ]; then
+        install_args+=("$1")
+      else
+        echo "错误: 选项 '$1' 需要先指定 -c 或 -i"
+        exit 1
+      fi
+      ;;
+    --profile)
+      if [ "$mode" != "config" ] && [ "$mode" != "install" ]; then
+        echo "错误: --profile 需要先指定 -c 或 -i"
+        exit 1
+      fi
+      shift
+      if [ -z "${1:-}" ]; then
+        echo "错误: --profile 需要参数"
+        exit 1
+      fi
+      if [ "$mode" = "config" ]; then
+        config_args+=("--profile" "$1")
+      else
+        install_args+=("--profile" "$1")
+      fi
       ;;
     -a | --all)
       if [ "$mode" = "install" ]; then
@@ -241,7 +273,15 @@ main() {
     if [ ${#config_args[@]} -eq 0 ]; then
       exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh"
     fi
+    # agents / agent-env：整组参数一次交给 config.sh（支持 --doctor 等）
+    if [[ "${config_args[0]}" == "agents" || "${config_args[0]}" == "agent-env" ]]; then
+      exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "${config_args[@]}"
+    fi
     for mod in "${config_args[@]}"; do
+      if [[ "$mod" == --* ]]; then
+        echo "错误: 选项 '$mod' 仅支持与 agents/agent-env 一起使用（如: dotf -c agents --doctor）"
+        exit 1
+      fi
       "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$mod"
     done
     exit $?
