@@ -30,3 +30,9 @@ if [[ -e "$_tiup_path" ]]; then
   export PATH="${_tiup_path}:${PATH}"
 fi
 
+# kimi-code
+local _kimi_code_path="${HOME}/.kimi-code/bin"
+if [[ -d "$_kimi_code_path" ]]; then
+  export PATH="${_kimi_code_path}:${PATH}"
+fi
+
