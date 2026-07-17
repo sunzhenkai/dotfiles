@@ -2,8 +2,8 @@
 # agents 安装包：编排 agent 相关 CLI（不写 MCP/skills）
 # 由 install.sh source。
 
-# Bundle 成员（可在此扩展）
-AGENTS_BUNDLE_MODULES=(cursor codex kimi-code)
+# Bundle 成员（与 agents sync TOOLS 对齐；可在此扩展）
+AGENTS_BUNDLE_MODULES=(claude cursor opencode codex kimi-code)
 
 install_agents_bundle() {
   echo "========================================"
@@ -20,6 +20,25 @@ install_agents_bundle() {
     local detail=""
 
     case "$mod" in
+    claude)
+      if command -v claude &>/dev/null; then
+        status="skip"
+        detail="已安装: $(command -v claude)"
+      else
+        if install_claude_cli; then
+          if command -v claude &>/dev/null; then
+            status="ok"
+            detail="新装完成"
+          else
+            status="skip"
+            detail="用户跳过或未在 PATH"
+          fi
+        else
+          status="fail"
+          detail="安装失败"
+        fi
+      fi
+      ;;
     cursor)
       if command -v cursor-agent &>/dev/null; then
         status="skip"
@@ -41,6 +60,25 @@ install_agents_bundle() {
             status="skip"
             detail="用户跳过或未安装"
           fi
+        fi
+      fi
+      ;;
+    opencode)
+      if command -v opencode &>/dev/null; then
+        status="skip"
+        detail="已安装: $(command -v opencode)"
+      else
+        if install_opencode; then
+          if command -v opencode &>/dev/null; then
+            status="ok"
+            detail="新装完成"
+          else
+            status="skip"
+            detail="用户跳过或未在 PATH"
+          fi
+        else
+          status="fail"
+          detail="安装失败"
         fi
       fi
       ;;

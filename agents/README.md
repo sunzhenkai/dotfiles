@@ -5,7 +5,9 @@
 ## 统一入口（推荐）
 
 ```shell
-dotf -i agents                 # 安装 CLI 工具包
+dotf -i agents                 # 安装 CLI 工具包（claude/cursor/opencode/codex/kimi-code）
+dotf -i opencode               # 单独安装 OpenCode（亦可）
+dotf -i claude                 # 单独安装 Claude Code CLI（亦可）
 dotf -c agents                 # 同步 skills + MCP
 dotf -c agents --doctor        # 同步 + 诊断摘要
 scripts/agents/sync.sh all

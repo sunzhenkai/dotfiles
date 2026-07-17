@@ -54,7 +54,7 @@ Examples:
 skills/commands、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
 
 ```shell
-dotf -i agents                 # 安装 agent CLI 工具包（cursor/codex/kimi-code）
+dotf -i agents                 # 安装 agent CLI 工具包（claude/cursor/opencode/codex/kimi-code）
 dotf -c agents                 # 同步 skills + MCP
 dotf -c agents --doctor        # 同步后输出诊断摘要
 python3 scripts/agents/doctor.py

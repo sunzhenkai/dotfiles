@@ -22,7 +22,7 @@ The agents install bundle SHALL declare which install modules it includes, and S
 
 #### Scenario: Bundle manifest is read
 - **WHEN** the install bundle definition is inspected
-- **THEN** it SHALL list included modules such as Cursor Agent CLI and Codex CLI
+- **THEN** it SHALL list included modules: Claude Code CLI, Cursor Agent CLI, OpenCode CLI, Codex CLI, and Kimi Code CLI
 - **THEN** modules outside the list SHALL NOT be installed by `dotf -i agents`
 
 #### Scenario: Optional module is unavailable
