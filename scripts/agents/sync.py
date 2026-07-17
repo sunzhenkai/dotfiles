@@ -34,6 +34,10 @@ def timestamp() -> str:
     return str(int(time.time()))
 
 
+def _is_indented(line: str) -> bool:
+    return bool(line) and (line[0] == " " or line[0] == "\t")
+
+
 def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
     m = FM_RE.match(text)
     if not m:
@@ -48,7 +52,7 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
     while i < len(lines):
         line = lines[i]
         if in_meta:
-            if line.startswith(" ") or line.startswith("\t"):
+            if _is_indented(line):
                 meta_lines.append(line)
                 i += 1
                 continue
@@ -60,7 +64,18 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
             continue
         if ":" in line:
             key, _, val = line.partition(":")
-            meta[key.strip()] = val.strip()
+            key = key.strip()
+            val = val.strip()
+            # YAML folded/literal block scalars: description: > / |
+            if val in (">", ">-", "|", "|-"):
+                block: List[str] = []
+                i += 1
+                while i < len(lines) and _is_indented(lines[i]):
+                    block.append(lines[i].strip())
+                    i += 1
+                meta[key] = " ".join(block).strip() if val.startswith(">") else "\n".join(block).strip()
+                continue
+            meta[key] = val
         i += 1
     if meta_lines:
         meta["_metadata_block"] = "\n".join(meta_lines)
@@ -78,6 +93,16 @@ def unquote(s: str) -> str:
         return s[1:-1]
     return s
 
+
+def yaml_quote(s: str) -> str:
+    """Emit a single-line YAML string safe for frontmatter values."""
+    s = unquote(s).replace("\n", " ").strip()
+    if not s:
+        return '""'
+    if any(c in s for c in ':#"\'\\\n') or s.startswith(">") or s.startswith("|") or s[:1] in "|&*!>@`":
+        escaped = s.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    return s
 
 def resolve_slash(tool: str, cmd_id: str) -> str:
     if tool == "claude" and cmd_id.startswith("opsx-"):
@@ -116,23 +141,23 @@ def command_excluded(cmd_file: Path, tool: str) -> bool:
 
 def render_skill_frontmatter(tool: str, meta: Dict[str, str], skill_id: str) -> str:
     name = unquote(fm_get(meta, "name", skill_id))
-    desc = fm_get(meta, "description")
+    desc = unquote(fm_get(meta, "description"))
+    if not desc:
+        raise ValueError(f"skill {skill_id}: description is required (got empty after parse)")
     license_ = fm_get(meta, "license")
     compat = fm_get(meta, "compatibility")
     lines = [
-        f"name: {name}",
-        f"description: {desc}",
+        f"name: {yaml_quote(name)}",
+        f"description: {yaml_quote(desc)}",
     ]
     if license_:
-        lines.append(f"license: {license_}")
+        lines.append(f"license: {yaml_quote(license_)}")
     if compat:
-        lines.append(f"compatibility: {compat}")
+        lines.append(f"compatibility: {yaml_quote(compat)}")
     if meta.get("_metadata_block"):
         lines.append("metadata:")
         lines.append(meta["_metadata_block"])
-    # Codex prefers short-description in metadata sometimes; keep shared metadata as-is
     return "---\n" + "\n".join(lines) + "\n---\n"
-
 
 def render_command_frontmatter(tool: str, meta: Dict[str, str], cmd_id: str) -> str:
     title = unquote(fm_get(meta, "title", cmd_id))

@@ -1,6 +1,6 @@
 ---
 name: commit-push
-description: >
+description: 分析当前 git 变更、起草提交说明、创建 commit 并 push 到远程。在用户要求提交、commit、push、提交并推送时使用。针对大改动做耗时优化，避免通读巨型 diff。
 ---
 
 # Commit & Push
