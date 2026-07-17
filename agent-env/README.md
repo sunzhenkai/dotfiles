@@ -91,10 +91,11 @@ scripts/agent-env/sync.sh all --profile browser
 
 ## 安全
 
-- 仓库只存变量**名**与占位符（`${ZHIPU_API_KEY}` / `{env:ZHIPU_API_KEY}`）
+- 仓库只存变量**名**与占位符（Cursor/Claude: `${ZHIPU_API_KEY}`；OpenCode: `{env:ZHIPU_API_KEY}`；Kimi: `bearerTokenEnvVar`）
 - 真实密钥只放环境变量或系统 keychain
 - 本机路径只放 `local.yaml`
 - doctor 会扫描明显 secret / 内网 URL，且**永不打印** secret 值
+- Kimi Code **不会**展开 `headers` 里的 `${ENV}`；若写成字面量会收到智谱 `{"code":401,...}`（非 JSON-RPC），表现为 MCP initialize 校验失败
 
 ## 与工具配置的关系
 

@@ -33,6 +33,8 @@ dotf -c kimi-code
 
 并同步 skills 到 `~/.kimi-code/skills/`、MCP 到 `~/.kimi-code/mcp.json`（commands 当前 skip）。
 
+MCP HTTP 鉴权使用 `bearerTokenEnvVar`（如 `ZHIPU_API_KEY`），**不要**在 headers 里写 `${ZHIPU_API_KEY}`——Kimi 不会展开该占位符。
+
 如需强制用仓库版本覆盖 config，先自行备份后删除 `~/.kimi-code/config.toml`，再执行 `dotf -c kimi-code`。
 
 ## 首次使用

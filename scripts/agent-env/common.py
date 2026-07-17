@@ -300,7 +300,7 @@ class Catalog:
 
 
 def auth_header(env_name: str, style: str) -> str:
-    if style in ("cursor", "claude", "kimi-code"):
+    if style in ("cursor", "claude"):
         return f"Bearer ${{{env_name}}}"
     if style == "opencode":
         return f"Bearer {{env:{env_name}}}"
@@ -312,9 +312,25 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
     auth = srv.get("auth") or {}
     env_name = auth.get("env")
 
-    if tool in ("cursor", "claude", "kimi-code"):
+    if tool == "kimi-code":
+        # Kimi 不展开 headers 里的 ${ENV}；HTTP/SSE 用 bearerTokenEnvVar
+        # 见 https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html
         if transport == "stdio":
             entry: Dict[str, Any] = {
+                "command": srv["command"],
+                "args": list(srv.get("args") or []),
+            }
+            if srv.get("env"):
+                entry["env"] = srv["env"]
+            return entry
+        entry = {"url": srv["url"]}
+        if env_name:
+            entry["bearerTokenEnvVar"] = env_name
+        return entry
+
+    if tool in ("cursor", "claude"):
+        if transport == "stdio":
+            entry = {
                 "command": srv["command"],
                 "args": list(srv.get("args") or []),
             }
