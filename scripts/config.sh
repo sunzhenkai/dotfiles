@@ -34,6 +34,7 @@ get_config_def() {
   claude)    echo "claude:~/.config/claude" ;;
   codex)     echo "codex/config.toml:~/.codex/config.toml" ;;
   cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
+  kimi-code) echo "kimi-code/config.toml:~/.kimi-code/config.toml" ;;
   agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
   logseq)    echo "logseq:~/.logseq" ;;
   iterm2)    echo "iterm2:~/.config/iterm2" ;;
@@ -65,6 +66,7 @@ get_config_desc() {
   claude)    echo "Claude Code 配置" ;;
   codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
   cursor)    echo "Cursor 编辑器 MCP 配置" ;;
+  kimi-code) echo "Kimi Code CLI 配置（首次安装；已有则跳过以免覆盖登录凭证）" ;;
   agents)    echo "同步共享 agents skills/commands 到各工具（不重装 MCP/settings）" ;;
   logseq)    echo "Logseq 笔记配置" ;;
   iterm2)    echo "iTerm2 终端模拟器配置" ;;
@@ -74,7 +76,7 @@ get_config_desc() {
 
 # 获取所有配置名（排序后，空格分隔）
 get_all_config_names() {
-  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
 }
 
 # ============================================================
@@ -289,6 +291,26 @@ install_opencode() {
   sync_agents opencode
 }
 
+# 特殊配置：kimi-code
+# ~/.kimi-code/config.toml 用复制而非软链：/login 会写入 oauth/凭证相关字段，
+# 软链会穿透污染仓库；已存在的配置也不覆盖，避免抹掉登录状态。
+install_kimi_code_config() {
+  local source="$DOTFILES_ROOT/kimi-code/config.toml"
+  local target="$HOME/.kimi-code/config.toml"
+
+  mkdir -p "$HOME/.kimi-code"
+
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    echo "已存在: ~/.kimi-code/config.toml（跳过覆盖，避免丢失 /login 凭证）"
+    echo "如需重置，请先备份并删除该文件后重新运行: dotf -c kimi-code"
+    return 0
+  fi
+
+  cp "$source" "$target"
+  echo "已安装: ~/.kimi-code/config.toml"
+  echo "提示: 启动 kimi 后执行 /login 完成鉴权"
+}
+
 install_all() {
   for name in $(get_all_config_names); do
     case "$name" in
@@ -298,6 +320,7 @@ install_all() {
     codex)    install_codex ;;
     cursor)   install_cursor ;;
     opencode) install_opencode ;;
+    kimi-code) install_kimi_code_config ;;
     tmux)     install_tmux ;;
     *)        install_config "$name" ;;
     esac
@@ -345,6 +368,7 @@ main() {
   codex)    install_codex ;;
   cursor)   install_cursor ;;
   opencode) install_opencode ;;
+  kimi-code) install_kimi_code_config ;;
   tmux)     install_tmux ;;
   *)        install_config "$config" ;;
   esac
