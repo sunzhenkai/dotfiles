@@ -243,10 +243,14 @@ install_codex() {
   sync_agents codex
 }
 
-# 特殊配置：tmux（依赖 submodule tpm）
+# 特殊配置：tmux（依赖 submodule tpm；补装 tmux-yank 剪贴板工具）
 install_tmux() {
   git -C "$DOTFILES_ROOT" submodule update --init tmux/3rd/tpm
   install_config "tmux"
+
+  # shellcheck source=/dev/null
+  source "$DOTFILES_ROOT/scripts/tools/common.sh"
+  install_tmux_clipboard_deps || true
 }
 
 # 特殊配置：cursor

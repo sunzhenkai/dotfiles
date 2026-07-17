@@ -152,6 +152,9 @@ init_debian() {
   # MySQL/MariaDB 客户端
   sudo apt-get install -y libmariadb-dev mariadb-client libmysqlclient-dev
 
+  # tmux-yank 剪贴板（X11: xclip/xsel；Wayland: wl-clipboard）
+  sudo apt-get install -y xclip xsel wl-clipboard
+
   # 设置 pkg-config 路径（解决 Homebrew/Linuxbrew 覆盖路径的问题）
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
 
@@ -187,6 +190,9 @@ init_arch() {
 
   # MySQL/MariaDB 客户端
   sudo pacman -Sy --noconfirm mariadb-libs mariadb-clients python-pymysql
+
+  # tmux-yank 剪贴板（X11: xclip/xsel；Wayland: wl-clipboard）
+  sudo pacman -Sy --noconfirm xclip xsel wl-clipboard
 
   # 设置 pkg-config 路径
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib/pkgconfig"
@@ -224,6 +230,9 @@ init_fedora() {
   # MySQL/MariaDB 客户端
   sudo dnf install -y mariadb-devel mariadb
 
+  # tmux-yank 剪贴板（X11: xclip/xsel；Wayland: wl-clipboard）
+  sudo dnf install -y xclip xsel wl-clipboard
+
   # 设置 pkg-config 路径
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
 
@@ -259,6 +268,10 @@ init_rhel() {
 
   # MySQL/MariaDB 客户端
   sudo yum install -y mariadb-devel mariadb
+
+  # tmux-yank 剪贴板（尽量装齐；部分发行版可能没有 wl-clipboard）
+  sudo yum install -y xclip xsel || sudo yum install -y xclip
+  sudo yum install -y wl-clipboard 2>/dev/null || true
 
   # 设置 pkg-config 路径
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"

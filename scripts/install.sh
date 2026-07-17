@@ -20,7 +20,7 @@ get_module_desc() {
   delta) echo "安装并配置 git-delta（git diff 高亮分页器）" ;;
   fonts) echo "安装字体（Maple Mono NF CN）" ;;
   npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
-  cursor) echo "安装 Cursor CLI" ;;
+  cursor) echo "安装 Cursor Agent CLI（cursor-agent）" ;;
   qoder) echo "安装 Qoder CLI" ;;
   trae-cli) echo "安装 Trae CLI" ;;
   codebuddy-code) echo "安装 CodeBuddy Code CLI" ;;

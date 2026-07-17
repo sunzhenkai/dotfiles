@@ -83,6 +83,10 @@ init_homebrew() {
   brew install anomalyco/tap/opencode
   brew install codex
   brew install k9s
+  # Linux：tmux-yank 需要系统剪贴板工具（macOS 用自带 pbcopy）
+  if [[ "$_os_id" != "darwin" ]]; then
+    brew install xclip
+  fi
   # ghostty 仅在 macOS 上可用
   if [[ "$_os_id" == "darwin" ]]; then
     brew install --cask ghostty
