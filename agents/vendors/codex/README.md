@@ -39,8 +39,8 @@ Codex 首次信任一个项目时，会自动把 `[projects."<path>"]` 追加进
 
 | 文件 | 是否入库 | 作用 |
 | --- | --- | --- |
-| `codex/config.toml` | ✅ 入库 | 稳定共享配置（model/provider/policy/tui 等），**不含 projects** |
-| `codex/config.local.toml` | ❌ gitignore | 本机 projects 及任意本地覆盖 |
+| `agents/vendors/codex/config.toml` | ✅ 入库 | 稳定共享配置（model/provider/policy/tui 等），**不含 projects** |
+| `agents/vendors/codex/config.local.toml` | ❌ gitignore | 本机 projects 及任意本地覆盖 |
 | `~/.codex/config.toml` | — | 安装时由上面两者**合并生成**（普通文件，非软链） |
 
 `dotf codex` 每次都用 `config.toml`（base）+ `config.local.toml`（local）**重新覆盖生成** `~/.codex/config.toml`。因此：
@@ -54,14 +54,14 @@ Codex 首次信任一个项目时，会自动把 `[projects."<path>"]` 追加进
 ### 新机初始化
 
 ```bash
-cp codex/config.local.toml.example codex/config.local.toml
+cp agents/vendors/codex/config.local.toml.example agents/vendors/codex/config.local.toml
 # 按需编辑其中的项目路径
 dotf codex
 ```
 
 ### 新增 / 删除已信任的项目
 
-直接编辑 `codex/config.local.toml`，增删对应的 `[projects."<path>"]` 块，然后：
+直接编辑 `agents/vendors/codex/config.local.toml`，增删对应的 `[projects."<path>"]` 块，然后：
 
 ```bash
 dotf codex

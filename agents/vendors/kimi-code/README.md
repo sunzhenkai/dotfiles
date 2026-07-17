@@ -26,12 +26,14 @@ kimi --version
 dotf -c kimi-code
 ```
 
-会把仓库内 `kimi-code/config.toml` 安装到 `~/.kimi-code/config.toml`：
+会把仓库内 `agents/vendors/kimi-code/config.toml` 安装到 `~/.kimi-code/config.toml`：
 
 - 目标不存在 → 直接写入
 - 目标已存在 → **跳过覆盖**（避免抹掉 `/login` 写入的凭证）
 
-如需强制用仓库版本覆盖，先自行备份后删除 `~/.kimi-code/config.toml`，再执行 `dotf -c kimi-code`。
+并同步 skills 到 `~/.kimi-code/skills/`、MCP 到 `~/.kimi-code/mcp.json`（commands 当前 skip）。
+
+如需强制用仓库版本覆盖 config，先自行备份后删除 `~/.kimi-code/config.toml`，再执行 `dotf -c kimi-code`。
 
 ## 首次使用
 

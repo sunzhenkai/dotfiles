@@ -30,11 +30,11 @@ get_config_def() {
   zed)       echo "zed:~/.config/zed" ;;
   fcitx5)    echo "fcitx5:~/.config/fcitx5" ;;
   git)       echo "git:~/.config/git" ;;
-  opencode)  echo "opencode:~/.config/opencode" ;;
-  claude)    echo "claude:~/.config/claude" ;;
-  codex)     echo "codex/config.toml:~/.codex/config.toml" ;;
-  cursor)    echo "cursor/mcp.json:~/.cursor/mcp.json" ;;
-  kimi-code) echo "kimi-code/config.toml:~/.kimi-code/config.toml" ;;
+  opencode)  echo "agents/vendors/opencode:~/.config/opencode" ;;
+  claude)    echo "agents/vendors/claude:~/.config/claude" ;;
+  codex)     echo "agents/vendors/codex/config.toml:~/.codex/config.toml" ;;
+  cursor)    echo "agents/vendors/cursor/mcp.json:~/.cursor/mcp.json" ;;
+  kimi-code) echo "agents/vendors/kimi-code/config.toml:~/.kimi-code/config.toml" ;;
   agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
   agent-env) echo "agent-env:~/.local/share/dotfiles-agent-env" ;;
   logseq)    echo "logseq:~/.logseq" ;;
@@ -220,7 +220,7 @@ install_claude() {
 #
 # ~/.codex/config.toml 不再使用软链，而是由「仓库 base + 本地 local」合并生成
 # 的真实文件。原因：codex 会把 [projects."<path>"] 自动写进该文件，软链会穿透
-# 污染仓库。projects 维护在 codex/config.local.toml（gitignore），安装时合并。
+# 污染仓库。projects 维护在 agents/vendors/codex/config.local.toml（gitignore），安装时合并。
 #
 # 注意：每次安装都用 base + local 重新覆盖 ~/.codex/config.toml。codex 新增的
 #       信任不会自动回抽——需手动把对应 [projects."<path>"] 块加入 local 后重跑。
@@ -233,8 +233,8 @@ install_codex() {
 
   mkdir -p "$HOME/.codex"
 
-  local base="$DOTFILES_ROOT/codex/config.toml"
-  local local_cfg="$DOTFILES_ROOT/codex/config.local.toml"
+  local base="$DOTFILES_ROOT/agents/vendors/codex/config.toml"
+  local local_cfg="$DOTFILES_ROOT/agents/vendors/codex/config.local.toml"
   local target="$HOME/.codex/config.toml"
 
   # 旧机制遗留：target 若是软链则移除，改用合并生成
@@ -246,7 +246,7 @@ install_codex() {
     if [ -f "$local_cfg" ]; then
       echo ""
       echo "# ============================================================"
-      echo "# ↓↓↓ 以下来自 codex/config.local.toml（机器特定，不纳入 git） ↓↓↓"
+      echo "# ↓↓↓ 以下来自 agents/vendors/codex/config.local.toml（机器特定，不纳入 git） ↓↓↓"
       cat "$local_cfg"
     fi
   } > "$target"
@@ -254,7 +254,7 @@ install_codex() {
 
   # 模型能力目录（model catalog，只读，仍用软链）
   mkdir -p "$HOME/.codex/model-catalogs"
-  link_file "codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
+  link_file "agents/vendors/codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
   echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"
 
   sync_agents codex
@@ -284,7 +284,7 @@ install_cursor() {
 
 install_opencode() {
   install_config "opencode"
-  # skills + MCP 一并同步；MCP 写入仓库 opencode/opencode.json
+  # skills + MCP 一并同步；MCP 写入 agents/vendors/opencode/opencode.json
   sync_agents opencode
 }
 
@@ -292,7 +292,7 @@ install_opencode() {
 # ~/.kimi-code/config.toml 用复制而非软链：/login 会写入 oauth/凭证相关字段，
 # 软链会穿透污染仓库；已存在的配置也不覆盖，避免抹掉登录状态。
 install_kimi_code_config() {
-  local source="$DOTFILES_ROOT/kimi-code/config.toml"
+  local source="$DOTFILES_ROOT/agents/vendors/kimi-code/config.toml"
   local target="$HOME/.kimi-code/config.toml"
 
   mkdir -p "$HOME/.kimi-code"
@@ -300,12 +300,14 @@ install_kimi_code_config() {
   if [ -e "$target" ] || [ -L "$target" ]; then
     echo "已存在: ~/.kimi-code/config.toml（跳过覆盖，避免丢失 /login 凭证）"
     echo "如需重置，请先备份并删除该文件后重新运行: dotf -c kimi-code"
-    return 0
+  else
+    cp "$source" "$target"
+    echo "已安装: ~/.kimi-code/config.toml"
+    echo "提示: 启动 kimi 后执行 /login 完成鉴权"
   fi
 
-  cp "$source" "$target"
-  echo "已安装: ~/.kimi-code/config.toml"
-  echo "提示: 启动 kimi 后执行 /login 完成鉴权"
+  # skills + MCP 走统一 agents sync（commands 对 kimi 为 skip）
+  sync_agents kimi-code
 }
 
 install_all() {

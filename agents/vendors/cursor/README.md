@@ -1,6 +1,6 @@
 # Cursor MCP
 
-`cursor/mcp.json` 是 **agent-env 生成物**。请改 `agent-env/mcp/` 后运行：
+`agents/vendors/cursor/mcp.json` 是 **agent-env 生成物**。请改 `agent-env/mcp/` 后运行：
 
 ```shell
 dotf -c agents

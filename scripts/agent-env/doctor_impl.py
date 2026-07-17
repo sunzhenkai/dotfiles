@@ -300,10 +300,17 @@ def _mcp_drift(
             return None
         actual = data.get("mcpServers") or {}
     elif tool == "opencode":
-        data = _read_json(cat.root / "opencode" / "opencode.json")
+        data = _read_json(
+            cat.root / "agents" / "vendors" / "opencode" / "opencode.json"
+        )
         if data is None:
             return None
         actual = data.get("mcp") or {}
+    elif tool == "kimi-code":
+        data = _read_json(Path.home() / ".kimi-code" / "mcp.json")
+        if data is None:
+            return None
+        actual = data.get("mcpServers") or {}
     else:
         return None
 
@@ -454,9 +461,10 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
 
     scan_roots = [
         cat.env_dir,
-        cat.root / "claude" / ".mcp.json",
-        cat.root / "cursor" / "mcp.json",
-        cat.root / "opencode" / "opencode.json",
+        cat.root / "agents" / "vendors" / "claude" / ".mcp.json",
+        cat.root / "agents" / "vendors" / "cursor" / "mcp.json",
+        cat.root / "agents" / "vendors" / "opencode" / "opencode.json",
+        cat.root / "agents" / "vendors" / "kimi-code" / "mcp.json",
     ]
     # 跳过 local overrides（允许私有路径）
     skip_names = {"local.yaml"}
@@ -541,18 +549,19 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         return
 
     targets = {
-        "claude": cat.root / "claude",  # 实际安装到 ~/.claude，仓库可能无生成物
+        "claude": Path.home() / ".claude" / "skills",
         "cursor": Path.home() / ".cursor" / "skills",
-        "opencode": cat.root / "opencode" / "skills",
+        "opencode": cat.root / "agents" / "vendors" / "opencode" / "skills",
         "codex": Path.home() / ".codex" / "skills",
+        "kimi-code": Path.home() / ".kimi-code" / "skills",
     }
-    # 更可靠：对 opencode 仓库内 skills 做存在性抽查
+    # 更可靠：对 opencode / kimi 仓库内或用户目录 skills 做存在性抽查
     sample = next(skills_src.iterdir(), None) if skills_src.is_dir() else None
-    check_tools = [tool] if tool else ["opencode", "cursor"]
+    check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code"]
     drifted = False
     for t in check_tools:
         if t == "opencode":
-            dest = cat.root / "opencode" / "skills"
+            dest = cat.root / "agents" / "vendors" / "opencode" / "skills"
             if sample and sample.is_dir():
                 marker = dest / sample.name
                 if not marker.exists():
@@ -578,6 +587,31 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
                 )
             else:
                 report.add("agents", f"{t}-drift", STATUS_PASS, "Cursor skills 目录存在")
+        elif t == "kimi-code":
+            dest = Path.home() / ".kimi-code" / "skills"
+            if sample and sample.is_dir():
+                marker = dest / sample.name
+                if not dest.is_dir() or not marker.exists():
+                    drifted = True
+                    report.add(
+                        "agents",
+                        f"{t}-drift",
+                        STATUS_WARN,
+                        f"{t} skills 可能未同步（缺 {sample.name}）",
+                        hint="运行 scripts/agents/sync.sh kimi-code",
+                    )
+                else:
+                    report.add("agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步")
+            elif not dest.is_dir():
+                report.add(
+                    "agents",
+                    f"{t}-drift",
+                    STATUS_WARN,
+                    "Kimi skills 目录不存在",
+                    hint="运行 scripts/agents/sync.sh kimi-code",
+                )
+            else:
+                report.add("agents", f"{t}-drift", STATUS_PASS, "Kimi skills 目录存在")
         else:
             report.add(
                 "agents",

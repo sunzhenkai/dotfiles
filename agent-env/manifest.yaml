@@ -6,30 +6,31 @@ tools:
   - cursor
   - opencode
   - codex
+  - kimi-code
 
 default_profile: research
 
 modules:
   mcp:
     enabled: true
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     exclude: [codex]
   browser:
     enabled: true
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     exclude: [codex]
   tools:
     enabled: true
-    tools: [claude, cursor, opencode, codex]
+    tools: [claude, cursor, opencode, codex, kimi-code]
   env:
     enabled: true
-    tools: [claude, cursor, opencode, codex]
+    tools: [claude, cursor, opencode, codex, kimi-code]
   security:
     enabled: true
-    tools: [claude, cursor, opencode, codex]
+    tools: [claude, cursor, opencode, codex, kimi-code]
   agents:
     enabled: true
-    tools: [claude, cursor, opencode, codex]
+    tools: [claude, cursor, opencode, codex, kimi-code]
 
 # Codex 当前无稳定 MCP 配置入口，显式降级
 unsupported:

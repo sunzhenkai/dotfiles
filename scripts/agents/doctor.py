@@ -68,8 +68,8 @@ def check_skills_drift(
             "dir",
         ),
         "opencode": (
-            cat.root / "opencode" / "skills",
-            cat.root / "opencode" / "commands",
+            cat.root / "agents" / "vendors" / "opencode" / "skills",
+            cat.root / "agents" / "vendors" / "opencode" / "commands",
             "dir",
         ),
         "claude": (
@@ -82,10 +82,23 @@ def check_skills_drift(
             Path.home() / ".codex" / "prompts",
             "dir",
         ),
+        "kimi-code": (
+            Path.home() / ".kimi-code" / "skills",
+            None,  # commands skip
+            "dir",
+        ),
     }
 
     targets = [tool] if tool else list(TOOLS)
     for t in targets:
+        if t not in dest_map:
+            report.add(
+                "skills",
+                f"{t}-unknown",
+                STATUS_WARN,
+                f"未知工具 skills 目标: {t}",
+            )
+            continue
         skill_dest, cmd_dest, _ = dest_map[t]
         missing_skills = []
         if not skill_dest.is_dir():
@@ -123,7 +136,14 @@ def check_skills_drift(
                 f"{t} skills 与源一致（{len(skill_ids)} 项）",
             )
 
-        if cmd_ids and cmd_dest:
+        if cmd_dest is None:
+            report.add(
+                "skills",
+                f"{t}-commands-drift",
+                STATUS_SKIP,
+                f"{t} commands 无稳定布局，已 skip",
+            )
+        elif cmd_ids and cmd_dest:
             missing_cmds = []
             if not cmd_dest.is_dir():
                 report.add(

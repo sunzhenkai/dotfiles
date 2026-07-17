@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-TOOLS = ("claude", "cursor", "opencode", "codex")
+TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code")
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 
@@ -192,6 +192,19 @@ def render_command_frontmatter(tool: str, meta: Dict[str, str], cmd_id: str) -> 
             "---\n"
         )
     if tool == "opencode":
+        lines = [f"description: {desc_out}"]
+        # OpenCode-only：若存在对应 persona，注入 agent 字段（不出现在共享源）
+        agent = unquote(fm_get(meta, "agent"))
+        if not agent and cmd_id:
+            # 约定：command id 与 persona 同名时可注入（如 en-chat）
+            persona = repo_root() / "agents" / "vendors" / "opencode" / "agents" / f"{cmd_id}.md"
+            if persona.is_file():
+                agent = cmd_id
+        if agent:
+            lines.append(f"agent: {agent}")
+        return "---\n" + "\n".join(lines) + "\n---\n"
+    if tool == "kimi-code":
+        # commands 对 kimi 整体 skip；此分支仅作防御
         return "---\n" f"description: {desc_out}\n" "---\n"
     # codex prompts: minimal
     return "---\n" f"description: {desc_out}\n" "---\n"
@@ -254,10 +267,12 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
     if tool == "cursor":
         return [home / ".cursor", root / ".cursor"]
     if tool == "opencode":
-        # Generate into repo opencode/; user symlink covers ~/.config/opencode
-        return [root / "opencode"]
+        # Generate into vendors/opencode/; user symlink covers ~/.config/opencode
+        return [root / "agents" / "vendors" / "opencode"]
     if tool == "codex":
         return [home / ".codex"]
+    if tool == "kimi-code":
+        return [home / ".kimi-code"]
     die(f"unknown tool: {tool}")
     return []
 
@@ -302,8 +317,10 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
                     written += 1
                     print(f"  + {dest}")
 
-    # Commands
-    if cmds_root.is_dir():
+    # Commands（kimi-code 无稳定 commands 布局 → skip，不阻断 skills）
+    if tool == "kimi-code":
+        print("  skip commands for kimi-code (no stable commands layout)")
+    elif cmds_root.is_dir():
         for cmd_file in sorted(cmds_root.glob("*.md")):
             cmd_id = cmd_file.stem
             if command_excluded(cmd_file, tool):
@@ -336,7 +353,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|opencode|codex|all",
+        help="claude|cursor|opencode|codex|kimi-code|all",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")

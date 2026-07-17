@@ -19,6 +19,8 @@
 
 真相源：`agent-env/mcp/servers.yaml` + profiles。
 
+本目录位于 `agents/vendors/claude/`（工具专属配置）。
+
 ```shell
 dotf -c agents
 scripts/agents/sync.sh claude

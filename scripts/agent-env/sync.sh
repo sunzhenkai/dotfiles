@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 兼容入口：委托统一 agents sync（仅 MCP/env）。
-# 用法: sync.sh [claude|cursor|opencode|codex|all] [--profile NAME] [--dry-run]
+# 用法: sync.sh [claude|cursor|opencode|codex|kimi-code|all] [--profile NAME] [--dry-run]
 #
 # 注意：请优先使用 scripts/agents/sync.sh（或 dotf -c agents）。
 set -euo pipefail

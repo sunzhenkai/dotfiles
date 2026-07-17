@@ -14,7 +14,7 @@ install_claude() {
   fi
 
   local settings_target="$claude_dir/settings.json"
-  local settings_template="$DOTFILES_ROOT/claude/settings.json"
+  local settings_template="$DOTFILES_ROOT/agents/vendors/claude/settings.json"
 
   if [ -e "$settings_target" ]; then
     mv "$settings_target" "$settings_target-$TIMESTAMP"
@@ -29,7 +29,7 @@ install_claude() {
   fi
 
   local claude_json_target="$HOME/.claude.json"
-  local claude_json_source="$DOTFILES_ROOT/claude/.claude.json"
+  local claude_json_source="$DOTFILES_ROOT/agents/vendors/claude/.claude.json"
 
   if [ ! -f "$claude_json_source" ]; then
     echo "⚠️  跳过 ~/.claude.json symlink: dotfiles 中不存在 $claude_json_source"

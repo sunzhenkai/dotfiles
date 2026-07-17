@@ -98,12 +98,14 @@ scripts/agent-env/sync.sh all --profile browser
 
 ## 与工具配置的关系
 
-Claude / Cursor / OpenCode 的 MCP 片段由本目录生成或合并：
+Claude / Cursor / OpenCode / Kimi 的 MCP 片段由本目录生成或合并：
 
 ```shell
-scripts/agent-env/sync.sh claude|cursor|opencode
+scripts/agents/sync.sh claude|cursor|opencode|kimi-code
+# 或兼容入口
+scripts/agent-env/sync.sh claude|cursor|opencode|kimi-code
 ```
 
 Codex 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills 仍走 `agents/`）。
 
-仓库内 `claude/.mcp.json`、`cursor/mcp.json`、`opencode/opencode.json` 的 MCP 段视为**生成物**；请改 `agent-env/mcp/` 后重新 sync，不要手写多源漂移。
+仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json` 的 MCP 段视为**生成物**；请改 `agent-env/mcp/` 后重新 sync，不要手写多源漂移。

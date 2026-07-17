@@ -8,7 +8,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -19,7 +19,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -30,7 +30,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -39,7 +39,7 @@ servers:
     transport: stdio
     command: npx
     args: ["-y", "@playwright/mcp@latest"]
-    tools: [claude, cursor, opencode]
+    tools: [claude, cursor, opencode, kimi-code]
     profiles: [browser, full]
     risk: high
     required_tools: [node, npx]

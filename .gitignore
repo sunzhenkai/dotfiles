@@ -5,8 +5,8 @@
 .opencode
 openspec/changes
 scripts/assets
-/opencode/package-lock.json
-/codex/config.local.toml
+/agents/vendors/opencode/package-lock.json
+/agents/vendors/codex/config.local.toml
 __pycache__
 
 # agent-env 本机覆盖与浏览器产物（勿提交密钥/路径/状态）

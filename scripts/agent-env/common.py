@@ -16,7 +16,7 @@ except ImportError as exc:  # pragma: no cover
         "error: 需要 PyYAML（pip install pyyaml / apt install python3-yaml）"
     ) from exc
 
-TOOLS = ("claude", "cursor", "opencode", "codex")
+TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code")
 KNOWN_PROFILES = ("coding", "research", "browser", "full")
 SERVER_ALLOWED_KEYS = {
     "transport",
@@ -300,7 +300,7 @@ class Catalog:
 
 
 def auth_header(env_name: str, style: str) -> str:
-    if style == "cursor" or style == "claude":
+    if style in ("cursor", "claude", "kimi-code"):
         return f"Bearer ${{{env_name}}}"
     if style == "opencode":
         return f"Bearer {{env:{env_name}}}"
@@ -312,7 +312,7 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
     auth = srv.get("auth") or {}
     env_name = auth.get("env")
 
-    if tool in ("cursor", "claude"):
+    if tool in ("cursor", "claude", "kimi-code"):
         if transport == "stdio":
             entry: Dict[str, Any] = {
                 "command": srv["command"],

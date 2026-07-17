@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 统一 agents sync：skills/commands + MCP/env。
 # 用法:
-#   sync.sh [claude|cursor|opencode|codex|all]
+#   sync.sh [claude|cursor|opencode|codex|kimi-code|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--doctor] [--strict]
 set -euo pipefail
 
@@ -24,7 +24,7 @@ EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  claude | cursor | opencode | codex | all)
+  claude | cursor | opencode | codex | kimi-code | all)
     TOOL="$1"
     ;;
   --skills-only)
