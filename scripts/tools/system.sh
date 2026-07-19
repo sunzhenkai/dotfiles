@@ -394,13 +394,8 @@ change_default_shell() {
   fi
 }
 
-# 配置 zsh
+# 配置 zsh（计划路径已授权；改默认 shell 仍走副作用 confirm）
 config_zsh() {
-  if ! confirm "是否配置 zsh（oh-my-zsh/默认 Shell）?" "N"; then
-    echo "跳过 zsh 配置。"
-    return 0
-  fi
-
   echo "---- Configuring zsh ----"
 
   # 设置 ZSH_CUSTOM 路径
@@ -434,9 +429,8 @@ post_init() {
   init_docker
 }
 
-# 系统初始化分发器
+# 系统初始化分发器（装包已由计划中的 install system 授权，不再二次确认）
 dispatch_init() {
-  # 显示将要执行的操作并请求用户确认
   echo ""
   echo "============================================"
   echo "  System: $ID"
@@ -445,11 +439,6 @@ dispatch_init() {
   echo "将通过系统包管理器安装软件包。"
   echo "需要 root/sudo 权限。"
   echo ""
-
-  if ! confirm "是否安装系统软件包?" "N"; then
-    echo "跳过系统软件包安装。"
-    return 0
-  fi
 
   case "$ID" in
   ubuntu | debian | pop | linuxmint)

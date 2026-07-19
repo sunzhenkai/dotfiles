@@ -54,12 +54,6 @@ init_homebrew() {
     _os_id="arch"
   fi
 
-  # 让用户确认
-  if ! confirm "是否通过 Homebrew 安装常用软件包?" "N"; then
-    echo "跳过 Homebrew 软件包安装。"
-    return 0
-  fi
-
   # 工具类
   brew install watch fswatch htop wget curl tree nmap
 

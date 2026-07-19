@@ -9,17 +9,12 @@ install_ossutil() {
   local install_dir="$HOME/.local/bin"
   local tool_path="$install_dir/ossutil"
 
-  # 检查是否已安装
+  # 检查是否已安装（幂等：已存在则跳过）
   if [ -f "$tool_path" ]; then
     echo "ossutil is already installed at: $tool_path"
-    if ! confirm "是否更新/重新安装 ossutil?" "N"; then
-      echo "跳过 ossutil 安装。"
-      return 0
-    fi
-    echo "Updating ossutil..."
-  else
-    mkdir -p "$install_dir"
+    return 0
   fi
+  mkdir -p "$install_dir"
 
   # 检测系统架构
   local arch

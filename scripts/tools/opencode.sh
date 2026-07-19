@@ -8,12 +8,6 @@ install_opencode() {
 
   if command -v opencode &>/dev/null; then
     echo "OpenCode 已安装: $(command -v opencode) ($(opencode --version 2>/dev/null || echo '?'))"
-    if ! confirm "是否重新安装 / 更新 OpenCode?" "N"; then
-      echo "跳过 OpenCode 安装"
-      return 0
-    fi
-  elif ! confirm "是否安装 OpenCode CLI?" "N"; then
-    echo "跳过 OpenCode 安装"
     return 0
   fi
 

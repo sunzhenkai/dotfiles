@@ -53,12 +53,12 @@ install_agents_bundle() {
             detail="安装后未找到 cursor-agent"
           fi
         else
-          # 用户跳过 confirm 时返回 0 且未安装
+          # 安装函数幂等返回 0 但未装上
           if command -v cursor-agent &>/dev/null; then
             status="ok"
           else
             status="skip"
-            detail="用户跳过或未安装"
+            detail="未安装"
           fi
         fi
       fi

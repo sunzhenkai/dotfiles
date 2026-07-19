@@ -216,7 +216,7 @@ cmd_init() {
       echo "  --profile <name> 使用场景 profile（minimal/remote/desktop/full）"
       echo "  --list           列出 OS 与使用场景 profile"
       echo "  --dry-run        只展示计划"
-      echo "  --yes            跳过确认执行"
+      echo "  --yes            跳过计划确认与副作用确认"
       exit 0
       ;;
     *)
@@ -589,9 +589,14 @@ show_help() {
   echo "  -icd                        安装 → 配置 → 诊断"
   echo "  -a, --all                   全量（配合 -i/-c/-d；单独 -a = 装+配，不含 doctor）"
   echo "  --dry-run                   只展示执行计划，不执行"
-  echo "  --yes, -y                   跳过确认（不绕过校验/备份）"
+  echo "  --yes, -y                   跳过计划确认与副作用确认（不绕过校验/备份）"
   echo "  --json                      输出脱敏执行汇总 JSON"
   echo "  -h, --help                  显示帮助"
+  echo ""
+  echo "确认语义:"
+  echo "  执行前进行计划确认（默认 N）；通过后执行计划中的动作，不再逐模块询问"
+  echo "  副作用确认（改默认 shell、Docker 装/配）仍会单独询问，除非 --yes"
+  echo "  非 TTY 且无 --yes/--dry-run 时快速失败"
   echo ""
   echo "agents 示例:"
   echo "  dotf agents -i              # 安装 agent CLI 工具包"

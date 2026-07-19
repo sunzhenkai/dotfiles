@@ -12,12 +12,6 @@ install_claude_cli() {
 
   if command -v claude &>/dev/null; then
     echo "Claude Code 已安装: $(command -v claude) ($(claude --version 2>/dev/null || echo '?'))"
-    if ! confirm "是否重新安装 / 更新 Claude Code CLI?" "N"; then
-      echo "跳过 Claude Code CLI 安装"
-      return 0
-    fi
-  elif ! confirm "是否安装 Claude Code CLI?" "N"; then
-    echo "跳过 Claude Code CLI 安装"
     return 0
   fi
 

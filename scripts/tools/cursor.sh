@@ -6,12 +6,6 @@ source "$SCRIPT_DIR/scripts/tools/common.sh"
 install_cursor_cli() {
   if command -v cursor-agent &>/dev/null; then
     echo "Cursor Agent 已安装: $(command -v cursor-agent)"
-    if ! confirm "是否重新安装 / 更新 Cursor Agent?" "N"; then
-      echo "跳过 Cursor Agent 安装"
-      return 0
-    fi
-  elif ! confirm "是否安装 Cursor Agent CLI?" "N"; then
-    echo "跳过 Cursor Agent 安装"
     return 0
   fi
 

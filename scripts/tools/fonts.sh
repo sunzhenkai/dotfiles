@@ -136,12 +136,6 @@ install_fonts_macos() {
 }
 
 setup_fonts() {
-  # 确认是否安装字体
-  if ! confirm "是否下载并安装 Maple Mono NF CN 字体?" "N"; then
-    echo "跳过字体安装"
-    return 0
-  fi
-
   git submodule update --init
   detect_os
 

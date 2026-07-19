@@ -6,11 +6,6 @@
 source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 install_delta() {
-  if ! confirm "是否安装并配置 git-delta（git diff 高亮分页器）?" "N"; then
-    echo "跳过 git-delta 安装"
-    return 0
-  fi
-
   # 确保 brew 可用（由 homebrew.sh 提供，此处兜底）
   command -v setup_brew_path &>/dev/null && setup_brew_path
 

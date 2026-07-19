@@ -68,10 +68,15 @@ Actions / controls:
   -i/-c/-d          Install / config / doctor
   -a                Install all + config all
   --dry-run         Show plan only
-  --yes / -y        Skip confirm (not validation/backup)
+  --yes / -y        Skip plan + side-effect confirms (not validation/backup)
   --json            Redacted execution summary JSON
   --deep            Enable doctor L1
   -h                Show help
+
+Confirm model:
+  Plan confirm before execute (default N); no per-module install/config prompts after.
+  Side-effect confirms remain for changing default shell and Docker install/config.
+  Non-TTY without --yes/--dry-run fails fast.
 
 Examples:
   dotf pull

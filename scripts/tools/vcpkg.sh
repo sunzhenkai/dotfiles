@@ -8,17 +8,9 @@ setup_vcpkg() {
 
   local install_dir="$HOME/.local/vcpkg"
 
-  # 检查是否已安装
+  # 检查是否已安装（幂等：已存在则跳过）
   if [ -f "$install_dir/vcpkg" ]; then
     echo "vcpkg is already installed at: $install_dir/vcpkg"
-    if ! confirm "是否更新/重新安装 vcpkg?" "N"; then
-      echo "跳过 vcpkg 安装。"
-      return 0
-    fi
-    echo "Updating vcpkg..."
-    git -C "$install_dir" pull
-    bash "$install_dir/bootstrap-vcpkg.sh"
-    echo "vcpkg updated!"
     return 0
   fi
 

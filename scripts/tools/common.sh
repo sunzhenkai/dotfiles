@@ -117,7 +117,7 @@ pip_install_system() {
 # 确认函数
 # ============================================================
 
-# 确认函数
+# 确认函数（提示与输入均走 /dev/tty，避免被 runner 捕获 stdout/stderr 时不可见）
 # 参数: $1=提示信息, $2=默认值(Y/N, 默认Y)
 # 返回: 0=用户确认, 1=用户拒绝
 confirm() {
@@ -129,13 +129,19 @@ confirm() {
     return 0
   fi
 
-  local reply
+  if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+    echo "错误: 非 TTY 环境请使用 --yes 或 --dry-run" >&2
+    return 1
+  fi
 
+  local reply
   if [[ "$default" == "Y" ]]; then
-    read -r -p "$prompt [Y/n]: " reply
+    printf '%s [Y/n]: ' "$prompt" >/dev/tty
+    read -r reply </dev/tty || true
     [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
   else
-    read -r -p "$prompt [y/N]: " reply
+    printf '%s [y/N]: ' "$prompt" >/dev/tty
+    read -r reply </dev/tty || true
     [[ "$reply" =~ ^[Yy] ]]
   fi
 }

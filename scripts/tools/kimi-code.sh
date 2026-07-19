@@ -19,12 +19,6 @@ install_kimi_code() {
 
   if command -v kimi &>/dev/null || [[ -x "$HOME/.kimi-code/bin/kimi" ]]; then
     echo "Kimi Code CLI 已安装: $(command -v kimi 2>/dev/null || echo "$HOME/.kimi-code/bin/kimi") ($(kimi --version 2>/dev/null || echo '?'))"
-    if ! confirm "是否重新安装 / 更新 Kimi Code CLI?" "N"; then
-      echo "跳过 Kimi Code CLI 安装"
-      return 0
-    fi
-  elif ! confirm "是否安装 Kimi Code CLI?" "N"; then
-    echo "跳过 Kimi Code CLI 安装"
     return 0
   fi
 

@@ -10,12 +10,8 @@ install_gcp_cli() {
 
   if [ -d "$install_dir" ] && command -v gcloud &>/dev/null; then
     echo "Google Cloud CLI is already installed: $(gcloud --version 2>&1 | head -1)"
-    if ! confirm "是否更新/重新安装 Google Cloud CLI?" "N"; then
-      echo "跳过 Google Cloud CLI 安装。"
-      _install_gke_auth_plugin
-      return 0
-    fi
-    echo "Updating Google Cloud CLI..."
+    _install_gke_auth_plugin
+    return 0
   fi
 
   local arch
