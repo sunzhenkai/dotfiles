@@ -9,23 +9,23 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 
 #### Scenario: 配置 Claude 时安装到 ~/.claude
 
-- **WHEN** 用户执行 `dotf -c claude` 或等价调用 `config.sh claude`
+- **WHEN** 用户执行 `dotf claude -c` 或等价调用 `config.sh claude`
 - **THEN** 系统 SHALL 将启用的 skills 安装到 `~/.claude/skills/`
 - **THEN** 系统 SHALL 将启用的 commands 安装到 `~/.claude/commands/` 下适配后的路径
 
 #### Scenario: 配置 Cursor 时安装到 ~/.cursor
 
-- **WHEN** 用户执行 `dotf -c cursor` 或等价调用
+- **WHEN** 用户执行 `dotf cursor -c` 或等价调用
 - **THEN** 系统 SHALL 将启用的 skills/commands 安装到 `~/.cursor/skills/` 与 `~/.cursor/commands/`
 
 #### Scenario: 配置 OpenCode 时 skills/commands 对用户可见
 
-- **WHEN** 用户执行 `dotf -c opencode` 或等价调用
+- **WHEN** 用户执行 `dotf opencode -c` 或等价调用
 - **THEN** 适配后的 skills/commands SHALL 出现在 OpenCode 实际加载的配置树中（`~/.config/opencode` 或其 symlink 目标下的 `skills/`、`commands/`）
 
 #### Scenario: 配置 Codex 时安装 skills
 
-- **WHEN** 用户执行 `dotf -c codex` 或等价调用
+- **WHEN** 用户执行 `dotf codex -c` 或等价调用
 - **THEN** 系统 SHALL 将启用的 skills 安装到 `~/.codex/skills/`
 - **THEN** 若实现包含 commands→prompts 映射，则对应文件 SHALL 安装到约定的 `~/.codex/prompts/`（或文档声明的路径）
 

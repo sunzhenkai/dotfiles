@@ -26,7 +26,7 @@
 
 #### Scenario: get_config_def 已知配置
 - **WHEN** 调用 `get_config_def "nvim"`
-- **THEN** 返回 `"nvim:~/.config/nvim"`，退出码为 0
+- **THEN** 返回 `"config/editors/nvim:~/.config/nvim"`，退出码为 0
 
 #### Scenario: get_config_def 未知配置
 - **WHEN** 调用 `get_config_def "nonexistent"`
@@ -38,7 +38,7 @@
 
 ### Requirement: iterm2 配置注册
 
-`iterm2` SHALL 在配置映射中注册，映射关系为 `iterm2:~/.config/iterm2`。
+`iterm2` SHALL 在配置映射中注册，映射关系为 `config/terminals/iterm2:~/.config/iterm2`。
 
 #### Scenario: 配置 iterm2
 - **WHEN** 执行 `scripts/config.sh iterm2`
@@ -85,7 +85,7 @@
 `homebrew.sh` 的 `init_homebrew()` SHALL NOT 依赖外部设置的 `$ID` 变量。SHALL 在函数内部自行检测操作系统。
 
 #### Scenario: 跳过 system 模块直接安装 homebrew
-- **WHEN** 执行 `dotf -i homebrew`（不先运行 system 模块）
+- **WHEN** 执行 `dotf homebrew -i`（不先运行 system 模块）
 - **THEN** macOS 特有的包（pngpaste、ghostty）正确安装
 
 ### Requirement: 中英文输出统一

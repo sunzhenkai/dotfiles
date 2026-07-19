@@ -9,7 +9,7 @@
 中文配置文档 SHALL 按功能分类组织，提高可读性和查找效率。
 
 #### Scenario: 文档分类结构
-- **WHEN** 用户查看 `kitty/configuration-zh.md`
+- **WHEN** 用户查看 `config/terminals/kitty/configuration-zh.md`
 - **THEN** 文档 SHALL 包含以下主要分类：
   1. 基础配置（启动、性能）
   2. 字体配置

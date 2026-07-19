@@ -6,77 +6,34 @@ DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%s)
 BACKUP_DIR="$HOME/.config/backups"
 
+# shellcheck source=/dev/null
+source "$DOTFILES_ROOT/scripts/modules.sh"
+
 # ============================================================
-# 配置映射函数（兼容 Bash 3.2，不使用关联数组）
+# 配置映射 — 真相源为 modules.yaml（经 modules.sh）
 # ============================================================
 
 # 获取配置定义 "source:target"，未知名称返回非零
 get_config_def() {
-  case "$1" in
-  starship)  echo "starship/starship.toml:~/.config/starship.toml" ;;
-  nvim)      echo "nvim:~/.config/nvim" ;;
-  kitty)     echo "kitty:~/.config/kitty" ;;
-  k9s)       echo "k9s:~/.config/k9s" ;;
-  tmux)      echo "tmux:~/.config/tmux" ;;
-  alacritty) echo "alacritty:~/.config/alacritty" ;;
-  zellij)    echo "zellij:~/.config/zellij" ;;
-  ghostty)   echo "ghostty:~/.config/ghostty" ;;
-  wezterm)   echo "wezterm:~/.config/wezterm" ;;
-  zsh)       echo "zsh:~/.config/zsh" ;;
-  yazi)      echo "yazi:~/.config/yazi" ;;
-  hypr)      echo "hypr:~/.config/hypr" ;;
-  helix)     echo "helix:~/.config/helix" ;;
-  shell_gpt) echo "shell_gpt:~/.config/shell_gpt" ;;
-  zed)       echo "zed:~/.config/zed" ;;
-  fcitx5)    echo "fcitx5:~/.config/fcitx5" ;;
-  git)       echo "git:~/.config/git" ;;
-  opencode)  echo "agents/vendors/opencode:~/.config/opencode" ;;
-  claude)    echo "agents/vendors/claude:~/.config/claude" ;;
-  codex)     echo "agents/vendors/codex/config.toml:~/.codex/config.toml" ;;
-  cursor)    echo "agents/vendors/cursor/mcp.json:~/.cursor/mcp.json" ;;
-  kimi-code) echo "agents/vendors/kimi-code/config.toml:~/.kimi-code/config.toml" ;;
-  agents)    echo "agents:~/.local/share/dotfiles-agents" ;;
-  logseq)    echo "logseq:~/.logseq" ;;
-  iterm2)    echo "iterm2:~/.config/iterm2" ;;
-  *)         return 1 ;;
-  esac
+  local name="$1" source target
+  modules_exists "$name" || return 1
+  modules_has "$name" config || return 1
+  source=$(modules_source "$name") || return 1
+  target=$(modules_target "$name") || return 1
+  echo "${source}:${target}"
 }
 
-# 获取配置描述
 get_config_desc() {
-  case "$1" in
-  starship)  echo "Starship 终端提示符配置" ;;
-  nvim)      echo "Neovim 编辑器配置" ;;
-  kitty)     echo "Kitty 终端模拟器配置" ;;
-  k9s)       echo "K9s Kubernetes CLI 配置" ;;
-  tmux)      echo "Tmux 终端复用器配置" ;;
-  alacritty) echo "Alacritty 终端模拟器配置" ;;
-  zellij)    echo "Zellij 终端复用器配置" ;;
-  ghostty)   echo "Ghostty 终端模拟器配置" ;;
-  wezterm)   echo "WezTerm 终端模拟器配置" ;;
-  zsh)       echo "Zsh shell 配置" ;;
-  yazi)      echo "Yazi 文件管理器配置" ;;
-  hypr)      echo "Hyprland 窗口管理器配置" ;;
-  helix)     echo "Helix 编辑器配置" ;;
-  shell_gpt) echo "Shell-GPT 配置" ;;
-  zed)       echo "Zed 编辑器配置" ;;
-  fcitx5)    echo "Fcitx5 输入法配置" ;;
-  git)       echo "Git 版本控制配置" ;;
-  opencode)  echo "OpenCode 配置" ;;
-  claude)    echo "Claude Code 配置" ;;
-  codex)     echo "Codex CLI 配置（MiniMax，无需登录）" ;;
-  cursor)    echo "Cursor 编辑器 MCP 配置" ;;
-  kimi-code) echo "Kimi Code CLI 配置（首次安装；已有则跳过以免覆盖登录凭证）" ;;
-  agents)    echo "同步 agents：skills/commands + MCP/profiles（可用 --doctor）" ;;
-  logseq)    echo "Logseq 笔记配置" ;;
-  iterm2)    echo "iTerm2 终端模拟器配置" ;;
-  *)         echo "$1" ;;
-  esac
+  modules_desc "$1" 2>/dev/null || echo "$1"
 }
 
-# 获取所有配置名（排序后，空格分隔）
+# 获取所有配置名（空格分隔）；传 --filter-os 时按当前 OS 过滤
 get_all_config_names() {
-  echo "agents alacritty claude codex cursor fcitx5 ghostty git helix hypr iterm2 k9s kimi-code kitty logseq nvim opencode shell_gpt starship tmux wezterm yazi zed zellij zsh"
+  if [[ "${1:-}" == "--filter-os" ]]; then
+    _modules_py names --capability config --filter-os
+  else
+    modules_names config
+  fi
 }
 
 # ============================================================
@@ -173,13 +130,13 @@ install_zsh() {
   install_config "zsh"
   if [ -e ~/.zshrc ]; then
     # 内容相同则跳过
-    if diff -q "$DOTFILES_ROOT/zsh/zshrc" ~/.zshrc >/dev/null 2>&1; then
+    if diff -q "$DOTFILES_ROOT/config/shell/zsh/zshrc" ~/.zshrc >/dev/null 2>&1; then
       echo "~/.zshrc 已是最新"
       return
     fi
     mv ~/.zshrc ~/.zshrc-$TIMESTAMP
   fi
-  cp "$DOTFILES_ROOT/zsh/zshrc" ~/.zshrc
+  cp "$DOTFILES_ROOT/config/shell/zsh/zshrc" ~/.zshrc
   echo "已安装: ~/.zshrc"
 }
 
@@ -311,7 +268,7 @@ install_codex() {
 
 # 特殊配置：tmux（依赖 submodule tpm；补装 tmux-yank 剪贴板工具）
 install_tmux() {
-  git -C "$DOTFILES_ROOT" submodule update --init tmux/3rd/tpm
+  git -C "$DOTFILES_ROOT" submodule update --init config/multiplexers/tmux/3rd/tpm
   install_config "tmux"
 
   # shellcheck source=/dev/null
@@ -348,7 +305,7 @@ install_kimi_code_config() {
 
   if [ -e "$target" ] || [ -L "$target" ]; then
     echo "已存在: ~/.kimi-code/config.toml（跳过覆盖，避免丢失 /login 凭证）"
-    echo "如需重置，请先备份并删除该文件后重新运行: dotf -c kimi-code"
+    echo "如需重置，请先备份并删除该文件后重新运行: dotf kimi-code -c"
   else
     cp "$source" "$target"
     echo "已安装: ~/.kimi-code/config.toml"
@@ -360,7 +317,7 @@ install_kimi_code_config() {
 }
 
 install_all() {
-  for name in $(get_all_config_names); do
+  for name in $(get_all_config_names --filter-os); do
     case "$name" in
     agents)   ;; # 各工具安装时已 sync；全量末尾再统一跑一次
     zsh)      install_zsh ;;

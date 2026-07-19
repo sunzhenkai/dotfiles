@@ -20,7 +20,7 @@ install_delta() {
   if ! command -v delta &>/dev/null; then
     echo "通过 Homebrew 安装 git-delta..."
     if ! command -v brew &>/dev/null; then
-      echo "✗ 未找到 Homebrew，请先运行: dotf -i homebrew"
+      echo "✗ 未找到 Homebrew，请先运行: dotf homebrew -i"
       return 1
     fi
     brew install git-delta

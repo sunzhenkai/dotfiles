@@ -1,6 +1,6 @@
-[submodule "tmux/3rd/tpm"]
-	path = tmux/3rd/tpm
+[submodule "config/multiplexers/tmux/3rd/tpm"]
+	path = config/multiplexers/tmux/3rd/tpm
 	url = https://github.com/tmux-plugins/tpm.git
-[submodule "alacritty/3rd/alacritty-theme"]
-	path = alacritty/3rd/alacritty-theme
+[submodule "config/terminals/alacritty/3rd/alacritty-theme"]
+	path = config/terminals/alacritty/3rd/alacritty-theme
 	url = https://github.com/alacritty/alacritty-theme.git

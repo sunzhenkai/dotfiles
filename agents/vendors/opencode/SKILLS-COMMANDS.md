@@ -7,7 +7,7 @@
 **MCP**：`opencode.json` 的 `mcp` 字段由统一 `agents` sync 合并。请改 `agents/env/mcp/` 后运行：
 
 ```shell
-dotf -c agents
+dotf agents -c
 scripts/agents/sync.sh opencode
 ```
 

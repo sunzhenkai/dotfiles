@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # dotf — Dotfiles CLI 轻量入口
 # 纯委托：参数解析 + 子命令路由，不含业务逻辑
+# CLI: 主体优先 — dotf <module...> -i|-c|-ic
 
 # 脚本位于 bin/，仓库根为其上一级
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DOTFILES_ROOT="$SCRIPT_DIR"
+
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/scripts/modules.sh"
 
 # 检测 Homebrew bash（优先使用更新版本）
 get_bash() {
@@ -18,11 +23,9 @@ get_bash() {
 # 通用工具函数
 # ============================================================
 
-# 确认函数（Y/n 默认值）
 confirm() {
   local prompt="$1"
-  local default="${2:-Y}"
-
+  local default="${2:-N}"
   local reply
 
   if [[ "$default" == "Y" ]]; then
@@ -34,14 +37,23 @@ confirm() {
   fi
 }
 
+run_config() {
+  local bash_bin
+  bash_bin="$(get_bash)"
+  "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$@"
+}
+
+run_install() {
+  bash "$SCRIPT_DIR/scripts/install.sh" "$@"
+}
+
 # ============================================================
-# 子命令: pull（保护性 git pull）
+# 子命令: pull
 # ============================================================
 
 cmd_pull() {
   cd "$SCRIPT_DIR" || exit 1
 
-  # 检查是否有未提交的改动
   if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null || \
      [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
     echo "检测到未提交的改动，执行 stash..."
@@ -56,7 +68,6 @@ cmd_pull() {
     exit 1
   fi
 
-  # 恢复 stash
   if [ "${stashed:-0}" -eq 1 ]; then
     echo "恢复暂存的改动..."
     if ! git stash pop; then
@@ -72,118 +83,374 @@ cmd_pull() {
 }
 
 # ============================================================
-# 子命令: init（完整初始化流程）
+# 子命令: init（OS profile 全量）
 # ============================================================
 
 cmd_init() {
-  echo "============================================"
-  echo "  Dotfiles 初始化"
-  echo "============================================"
-  echo ""
+  local force_os=""
+  local list_only=0
 
-  # === Install 阶段 ===
-  echo "将安装以下模块:"
-  echo ""
-  bash "$SCRIPT_DIR/scripts/install.sh" --list-desc | while IFS=$'\t' read -r name desc; do
-    printf "  %-12s %s\n" "$name" "$desc"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --list)
+      list_only=1
+      ;;
+    --os)
+      shift
+      if [ -z "${1:-}" ]; then
+        echo "错误: --os 需要参数"
+        exit 1
+      fi
+      force_os="$1"
+      ;;
+    -h | --help)
+      echo "用法: dotf init [--os <id>] [--list]"
+      echo ""
+      echo "  按操作系统 profile 初始化：系统包步骤 → 可装全集 → 可配全集"
+      echo "  --os <id>   强制指定 profile（如 darwin、ubuntu、arch）"
+      echo "  --list      列出可用 profile"
+      exit 0
+      ;;
+    *)
+      echo "错误: 未知 init 选项 '$1'"
+      echo "用法: dotf init [--os <id>] [--list]"
+      exit 1
+      ;;
+    esac
+    shift
   done
+
+  if [ "$list_only" -eq 1 ]; then
+    echo "可用 OS profile:"
+    modules_profiles | sed 's/^/  /'
+    exit 0
+  fi
+
+  local os_id
+  if [ -n "$force_os" ]; then
+    os_id="$force_os"
+    echo "使用强制 OS profile: $os_id"
+  else
+    os_id="$(modules_detect_os)"
+    echo "检测到 OS: $os_id"
+  fi
+
+  echo "============================================"
+  echo "  Dotfiles 初始化 (profile: $os_id)"
+  echo "============================================"
   echo ""
 
-  if confirm "是否开始安装?" "N"; then
-    bash "$SCRIPT_DIR/scripts/install.sh" --all
+  # 1) 系统包步骤（dispatch_init via system 模块）
+  echo "将执行系统包/基础环境步骤（system 模块）..."
+  if confirm "是否执行系统包步骤?" "N"; then
+    run_install system || { echo "错误: system 步骤失败"; exit 1; }
+  else
+    echo "跳过系统包步骤。"
+  fi
+
+  echo ""
+
+  # 2) 该 OS 全部可装
+  echo "将安装以下模块 (OS=$os_id):"
+  echo ""
+  local install_mods=()
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    # system 已单独处理，全集中跳过以免重复
+    [ "$name" = "system" ] && continue
+    install_mods+=("$name")
+    printf "  %-12s %s\n" "$name" "$(modules_desc "$name")"
+  done < <(modules_list install --os "$os_id")
+  echo ""
+
+  if [ ${#install_mods[@]} -eq 0 ]; then
+    echo "（无适用安装模块）"
+  elif confirm "是否开始安装?" "N"; then
+    for mod in "${install_mods[@]}"; do
+      if confirm "安装 $mod?" "N"; then
+        run_install "$mod" || { echo "错误: 安装 $mod 失败"; exit 1; }
+      else
+        echo "跳过 $mod"
+      fi
+    done
   else
     echo "跳过安装。"
   fi
 
   echo ""
 
-  # === Config 阶段 ===
-  echo "将配置以下模块:"
+  # 3) 该 OS 全部可配
+  echo "将配置以下模块 (OS=$os_id):"
   echo ""
-  local bash_bin
-  bash_bin="$(get_bash)"
-  "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --list | while read -r name; do
-    printf "  %s\n" "$name"
-  done
+  local config_mods=()
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    config_mods+=("$name")
+    printf "  %-12s %s\n" "$name" "$(modules_desc "$name")"
+  done < <(modules_list config --os "$os_id")
   echo ""
 
-  if confirm "是否开始配置?" "N"; then
-    "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
+  if [ ${#config_mods[@]} -eq 0 ]; then
+    echo "（无适用配置模块）"
+  elif confirm "是否开始配置?" "N"; then
+    for mod in "${config_mods[@]}"; do
+      if confirm "配置 $mod?" "N"; then
+        run_config "$mod" || { echo "错误: 配置 $mod 失败"; exit 1; }
+      else
+        echo "跳过 $mod"
+      fi
+    done
   else
     echo "跳过配置。"
   fi
 
   echo ""
-  echo "✓ 初始化完成"
+  echo "✓ 初始化完成 (profile: $os_id)"
 }
-
-# ============================================================
-# 子命令: __path（输出仓库路径）
-# ============================================================
 
 cmd_path() {
   echo "$SCRIPT_DIR"
 }
 
 # ============================================================
-# 帮助信息
+# 交互选择
+# ============================================================
+
+# 交互选择模块；capability: install|config|both|all
+# 将选中的模块名写入全局数组 SELECTED_MODULES
+interactive_select() {
+  local capability="$1"
+  local -a list=()
+  local name i
+
+  SELECTED_MODULES=()
+
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    list+=("$name")
+  done < <(
+    case "$capability" in
+    install) modules_list install --filter-os ;;
+    config) modules_list config --filter-os ;;
+    both) modules_list both --filter-os ;;
+    *) modules_list --filter-os ;;
+    esac
+  )
+
+  if [ ${#list[@]} -eq 0 ]; then
+    echo "当前 OS 下无可用模块"
+    return 1
+  fi
+
+  while true; do
+    echo ""
+    echo "可选模块:"
+    for i in "${!list[@]}"; do
+      printf "  %2d) %-14s %s\n" "$((i + 1))" "${list[$i]}" "$(modules_desc "${list[$i]}")"
+    done
+    echo ""
+    echo "输入序号、模块名或 a（全部），空格分隔；q 取消"
+    read -r -p "> " input
+
+    if [[ "$input" == "q" || "$input" == "Q" ]]; then
+      echo "已取消"
+      return 1
+    fi
+
+    if [[ "$input" == "a" || "$input" == "A" ]]; then
+      SELECTED_MODULES=("${list[@]}")
+      return 0
+    fi
+
+    local -a picked=()
+    local token valid=1 idx
+    for token in $input; do
+      if [[ "$token" =~ ^[0-9]+$ ]]; then
+        idx=$((token - 1))
+        if [ "$idx" -lt 0 ] || [ "$idx" -ge ${#list[@]} ]; then
+          echo "无效序号: $token"
+          valid=0
+          break
+        fi
+        picked+=("${list[$idx]}")
+      else
+        local found=0
+        for name in "${list[@]}"; do
+          if [ "$name" = "$token" ]; then
+            picked+=("$name")
+            found=1
+            break
+          fi
+        done
+        if [ "$found" -eq 0 ]; then
+          echo "无效输入: $token"
+          valid=0
+          break
+        fi
+      fi
+    done
+
+    [ "$valid" -eq 0 ] && continue
+    if [ ${#picked[@]} -eq 0 ]; then
+      echo "未选择任何模块"
+      continue
+    fi
+
+    # 去重（保序）
+    SELECTED_MODULES=()
+    for name in "${picked[@]}"; do
+      local dup=0
+      for existing in "${SELECTED_MODULES[@]+"${SELECTED_MODULES[@]}"}"; do
+        [ "$existing" = "$name" ] && dup=1 && break
+      done
+      [ "$dup" -eq 0 ] && SELECTED_MODULES+=("$name")
+    done
+    return 0
+  done
+}
+
+# ============================================================
+# 执行动作
+# ============================================================
+
+do_install_one() {
+  local mod="$1"
+  if ! modules_exists "$mod"; then
+    echo "错误: 未知模块 '$mod'"
+    echo "可用模块:"
+    modules_list | sed 's/^/  /'
+    return 1
+  fi
+  if ! modules_has "$mod" install; then
+    echo "错误: 模块 '$mod' 无安装步骤"
+    echo "提示: 该模块可能仅支持配置，请使用: dotf $mod -c"
+    return 1
+  fi
+  run_install "$mod"
+}
+
+do_config_one() {
+  local mod="$1"
+  shift
+  local extra=("$@")
+  if ! modules_exists "$mod"; then
+    echo "错误: 未知模块 '$mod'"
+    echo "可用模块:"
+    modules_list | sed 's/^/  /'
+    return 1
+  fi
+  if ! modules_has "$mod" config; then
+    echo "错误: 模块 '$mod' 无配置步骤"
+    echo "提示: 该模块可能仅支持安装，请使用: dotf $mod -i"
+    return 1
+  fi
+  if [ ${#extra[@]} -gt 0 ]; then
+    run_config "$mod" "${extra[@]}"
+  else
+    run_config "$mod"
+  fi
+}
+
+do_ic_one() {
+  local mod="$1"
+  shift
+  local extra=("$@")
+  do_install_one "$mod" || return $?
+  do_config_one "$mod" "${extra[@]+"${extra[@]}"}"
+}
+
+reject_legacy_syntax() {
+  echo "错误: 旧语法已移除（动作优先不再支持）"
+  echo ""
+  echo "新用法（主体优先）:"
+  echo "  dotf <module...> -i|-c|-ic"
+  echo "  dotf -i|-c|-ic              # 交互选择"
+  echo "  dotf -i -a | -c -a | -a     # 全量"
+  echo ""
+  echo "示例:"
+  echo "  dotf sdk -i"
+  echo "  dotf nvim -c"
+  echo "  dotf agents -ic"
+  exit 1
+}
+
+# ============================================================
+# 帮助
 # ============================================================
 
 show_help() {
   echo "dotf — Dotfiles 管理工具"
   echo ""
-  echo "用法: dotf <命令|选项> [参数...]"
+  echo "用法: dotf <module...> -i|-c|-ic"
+  echo "      dotf -i|-c|-ic              # 无模块 → 交互选择"
+  echo "      dotf -i -a | -c -a | -a     # 全量（按当前 OS 过滤）"
+  echo "      dotf <命令> [参数...]"
   echo ""
   echo "命令:"
-  echo "  init                    完整初始化（安装 + 配置，带交互确认）"
-  echo "  pull                    拉取 dotfiles 最新更新（保护性 pull）"
-  echo "  cd                      跳转到 dotfiles 目录（需 zsh wrapper）"
+  echo "  init [--os <id>] [--list]   按 OS profile 初始化（系统包 + 可装 + 可配）"
+  echo "  pull                        拉取 dotfiles 最新更新（保护性 pull）"
+  echo "  cd                          跳转到 dotfiles 目录（需 zsh wrapper）"
   echo ""
-  echo "选项:"
-  echo "  -i, --install [模块...] 安装工具/SDK（委托 scripts/install.sh）"
-  echo "  -c, --config  [模块...] 配置/链接配置文件（委托 scripts/config.sh）"
-  echo "  -a, --all               全部（遍历该模式所有模块，每项仍需确认）"
-  echo "  -h, --help              显示帮助"
+  echo "动作:"
+  echo "  -i, --install               安装"
+  echo "  -c, --config                配置/链接"
+  echo "  -ic                         先安装后配置（install 失败则不跑 config）"
+  echo "  -a, --all                   全量（需配合 -i/-c，或单独 -a = 装+配）"
+  echo "  -h, --help                  显示帮助"
   echo ""
   echo "agents 示例:"
-  echo "  dotf -i agents          # 安装 agent CLI 工具包"
-  echo "  dotf -c agents          # 同步 skills + MCP"
-  echo "  dotf -c agents --doctor # 同步后输出 doctor 摘要"
+  echo "  dotf agents -i              # 安装 agent CLI 工具包"
+  echo "  dotf agents -c              # 同步 skills + MCP"
+  echo "  dotf agents -c --doctor     # 同步后输出 doctor 摘要"
+  echo "  dotf agents -ic             # 先装后配"
   echo "  python3 scripts/agents/doctor.py"
   echo ""
   echo "示例:"
-  echo "  dotf init               # 完整初始化（安装 + 配置）"
-  echo "  dotf pull               # 拉取更新"
-  echo "  dotf -i sdk             # 安装 SDK"
-  echo "  dotf -c nvim            # 配置 nvim"
-  echo "  dotf -c -a              # 配置全部"
-  echo "  dotf -i -a              # 安装全部"
-  echo "  dotf -i sdk -c nvim     # 安装 SDK + 配置 nvim"
+  echo "  dotf init                   # OS profile 完整初始化"
+  echo "  dotf init --list            # 列出 profile"
+  echo "  dotf pull                   # 拉取更新"
+  echo "  dotf sdk -i                 # 安装 SDK"
+  echo "  dotf nvim -c                # 配置 nvim"
+  echo "  dotf sdk golang -i          # 安装多个模块"
+  echo "  dotf -c -a                  # 配置全部（当前 OS）"
+  echo "  dotf -i -a                  # 安装全部（当前 OS）"
+  echo "  dotf -a                     # 安装全部 + 配置全部"
 }
 
 # ============================================================
-# 参数解析
+# 参数解析（主体优先）
 # ============================================================
 
 main() {
-  # 无参数 → 显示帮助
   if [ $# -eq 0 ]; then
     show_help
     exit 0
   fi
 
-  local mode=""
-  local install_args=()
-  local config_args=()
+  local -a modules=()
+  local -a config_extra=()
+  local action="" # install | config | ic
+  local want_all=0
+  local saw_action_flag=0
+  local positional_before_action=0
 
   while [ $# -gt 0 ]; do
     case "$1" in
     pull)
+      if [ ${#modules[@]} -gt 0 ] || [ -n "$action" ]; then
+        echo "错误: pull 为独立命令"
+        exit 1
+      fi
       cmd_pull
       exit $?
       ;;
     init)
-      cmd_init
+      if [ ${#modules[@]} -gt 0 ] || [ -n "$action" ]; then
+        echo "错误: init 为独立命令"
+        exit 1
+      fi
+      shift
+      cmd_init "$@"
       exit $?
       ;;
     __path)
@@ -191,53 +458,57 @@ main() {
       exit $?
       ;;
     -i | --install)
-      mode="install"
+      saw_action_flag=1
+      if [ "$action" = "config" ] || [ "$action" = "ic" ]; then
+        # -c 后再 -i → 视为旧模式切换，拒绝
+        reject_legacy_syntax
+      fi
+      if [ "$action" = "install" ]; then
+        : # 重复 -i 忽略
+      else
+        action="install"
+      fi
       ;;
     -c | --config)
-      mode="config"
+      saw_action_flag=1
+      if [ "$action" = "install" ]; then
+        # 已有 -i 再 -c：若无模块则可能是用户想 -ic；若已有模块在 -i 前则是新语法的误用
+        # 规格：删除 mode 切换。允许 -i -c 作为 -ic 的等价（无模块夹在中间时）
+        if [ ${#modules[@]} -gt 0 ] && [ "$positional_before_action" -eq 0 ]; then
+          # 旧语法: -i sdk -c nvim
+          reject_legacy_syntax
+        fi
+        action="ic"
+      elif [ "$action" = "ic" ]; then
+        :
+      else
+        action="config"
+      fi
+      ;;
+    -ic)
+      saw_action_flag=1
+      if [ -n "$action" ] && [ "$action" != "ic" ]; then
+        reject_legacy_syntax
+      fi
+      action="ic"
+      ;;
+    -a | --all)
+      want_all=1
+      ;;
+    -h | --help)
+      show_help
+      exit 0
       ;;
     --doctor | --skills-only | --env-only | --dry-run | --strict | --verbose | --json | --deep)
-      if [ "$mode" = "config" ]; then
-        config_args+=("$1")
-      elif [ "$mode" = "install" ]; then
-        install_args+=("$1")
-      else
-        echo "错误: 选项 '$1' 需要先指定 -c 或 -i"
-        exit 1
-      fi
+      config_extra+=("$1")
       ;;
     --profile)
-      if [ "$mode" != "config" ] && [ "$mode" != "install" ]; then
-        echo "错误: --profile 需要先指定 -c 或 -i"
-        exit 1
-      fi
       shift
       if [ -z "${1:-}" ]; then
         echo "错误: --profile 需要参数"
         exit 1
       fi
-      if [ "$mode" = "config" ]; then
-        config_args+=("--profile" "$1")
-      else
-        install_args+=("--profile" "$1")
-      fi
-      ;;
-    -a | --all)
-      if [ "$mode" = "install" ]; then
-        exec bash "$SCRIPT_DIR/scripts/install.sh" --all
-      elif [ "$mode" = "config" ]; then
-        local bash_bin
-        bash_bin="$(get_bash)"
-        exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" --all
-      else
-        echo "提示: 使用 'dotf init' 进行完整初始化（安装 + 配置）"
-        echo "      或指定模式: dotf -i -a / dotf -c -a"
-        exit 1
-      fi
-      ;;
-    -h | --help)
-      show_help
-      exit 0
+      config_extra+=("--profile" "$1")
       ;;
     -*)
       echo "错误: 未知选项 '$1'"
@@ -246,46 +517,136 @@ main() {
       exit 1
       ;;
     *)
-      # 非 flag 参数 → 归入当前模式
-      if [ "$mode" = "install" ]; then
-        install_args+=("$1")
-      elif [ "$mode" = "config" ]; then
-        config_args+=("$1")
+      # 位置参数 = 模块名
+      if [ "$saw_action_flag" -eq 0 ]; then
+        positional_before_action=1
       else
-        echo "错误: 请先指定模式 (-i 或 -c)"
-        echo ""
-        show_help
-        exit 1
+        # 动作之后再跟模块名 → 旧语法（dotf -i sdk）
+        reject_legacy_syntax
       fi
+      modules+=("$1")
       ;;
     esac
     shift
   done
 
-  # 执行委托
-  if [ "$mode" = "install" ]; then
-    exec bash "$SCRIPT_DIR/scripts/install.sh" "${install_args[@]}"
+  # --- 全量模式 ---
+  if [ "$want_all" -eq 1 ]; then
+    if [ ${#modules[@]} -gt 0 ]; then
+      echo "错误: -a/--all 不能与模块名同时使用"
+      exit 1
+    fi
+    case "$action" in
+    install)
+      # 仅安装全部（OS 过滤）；不含专属 dispatch_init（除非确认 system）
+      echo "将安装当前 OS 适用的全部模块（逐项确认在各模块内部）"
+      if confirm "开始全量安装?" "N"; then
+        run_install --all || exit $?
+      else
+        echo "已取消"
+        exit 0
+      fi
+      exit 0
+      ;;
+    config)
+      echo "将配置当前 OS 适用的全部模块"
+      if confirm "开始全量配置?" "N"; then
+        local bash_bin name
+        bash_bin="$(get_bash)"
+        while IFS= read -r name; do
+          [ -z "$name" ] && continue
+          if confirm "配置 $name?" "N"; then
+            "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$name" || exit $?
+          else
+            echo "跳过 $name"
+          fi
+        done < <(modules_list config --filter-os)
+      else
+        echo "已取消"
+        exit 0
+      fi
+      exit 0
+      ;;
+    ic | "")
+      # dotf -a 或 dotf -ic -a：装全部 + 配全部（不含隐含 dispatch_init）
+      if [ -z "$action" ] || [ "$action" = "ic" ]; then
+        echo "将安装并配置当前 OS 适用的全部模块"
+        if confirm "开始全量安装?" "N"; then
+          run_install --all || exit $?
+        else
+          echo "跳过安装。"
+        fi
+        echo ""
+        if confirm "开始全量配置?" "N"; then
+          local bash_bin name
+          bash_bin="$(get_bash)"
+          while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            if confirm "配置 $name?" "N"; then
+              "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$name" || exit $?
+            else
+              echo "跳过 $name"
+            fi
+          done < <(modules_list config --filter-os)
+        else
+          echo "跳过配置。"
+        fi
+        exit 0
+      fi
+      ;;
+    esac
   fi
 
-  if [ "$mode" = "config" ]; then
-    local bash_bin
-    bash_bin="$(get_bash)"
-    if [ ${#config_args[@]} -eq 0 ]; then
-      exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh"
-    fi
-    # agents：整组参数一次交给 config.sh（支持 --doctor 等）
-    if [[ "${config_args[0]}" == "agents" ]]; then
-      exec "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "${config_args[@]}"
-    fi
-    for mod in "${config_args[@]}"; do
-      if [[ "$mod" == --* ]]; then
-        echo "错误: 选项 '$mod' 仅支持与 agents 一起使用（如: dotf -c agents --doctor）"
-        exit 1
-      fi
-      "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$mod"
-    done
-    exit $?
+  # --- 必须有动作 ---
+  if [ -z "$action" ]; then
+    echo "错误: 请指定动作 -i / -c / -ic"
+    echo ""
+    show_help
+    exit 1
   fi
+
+  # --- 无模块 → 交互 ---
+  if [ ${#modules[@]} -eq 0 ]; then
+    local cap
+    case "$action" in
+    install) cap=install ;;
+    config) cap=config ;;
+    ic) cap=both ;; # 推荐：展示双能力；执行时按 -ic 校验
+    esac
+    # -ic 交互：展示全部模块，执行时校验（spec 允许）
+    if [ "$action" = "ic" ]; then
+      cap=""
+    fi
+    interactive_select "${cap:-all}" || exit 1
+    modules=("${SELECTED_MODULES[@]}")
+  fi
+
+  # --- 按序执行 ---
+  local mod
+  for mod in "${modules[@]}"; do
+    case "$action" in
+    install)
+      do_install_one "$mod" || exit $?
+      ;;
+    config)
+      if [ "$mod" = "agents" ] && [ ${#config_extra[@]} -gt 0 ]; then
+        do_config_one "$mod" "${config_extra[@]}" || exit $?
+      elif [ ${#config_extra[@]} -gt 0 ] && [ "$mod" != "agents" ]; then
+        echo "错误: 选项仅支持与 agents 一起使用（如: dotf agents -c --doctor）"
+        exit 1
+      else
+        do_config_one "$mod" || exit $?
+      fi
+      ;;
+    ic)
+      if [ "$mod" = "agents" ] && [ ${#config_extra[@]} -gt 0 ]; then
+        do_ic_one "$mod" "${config_extra[@]}" || exit $?
+      else
+        do_ic_one "$mod" || exit $?
+      fi
+      ;;
+    esac
+  done
 }
 
 main "$@"

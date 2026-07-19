@@ -2,41 +2,23 @@
 # 用于安装必要 sdk、配置文件
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DOTFILES_ROOT="$SCRIPT_DIR"
 
-# 可用模块列表
-MODULES=(homebrew system sdk golang senv grepom mdserve git delta fonts npm agents claude cursor opencode qoder trae-cli codebuddy-code codex kimi-code vcpkg ossutil aws aliyun gcp d2)
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/scripts/modules.sh"
 
-# 模块描述（兼容 bash 3.2，不使用关联数组）
+# 模块清单与描述 — 真相源 modules.yaml
+get_install_modules() {
+  # 可选: get_install_modules [--filter-os]
+  if [[ "${1:-}" == "--filter-os" ]]; then
+    modules_list install --filter-os
+  else
+    modules_list install
+  fi
+}
+
 get_module_desc() {
-  case "$1" in
-  homebrew) echo "安装 Homebrew 包管理器" ;;
-  system) echo "系统配置（软件源、依赖等）" ;;
-  sdk) echo "安装 SDK（Go/Python/Node via mise）" ;;
-  golang) echo "配置 Golang 环境（GOPATH 等）" ;;
-  senv) echo "安装 senv 二进制工具" ;;
-  grepom) echo "安装 grepom 多仓库管理工具" ;;
-  mdserve) echo "安装 mdserve 二进制工具" ;;
-  git) echo "配置 Git" ;;
-  delta) echo "安装并配置 git-delta（git diff 高亮分页器）" ;;
-  fonts) echo "安装字体（Maple Mono NF CN）" ;;
-  npm) echo "安装 npm 全局包（docsify-cli 等）" ;;
-  agents) echo "安装 agents CLI 工具包（claude/cursor/opencode/codex/kimi-code；不写 MCP/skills）" ;;
-  claude) echo "安装 Claude Code CLI" ;;
-  cursor) echo "安装 Cursor Agent CLI（cursor-agent）" ;;
-  opencode) echo "安装 OpenCode CLI（Homebrew）" ;;
-  qoder) echo "安装 Qoder CLI" ;;
-  trae-cli) echo "安装 Trae CLI" ;;
-  codebuddy-code) echo "安装 CodeBuddy Code CLI" ;;
-  codex) echo "安装 Codex CLI" ;;
-  kimi-code) echo "安装 Kimi Code CLI" ;;
-  vcpkg) echo "安装 vcpkg C++ 包管理器" ;;
-  ossutil) echo "安装 ossutil 2.0（阿里云 OSS CLI）" ;;
-  aws) echo "安装 AWS CLI v2" ;;
-  aliyun) echo "安装阿里云 CLI" ;;
-  gcp) echo "安装 Google Cloud CLI + gke-gcloud-auth-plugin" ;;
-  d2) echo "安装 D2 图描述语言" ;;
-  *) echo "$1" ;;
-  esac
+  modules_desc "$1" 2>/dev/null || echo "$1"
 }
 
 # 确认函数（由 common.sh 提供，此处为独立运行时的兜底定义）
@@ -156,14 +138,15 @@ show_help() {
   echo "用法: $0 [模块...] [选项]"
   echo ""
   echo "模块:"
-  for m in "${MODULES[@]}"; do
+  while IFS= read -r m; do
+    [ -z "$m" ] && continue
     printf "  %-12s %s\n" "$m" "$(get_module_desc "$m")"
-  done
+  done < <(get_install_modules)
   echo ""
   echo "别名: codebuddy -> codebuddy-code"
   echo ""
   echo "选项:"
-  echo "  --all, -a    安装所有模块"
+  echo "  --all, -a    安装所有模块（按当前 OS 过滤）"
   echo "  --help, -h   显示此帮助"
   echo ""
   echo "示例:"
@@ -185,9 +168,10 @@ main() {
     case "$1" in
     --all | -a)
       load_modules
-      for m in "${MODULES[@]}"; do
+      while IFS= read -r m; do
+        [ -z "$m" ] && continue
         run_module "$m"
-      done
+      done < <(get_install_modules --filter-os)
       print_timing_summary
       exit 0
       ;;
@@ -196,15 +180,14 @@ main() {
       exit 0
       ;;
     --list)
-      for m in "${MODULES[@]}"; do
-        echo "$m"
-      done
+      get_install_modules
       exit 0
       ;;
     --list-desc)
-      for m in "${MODULES[@]}"; do
+      while IFS= read -r m; do
+        [ -z "$m" ] && continue
         printf "%s\t%s\n" "$m" "$(get_module_desc "$m")"
-      done
+      done < <(get_install_modules)
       exit 0
       ;;
     -*)
@@ -226,12 +209,16 @@ main() {
 
   # 执行指定模块
   if [[ ${#modules[@]} -gt 0 ]]; then
-    # 验证模块名
+    # 验证模块名（须在注册表且具备 install）
     for m in "${modules[@]}"; do
-      if [[ ! " ${MODULES[*]} " =~ " $m " ]]; then
+      if ! modules_exists "$m"; then
         echo "错误: 未知模块 '$m'"
-        echo ""
-        show_help
+        echo "可用安装模块:"
+        get_install_modules | sed 's/^/  /'
+        exit 1
+      fi
+      if ! modules_has "$m" install; then
+        echo "错误: 模块 '$m' 无安装步骤"
         exit 1
       fi
     done

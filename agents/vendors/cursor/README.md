@@ -3,7 +3,7 @@
 `agents/vendors/cursor/mcp.json` 是 **agents/env 生成物**。请改 `agents/env/mcp/` 后运行：
 
 ```shell
-dotf -c agents
+dotf agents -c
 scripts/agents/sync.sh cursor
 ```
 

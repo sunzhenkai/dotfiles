@@ -168,13 +168,13 @@
 系统 SHALL 提供完整的快捷键文档。
 
 #### Scenario: 文档存在
-- **WHEN** 用户查看 `kitty/keybindings.md`
+- **WHEN** 用户查看 `config/terminals/kitty/keybindings.md`
 - **THEN** 文档 SHALL 按功能分类（滚动、窗格、tab 等）
 - **THEN** 每个快捷键 SHALL 显示：按键组合、功能描述
 - **THEN** 文档 SHALL 使用 Markdown 格式，支持表格
 
 #### Scenario: 文档与配置一致
 - **WHEN** `kitty.conf` 中的快捷键被修改
-- **THEN** `kitty/keybindings.md` SHALL 同步更新
+- **THEN** `config/terminals/kitty/keybindings.md` SHALL 同步更新
 - **THEN** 文档 SHALL 反映当前配置的所有快捷键
 - **THEN** 过时或未使用的快捷键 SHALL 从文档中移除

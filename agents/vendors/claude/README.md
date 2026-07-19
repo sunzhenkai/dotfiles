@@ -5,7 +5,7 @@
 ## 安装
 
 1. 在 shell 配置中设置 `ZHIPU_API_KEY`（如 `~/.envrc`）。
-2. 运行：`dotf -c claude` 或 `bash scripts/config.sh claude`。
+2. 运行：`dotf claude -c` 或 `bash scripts/config.sh claude`。
 
 ## 配置文件
 
@@ -22,7 +22,7 @@
 本目录位于 `agents/vendors/claude/`（工具专属配置）。
 
 ```shell
-dotf -c agents
+dotf agents -c
 scripts/agents/sync.sh claude
 ```
 

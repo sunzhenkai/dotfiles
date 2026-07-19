@@ -7,8 +7,8 @@
 当前 Codex **无稳定 MCP 配置入口**。统一 `agents` sync 对 Codex MCP 记为 `skip`。
 
 ```shell
-dotf -c codex
-dotf -c agents
+dotf codex -c
+dotf agents -c
 scripts/agents/sync.sh codex   # skills 同步；MCP skip
 python3 scripts/agents/doctor.py
 ```

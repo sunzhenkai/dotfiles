@@ -18,7 +18,7 @@ install_opencode() {
   fi
 
   if ! command -v brew &>/dev/null; then
-    echo "✗ 未找到 Homebrew，请先运行: dotf -i homebrew"
+    echo "✗ 未找到 Homebrew，请先运行: dotf homebrew -i"
     return 1
   fi
 

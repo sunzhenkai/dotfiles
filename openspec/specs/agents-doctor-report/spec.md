@@ -12,7 +12,7 @@ The system SHALL provide a unified agents doctor command that diagnoses skills s
 - **THEN** it SHALL report grouped results covering at least env, tools, mcp, skills/agents sync, browser (if in scope), and security
 
 #### Scenario: Doctor is requested after config
-- **WHEN** the user runs `dotf -c agents` with a doctor-enabled option
+- **WHEN** the user runs `dotf agents -c` with a doctor-enabled option
 - **THEN** sync SHALL complete first according to the selected scope
 - **THEN** doctor SHALL print a summary of current status and outstanding problems
 

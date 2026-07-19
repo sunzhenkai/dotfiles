@@ -7,7 +7,7 @@ TBD - created by archiving change unify-agents. Update Purpose after archive.
 The system SHALL expose a single primary config module named `agents` that synchronizes both shared skills/commands and agent environment MCP/profile configuration.
 
 #### Scenario: User configures agents
-- **WHEN** the user runs `dotf -c agents` or the equivalent config script entry
+- **WHEN** the user runs `dotf agents -c` or the equivalent config script entry
 - **THEN** the system SHALL sync skills/commands for supported tools
 - **THEN** the system SHALL sync MCP/profile configuration for tools that support it
 - **THEN** the operation SHALL be idempotent when repeated with the same inputs
@@ -34,7 +34,7 @@ The system SHALL allow users to restrict sync scope without abandoning the unifi
 The system SHALL route Claude/Cursor/OpenCode/Codex config flows through the unified agents sync helper rather than calling divergent skills-only and env-only entrypoints independently in a conflicting way.
 
 #### Scenario: Cursor config runs
-- **WHEN** the user runs `dotf -c cursor`
+- **WHEN** the user runs `dotf cursor -c`
 - **THEN** Cursor-specific settings/MCP installation MAY still run
 - **THEN** shared skills and managed MCP sync SHALL go through the unified agents sync path
 - **THEN** repeated runs SHALL remain idempotent
@@ -44,10 +44,18 @@ The system SHALL provide scripts under `scripts/agents/` as the single CLI surfa
 
 #### Scenario: User invokes scripts directly
 - **WHEN** the user runs `scripts/agents/sync.sh` without going through `dotf`
-- **THEN** the command SHALL support the same core scopes as `dotf -c agents`
+- **THEN** the command SHALL support the same core scopes as `dotf agents -c`
 - **THEN** documentation SHALL present this path as equivalent to the config module
 
 #### Scenario: No parallel agent script directory
 - **WHEN** the sync/doctor logic is loaded
 - **THEN** all core implementation modules SHALL reside under `scripts/agents/`
 - **THEN** the code SHALL NOT import agent logic from a separate `scripts/agent-env/` directory
+
+### Requirement: Agents dual capability via subject-first CLI
+The `agents` module SHALL be registered with both install and config capabilities. Users SHALL be able to run `dotf agents -i`, `dotf agents -c`, and `dotf agents -ic` under the subject-first CLI.
+
+#### Scenario: Install then config
+- **WHEN** the user runs `dotf agents -ic`
+- **THEN** the system SHALL run the agents install bundle first
+- **THEN** only if install succeeds, the system SHALL run the unified agents config sync

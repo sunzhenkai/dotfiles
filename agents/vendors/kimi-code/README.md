@@ -5,7 +5,7 @@
 ## 安装
 
 ```shell
-dotf -i kimi-code
+dotf kimi-code -i
 ```
 
 等价于官方脚本：
@@ -23,7 +23,7 @@ kimi --version
 ## 配置
 
 ```shell
-dotf -c kimi-code
+dotf kimi-code -c
 ```
 
 会把仓库内 `agents/vendors/kimi-code/config.toml` 安装到 `~/.kimi-code/config.toml`：
@@ -35,7 +35,7 @@ dotf -c kimi-code
 
 MCP HTTP 鉴权使用 `bearerTokenEnvVar`（如 `ZHIPU_API_KEY`），**不要**在 headers 里写 `${ZHIPU_API_KEY}`——Kimi 不会展开该占位符。
 
-如需强制用仓库版本覆盖 config，先自行备份后删除 `~/.kimi-code/config.toml`，再执行 `dotf -c kimi-code`。
+如需强制用仓库版本覆盖 config，先自行备份后删除 `~/.kimi-code/config.toml`，再执行 `dotf kimi-code -c`。
 
 ## 首次使用
 

@@ -9,7 +9,7 @@ install_agents_bundle() {
   echo "========================================"
   echo "agents install bundle"
   echo "成员: ${AGENTS_BUNDLE_MODULES[*]}"
-  echo "说明: 只安装 CLI；配置请随后运行: dotf -c agents"
+  echo "说明: 只安装 CLI；配置请随后运行: dotf agents -c"
   echo "========================================"
 
   local ok=0 skip=0 fail=0
@@ -143,7 +143,7 @@ install_agents_bundle() {
   echo "摘要: ok=$ok  skip(up-to-date/跳过)=$skip  fail=$fail"
   echo ""
   echo "下一步:"
-  echo "  dotf -c agents              # 同步 skills + MCP"
+  echo "  dotf agents -c              # 同步 skills + MCP"
   echo "  python3 scripts/agents/doctor.py   # 详细状态报告"
   echo "  （-i agents 不会写入 MCP/skills）"
 
