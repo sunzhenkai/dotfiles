@@ -5,9 +5,13 @@ set -e
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%s)
 BACKUP_DIR="$HOME/.config/backups"
+export DOTFILES_ROOT
+export DOTF_BACKUP_DIR="$BACKUP_DIR"
 
 # shellcheck source=/dev/null
 source "$DOTFILES_ROOT/scripts/modules.sh"
+# shellcheck source=/dev/null
+source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
 
 # ============================================================
 # 配置映射 — 真相源为 modules.yaml（经 modules.sh）
@@ -42,38 +46,16 @@ get_all_config_names() {
 
 backup_to() {
   local src="$1"
-  local basename
-  basename=$(basename "$src")
-  local dest="$BACKUP_DIR/${basename}-${TIMESTAMP}"
-  mkdir -p "$BACKUP_DIR"
-  mv "$src" "$dest"
-  echo "已备份 $basename 到 $dest"
+  local dest
+  dest=$(dotf_backup_to "$src")
+  echo "已备份 $(basename "$src") 到 $dest"
 }
 
 # 创建 symlink（带备份），source 为仓库内相对路径，target 为绝对路径。
-# 与 install_config 同样的 symlink+backup 策略，供需要安装到子目录的额外文件复用。
 link_file() {
   local source="$1"
   local target="$2"
-  local expected_link="$DOTFILES_ROOT/$source"
-  local expected_abs
-  expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
-
-  # 已是正确 symlink → 跳过
-  if [ -L "$target" ]; then
-    local current_link
-    current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
-    if [ "$current_link" = "$expected_abs" ]; then
-      return 0
-    fi
-    ln -sf "$expected_link" "$target"
-    return 0
-  fi
-  # 普通文件/目录存在 → 备份后创建
-  if [ -e "$target" ]; then
-    backup_to "$target"
-  fi
-  ln -s "$expected_link" "$target"
+  dotf_ensure_symlink "$source" "$target"
 }
 
 install_config() {
@@ -86,39 +68,15 @@ install_config() {
   }
 
   IFS=':' read -r source target <<<"$def"
-  target="${target/#\~/$HOME}"
-  local expected_link="$DOTFILES_ROOT/$source"
-  local expected_abs
-  expected_abs=$(readlink -f "$expected_link" 2>/dev/null || echo "$expected_link")
-
-  # 状态 1: 目标已是正确 symlink → 跳过
-  if [ -L "$target" ]; then
-    local current_link
-    current_link=$(readlink -f "$target" 2>/dev/null || readlink "$target")
-    if [ "$current_link" = "$expected_abs" ]; then
-      echo "已安装: $name"
-      return 0
-    fi
-    # 状态 2: symlink 指向错误位置且目标存在（非 broken）→ 备份后覆盖
-    if [ -e "$target" ]; then
-      backup_to "$target"
-      ln -s "$expected_link" "$target"
-    else
-      # 状态 3: broken symlink → 直接覆盖，无需备份
-      ln -sf "$expected_link" "$target"
-    fi
+  target=$(dotf_expand_path "$target")
+  if ! dotf_ensure_symlink "$source" "$target"; then
+    return 1
+  fi
+  if [ "${DOTF_CFG_STATUS:-}" = "unchanged" ]; then
     echo "已安装: $name"
-    return 0
+  else
+    echo "已安装: $name"
   fi
-
-  # 状态 4: 普通文件/目录 → 备份后创建
-  if [ -e "$target" ]; then
-    backup_to "$target"
-  fi
-
-  # 状态 5: 不存在 → 直接创建
-  ln -s "$expected_link" "$target"
-  echo "已安装: $name"
 }
 
 # ============================================================
@@ -140,14 +98,21 @@ install_zsh() {
   echo "已安装: ~/.zshrc"
 }
 
-# 统一 agents sync（skills + MCP/env；可传 --skills-only/--env-only/--profile/--doctor）
+# 统一 agents sync（skills + MCP/env；可传 --skills-only/--env-only/--profile）
+# 诊断请用: dotf agents -d
 sync_agents() {
   "$DOTFILES_ROOT/scripts/agents/sync.sh" "$@"
 }
 
 install_agents() {
-  # 其余参数透传（如 --doctor --profile research）
-  sync_agents all "$@"
+  # 用法: install_agents [tool|all] [--profile ... --skills-only ...]
+  # 无 tool 时默认 all；显式 tool 名启用过滤同步
+  local tool="all"
+  if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
+    tool="$1"
+    shift
+  fi
+  sync_agents "$tool" "$@"
 }
 
 # 特殊配置：claude（settings / .claude.json；MCP/skills 走统一 agents sync）
@@ -208,11 +173,7 @@ install_claude() {
     echo "已安装: .claude.json"
   fi
 
-  if [ -x "$DOTFILES_ROOT/scripts/agents/sync.sh" ]; then
-    "$DOTFILES_ROOT/scripts/agents/sync.sh" claude
-  else
-    echo "⚠️  跳过 agents sync：找不到 scripts/agents/sync.sh"
-  fi
+  # 共享 skills/MCP 同步由 `dotf agents -c` 显式触发，单工具 config 不隐式 sync
 
   if [ -n "${SUDO_USER:-}" ] && [ "$(id -u)" -eq 0 ]; then
     local claude_state="$HOME/.claude.json"
@@ -262,8 +223,7 @@ install_codex() {
   mkdir -p "$HOME/.codex/model-catalogs"
   link_file "agents/vendors/codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
   echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"
-
-  sync_agents codex
+  # skills/MCP：dotf agents -c [--tool codex] 或 sync.sh codex
 }
 
 # 特殊配置：tmux（依赖 submodule tpm；补装 tmux-yank 剪贴板工具）
@@ -284,14 +244,13 @@ install_cursor() {
   fi
 
   mkdir -p "$HOME/.cursor"
-  sync_agents cursor
+  echo "Cursor vendor 目录已就绪；共享 sync 请运行: dotf agents -c"
 }
 
 
 install_opencode() {
   install_config "opencode"
-  # skills + MCP 一并同步；MCP 写入 agents/vendors/opencode/opencode.json
-  sync_agents opencode
+  # skills/MCP：dotf agents -c 或 sync.sh opencode
 }
 
 # 特殊配置：kimi-code
@@ -311,24 +270,18 @@ install_kimi_code_config() {
     echo "已安装: ~/.kimi-code/config.toml"
     echo "提示: 启动 kimi 后执行 /login 完成鉴权"
   fi
-
-  # skills + MCP 走统一 agents sync（commands 对 kimi 为 skip）
-  sync_agents kimi-code
+  # skills/MCP：dotf agents -c 或 sync.sh kimi-code
 }
 
 install_all() {
+  # shellcheck source=/dev/null
+  source "$DOTFILES_ROOT/scripts/lib/runner.sh"
+  local name
   for name in $(get_all_config_names --filter-os); do
-    case "$name" in
-    agents)   ;; # 各工具安装时已 sync；全量末尾再统一跑一次
-    zsh)      install_zsh ;;
-    claude)   install_claude ;;
-    codex)    install_codex ;;
-    cursor)   install_cursor ;;
-    opencode) install_opencode ;;
-    kimi-code) install_kimi_code_config ;;
-    tmux)     install_tmux ;;
-    *)        install_config "$name" ;;
-    esac
+    if [ "$name" = "agents" ]; then
+      continue # 末尾统一 sync
+    fi
+    runner_run_action config "$name" || true
   done
   sync_agents all
 }
@@ -354,9 +307,13 @@ main() {
     echo "  --list-desc     列出配置名及描述"
     echo ""
     echo "agents 附加选项（仅 agents）:"
-    echo "  --doctor --profile NAME --skills-only --env-only --dry-run --strict"
+    echo "  --profile NAME --skills-only --env-only --dry-run --strict"
+    echo "诊断请用: dotf agents -d  或  dotf agents -cd"
     exit 1
   fi
+
+  # shellcheck source=/dev/null
+  source "$DOTFILES_ROOT/scripts/lib/runner.sh"
 
   case "$config" in
   --list)
@@ -372,17 +329,16 @@ main() {
   --all | -a) install_all ;;
   agents)
     shift
-    install_agents "$@"
+    runner_run_action config agents "$@"
     ;;
-  zsh)      install_zsh ;;
-  claude)   install_claude ;;
-  codex)    install_codex ;;
-  cursor)   install_cursor ;;
-  opencode) install_opencode ;;
-  kimi-code) install_kimi_code_config ;;
-  tmux)     install_tmux ;;
-  *)        install_config "$config" ;;
+  *)
+    # 约定式处理器；无处理器时 runner 走 compat
+    runner_run_action config "$config"
+    ;;
   esac
 }
 
-main "$@"
+# 仅直接执行时进入 CLI；可被约定式处理器 source
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi

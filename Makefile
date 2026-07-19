@@ -1,7 +1,29 @@
-.PHONY: install
+.PHONY: install test validate smoke bash32 shellcheck ci
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
+
+validate:
+	python3 scripts/modules.py validate
+
+test:
+	python3 -m pytest -q
+
+smoke:
+	bash scripts/ci/smoke-linux.sh
+
+bash32:
+	bash scripts/ci/bash32-check.sh
+
+shellcheck:
+	shellcheck -x bin/dotf scripts/modules.sh scripts/doctor.sh \
+		scripts/bootstrap.sh scripts/run_plan.sh \
+		scripts/ci/smoke-linux.sh scripts/ci/bash32-check.sh
+
+ci: validate test
+	@command -v shellcheck >/dev/null && $(MAKE) shellcheck || echo "skip shellcheck (not installed)"
+	$(MAKE) smoke
+	$(MAKE) bash32
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \

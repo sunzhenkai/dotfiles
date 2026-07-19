@@ -2,7 +2,8 @@
 # 统一 agents sync：skills/commands + MCP/env。
 # 用法:
 #   sync.sh [claude|cursor|opencode|codex|kimi-code|all]
-#           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--doctor] [--strict]
+#           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
+# 诊断请用: dotf agents -d  或  python3 scripts/agents/doctor.py
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +19,6 @@ SKILLS=1
 ENV=1
 PROFILE=""
 DRY_RUN=0
-DOCTOR=0
 STRICT=0
 EXTRA=()
 
@@ -48,7 +48,9 @@ while [ $# -gt 0 ]; do
     EXTRA+=(--dry-run)
     ;;
   --doctor)
-    DOCTOR=1
+    echo "error: --doctor 已不再作为 sync 旁路旗标" >&2
+    echo "请改用: dotf agents -d  或  dotf agents -cd" >&2
+    exit 1
     ;;
   --strict)
     STRICT=1
@@ -92,25 +94,9 @@ if [ "$ENV" -eq 1 ]; then
   python3 "$SCRIPT_DIR/env_sync.py" "${env_args[@]}"
 fi
 
-if [ "$DOCTOR" -eq 1 ]; then
-  echo "--- doctor ---"
-  doctor_args=(--root "$ROOT")
-  if [ -n "$PROFILE" ]; then
-    doctor_args+=(--profile "$PROFILE")
-  fi
-  if [ "$TOOL" != "all" ]; then
-    doctor_args+=(--tool "$TOOL")
-  fi
-  set +e
-  python3 "$SCRIPT_DIR/doctor.py" "${doctor_args[@]}"
-  doc_rc=$?
-  set -e
-  if [ "$STRICT" -eq 1 ] && [ "$doc_rc" -ne 0 ]; then
-    exit "$doc_rc"
-  fi
-  if [ "$doc_rc" -ne 0 ]; then
-    echo "⚠️  doctor 发现 fail（非 --strict，不阻断 sync）"
-  fi
+# --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）
+if [ "$STRICT" -eq 1 ]; then
+  :
 fi
 
 echo "✓ agents sync 完成"

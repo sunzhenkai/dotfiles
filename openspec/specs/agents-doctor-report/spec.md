@@ -4,7 +4,7 @@
 TBD - created by archiving change unify-agents. Update Purpose after archive.
 ## Requirements
 ### Requirement: Unified doctor command
-The system SHALL provide a unified agents doctor command that diagnoses skills sync, MCP/env configuration, tools, browser, security, and related agent readiness.
+The system SHALL provide a unified agents doctor command that diagnoses skills sync, MCP/env configuration, tools, browser, security, and related agent readiness. Users SHALL invoke it via `dotf agents -d` (or combinations that include doctor such as `-cd`), not via a config/sync `--doctor` flag.
 
 #### Scenario: Doctor runs with defaults
 - **WHEN** the user runs agents doctor without extra flags
@@ -12,9 +12,14 @@ The system SHALL provide a unified agents doctor command that diagnoses skills s
 - **THEN** it SHALL report grouped results covering at least env, tools, mcp, skills/agents sync, browser (if in scope), and security
 
 #### Scenario: Doctor is requested after config
-- **WHEN** the user runs `dotf agents -c` with a doctor-enabled option
+- **WHEN** the user runs `dotf agents -cd`
 - **THEN** sync SHALL complete first according to the selected scope
 - **THEN** doctor SHALL print a summary of current status and outstanding problems
+
+#### Scenario: Doctor-only via subject-first CLI
+- **WHEN** the user runs `dotf agents -d`
+- **THEN** doctor SHALL run without performing sync in the same invocation
+- **THEN** doctor SHALL still report current status and outstanding problems
 
 ### Requirement: Detailed status and problem report
 The doctor command SHALL produce a structured report that distinguishes overall status, individual check results, and actionable problems.

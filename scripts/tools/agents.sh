@@ -144,7 +144,7 @@ install_agents_bundle() {
   echo ""
   echo "下一步:"
   echo "  dotf agents -c              # 同步 skills + MCP"
-  echo "  python3 scripts/agents/doctor.py   # 详细状态报告"
+  echo "  dotf agents -d              # 深度诊断"
   echo "  （-i agents 不会写入 MCP/skills）"
 
   if [ "$fail" -gt 0 ]; then

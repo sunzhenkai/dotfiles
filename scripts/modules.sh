@@ -11,13 +11,13 @@ _modules_py() {
 }
 
 # 列出模块名（一行一个）
-# 用法: modules_list [install|config|both] [--os ID|--filter-os]
+# 用法: modules_list [install|config|doctor|both] [--os ID|--filter-os]
 modules_list() {
   local cap=""
   local extra=()
   while [ $# -gt 0 ]; do
     case "$1" in
-    install | config | both)
+    install | config | doctor | both)
       cap="$1"
       ;;
     --os)
@@ -29,6 +29,9 @@ modules_list() {
       ;;
     --desc)
       extra+=(--desc)
+      ;;
+    --registry-order)
+      extra+=(--registry-order)
       ;;
     *)
       echo "modules_list: 未知参数 $1" >&2
@@ -58,7 +61,7 @@ modules_exists() {
 }
 
 modules_has() {
-  # modules_has <name> install|config
+  # modules_has <name> install|config|doctor
   _modules_py has "$1" "$2"
 }
 
@@ -74,14 +77,31 @@ modules_target() {
   _modules_py field "$1" target
 }
 
+modules_bin() {
+  _modules_py field "$1" bin
+}
+
+modules_group() {
+  _modules_py field "$1" group
+}
+
+modules_depends_on() {
+  _modules_py field "$1" depends_on
+}
+
 modules_detect_os() {
   _modules_py detect-os
 }
 
 modules_profiles() {
-  _modules_py profiles
+  # 默认 OS profile（init --list）；使用场景: modules_profiles usage
+  _modules_py profiles "${1:-os}"
 }
 
 modules_get() {
   _modules_py get "$1"
+}
+
+modules_validate() {
+  _modules_py validate
 }

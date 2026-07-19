@@ -4,13 +4,20 @@
 
 ## 统一入口（推荐）
 
+**边界**：`agents` 负责聚合安装计划与共享 skills/commands/MCP 同步；单工具模块只处理本工具 CLI/vendor 配置，**不会**隐式全量 sync。
+
 ```shell
-dotf agents -i                 # 安装 CLI 工具包（claude/cursor/opencode/codex/kimi-code）
-dotf opencode -i               # 单独安装 OpenCode（亦可）
-dotf claude -i                 # 单独安装 Claude Code CLI（亦可）
-dotf agents -c                 # 同步 skills + MCP
-dotf agents -c --doctor        # 同步 + 诊断摘要
+dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 动作
+dotf claude -i                 # 仅安装 Claude CLI
+dotf cursor -c                 # 仅应用 Cursor vendor 配置（不 sync skills/MCP）
+dotf agents -c                 # 聚合同步 skills + MCP（全部工具）
+dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 适用目标
+dotf agents -d                 # L0 诊断
+dotf agents -d --deep          # L0 + agents L1 深度诊断
+dotf agents -d --deep --json   # 深度诊断 JSON（凭据脱敏）
+dotf agents -cd                # 先同步再诊断
 scripts/agents/sync.sh all
+scripts/agents/sync.sh cursor  # 等价过滤入口
 python3 scripts/agents/doctor.py
 ```
 

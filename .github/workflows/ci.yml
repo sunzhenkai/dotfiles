@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux:
+    name: Linux (validate / pytest / shellcheck / smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install PyYAML pytest
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Registry validate
+        run: python3 scripts/modules.py validate
+
+      - name: Python tests
+        run: python -m pytest -q
+
+      - name: ShellCheck
+        run: |
+          shellcheck -x bin/dotf scripts/modules.sh scripts/doctor.sh \
+            scripts/bootstrap.sh scripts/run_plan.sh \
+            scripts/lib/result.sh scripts/lib/runner.sh scripts/lib/compat_adapter.sh \
+            scripts/lib/config_safe.sh scripts/lib/handler_common.sh \
+            scripts/lib/doctor_l0.sh scripts/lib/doctor_run.sh \
+            scripts/ci/smoke-linux.sh scripts/ci/bash32-check.sh
+
+      - name: Linux smoke
+        run: bash scripts/ci/smoke-linux.sh
+
+  macos:
+    name: macOS (Bash 3.2 CLI)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: pip install PyYAML
+
+      - name: Bash 3.2 compatibility
+        env:
+          BASH_BIN: /bin/bash
+        run: bash scripts/ci/bash32-check.sh
+
+      - name: Registry validate
+        run: python3 scripts/modules.py validate

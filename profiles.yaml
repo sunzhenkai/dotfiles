@@ -1,0 +1,54 @@
+# 使用场景 profile（与 OS profile 正交）
+# 由 scripts/modules.py 读取；modules 为模块名列表，includes 可复用其它 profile。
+# full 且 modules 为空时，planner 解释为当前 OS 适用全集（保持原 init 全量语义）。
+#
+# 字段:
+#   default          — 默认 profile 名
+#   profiles.<name>:
+#     desc           — 描述
+#     modules        — 模块名列表（须存在于 modules.yaml）
+#     includes       — 其它 profile 名（不得成环）
+
+version: 1
+default: full
+
+profiles:
+  minimal:
+    desc: 最小可维护 shell 环境
+    modules:
+      - system
+      - sdk
+      - git
+      - zsh
+      - starship
+
+  remote:
+    desc: 远程/无桌面开发环境
+    includes: [minimal]
+    modules:
+      - golang
+      - nvim
+      - tmux
+      - delta
+      - grepom
+      - agents
+      - claude
+
+  desktop:
+    desc: 桌面环境（模块仍按 OS 过滤）
+    includes: [minimal]
+    modules:
+      - nvim
+      - tmux
+      - fonts
+      - kitty
+      - alacritty
+      - wezterm
+      - ghostty
+      - hypr
+      - fcitx5
+      - iterm2
+
+  full:
+    desc: 全量初始化语义（当前 OS 适用全集）
+    modules: []

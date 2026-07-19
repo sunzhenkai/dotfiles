@@ -124,6 +124,11 @@ confirm() {
   local prompt="$1"
   local default="${2:-Y}"
 
+  # 顶层 orchestrator 已通过 --yes 授权时，模块内不再二次确认
+  if [ "${DOTF_YES:-0}" = "1" ] || [ "${ASSUME_YES:-0}" = "1" ]; then
+    return 0
+  fi
+
   local reply
 
   if [[ "$default" == "Y" ]]; then

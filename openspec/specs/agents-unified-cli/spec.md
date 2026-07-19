@@ -40,12 +40,17 @@ The system SHALL route Claude/Cursor/OpenCode/Codex config flows through the uni
 - **THEN** repeated runs SHALL remain idempotent
 
 ### Requirement: Scripts expose a single agents CLI surface
-The system SHALL provide scripts under `scripts/agents/` as the single CLI surface for sync and doctor orchestration, implemented as one self-contained Python package with no reverse dependency on any other agent script directory.
+The system SHALL provide scripts under `scripts/agents/` as the single CLI surface for sync and doctor orchestration, implemented as one self-contained Python package with no reverse dependency on any other agent script directory. Sync entrypoints SHALL NOT accept a `--doctor` flag; diagnosis SHALL be invoked via the module doctor action (`dotf agents -d`) or by calling the doctor script directly.
 
 #### Scenario: User invokes scripts directly
 - **WHEN** the user runs `scripts/agents/sync.sh` without going through `dotf`
 - **THEN** the command SHALL support the same core scopes as `dotf agents -c`
 - **THEN** documentation SHALL present this path as equivalent to the config module
+
+#### Scenario: Sync rejects doctor flag
+- **WHEN** the user runs `scripts/agents/sync.sh --doctor` or `dotf agents -c --doctor`
+- **THEN** the command SHALL fail with a non-zero exit
+- **THEN** the error SHALL direct the user to `dotf agents -d` or `dotf agents -cd`
 
 #### Scenario: No parallel agent script directory
 - **WHEN** the sync/doctor logic is loaded
@@ -53,9 +58,19 @@ The system SHALL provide scripts under `scripts/agents/` as the single CLI surfa
 - **THEN** the code SHALL NOT import agent logic from a separate `scripts/agent-env/` directory
 
 ### Requirement: Agents dual capability via subject-first CLI
-The `agents` module SHALL be registered with both install and config capabilities. Users SHALL be able to run `dotf agents -i`, `dotf agents -c`, and `dotf agents -ic` under the subject-first CLI.
+The `agents` module SHALL be registered with install, config, and doctor capabilities. Users SHALL be able to run `dotf agents -i`, `dotf agents -c`, `dotf agents -d`, and combinations such as `dotf agents -ic` and `dotf agents -cd` under the subject-first CLI.
 
 #### Scenario: Install then config
 - **WHEN** the user runs `dotf agents -ic`
 - **THEN** the system SHALL run the agents install bundle first
 - **THEN** only if install succeeds, the system SHALL run the unified agents config sync
+
+#### Scenario: Config then doctor
+- **WHEN** the user runs `dotf agents -cd`
+- **THEN** the system SHALL run the unified agents config sync first
+- **THEN** only if config succeeds, the system SHALL run agents doctor
+
+#### Scenario: Doctor alone
+- **WHEN** the user runs `dotf agents -d`
+- **THEN** the system SHALL run agents doctor without requiring a preceding sync in the same invocation
+

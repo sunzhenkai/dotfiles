@@ -1,138 +1,224 @@
-# 统一模块注册表 — install/config 能力与路径的真相源
+# 统一模块注册表 — install/config/doctor 能力与路径的真相源
 # 由 scripts/modules.py / scripts/modules.sh 读取；勿再维护并行硬编码清单。
 #
 # 字段:
-#   name     — 唯一模块名
-#   desc     — 人类可读描述
-#   install  — true 表示具备安装能力（由 scripts/install.sh 按名调度）
-#   config   — { source, target } 配置源（相对仓根）与安装目标
-#   os       — 可选适用 OS 集合；省略 = 全平台
-#              支持具体 ID（darwin/ubuntu/…）或族名 linux（非 darwin）
+#   name       — 唯一模块名
+#   desc       — 人类可读描述
+#   install    — true 表示具备安装能力（由 scripts/install.sh 按名调度）
+#   config     — { source, target } 配置源（相对仓根）与安装目标
+#   doctor     — true 表示具备诊断能力（工具型模块强制；L0 或专用实现）
+#   bin        — 可选，L0 doctor 用于 PATH 检查的命令名
+#   os         — 可选适用 OS 集合；省略 = 全平台
+#                支持具体 ID（darwin/ubuntu/…）或族名 linux（非 darwin）
+#   depends_on — 可选依赖模块名列表（planner 拓扑排序）
+#   group      — 可选展示分组（不影响执行顺序）
+# 禁止字段: script/command/handler/function/exec/run（注册表非可执行 DSL）
+#
+# 使用场景 profile 见 profiles.yaml（与 OS profile 正交）
+# 非工具型（不强制 doctor）: system / homebrew / fonts
 
 modules:
   # ---------- install-only ----------
   - name: homebrew
     desc: 安装 Homebrew 包管理器
+    group: core
+    depends_on: [system]
     install: true
 
   - name: system
     desc: 系统配置（软件源、依赖等）
+    group: core
     install: true
 
   - name: sdk
     desc: 安装 SDK（Go/Python/Node via mise）
+    group: core
+    depends_on: [system]
     install: true
+    doctor: true
+    bin: mise
 
   - name: golang
     desc: 配置 Golang 环境（GOPATH 等）
+    group: core
+    depends_on: [sdk]
     install: true
+    doctor: true
+    bin: go
 
   - name: senv
     desc: 安装 senv 二进制工具
+    group: tools
+    depends_on: [golang]
     install: true
+    doctor: true
+    bin: senv
 
   - name: grepom
     desc: 安装 grepom 多仓库管理工具
+    group: tools
+    depends_on: [golang]
     install: true
+    doctor: true
+    bin: grepom
 
   - name: mdserve
     desc: 安装 mdserve 二进制工具
+    group: tools
+    depends_on: [golang]
     install: true
+    doctor: true
+    bin: mdserve
 
   - name: delta
     desc: 安装并配置 git-delta（git diff 高亮分页器）
+    group: tools
+    depends_on: [git]
     install: true
+    doctor: true
+    bin: delta
 
   - name: fonts
     desc: 安装字体（Maple Mono NF CN）
+    group: desktop
     install: true
 
   - name: npm
     desc: 安装 npm 全局包（docsify-cli 等）
+    group: tools
+    depends_on: [sdk]
     install: true
+    doctor: true
+    bin: npm
 
   - name: qoder
     desc: 安装 Qoder CLI
+    group: agents
     install: true
+    doctor: true
 
   - name: trae-cli
     desc: 安装 Trae CLI
+    group: agents
     install: true
+    doctor: true
 
   - name: codebuddy-code
     desc: 安装 CodeBuddy Code CLI
+    group: agents
     install: true
+    doctor: true
 
   - name: vcpkg
     desc: 安装 vcpkg C++ 包管理器
+    group: tools
     install: true
+    doctor: true
+    bin: vcpkg
 
   - name: ossutil
     desc: 安装 ossutil 2.0（阿里云 OSS CLI）
+    group: tools
     install: true
+    doctor: true
+    bin: ossutil
 
   - name: aws
     desc: 安装 AWS CLI v2
+    group: tools
     install: true
+    doctor: true
+    bin: aws
 
   - name: aliyun
     desc: 安装阿里云 CLI
+    group: tools
     install: true
+    doctor: true
+    bin: aliyun
 
   - name: gcp
     desc: 安装 Google Cloud CLI + gke-gcloud-auth-plugin
+    group: tools
     install: true
+    doctor: true
+    bin: gcloud
 
   - name: d2
     desc: 安装 D2 图描述语言
+    group: tools
     install: true
+    doctor: true
+    bin: d2
 
   # ---------- dual: install + config ----------
   - name: git
     desc: Git 版本控制
+    group: core
+    depends_on: [system]
     install: true
+    doctor: true
+    bin: git
     config:
       source: config/tools/git
       target: ~/.config/git
 
   - name: agents
     desc: agents CLI 工具包 + skills/MCP 同步
+    group: agents
+    # install 由 planner 展开为各单工具动作（见 planner.AGENTS_INSTALL_BUNDLE）
     install: true
+    doctor: true
     config:
       source: agents
       target: ~/.local/share/dotfiles-agents
 
   - name: claude
     desc: Claude Code CLI + 配置
+    group: agents
     install: true
+    doctor: true
+    bin: claude
     config:
       source: agents/vendors/claude
       target: ~/.config/claude
 
   - name: cursor
     desc: Cursor Agent CLI + MCP 配置
+    group: agents
     install: true
+    doctor: true
+    bin: cursor
     config:
       source: agents/vendors/cursor/mcp.json
       target: ~/.cursor/mcp.json
 
   - name: opencode
     desc: OpenCode CLI + 配置
+    group: agents
     install: true
+    doctor: true
+    bin: opencode
     config:
       source: agents/vendors/opencode
       target: ~/.config/opencode
 
   - name: codex
     desc: Codex CLI + 配置（MiniMax）
+    group: agents
     install: true
+    doctor: true
+    bin: codex
     config:
       source: agents/vendors/codex/config.toml
       target: ~/.codex/config.toml
 
   - name: kimi-code
     desc: Kimi Code CLI + 配置
+    group: agents
     install: true
+    doctor: true
+    bin: kimi
     config:
       source: agents/vendors/kimi-code/config.toml
       target: ~/.kimi-code/config.toml
@@ -140,12 +226,18 @@ modules:
   # ---------- config-only: shell ----------
   - name: zsh
     desc: Zsh shell 配置
+    group: shell
+    doctor: true
     config:
       source: config/shell/zsh
       target: ~/.config/zsh
 
   - name: starship
     desc: Starship 终端提示符配置
+    group: shell
+    depends_on: [zsh]
+    doctor: true
+    bin: starship
     config:
       source: config/shell/starship/starship.toml
       target: ~/.config/starship.toml
@@ -153,18 +245,26 @@ modules:
   # ---------- config-only: editors ----------
   - name: nvim
     desc: Neovim 编辑器配置
+    group: editors
+    doctor: true
+    bin: nvim
     config:
       source: config/editors/nvim
       target: ~/.config/nvim
 
   - name: helix
     desc: Helix 编辑器配置
+    group: editors
+    doctor: true
+    bin: hx
     config:
       source: config/editors/helix
       target: ~/.config/helix
 
   - name: zed
     desc: Zed 编辑器配置
+    group: editors
+    doctor: true
     config:
       source: config/editors/zed
       target: ~/.config/zed
@@ -172,30 +272,44 @@ modules:
   # ---------- config-only: terminals ----------
   - name: kitty
     desc: Kitty 终端模拟器配置
+    group: terminals
+    doctor: true
+    bin: kitty
     config:
       source: config/terminals/kitty
       target: ~/.config/kitty
 
   - name: alacritty
     desc: Alacritty 终端模拟器配置
+    group: terminals
+    doctor: true
+    bin: alacritty
     config:
       source: config/terminals/alacritty
       target: ~/.config/alacritty
 
   - name: ghostty
     desc: Ghostty 终端模拟器配置
+    group: terminals
+    doctor: true
+    bin: ghostty
     config:
       source: config/terminals/ghostty
       target: ~/.config/ghostty
 
   - name: wezterm
     desc: WezTerm 终端模拟器配置
+    group: terminals
+    doctor: true
+    bin: wezterm
     config:
       source: config/terminals/wezterm
       target: ~/.config/wezterm
 
   - name: iterm2
     desc: iTerm2 终端模拟器配置
+    group: terminals
+    doctor: true
     config:
       source: config/terminals/iterm2
       target: ~/.config/iterm2
@@ -204,12 +318,18 @@ modules:
   # ---------- config-only: multiplexers ----------
   - name: tmux
     desc: Tmux 终端复用器配置
+    group: multiplexers
+    doctor: true
+    bin: tmux
     config:
       source: config/multiplexers/tmux
       target: ~/.config/tmux
 
   - name: zellij
     desc: Zellij 终端复用器配置
+    group: multiplexers
+    doctor: true
+    bin: zellij
     config:
       source: config/multiplexers/zellij
       target: ~/.config/zellij
@@ -217,6 +337,8 @@ modules:
   # ---------- config-only: desktop ----------
   - name: hypr
     desc: Hyprland 窗口管理器配置
+    group: desktop
+    doctor: true
     config:
       source: config/desktop/hypr
       target: ~/.config/hypr
@@ -224,6 +346,8 @@ modules:
 
   - name: fcitx5
     desc: Fcitx5 输入法配置
+    group: desktop
+    doctor: true
     config:
       source: config/desktop/fcitx5
       target: ~/.config/fcitx5
@@ -232,24 +356,34 @@ modules:
   # ---------- config-only: tools ----------
   - name: yazi
     desc: Yazi 文件管理器配置
+    group: utils
+    doctor: true
+    bin: yazi
     config:
       source: config/tools/yazi
       target: ~/.config/yazi
 
   - name: k9s
     desc: K9s Kubernetes CLI 配置
+    group: utils
+    doctor: true
+    bin: k9s
     config:
       source: config/tools/k9s
       target: ~/.config/k9s
 
   - name: shell_gpt
     desc: Shell-GPT 配置
+    group: utils
+    doctor: true
     config:
       source: config/tools/shell_gpt
       target: ~/.config/shell_gpt
 
   - name: logseq
     desc: Logseq 笔记配置
+    group: utils
+    doctor: true
     config:
       source: config/tools/logseq
       target: ~/.logseq
