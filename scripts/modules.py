@@ -114,6 +114,11 @@ def has_doctor(mod: dict[str, Any]) -> bool:
     return bool(mod.get("doctor"))
 
 
+def is_enabled(mod: dict[str, Any]) -> bool:
+    """enabled 缺省为 true；显式 false 时不参与自动全集/profile/--all。"""
+    return mod.get("enabled", True) is not False
+
+
 def is_tool_module(mod: dict[str, Any]) -> bool:
     name = mod.get("name")
     if not name or name in NON_TOOL_MODULES:
@@ -152,9 +157,12 @@ def filter_modules(
     *,
     capability: str | None = None,
     os_id: str | None = None,
+    include_disabled: bool = False,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for mod in modules:
+        if not include_disabled and not is_enabled(mod):
+            continue
         if capability == "install" and not has_install(mod):
             continue
         if capability == "config" and not has_config(mod):
@@ -255,6 +263,8 @@ def validate_registry(
             errors.append(f"{name}: install 必须为 bool")
         if "doctor" in mod and not isinstance(mod["doctor"], bool):
             errors.append(f"{name}: doctor 必须为 bool")
+        if "enabled" in mod and not isinstance(mod["enabled"], bool):
+            errors.append(f"{name}: enabled 必须为 bool")
         if "bin" in mod and mod["bin"] is not None and not isinstance(mod["bin"], str):
             errors.append(f"{name}: bin 必须为字符串")
         if "group" in mod and mod["group"] is not None and not isinstance(mod["group"], str):

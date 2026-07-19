@@ -12,6 +12,8 @@
 #                支持具体 ID（darwin/ubuntu/…）或族名 linux（非 darwin）
 #   depends_on — 可选依赖模块名列表（planner 拓扑排序）
 #   group      — 可选展示分组（不影响执行顺序）
+#   enabled    — 可选，false 时不参与 select_all / profile / --all；
+#                显式点名（dotf <name> -i 等）仍可用
 # 禁止字段: script/command/handler/function/exec/run（注册表非可执行 DSL）
 #
 # 使用场景 profile 见 profiles.yaml（与 OS profile 正交）
@@ -92,8 +94,9 @@ modules:
     bin: npm
 
   - name: qoder
-    desc: 安装 Qoder CLI
+    desc: 安装 Qoder CLI（默认跳过，显式点名可装）
     group: agents
+    enabled: false
     install: true
     doctor: true
 
@@ -104,8 +107,9 @@ modules:
     doctor: true
 
   - name: codebuddy-code
-    desc: 安装 CodeBuddy Code CLI
+    desc: 安装 CodeBuddy Code CLI（默认跳过，显式点名可装）
     group: agents
+    enabled: false
     install: true
     doctor: true
 

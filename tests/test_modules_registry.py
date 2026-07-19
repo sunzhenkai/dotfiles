@@ -68,6 +68,25 @@ def test_os_filter_config_modules() -> None:
     assert "nvim" in linux_cfg and "nvim" in darwin_cfg
 
 
+def test_disabled_modules_excluded_from_default_lists() -> None:
+    mods = modules.load_registry()
+    qoder = modules.find_module(mods, "qoder")
+    codebuddy = modules.find_module(mods, "codebuddy-code")
+    assert qoder and not modules.is_enabled(qoder)
+    assert codebuddy and not modules.is_enabled(codebuddy)
+
+    install_names = {m["name"] for m in modules.filter_modules(mods, capability="install")}
+    assert "qoder" not in install_names
+    assert "codebuddy-code" not in install_names
+
+    with_disabled = {
+        m["name"]
+        for m in modules.filter_modules(mods, capability="install", include_disabled=True)
+    }
+    assert "qoder" in with_disabled
+    assert "codebuddy-code" in with_disabled
+
+
 def test_matches_os_family() -> None:
     assert modules.matches_os(["linux"], "ubuntu")
     assert modules.matches_os(["linux"], "arch")

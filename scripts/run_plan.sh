@@ -106,11 +106,29 @@ if [ ${#ACTIONS[@]} -eq 0 ]; then
   echo "（空计划）"
   exit 0
 fi
-printf '%-4s %-8s %-16s %s\n' "#" "ACTION" "MODULE" "REASON"
-echo "--------------------------------------------------------"
+# 按模块合并展示：同一模块的 install/config 等合并到 ACTION 列（Bash 3.2 兼容）
+printf '%-4s %-16s %-16s %s\n' "#" "ACTION" "MODULE" "REASON"
+echo "------------------------------------------------------------"
+_seen_modules=$'\n'
 for row in "${ACTIONS[@]}"; do
   IFS=$'\t' read -r a_idx action module reason <<<"$row"
-  printf '%-4s %-8s %-16s %s\n' "$a_idx" "$action" "$module" "$reason"
+  case "$_seen_modules" in
+  *$'\n'"$module"$'\n'*) continue ;;
+  esac
+  _seen_modules="${_seen_modules}${module}"$'\n'
+  merged_actions="$action"
+  merged_reason="$reason"
+  for other in "${ACTIONS[@]}"; do
+    IFS=$'\t' read -r o_idx o_action o_module o_reason <<<"$other"
+    [ "$o_module" = "$module" ] || continue
+    [ "$o_idx" = "$a_idx" ] && [ "$o_action" = "$action" ] && continue
+    merged_actions="${merged_actions},${o_action}"
+    case ",${merged_reason}," in
+    *",${o_reason},"*) ;;
+    *) merged_reason="${merged_reason},${o_reason}" ;;
+    esac
+  done
+  printf '%-4s %-16s %-16s %s\n' "$a_idx" "$merged_actions" "$module" "$merged_reason"
 done
 echo ""
 

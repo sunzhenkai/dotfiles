@@ -24,8 +24,8 @@ detect_os() {
 
 # Check if Linux has GUI (X11 or Wayland)
 has_linux_gui() {
-  # Check for display server
-  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+  # ${VAR-} 避免 set -u 下未设置变量直接展开报错
+  if [ -n "${DISPLAY-}" ] || [ -n "${WAYLAND_DISPLAY-}" ]; then
     return 0
   fi
 

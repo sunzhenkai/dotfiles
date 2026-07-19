@@ -218,6 +218,8 @@ def build_plan(
             name = m.get("name")
             if not name:
                 continue
+            if not modules.is_enabled(m):
+                continue
             os_list = m.get("os")
             if os_list is not None and not isinstance(os_list, list):
                 os_list = [os_list]
@@ -245,6 +247,16 @@ def build_plan(
                 seen_seed.add(tool)
                 unique_seeds.append(tool)
             reasons.setdefault(tool, "depends:agents")
+
+    # enabled:false → profile/all 静默跳过；显式点名仍执行
+    kept_seeds: list[str] = []
+    for s in unique_seeds:
+        mod = by_name.get(s)
+        if mod is not None and not modules.is_enabled(mod) and reasons.get(s) != "explicit":
+            reasons.pop(s, None)
+            continue
+        kept_seeds.append(s)
+    unique_seeds = kept_seeds
 
     if not unique_seeds and not errors:
         # 允许空计划（例如空 profile）
@@ -329,6 +341,28 @@ def build_plan(
     )
 
 
+def _group_actions_for_display(
+    actions: list[PlanAction],
+) -> list[tuple[int, str, str, str]]:
+    """按模块合并展示行：(首序号, 合并后 ACTION, MODULE, REASON)。"""
+    order: list[str] = []
+    grouped: dict[str, list[PlanAction]] = {}
+    for a in actions:
+        if a.module not in grouped:
+            grouped[a.module] = []
+            order.append(a.module)
+        grouped[a.module].append(a)
+
+    rows: list[tuple[int, str, str, str]] = []
+    for mod in order:
+        acts = grouped[mod]
+        action_str = ",".join(a.action for a in acts)
+        reasons = list(dict.fromkeys(a.reason for a in acts))
+        reason = ",".join(reasons)
+        rows.append((acts[0].index, action_str, mod, reason))
+    return rows
+
+
 def format_plan_text(plan: Plan) -> str:
     lines = [
         f"执行计划  OS={plan.os_id}"
@@ -339,10 +373,10 @@ def format_plan_text(plan: Plan) -> str:
     if not plan.actions:
         lines.append("（空计划）")
         return "\n".join(lines)
-    lines.append(f"{'#':<4} {'ACTION':<8} {'MODULE':<16} REASON")
-    lines.append("-" * 56)
-    for a in plan.actions:
-        lines.append(f"{a.index:<4} {a.action:<8} {a.module:<16} {a.reason}")
+    lines.append(f"{'#':<4} {'ACTION':<16} {'MODULE':<16} REASON")
+    lines.append("-" * 60)
+    for idx, action_str, mod, reason in _group_actions_for_display(plan.actions):
+        lines.append(f"{idx:<4} {action_str:<16} {mod:<16} {reason}")
     return "\n".join(lines)
 
 

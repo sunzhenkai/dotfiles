@@ -206,3 +206,72 @@ def test_format_text_stable(tmp_home: Path) -> None:
     t2 = planner.format_plan_text(plan)
     assert t1 == t2
     assert "install" in t1 and "a" in t1
+
+
+def test_format_text_merges_actions_per_module() -> None:
+    plan = planner.Plan(
+        os_id="ubuntu",
+        profile="full",
+        actions=[
+            planner.PlanAction("git", "install", "all", index=1),
+            planner.PlanAction("git", "config", "all", index=2),
+            planner.PlanAction("delta", "install", "all", index=3),
+        ],
+    )
+    text = planner.format_plan_text(plan)
+    assert "共 3 个动作" in text
+    data_lines = [
+        line
+        for line in text.splitlines()
+        if line and not line.startswith(("-", "执行", "共", "#"))
+    ]
+    assert len(data_lines) == 2
+    assert "install,config" in data_lines[0] and "git" in data_lines[0]
+    assert data_lines[1].split()[1:][:2] == ["install", "delta"]
+
+
+def test_disabled_skipped_in_select_all_and_profile() -> None:
+    reg = _reg(
+        {"name": "a", "install": True, "doctor": True},
+        {"name": "qoder", "install": True, "doctor": True, "enabled": False},
+        {"name": "codebuddy-code", "install": True, "doctor": True, "enabled": False},
+    )
+    plan_all = planner.build_plan(
+        os_id="linux",
+        select_all=True,
+        actions=["install"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert plan_all.ok, plan_all.errors
+    names_all = {a.module for a in plan_all.actions}
+    assert names_all == {"a"}
+    assert "qoder" not in names_all
+    assert "codebuddy-code" not in names_all
+
+    plan_prof = planner.build_plan(
+        os_id="linux",
+        profile="with_disabled",
+        actions=["install"],
+        registry=reg,
+        profiles_data=_profiles(
+            with_disabled={"modules": ["a", "qoder"], "includes": []},
+        ),
+    )
+    assert plan_prof.ok, plan_prof.errors
+    assert [a.module for a in plan_prof.actions] == ["a"]
+
+
+def test_disabled_still_runs_when_explicit() -> None:
+    reg = _reg(
+        {"name": "qoder", "install": True, "doctor": True, "enabled": False},
+    )
+    plan = planner.build_plan(
+        os_id="linux",
+        modules_explicit=["qoder"],
+        actions=["install"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert plan.ok, plan.errors
+    assert [a.module for a in plan.actions] == ["qoder"]
