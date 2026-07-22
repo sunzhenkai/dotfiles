@@ -22,6 +22,8 @@ pi --version
 pi list
 ```
 
+> **踩坑**：`@virdis/subagents@0.1.0` 自带 skill 的 frontmatter 为 `name: @virdis/subagents`，YAML 无法解析，交互启动会报 `[Skill conflicts]`。`dotf pi -i` 会在安装后把它幂等改成 `name: pi-subagents`。已装过的机器也可直接再跑一次 `dotf pi -i`。
+
 ## 配置
 
 ```shell

@@ -22,6 +22,20 @@ _ensure_pi_path() {
   done
 }
 
+# 上游 @virdis/subagents 0.1.0 的 SKILL.md 写成 `name: @virdis/subagents`：
+# 1) YAML 中 @ 为保留字符，pi 启动时报 [Skill conflicts]
+# 2) pi skill name 规范只允许 [a-z0-9-]
+# 重装 packages 后会覆盖，故安装后幂等修补。
+_patch_virdis_subagents_skill() {
+  local skill="$HOME/.pi/agent/npm/node_modules/@virdis/subagents/skills/pi-subagents/SKILL.md"
+  [[ -f "$skill" ]] || return 0
+
+  if grep -qE '^name: @virdis/subagents$' "$skill"; then
+    sed -i 's/^name: @virdis\/subagents$/name: pi-subagents/' "$skill"
+    echo "  → 已修补 @virdis/subagents skill name → pi-subagents（上游 YAML 非法）"
+  fi
+}
+
 # 安装/确保默认 pi packages（幂等）
 install_pi_packages() {
   _ensure_pi_path
@@ -40,6 +54,8 @@ install_pi_packages() {
       return 1
     fi
   done
+
+  _patch_virdis_subagents_skill
   echo "✓ Pi packages 已就绪"
 }
 
