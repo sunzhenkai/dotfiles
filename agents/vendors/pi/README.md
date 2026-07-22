@@ -8,16 +8,18 @@
 dotf pi -i
 ```
 
-等价于官方脚本：
+会安装：
 
-```shell
-curl -fsSL https://pi.dev/install.sh | sh
-```
+1. Pi CLI（官方 `install.sh` / `@earendil-works/pi-coding-agent`，需 Node.js ≥ 22.19）
+2. 默认扩展包（幂等，已装则跳过）：
+   - `npm:@ogulcancelik/pi-goal` — 目标管理
+   - `npm:@virdis/subagents` — 子代理委派
 
-包名：`@earendil-works/pi-coding-agent`（需 Node.js ≥ 22.19）。验证：
+验证：
 
 ```shell
 pi --version
+pi list
 ```
 
 ## 配置
@@ -45,6 +47,29 @@ pi
 ```
 
 交互界面可用 `/model`、`/login` 选择 provider；自定义模型见 `~/.pi/agent/models.json`（[文档](https://pi.dev/docs/latest/)）。
+
+## 踩坑：MiniMax 国内站 vs 海外站（401）
+
+> **专题全文**（含 curl 排查、Codex/Pi/openviking）:  
+> `repos/codeup/agent-data/knowledge/snippets/minimax-cn-vs-intl.md`
+
+Pi 内置两套 provider，**端点与环境变量不同**：
+
+| Provider | 端点 | 环境变量 |
+|----------|------|----------|
+| `minimax`（海外） | `https://api.minimax.io/anthropic` | `MINIMAX_API_KEY` |
+| `minimax-cn`（国内） | `https://api.minimaxi.com/anthropic` | `MINIMAX_CN_API_KEY` |
+
+本机 key / Codex 走国内站。Pi 若默认 `minimax` → 稳定 `401 invalid api key`（key 没坏，区域错了）。
+
+推荐（国内 key）：
+
+1. `~/.pi/agent/settings.json`：`defaultProvider: "minimax-cn"`、`defaultModel: "MiniMax-M3"`
+2. 鉴权任选：`export MINIMAX_CN_API_KEY="$MINIMAX_API_KEY"`，或 `auth.json` 里 `minimax-cn.key = "$MINIMAX_API_KEY"`，或 `/login` → MiniMax CN
+
+```shell
+pi --provider minimax-cn --model MiniMax-M3 -p --no-session --no-tools '只回复：ok'
+```
 
 ## tmux
 

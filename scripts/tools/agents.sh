@@ -135,22 +135,18 @@ install_agents_bundle() {
       if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
         export PATH="$HOME/.local/bin:$PATH"
       fi
-      if command -v pi &>/dev/null; then
-        status="skip"
-        detail="已安装: $(command -v pi)"
-      else
-        if install_pi; then
-          if command -v pi &>/dev/null; then
-            status="ok"
-            detail="新装完成"
-          else
-            status="skip"
-            detail="用户跳过或未在 PATH"
-          fi
+      # install_pi 幂等：缺 CLI 则装 CLI，并始终确保默认 packages
+      if install_pi; then
+        if command -v pi &>/dev/null; then
+          status="ok"
+          detail="CLI + packages 已就绪: $(command -v pi)"
         else
-          status="fail"
-          detail="安装失败"
+          status="skip"
+          detail="用户跳过或未在 PATH"
         fi
+      else
+        status="fail"
+        detail="安装失败"
       fi
       ;;
     *)
