@@ -58,5 +58,5 @@ skills/commands 安装 SHALL 可重复执行；对已由本系统管理且内容
 #### Scenario: 同步全部目标工具
 
 - **WHEN** 用户调用同步入口且指定全部目标工具（或等价 `agents` 全量模式）
-- **THEN** 系统 SHALL 依次处理 claude、cursor、opencode、codex（跳过清单中排除的组合）
+- **THEN** 系统 SHALL 依次处理 claude、cursor、opencode、codex、kimi-code、pi（跳过清单中排除的组合）
 

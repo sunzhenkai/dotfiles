@@ -37,7 +37,7 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 
 ### Requirement: 可选的工具启用范围
 
-系统 SHALL 支持声明某个 skill/command 对哪些工具生效（默认全部目标工具：claude、cursor、opencode、codex），以便排除不适用的条目。
+系统 SHALL 支持声明某个 skill/command 对哪些工具生效（默认全部目标工具：claude、cursor、opencode、codex、kimi-code、pi），以便排除不适用的条目。
 
 #### Scenario: 默认对全部目标工具启用
 

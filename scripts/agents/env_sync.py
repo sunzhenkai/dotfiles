@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""将 agents/env MCP 声明同步到 Claude / Cursor / OpenCode / Codex。"""
+"""将 agents/env MCP 声明同步到 Claude / Cursor / OpenCode / Codex / Kimi / Pi。"""
 
 from __future__ import annotations
 
@@ -261,6 +261,21 @@ def sync_codex(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     return "skip"
 
 
+def sync_pi(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    reason = (
+        (cat.manifest.get("unsupported") or {})
+        .get("pi", {})
+        .get("reason")
+        or "Pi MCP unsupported"
+    )
+    msg = f"pi: skip MCP sync ({reason})"
+    if dry_run:
+        print(f"[dry-run] {msg}")
+    else:
+        print(msg)
+    return "skip"
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     root = args.root or repo_root_from(Path(__file__))
@@ -305,6 +320,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     sync_kimi_code(cat, profile, args.dry_run, args.also_repo_templates),
                 )
             )
+        elif tool == "pi":
+            results.append((tool, sync_pi(cat, profile, args.dry_run)))
         else:
             die(f"未知工具: {tool}")
 

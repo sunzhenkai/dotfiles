@@ -227,6 +227,16 @@ modules:
       source: agents/vendors/kimi-code/config.toml
       target: ~/.kimi-code/config.toml
 
+  - name: pi
+    desc: Pi coding agent CLI + 配置
+    group: agents
+    install: true
+    doctor: true
+    bin: pi
+    config:
+      source: agents/vendors/pi
+      target: ~/.pi/agent
+
   # ---------- config-only: shell ----------
   - name: zsh
     desc: Zsh shell 配置

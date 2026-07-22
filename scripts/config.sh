@@ -273,6 +273,26 @@ install_kimi_code_config() {
   # skills/MCP：dotf agents -c 或 sync.sh kimi-code
 }
 
+# 特殊配置：pi
+# ~/.pi/agent/settings.json 用复制而非软链：/settings、/login 会写入本地状态。
+# 已存在则跳过覆盖。
+install_pi_config() {
+  local source="$DOTFILES_ROOT/agents/vendors/pi/settings.json"
+  local target="$HOME/.pi/agent/settings.json"
+
+  mkdir -p "$HOME/.pi/agent"
+
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    echo "已存在: ~/.pi/agent/settings.json（跳过覆盖，避免丢失本地 settings/login 状态）"
+    echo "如需重置，请先备份并删除该文件后重新运行: dotf pi -c"
+  else
+    cp "$source" "$target"
+    echo "已安装: ~/.pi/agent/settings.json"
+    echo "提示: 启动 pi 后用 /model 或 /login 完成鉴权"
+  fi
+  # skills/prompts：dotf agents -c 或 sync.sh pi（MCP skip）
+}
+
 install_all() {
   # shellcheck source=/dev/null
   source "$DOTFILES_ROOT/scripts/lib/runner.sh"

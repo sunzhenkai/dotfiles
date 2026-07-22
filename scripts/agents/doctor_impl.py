@@ -554,10 +554,11 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         "opencode": cat.root / "agents" / "vendors" / "opencode" / "skills",
         "codex": Path.home() / ".codex" / "skills",
         "kimi-code": Path.home() / ".kimi-code" / "skills",
+        "pi": Path.home() / ".pi" / "agent" / "skills",
     }
-    # 更可靠：对 opencode / kimi 仓库内或用户目录 skills 做存在性抽查
+    # 更可靠：对 opencode / kimi / pi 仓库内或用户目录 skills 做存在性抽查
     sample = next(skills_src.iterdir(), None) if skills_src.is_dir() else None
-    check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code"]
+    check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code", "pi"]
     drifted = False
     for t in check_tools:
         if t == "opencode":
@@ -612,6 +613,31 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
                 )
             else:
                 report.add("agents", f"{t}-drift", STATUS_PASS, "Kimi skills 目录存在")
+        elif t == "pi":
+            dest = Path.home() / ".pi" / "agent" / "skills"
+            if sample and sample.is_dir():
+                marker = dest / sample.name
+                if not dest.is_dir() or not marker.exists():
+                    drifted = True
+                    report.add(
+                        "agents",
+                        f"{t}-drift",
+                        STATUS_WARN,
+                        f"{t} skills 可能未同步（缺 {sample.name}）",
+                        hint="运行 scripts/agents/sync.sh pi",
+                    )
+                else:
+                    report.add("agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步")
+            elif not dest.is_dir():
+                report.add(
+                    "agents",
+                    f"{t}-drift",
+                    STATUS_WARN,
+                    "Pi skills 目录不存在",
+                    hint="运行 scripts/agents/sync.sh pi",
+                )
+            else:
+                report.add("agents", f"{t}-drift", STATUS_PASS, "Pi skills 目录存在")
         else:
             report.add(
                 "agents",

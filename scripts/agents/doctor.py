@@ -82,6 +82,11 @@ def check_skills_drift(
             None,  # commands skip
             "dir",
         ),
+        "pi": (
+            Path.home() / ".pi" / "agent" / "skills",
+            Path.home() / ".pi" / "agent" / "prompts",
+            "dir",
+        ),
     }
 
     targets = [tool] if tool else list(TOOLS)

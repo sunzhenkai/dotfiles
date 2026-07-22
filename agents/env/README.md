@@ -93,9 +93,9 @@ cp agents/env/local.yaml.example agents/env/local.yaml
 Claude / Cursor / OpenCode / Kimi 的 MCP 片段由本目录生成或合并：
 
 ```shell
-scripts/agents/sync.sh claude|cursor|opencode|kimi-code
+scripts/agents/sync.sh claude|cursor|opencode|kimi-code|pi
 ```
 
-Codex 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills 仍走 `agents/`）。
+Codex / Pi 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills/prompts 仍走 `agents/`）。
 
 仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。

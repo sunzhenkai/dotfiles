@@ -114,7 +114,7 @@ scripts/agents/sync.sh all --dry-run
 
 - 源码：`agents/{skills,commands,vendors,env}`（skills/commands + 工具专属 vendors + MCP/env 真相源）
 - 脚本：单一包 `scripts/agents/`（`sync.sh` / `doctor.py` / `env_sync.py`）
-- 工具专属路径：`agents/vendors/{claude,cursor,opencode,codex,kimi-code}/`
+- 工具专属路径：`agents/vendors/{claude,cursor,opencode,codex,kimi-code,pi}/`
 
 详见 `agents/README.md`、`agents/env/README.md`。
 

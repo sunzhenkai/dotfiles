@@ -16,7 +16,7 @@ except ImportError as exc:  # pragma: no cover
         "error: 需要 PyYAML（pip install pyyaml / apt install python3-yaml）"
     ) from exc
 
-TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code")
+TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code", "pi")
 KNOWN_PROFILES = ("coding", "research", "browser", "full")
 SERVER_ALLOWED_KEYS = {
     "transport",

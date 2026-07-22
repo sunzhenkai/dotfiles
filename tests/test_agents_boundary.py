@@ -31,7 +31,7 @@ def test_agents_install_plan_expands_tools() -> None:
     )
     assert r.returncode == 0, r.stderr + r.stdout
     assert "PLAN_OK" in r.stdout
-    for tool in ("claude", "cursor", "opencode", "codex", "kimi-code"):
+    for tool in ("claude", "cursor", "opencode", "codex", "kimi-code", "pi"):
         assert f"install\t{tool}" in r.stdout.replace(" ", "\t") or (
             f"\tinstall\t{tool}\t" in r.stdout
         )
@@ -96,6 +96,7 @@ def test_single_tool_config_source_has_no_sync_call() -> None:
     assert "sync_agents codex" not in text
     assert "sync_agents opencode" not in text
     assert "sync_agents kimi-code" not in text
+    assert "sync_agents pi" not in text
     assert 'sync.sh" claude' not in text
     # 聚合入口仍保留
     assert "sync_agents all" in text or "sync_agents()" in text

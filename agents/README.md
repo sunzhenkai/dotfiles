@@ -1,6 +1,6 @@
 # Shared agent skills & commands
 
-跨 Claude Code / Cursor / OpenCode / Codex / Kimi Code 的 **skills / commands 唯一真相源**。
+跨 Claude Code / Cursor / OpenCode / Codex / Kimi Code / Pi 的 **skills / commands 唯一真相源**。
 
 ## 统一入口（推荐）
 
@@ -74,7 +74,7 @@ tags: [a, b]          # 可选
 | 工具 | `opsx-apply` 示例 |
 |------|-------------------|
 | claude | `/opsx:apply` |
-| cursor / opencode / codex / kimi-code | `/opsx-apply` |
+| cursor / opencode / codex / kimi-code / pi | `/opsx-apply` |
 
 ## 排除某一工具
 
@@ -91,7 +91,7 @@ agents/commands/my-command.exclude
 codex
 ```
 
-未声明 `exclude` 时，默认对 `claude`、`cursor`、`opencode`、`codex`、`kimi-code` 全部启用。
+未声明 `exclude` 时，默认对 `claude`、`cursor`、`opencode`、`codex`、`kimi-code`、`pi` 全部启用。
 
 ## 同步
 
@@ -105,12 +105,13 @@ scripts/agents/sync.sh cursor
 scripts/agents/sync.sh opencode
 scripts/agents/sync.sh codex
 scripts/agents/sync.sh kimi-code
+scripts/agents/sync.sh pi
 
 # 也可用配置入口
 scripts/config.sh agents
 ```
 
-`dotf claude -c|cursor|opencode|codex|kimi-code` 时也会自动同步对应工具。
+共享 sync：`dotf agents -c [--tool <name>]`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 
 ## 安装目标
 
@@ -121,6 +122,7 @@ scripts/config.sh agents
 | opencode | `agents/vendors/opencode/skills/`（随 `~/.config/opencode` symlink） | `agents/vendors/opencode/commands/` |
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |
+| pi | `~/.pi/agent/skills/` | `~/.pi/agent/prompts/`（prompt templates） |
 
 **不要手改** `.claude/`、`.cursor/`、`agents/vendors/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。
 

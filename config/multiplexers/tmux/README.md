@@ -49,6 +49,7 @@ tmux
 | `Prefix` + `e` | 右侧 25% 打开 claude |
 | `Prefix` + `u` | 右侧 25% 打开 cursor-agent |
 | `Prefix` + `v` | 右侧 25% 打开 kimi |
+| `Prefix` + `p` | 右侧 25% 打开 pi |
 | `Prefix` + `h/j/k/l` | 面板导航 (左/下/上/右) |
 | `Prefix` + `H/J/K/L` | 调整面板大小 |
 | `Prefix` + `>` / `<` | 交换面板 |
