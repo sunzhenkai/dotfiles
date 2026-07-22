@@ -34,7 +34,7 @@ dotf pi -c
 
 | 文件 | 行为 |
 |------|------|
-| `settings.json` | 合并托管键（`defaultProvider` / `defaultModel` / telemetry 等）；保留本地 `packages`、`theme` 等 |
+| `settings.json` | 合并托管键（`defaultProvider` / `defaultModel` / `enabledModels` / telemetry 等）；保留本地 `packages`、`theme` 等 |
 | `auth.json` | 缺条目时写入 env 引用（无真实密钥）：`minimax-cn` → `$MINIMAX_API_KEY`，`kimi-coding` → `$KIMI_API_KEY` |
 
 并同步 skills 到 `~/.pi/agent/skills/`、commands → prompt templates 到 `~/.pi/agent/prompts/`。
@@ -45,6 +45,7 @@ Pi **无内置 MCP**；统一 `agents` sync 对 Pi MCP 记为 `skip`（与 Codex
 
 - `defaultProvider: "minimax-cn"`
 - `defaultModel: "MiniMax-M3"`
+- `enabledModels: ["minimax-cn/*", "kimi-coding/*"]`，模型切换仅启用这两个 provider
 - 默认鉴权读 `MINIMAX_API_KEY`（经 `auth.json` 展开；也可另设 `MINIMAX_CN_API_KEY`）
 - 备选：内置 `kimi-coding`（模型如 `kimi-for-coding`），鉴权读 `KIMI_API_KEY`
 
@@ -71,7 +72,12 @@ pi
 UnrecognizedClientException: 403: ...
 ```
 
-本仓库通过 `defaultProvider=minimax-cn` 固定默认，避免被 AWS_* 带偏。需要 Bedrock 时再显式 `/model` 或改 settings。
+本仓库通过 `defaultProvider=minimax-cn` 固定默认，并用 `enabledModels` 把模型切换范围限制为
+`minimax-cn/*` 与 `kimi-coding/*`，避免被 AWS_* 带偏。
+
+`~/.pi/agent/models-store.json` 是 Pi 自动维护的 provider 模型目录缓存，并非启用列表。只要启动环境
+存在 AWS 凭据，Pi 仍可能探测并缓存 `amazon-bedrock`；这不表示 Bedrock 已被本仓库启用，手动删除
+缓存也可能在下次启动时恢复。实际启用范围以 `settings.json` 的 `enabledModels` 为准。
 
 ## 踩坑：MiniMax 国内站 vs 海外站（401）
 

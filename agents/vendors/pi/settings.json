@@ -3,5 +3,9 @@
   "quietStartup": false,
   "enableInstallTelemetry": false,
   "defaultProvider": "minimax-cn",
-  "defaultModel": "MiniMax-M3"
+  "defaultModel": "MiniMax-M3",
+  "enabledModels": [
+    "minimax-cn/*",
+    "kimi-coding/*"
+  ]
 }

@@ -302,6 +302,7 @@ managed = {
     "enableInstallTelemetry",
     "defaultProvider",
     "defaultModel",
+    "enabledModels",
 }
 src = json.loads(src_path.read_text(encoding="utf-8"))
 tgt = {}
