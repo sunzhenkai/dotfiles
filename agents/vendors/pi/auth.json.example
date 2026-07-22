@@ -2,5 +2,9 @@
   "minimax-cn": {
     "type": "api_key",
     "key": "$MINIMAX_API_KEY"
+  },
+  "kimi-coding": {
+    "type": "api_key",
+    "key": "$KIMI_API_KEY"
   }
 }

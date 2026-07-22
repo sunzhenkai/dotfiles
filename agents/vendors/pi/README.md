@@ -35,7 +35,7 @@ dotf pi -c
 | 文件 | 行为 |
 |------|------|
 | `settings.json` | 合并托管键（`defaultProvider` / `defaultModel` / telemetry 等）；保留本地 `packages`、`theme` 等 |
-| `auth.json` | 仅当缺少 `minimax-cn` 时写入 `"key": "$MINIMAX_API_KEY"`（环境变量引用，无真实密钥） |
+| `auth.json` | 缺条目时写入 env 引用（无真实密钥）：`minimax-cn` → `$MINIMAX_API_KEY`，`kimi-coding` → `$KIMI_API_KEY` |
 
 并同步 skills 到 `~/.pi/agent/skills/`、commands → prompt templates 到 `~/.pi/agent/prompts/`。
 
@@ -45,21 +45,23 @@ Pi **无内置 MCP**；统一 `agents` sync 对 Pi MCP 记为 `skip`（与 Codex
 
 - `defaultProvider: "minimax-cn"`
 - `defaultModel: "MiniMax-M3"`
-- 鉴权读 `MINIMAX_API_KEY`（经 `auth.json` 展开；也可另设 `MINIMAX_CN_API_KEY`）
+- 默认鉴权读 `MINIMAX_API_KEY`（经 `auth.json` 展开；也可另设 `MINIMAX_CN_API_KEY`）
+- 备选：内置 `kimi-coding`（模型如 `kimi-for-coding`），鉴权读 `KIMI_API_KEY`
 
-海外站：把 `defaultProvider` 改为 `minimax`，或启动后 `/model` 切换。不要把本机 AWS/Bedrock 密钥写进仓库。
+海外 MiniMax：把 `defaultProvider` 改为 `minimax`，或启动后 `/model` 切换。不要把本机 AWS/Bedrock 密钥写进仓库。
 
 ## 首次使用
 
 ```shell
-# shell / ~/.envrc（与 Codex 相同变量即可）
-export MINIMAX_API_KEY="..."
+# shell / ~/.envrc
+export MINIMAX_API_KEY="..."   # 默认 minimax-cn（与 Codex 同源）
+export KIMI_API_KEY="..."      # 可选：切到 kimi-coding
 
 cd your-project
 pi
 ```
 
-交互界面可用 `/model`、`/login` 选择 provider；自定义模型见 `~/.pi/agent/models.json`（[文档](https://pi.dev/docs/latest/)）。
+交互界面可用 `/model`、`/login` 选择 provider（含 `kimi-coding`）；自定义模型见 `~/.pi/agent/models.json`（[文档](https://pi.dev/docs/latest/)）。
 
 ## 踩坑：AWS_* 误选 Bedrock（403 UnrecognizedClientException）
 
@@ -76,12 +78,13 @@ UnrecognizedClientException: 403: ...
 > **专题全文**（含 curl 排查、Codex/Pi/openviking）:  
 > `repos/codeup/agent-data/knowledge/snippets/minimax-cn-vs-intl.md`
 
-Pi 内置两套 provider，**端点与环境变量不同**：
+Pi 内置多套 provider，本库常用：
 
-| Provider | 端点 | 环境变量 / auth |
+| Provider | 说明 | 环境变量 / auth |
 |----------|------|-----------------|
-| `minimax`（海外） | `https://api.minimax.io/anthropic` | `MINIMAX_API_KEY` |
-| `minimax-cn`（国内） | `https://api.minimaxi.com/anthropic` | `MINIMAX_CN_API_KEY`，或 `auth.json` 的 `$MINIMAX_API_KEY` |
+| `minimax`（海外） | `https://api.minimax.io/anthropic` | `MINIMAX_API_KEY`（海外站 key） |
+| `minimax-cn`（国内，默认） | `https://api.minimaxi.com/anthropic` | `MINIMAX_CN_API_KEY`，或 `auth.json` 的 `$MINIMAX_API_KEY` |
+| `kimi-coding` | Kimi For Coding | `KIMI_API_KEY`，或 `auth.json` 的 `$KIMI_API_KEY` |
 
 本库约定：`MINIMAX_API_KEY` 为国内站 key（与 Codex 一致）。Pi 若落到海外 `minimax` → 常见 `401 invalid api key`（key 没坏，区域错了）。
 
@@ -89,6 +92,8 @@ Pi 内置两套 provider，**端点与环境变量不同**：
 pi --provider minimax-cn --model MiniMax-M3 -p --no-session --no-tools '只回复：ok'
 # 或依赖 settings 默认：
 pi -p --no-session --no-tools '只回复：ok'
+# 切到 Kimi：
+pi --provider kimi-coding --model kimi-for-coding -p --no-session --no-tools '只回复：ok'
 ```
 
 ## tmux

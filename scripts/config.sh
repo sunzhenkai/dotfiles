@@ -276,7 +276,8 @@ install_kimi_code_config() {
 # 特殊配置：pi
 # ~/.pi/agent/settings.json、auth.json 用文件而非软链：/settings、/login 会写入本地状态。
 # settings：合并仓库托管键，保留本地 packages/theme 等。
-# auth：仅在缺失 minimax-cn 时写入 "$MINIMAX_API_KEY" 引用（不落真实密钥）。
+# auth：仅在缺失对应条目时写入 env 引用（不落真实密钥）：
+#   minimax-cn → $MINIMAX_API_KEY；kimi-coding → $KIMI_API_KEY
 install_pi_config() {
   local settings_src="$DOTFILES_ROOT/agents/vendors/pi/settings.json"
   local settings_tgt="$HOME/.pi/agent/settings.json"
@@ -327,7 +328,7 @@ else:
     print("已存在: ~/.pi/agent/settings.json（托管键已对齐）")
 PY
 
-  # auth.json：缺省写入 env 引用；已有 minimax-cn 则不动
+  # auth.json：缺省写入 env 引用；已有条目则保留（不覆盖 /login 写入的密钥）
   python3 - "$auth_tgt" <<'PY'
 import json, sys
 from pathlib import Path
@@ -342,24 +343,40 @@ if auth_path.exists():
     if not isinstance(data, dict):
         data = {}
 
-entry = data.get("minimax-cn")
-if isinstance(entry, dict) and entry.get("type") and entry.get("key"):
-    print("已存在: ~/.pi/agent/auth.json（保留 minimax-cn）")
-else:
-    data["minimax-cn"] = {"type": "api_key", "key": "$MINIMAX_API_KEY"}
+# provider → env 引用；仅在缺失或无效条目时补齐
+defaults = {
+    "minimax-cn": "$MINIMAX_API_KEY",
+    "kimi-coding": "$KIMI_API_KEY",
+}
+written = []
+kept = []
+for provider, key_ref in defaults.items():
+    entry = data.get(provider)
+    if isinstance(entry, dict) and entry.get("type") and entry.get("key"):
+        kept.append(provider)
+        continue
+    data[provider] = {"type": "api_key", "key": key_ref}
+    written.append(f'{provider}.key = "{key_ref}"')
+
+if written:
     auth_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     auth_path.chmod(0o600)
-    print('已写入: ~/.pi/agent/auth.json（minimax-cn.key = "$MINIMAX_API_KEY"）')
+    print(f"已写入: ~/.pi/agent/auth.json（{'; '.join(written)}）")
+if kept:
+    print(f"已存在: ~/.pi/agent/auth.json（保留 {', '.join(kept)}）")
 PY
 
   if [ -z "${MINIMAX_API_KEY:-}" ] && [ -z "${MINIMAX_CN_API_KEY:-}" ]; then
-    echo "⚠️  未检测到 MINIMAX_API_KEY / MINIMAX_CN_API_KEY；pi 鉴权会失败"
+    echo "⚠️  未检测到 MINIMAX_API_KEY / MINIMAX_CN_API_KEY；默认 provider minimax-cn 鉴权会失败"
     echo "   国内站约定：export MINIMAX_API_KEY=...（与 Codex 同源），auth 会展开 \$MINIMAX_API_KEY"
+  fi
+  if [ -z "${KIMI_API_KEY:-}" ]; then
+    echo "提示: 未检测到 KIMI_API_KEY；切换到 kimi-coding 前请 export KIMI_API_KEY=..."
   fi
   if [ -n "${AWS_ACCESS_KEY_ID:-}" ] || [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
     echo "提示: 环境中有 AWS_*；已固定 defaultProvider=minimax-cn，避免 Pi 误选 amazon-bedrock"
   fi
-  echo "提示: 海外站可改 settings 为 defaultProvider=minimax，或 /model 切换"
+  echo "提示: 可用 /model 切到 kimi-coding（kimi-for-coding）；海外 MiniMax 可改 defaultProvider=minimax"
   # skills/prompts：dotf agents -c 或 sync.sh pi（MCP skip）
 }
 
