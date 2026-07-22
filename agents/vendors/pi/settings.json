@@ -1,5 +1,7 @@
 {
   "enableSkillCommands": true,
   "quietStartup": false,
-  "enableInstallTelemetry": false
+  "enableInstallTelemetry": false,
+  "defaultProvider": "minimax-cn",
+  "defaultModel": "MiniMax-M3"
 }

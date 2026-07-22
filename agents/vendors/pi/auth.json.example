@@ -1,0 +1,6 @@
+{
+  "minimax-cn": {
+    "type": "api_key",
+    "key": "$MINIMAX_API_KEY"
+  }
+}

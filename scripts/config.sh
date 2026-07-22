@@ -274,22 +274,92 @@ install_kimi_code_config() {
 }
 
 # 特殊配置：pi
-# ~/.pi/agent/settings.json 用复制而非软链：/settings、/login 会写入本地状态。
-# 已存在则跳过覆盖。
+# ~/.pi/agent/settings.json、auth.json 用文件而非软链：/settings、/login 会写入本地状态。
+# settings：合并仓库托管键，保留本地 packages/theme 等。
+# auth：仅在缺失 minimax-cn 时写入 "$MINIMAX_API_KEY" 引用（不落真实密钥）。
 install_pi_config() {
-  local source="$DOTFILES_ROOT/agents/vendors/pi/settings.json"
-  local target="$HOME/.pi/agent/settings.json"
+  local settings_src="$DOTFILES_ROOT/agents/vendors/pi/settings.json"
+  local settings_tgt="$HOME/.pi/agent/settings.json"
+  local auth_tgt="$HOME/.pi/agent/auth.json"
 
   mkdir -p "$HOME/.pi/agent"
 
-  if [ -e "$target" ] || [ -L "$target" ]; then
-    echo "已存在: ~/.pi/agent/settings.json（跳过覆盖，避免丢失本地 settings/login 状态）"
-    echo "如需重置，请先备份并删除该文件后重新运行: dotf pi -c"
-  else
-    cp "$source" "$target"
-    echo "已安装: ~/.pi/agent/settings.json"
-    echo "提示: 启动 pi 后用 /model 或 /login 完成鉴权"
+  if [ ! -f "$settings_src" ]; then
+    echo "✗ 缺少仓库模板: $settings_src"
+    return 1
   fi
+
+  python3 - "$settings_src" "$settings_tgt" <<'PY'
+import json, sys
+from pathlib import Path
+
+src_path, tgt_path = Path(sys.argv[1]), Path(sys.argv[2])
+# 仓库托管键：可跨机器复用的默认行为；不覆盖本地专属状态键。
+managed = {
+    "enableSkillCommands",
+    "quietStartup",
+    "enableInstallTelemetry",
+    "defaultProvider",
+    "defaultModel",
+}
+src = json.loads(src_path.read_text(encoding="utf-8"))
+tgt = {}
+if tgt_path.exists():
+    try:
+        tgt = json.loads(tgt_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        tgt = {}
+    if not isinstance(tgt, dict):
+        tgt = {}
+
+changed = []
+for key in managed:
+    if key not in src:
+        continue
+    if tgt.get(key) != src[key]:
+        tgt[key] = src[key]
+        changed.append(key)
+
+tgt_path.write_text(json.dumps(tgt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+if changed:
+    print(f"已更新: ~/.pi/agent/settings.json（托管键: {', '.join(changed)}）")
+else:
+    print("已存在: ~/.pi/agent/settings.json（托管键已对齐）")
+PY
+
+  # auth.json：缺省写入 env 引用；已有 minimax-cn 则不动
+  python3 - "$auth_tgt" <<'PY'
+import json, sys
+from pathlib import Path
+
+auth_path = Path(sys.argv[1])
+data = {}
+if auth_path.exists():
+    try:
+        data = json.loads(auth_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+
+entry = data.get("minimax-cn")
+if isinstance(entry, dict) and entry.get("type") and entry.get("key"):
+    print("已存在: ~/.pi/agent/auth.json（保留 minimax-cn）")
+else:
+    data["minimax-cn"] = {"type": "api_key", "key": "$MINIMAX_API_KEY"}
+    auth_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    auth_path.chmod(0o600)
+    print('已写入: ~/.pi/agent/auth.json（minimax-cn.key = "$MINIMAX_API_KEY"）')
+PY
+
+  if [ -z "${MINIMAX_API_KEY:-}" ] && [ -z "${MINIMAX_CN_API_KEY:-}" ]; then
+    echo "⚠️  未检测到 MINIMAX_API_KEY / MINIMAX_CN_API_KEY；pi 鉴权会失败"
+    echo "   国内站约定：export MINIMAX_API_KEY=...（与 Codex 同源），auth 会展开 \$MINIMAX_API_KEY"
+  fi
+  if [ -n "${AWS_ACCESS_KEY_ID:-}" ] || [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+    echo "提示: 环境中有 AWS_*；已固定 defaultProvider=minimax-cn，避免 Pi 误选 amazon-bedrock"
+  fi
+  echo "提示: 海外站可改 settings 为 defaultProvider=minimax，或 /model 切换"
   # skills/prompts：dotf agents -c 或 sync.sh pi（MCP skip）
 }
 

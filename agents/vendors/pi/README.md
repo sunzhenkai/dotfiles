@@ -30,25 +30,46 @@ pi list
 dotf pi -c
 ```
 
-会把仓库内 `agents/vendors/pi/settings.json` 安装到 `~/.pi/agent/settings.json`：
+会把仓库模板应用到本机（**不软链**，避免 `/settings`、`/login` 写回仓库）：
 
-- 目标不存在 → 直接写入
-- 目标已存在 → **跳过覆盖**（避免抹掉 `/settings`、`/login` 本地状态）
+| 文件 | 行为 |
+|------|------|
+| `settings.json` | 合并托管键（`defaultProvider` / `defaultModel` / telemetry 等）；保留本地 `packages`、`theme` 等 |
+| `auth.json` | 仅当缺少 `minimax-cn` 时写入 `"key": "$MINIMAX_API_KEY"`（环境变量引用，无真实密钥） |
 
 并同步 skills 到 `~/.pi/agent/skills/`、commands → prompt templates 到 `~/.pi/agent/prompts/`。
 
 Pi **无内置 MCP**；统一 `agents` sync 对 Pi MCP 记为 `skip`（与 Codex 同类降级）。
 
-如需强制用仓库版本覆盖 settings，先自行备份后删除 `~/.pi/agent/settings.json`，再执行 `dotf pi -c`。
+仓库默认（可跨机器复用，与 Codex 同源约定）：
+
+- `defaultProvider: "minimax-cn"`
+- `defaultModel: "MiniMax-M3"`
+- 鉴权读 `MINIMAX_API_KEY`（经 `auth.json` 展开；也可另设 `MINIMAX_CN_API_KEY`）
+
+海外站：把 `defaultProvider` 改为 `minimax`，或启动后 `/model` 切换。不要把本机 AWS/Bedrock 密钥写进仓库。
 
 ## 首次使用
 
 ```shell
+# shell / ~/.envrc（与 Codex 相同变量即可）
+export MINIMAX_API_KEY="..."
+
 cd your-project
 pi
 ```
 
 交互界面可用 `/model`、`/login` 选择 provider；自定义模型见 `~/.pi/agent/models.json`（[文档](https://pi.dev/docs/latest/)）。
+
+## 踩坑：AWS_* 误选 Bedrock（403 UnrecognizedClientException）
+
+环境里若有 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`（常用于 S3/其他服务），且 **未** 设置 `defaultProvider`，Pi 会自动选 `amazon-bedrock`，非 Bedrock 密钥会报：
+
+```text
+UnrecognizedClientException: 403: ...
+```
+
+本仓库通过 `defaultProvider=minimax-cn` 固定默认，避免被 AWS_* 带偏。需要 Bedrock 时再显式 `/model` 或改 settings。
 
 ## 踩坑：MiniMax 国内站 vs 海外站（401）
 
@@ -57,20 +78,17 @@ pi
 
 Pi 内置两套 provider，**端点与环境变量不同**：
 
-| Provider | 端点 | 环境变量 |
-|----------|------|----------|
+| Provider | 端点 | 环境变量 / auth |
+|----------|------|-----------------|
 | `minimax`（海外） | `https://api.minimax.io/anthropic` | `MINIMAX_API_KEY` |
-| `minimax-cn`（国内） | `https://api.minimaxi.com/anthropic` | `MINIMAX_CN_API_KEY` |
+| `minimax-cn`（国内） | `https://api.minimaxi.com/anthropic` | `MINIMAX_CN_API_KEY`，或 `auth.json` 的 `$MINIMAX_API_KEY` |
 
-本机 key / Codex 走国内站。Pi 若默认 `minimax` → 稳定 `401 invalid api key`（key 没坏，区域错了）。
-
-推荐（国内 key）：
-
-1. `~/.pi/agent/settings.json`：`defaultProvider: "minimax-cn"`、`defaultModel: "MiniMax-M3"`
-2. 鉴权任选：`export MINIMAX_CN_API_KEY="$MINIMAX_API_KEY"`，或 `auth.json` 里 `minimax-cn.key = "$MINIMAX_API_KEY"`，或 `/login` → MiniMax CN
+本库约定：`MINIMAX_API_KEY` 为国内站 key（与 Codex 一致）。Pi 若落到海外 `minimax` → 常见 `401 invalid api key`（key 没坏，区域错了）。
 
 ```shell
 pi --provider minimax-cn --model MiniMax-M3 -p --no-session --no-tools '只回复：ok'
+# 或依赖 settings 默认：
+pi -p --no-session --no-tools '只回复：ok'
 ```
 
 ## tmux
