@@ -127,7 +127,7 @@ scripts/config.sh agents
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |
 | pi | `~/.pi/agent/skills/` | `~/.pi/agent/prompts/`（prompt templates） |
-| zcode | `~/.zcode/skills/` | `~/.zcode/commands/` |
+| zcode | `~/.zcode/skills/` | `~/.zcode/commands/`（MCP：`~/.zcode/cli/config.json` → `mcp.servers`） |
 | qoder | `~/.qoder/skills/` | `~/.qoder/commands/` |
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
 

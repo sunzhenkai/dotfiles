@@ -41,10 +41,23 @@ dotf agents -c --tool zcode
 scripts/agents/sync.sh zcode
 ```
 
-| 目标 | 路径 |
-|------|------|
-| Skills | `~/.zcode/skills/` |
-| Commands | `~/.zcode/commands/` |
-| MCP | merge `mcp.servers` → `~/.zcode/cli/config.json` |
+## ZCode 资源布局（官方）
 
-`agents/vendors/zcode/mcp.json` 为 **agents/env 生成物**（`{"mcp":{"servers":...}}` 片段）；请改 `agents/env/mcp/` 后重新 sync。已有 `config.json` 中非托管字段与非托管 MCP 会保留。
+| 资源 | 用户级位置 | 项目级位置 | 冲突规则 |
+|------|------------|------------|----------|
+| Skills | `~/.zcode/skills/`、`~/.agents/skills/` | `<repo>/.zcode/skills/`、`<repo>/.agents/skills/` | 同名第一个赢，user 优先 |
+| Commands | `~/.zcode/commands/`、`~/.agents/commands/` | `<repo>/.zcode/commands/`、`<repo>/.agents/commands/` | 同名第一个赢，user 优先 |
+| MCP | `~/.zcode/cli/config.json` → `mcp.servers` | `<repo>/.zcode/config.json` → `mcp.servers` | user 覆盖 workspace；各层自动连接 |
+| Hooks | `~/.zcode/cli/config.json` → `hooks`（需 `hooks.enabled:true`） | `<repo>/.zcode/config.json` → `hooks` | 配置式需显式 enable；插件 hook 自动追加 |
+| Plugins | marketplace 安装，开关存于 `~/.zcode/cli/config.json` → `plugins` | — | 插件可贡献 skill/command/hook/MCP/agent |
+
+## 本仓库 sync 写入范围
+
+| 目标 | 写入位置 | 说明 |
+|------|----------|------|
+| Skills | `~/.zcode/skills/` | 用户级主路径（不写 `~/.agents/` / 项目级） |
+| Commands | `~/.zcode/commands/` | 同上 |
+| MCP | merge → `~/.zcode/cli/config.json` 的 `mcp.servers` | 保留非托管 server 与其它本机字段 |
+| Hooks / Plugins | — | 不由 agents sync 管理 |
+
+`agents/vendors/zcode/mcp.json` 为 **agents/env 生成物**（`{"mcp":{"servers":...}}` 片段）；请改 `agents/env/mcp/` 后重新 sync。
