@@ -8,6 +8,7 @@ tools:
   - codex
   - kimi-code
   - pi
+  - zcode
   - qoder
   - codebuddy-code
 
@@ -16,24 +17,24 @@ default_profile: browser
 modules:
   mcp:
     enabled: true
-    tools: [claude, cursor, opencode, kimi-code, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, kimi-code, zcode, qoder, codebuddy-code]
     exclude: [codex, pi]
   browser:
     enabled: true
-    tools: [claude, cursor, opencode, kimi-code, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, kimi-code, zcode, qoder, codebuddy-code]
     exclude: [codex, pi]
   tools:
     enabled: true
-    tools: [claude, cursor, opencode, codex, kimi-code, pi, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code]
   env:
     enabled: true
-    tools: [claude, cursor, opencode, codex, kimi-code, pi, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code]
   security:
     enabled: true
-    tools: [claude, cursor, opencode, codex, kimi-code, pi, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code]
   agents:
     enabled: true
-    tools: [claude, cursor, opencode, codex, kimi-code, pi, qoder, codebuddy-code]
+    tools: [claude, cursor, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code]
 
 # Codex / Pi 当前无稳定 MCP 配置入口，显式降级
 unsupported:

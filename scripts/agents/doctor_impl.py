@@ -454,6 +454,12 @@ def _mcp_drift(
         if data is None:
             return None
         actual = data.get("mcpServers") or {}
+    elif tool == "zcode":
+        data = _read_json(Path.home() / ".zcode" / "cli" / "config.json")
+        if data is None:
+            return None
+        mcp = data.get("mcp") or {}
+        actual = mcp.get("servers") or {} if isinstance(mcp, dict) else {}
     else:
         return None
 
@@ -618,6 +624,7 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
         cat.root / "agents" / "vendors" / "cursor" / "mcp.json",
         cat.root / "agents" / "vendors" / "opencode" / "opencode.json",
         cat.root / "agents" / "vendors" / "kimi-code" / "mcp.json",
+        cat.root / "agents" / "vendors" / "zcode" / "mcp.json",
         cat.root / "agents" / "vendors" / "qoder" / "settings.json",
         cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json",
     ]
@@ -720,12 +727,13 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         "codex": Path.home() / ".codex" / "skills",
         "kimi-code": Path.home() / ".kimi-code" / "skills",
         "pi": Path.home() / ".pi" / "agent" / "skills",
+        "zcode": Path.home() / ".zcode" / "skills",
         "qoder": Path.home() / ".qoder" / "skills",
         "codebuddy-code": Path.home() / ".codebuddy" / "skills",
     }
     # 更可靠：对常用工具目录 skills 做存在性抽查（opt-in 工具仅在 --tool 时检查）
     sample = next(skills_src.iterdir(), None) if skills_src.is_dir() else None
-    check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code", "pi"]
+    check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code", "pi", "zcode"]
     drifted = False
     for t in check_tools:
         if t == "opencode":
@@ -805,6 +813,33 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
                 )
             else:
                 report.add("agents", f"{t}-drift", STATUS_PASS, "Pi skills 目录存在")
+        elif t == "zcode":
+            dest = Path.home() / ".zcode" / "skills"
+            if sample and sample.is_dir():
+                marker = dest / sample.name
+                if not dest.is_dir() or not marker.exists():
+                    drifted = True
+                    report.add(
+                        "agents",
+                        f"{t}-drift",
+                        STATUS_WARN,
+                        f"{t} skills 可能未同步（缺 {sample.name}）",
+                        hint="运行 scripts/agents/sync.sh zcode",
+                    )
+                else:
+                    report.add(
+                        "agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步"
+                    )
+            elif not dest.is_dir():
+                report.add(
+                    "agents",
+                    f"{t}-drift",
+                    STATUS_WARN,
+                    "ZCode skills 目录不存在",
+                    hint="运行 scripts/agents/sync.sh zcode",
+                )
+            else:
+                report.add("agents", f"{t}-drift", STATUS_PASS, "ZCode skills 目录存在")
         elif t in ("qoder", "codebuddy-code"):
             dest = targets[t]
             label = "Qoder" if t == "qoder" else "CodeBuddy"

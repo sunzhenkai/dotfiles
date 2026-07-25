@@ -1,6 +1,6 @@
 # Shared agent skills & commands
 
-跨 Claude Code / Cursor / OpenCode / Codex / Kimi Code / Pi / Qoder / CodeBuddy 的 **skills / commands 唯一真相源**。
+跨 Claude Code / Cursor / OpenCode / Codex / Kimi Code / Pi / ZCode / Qoder / CodeBuddy 的 **skills / commands 唯一真相源**。
 
 ## 统一入口（推荐）
 
@@ -74,7 +74,7 @@ tags: [a, b]          # 可选
 | 工具 | `opsx-apply` 示例 |
 |------|-------------------|
 | claude | `/opsx:apply` |
-| cursor / opencode / codex / kimi-code / pi / qoder / codebuddy-code | `/opsx-apply` |
+| cursor / opencode / codex / kimi-code / pi / zcode / qoder / codebuddy-code | `/opsx-apply` |
 
 ## 排除某一工具
 
@@ -106,6 +106,7 @@ scripts/agents/sync.sh opencode
 scripts/agents/sync.sh codex
 scripts/agents/sync.sh kimi-code
 scripts/agents/sync.sh pi
+scripts/agents/sync.sh zcode
 scripts/agents/sync.sh qoder
 scripts/agents/sync.sh codebuddy-code
 
@@ -126,6 +127,7 @@ scripts/config.sh agents
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |
 | pi | `~/.pi/agent/skills/` | `~/.pi/agent/prompts/`（prompt templates） |
+| zcode | `~/.zcode/skills/` | `~/.zcode/commands/` |
 | qoder | `~/.qoder/skills/` | `~/.qoder/commands/` |
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
 

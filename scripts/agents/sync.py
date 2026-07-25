@@ -19,6 +19,7 @@ TOOLS = (
     "codex",
     "kimi-code",
     "pi",
+    "zcode",
     "qoder",
     "codebuddy-code",
 )
@@ -191,6 +192,11 @@ def render_command_frontmatter(tool: str, meta: Dict[str, str], cmd_id: str) -> 
             f"tags: {tags}\n"
             "---\n"
         )
+    if tool == "zcode":
+        # 命令名取自文件名；frontmatter 仅 description / argument-hint
+        if desc_out:
+            return "---\n" f"description: {desc_out}\n" "---\n"
+        return ""
     if tool == "cursor":
         return (
             "---\n"
@@ -284,6 +290,8 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
         return [home / ".kimi-code"]
     if tool == "pi":
         return [home / ".pi" / "agent"]
+    if tool == "zcode":
+        return [home / ".zcode"]
     if tool == "qoder":
         return [home / ".qoder"]
     if tool == "codebuddy-code":
@@ -368,7 +376,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|opencode|codex|kimi-code|pi|qoder|codebuddy-code|all",
+        help="claude|cursor|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|all",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")

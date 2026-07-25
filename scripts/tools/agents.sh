@@ -3,7 +3,7 @@
 # 由 install.sh source。
 
 # Bundle 成员 ⊂ agents sync TOOLS（opt-in：qoder / codebuddy-code 仅在 TOOLS，不进默认安装包）
-AGENTS_BUNDLE_MODULES=(claude cursor opencode codex kimi-code pi)
+AGENTS_BUNDLE_MODULES=(claude cursor opencode codex kimi-code pi zcode)
 
 install_agents_bundle() {
   echo "========================================"
@@ -147,6 +147,34 @@ install_agents_bundle() {
       else
         status="fail"
         detail="安装失败"
+      fi
+      ;;
+    zcode)
+      if command -v npm &>/dev/null; then
+        _zcode_npm_bin="$(npm prefix -g 2>/dev/null)/bin"
+        if [[ -d "$_zcode_npm_bin" && ":$PATH:" != *":$_zcode_npm_bin:"* ]]; then
+          export PATH="$_zcode_npm_bin:$PATH"
+        fi
+      fi
+      if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
+      fi
+      if command -v zcode &>/dev/null; then
+        status="skip"
+        detail="已安装: $(command -v zcode)"
+      else
+        if install_zcode; then
+          if command -v zcode &>/dev/null; then
+            status="ok"
+            detail="新装完成"
+          else
+            status="skip"
+            detail="用户跳过或未在 PATH"
+          fi
+        else
+          status="fail"
+          detail="安装失败"
+        fi
       fi
       ;;
     *)

@@ -333,6 +333,50 @@ def sync_codebuddy_code(
     return "ok"
 
 
+def sync_zcode(
+    cat: Catalog,
+    profile: Optional[str],
+    dry_run: bool,
+    also_repo: bool,
+) -> str:
+    """Merge mcp.servers into ~/.zcode/cli/config.json（保留其它本机字段）。"""
+    servers = cat.selected_servers("zcode", profile)
+    rendered = {
+        sid: render_server_for_tool(sid, srv, "zcode") for sid, srv in servers.items()
+    }
+    target = Path.home() / ".zcode" / "cli" / "config.json"
+    existing: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {target}: {exc}")
+    mcp_block = existing.get("mcp") if isinstance(existing.get("mcp"), dict) else {}
+    block = mcp_block.get("servers") or {}
+    if not isinstance(block, dict):
+        block = {}
+    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
+    data = dict(existing)
+    data["mcp"] = {**mcp_block, "servers": merged}
+
+    status = f"zcode: {len(rendered)} managed servers → {target} (mcp.servers)"
+    if dry_run:
+        print(f"[dry-run] {status}")
+        print(json.dumps({"mcp": {"servers": rendered}}, indent=2, ensure_ascii=False))
+        return "ok"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup_file(target, Path.home() / ".config" / "backups")
+    atomic_write_json(target, data, dry_run=False)
+    print(f"已同步: {status}")
+
+    if also_repo:
+        repo_tpl = cat.root / "agents" / "vendors" / "zcode" / "mcp.json"
+        atomic_write_json(repo_tpl, {"mcp": {"servers": rendered}}, dry_run=False)
+        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
+    return "ok"
+
+
 def sync_codex(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     reason = (
         (cat.manifest.get("unsupported") or {})
@@ -409,6 +453,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         elif tool == "pi":
             results.append((tool, sync_pi(cat, profile, args.dry_run)))
+        elif tool == "zcode":
+            results.append(
+                (
+                    tool,
+                    sync_zcode(cat, profile, args.dry_run, args.also_repo_templates),
+                )
+            )
         elif tool == "qoder":
             results.append(
                 (

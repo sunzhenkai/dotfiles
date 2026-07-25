@@ -271,6 +271,14 @@ install_codebuddy_code_config() {
   echo "CodeBuddy 目录已就绪；共享 sync 请运行: dotf agents -c --tool codebuddy-code"
 }
 
+# 特殊配置：zcode
+# ~/.zcode/cli/config.json 可能含本机 model/provider/MCP；目录就绪即可，MCP 走统一 sync。
+install_zcode_config() {
+  mkdir -p "$HOME/.zcode/skills" "$HOME/.zcode/commands" "$HOME/.zcode/cli"
+  echo "ZCode 目录已就绪（~/.zcode/{skills,commands,cli}）"
+  echo "skills/MCP：dotf agents -c --tool zcode 或 sync.sh zcode"
+}
+
 install_opencode() {
   install_config "opencode"
   # skills/MCP：dotf agents -c 或 sync.sh opencode

@@ -23,6 +23,7 @@ TOOLS = (
     "codex",
     "kimi-code",
     "pi",
+    "zcode",
     "qoder",
     "codebuddy-code",
 )
@@ -340,12 +341,15 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             entry["bearerTokenEnvVar"] = env_name
         return entry
 
-    if tool in ("cursor", "claude", "qoder", "codebuddy-code"):
+    if tool in ("cursor", "claude", "qoder", "codebuddy-code", "zcode"):
         if transport == "stdio":
             entry = {
                 "command": srv["command"],
                 "args": list(srv.get("args") or []),
             }
+            # ZCode config.json 示例显式带 type: stdio
+            if tool == "zcode":
+                entry = {"type": "stdio", **entry}
             if srv.get("env"):
                 entry["env"] = srv["env"]
             return entry

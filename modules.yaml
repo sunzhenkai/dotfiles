@@ -245,6 +245,16 @@ modules:
       source: agents/vendors/pi
       target: ~/.pi/agent
 
+  - name: zcode
+    desc: ZCode CLI + 配置（~/.zcode）
+    group: agents
+    install: true
+    doctor: true
+    bin: zcode
+    config:
+      source: agents/vendors/zcode
+      target: ~/.zcode
+
   # ---------- config-only: shell ----------
   - name: zsh
     desc: Zsh shell 配置

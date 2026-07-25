@@ -110,13 +110,13 @@ Smoke test：
 
 ## 与工具配置的关系
 
-Claude / Cursor / OpenCode / Kimi / Qoder / CodeBuddy 的 MCP 片段由本目录生成或合并：
+Claude / Cursor / OpenCode / Kimi / ZCode / Qoder / CodeBuddy 的 MCP 片段由本目录生成或合并：
 
 ```shell
-scripts/agents/sync.sh claude|cursor|opencode|kimi-code|qoder|codebuddy-code|pi
+scripts/agents/sync.sh claude|cursor|opencode|kimi-code|zcode|qoder|codebuddy-code|pi
 ```
 
 Codex / Pi 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills/prompts 仍走 `agents/`）。
 `qoder` / `codebuddy-code` 为 opt-in 安装模块，但仍参与 MCP sync。
 
-仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json`、`agents/vendors/qoder/settings.json`（仅 `mcpServers`）、`agents/vendors/codebuddy-code/.mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。
+仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json`、`agents/vendors/zcode/mcp.json`（`mcp.servers`）、`agents/vendors/qoder/settings.json`（仅 `mcpServers`）、`agents/vendors/codebuddy-code/.mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。
