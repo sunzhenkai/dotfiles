@@ -11,6 +11,20 @@
     "zread": {
       "url": "https://open.bigmodel.cn/api/mcp/zread/mcp",
       "bearerTokenEnvVar": "ZHIPU_API_KEY"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser",
+        "chromium",
+        "--headless",
+        "--user-data-dir",
+        "/tmp/agent-env/browser/profile",
+        "--output-dir",
+        "/tmp/agent-env/browser/artifacts"
+      ]
     }
   }
 }
