@@ -47,11 +47,11 @@ agents/env/
 | Profile | 内容 | 风险 |
 |---------|------|------|
 | `coding` | 本地 CLI/runtime 检查 | low |
-| `research`（默认） | coding 检查 + 智谱 web MCP | low |
-| `browser` | research + Playwright 自动化 | high |
+| `research` | coding 检查 + 智谱 web MCP | low |
+| `browser`（默认） | research + Playwright 自动化 | high |
 | `full` | 完整能力（含 browser） | high |
 
-浏览器自动化**不会**随默认 `research` 启用。
+`dotf agents -c` 默认使用 `browser` profile，会写入 Playwright MCP。若只要 web 搜索、不要浏览器自动化，用 `--profile research` 或在 `local.yaml` 设 `profile: research`。
 
 ## 快速使用
 
@@ -76,9 +76,27 @@ cp agents/env/local.yaml.example agents/env/local.yaml
 ## Browser MCP
 
 - 默认 provider：`@playwright/mcp`（`npx -y @playwright/mcp@latest`）
-- 默认 **隔离** user-data-dir：`~/.cache/agent-env/browser/profile`
-- 截图 / trace 建议目录：`~/.cache/agent-env/browser/artifacts`（**不要提交**）
+- 默认 **隔离** user-data-dir：`/tmp/agent-env/browser/profile`
+- 截图 / trace 建议目录：`/tmp/agent-env/browser/artifacts`（**不要提交**）
 - Chrome DevTools / 真实主 profile：仅 local override 显式 opt-in，doctor 会标 high risk
+
+启用流程：
+
+```shell
+scripts/agents/sync.sh cursor --env-only --profile browser
+python3 scripts/agents/doctor.py --profile browser --tool cursor --verbose
+```
+
+同步后重载或重启对应 agent 客户端，让新的 MCP 配置生效。默认 `browser` / `full` 会生成 `playwright`；显式 `--profile research` 或 `coding` 则不启用浏览器自动化。
+
+Smoke test：
+
+1. 在启用 browser profile 的 agent 中打开 `https://example.com`。
+2. 读取页面 snapshot，确认能看到 Example Domain。
+3. 如需视觉检查，再请求 screenshot；指定文件名时使用 artifact 目录下的绝对路径，例如 `/tmp/agent-env/browser/artifacts/example.png`。
+4. 若 provider 启动失败，先运行 `npx playwright install chromium`；Linux 缺系统依赖时再按 Playwright 提示运行 `npx playwright install-deps`。
+
+截图、trace、downloads、浏览器 profile 都可能包含私有信息；不要提交到仓库，也不要把包含登录态的真实 profile 作为默认配置。headed/xvfb、`browser_executable`、CDP endpoint、真实 profile 只能通过 `agents/env/local.yaml`、`agents/env/local/*.yaml` 或环境变量显式 opt-in。
 
 ## 安全
 
@@ -92,12 +110,13 @@ cp agents/env/local.yaml.example agents/env/local.yaml
 
 ## 与工具配置的关系
 
-Claude / Cursor / OpenCode / Kimi 的 MCP 片段由本目录生成或合并：
+Claude / Cursor / OpenCode / Kimi / Qoder / CodeBuddy 的 MCP 片段由本目录生成或合并：
 
 ```shell
-scripts/agents/sync.sh claude|cursor|opencode|kimi-code|pi
+scripts/agents/sync.sh claude|cursor|opencode|kimi-code|qoder|codebuddy-code|pi
 ```
 
 Codex / Pi 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills/prompts 仍走 `agents/`）。
+`qoder` / `codebuddy-code` 为 opt-in 安装模块，但仍参与 MCP sync。
 
-仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。
+仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json`、`agents/vendors/qoder/settings.json`（仅 `mcpServers`）、`agents/vendors/codebuddy-code/.mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。

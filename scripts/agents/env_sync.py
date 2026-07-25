@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""将 agents/env MCP 声明同步到 Claude / Cursor / OpenCode / Codex / Kimi / Pi。"""
+"""将 agents/env MCP 声明同步到各 agent 工具。"""
 
 from __future__ import annotations
 
@@ -246,6 +246,93 @@ def sync_kimi_code(
     return "ok"
 
 
+def sync_qoder(
+    cat: Catalog,
+    profile: Optional[str],
+    dry_run: bool,
+    also_repo: bool,
+) -> str:
+    """Merge mcpServers into ~/.qoder/settings.json（保留其它本机字段）。"""
+    servers = cat.selected_servers("qoder", profile)
+    rendered = {
+        sid: render_server_for_tool(sid, srv, "qoder") for sid, srv in servers.items()
+    }
+    target = Path.home() / ".qoder" / "settings.json"
+    existing: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {target}: {exc}")
+    block = existing.get("mcpServers") or {}
+    if not isinstance(block, dict):
+        block = {}
+    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
+    data = dict(existing)
+    data["mcpServers"] = merged
+
+    status = f"qoder: {len(rendered)} managed servers → {target}"
+    if dry_run:
+        print(f"[dry-run] {status}")
+        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
+        return "ok"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup_file(target, Path.home() / ".config" / "backups")
+    atomic_write_json(target, data, dry_run=False)
+    print(f"已同步: {status}")
+
+    if also_repo:
+        repo_tpl = cat.root / "agents" / "vendors" / "qoder" / "settings.json"
+        # 仓库模板只写托管 mcpServers，避免把本机 trustedDirectories 写回仓库
+        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
+        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
+    return "ok"
+
+
+def sync_codebuddy_code(
+    cat: Catalog,
+    profile: Optional[str],
+    dry_run: bool,
+    also_repo: bool,
+) -> str:
+    servers = cat.selected_servers("codebuddy-code", profile)
+    rendered = {
+        sid: render_server_for_tool(sid, srv, "codebuddy-code")
+        for sid, srv in servers.items()
+    }
+    target = Path.home() / ".codebuddy" / ".mcp.json"
+    existing: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {target}: {exc}")
+    block = existing.get("mcpServers") or {}
+    if not isinstance(block, dict):
+        block = {}
+    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
+    data = dict(existing)
+    data["mcpServers"] = merged
+
+    status = f"codebuddy-code: {len(rendered)} managed servers → {target}"
+    if dry_run:
+        print(f"[dry-run] {status}")
+        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
+        return "ok"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup_file(target, Path.home() / ".config" / "backups")
+    atomic_write_json(target, data, dry_run=False)
+    print(f"已同步: {status}")
+
+    if also_repo:
+        repo_tpl = cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json"
+        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
+        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
+    return "ok"
+
+
 def sync_codex(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     reason = (
         (cat.manifest.get("unsupported") or {})
@@ -322,6 +409,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         elif tool == "pi":
             results.append((tool, sync_pi(cat, profile, args.dry_run)))
+        elif tool == "qoder":
+            results.append(
+                (
+                    tool,
+                    sync_qoder(cat, profile, args.dry_run, args.also_repo_templates),
+                )
+            )
+        elif tool == "codebuddy-code":
+            results.append(
+                (
+                    tool,
+                    sync_codebuddy_code(
+                        cat, profile, args.dry_run, args.also_repo_templates
+                    ),
+                )
+            )
         else:
             die(f"未知工具: {tool}")
 

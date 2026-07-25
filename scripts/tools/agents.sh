@@ -2,7 +2,7 @@
 # agents 安装包：编排 agent 相关 CLI（不写 MCP/skills）
 # 由 install.sh source。
 
-# Bundle 成员（与 agents sync TOOLS 对齐；可在此扩展）
+# Bundle 成员 ⊂ agents sync TOOLS（opt-in：qoder / codebuddy-code 仅在 TOOLS，不进默认安装包）
 AGENTS_BUNDLE_MODULES=(claude cursor opencode codex kimi-code pi)
 
 install_agents_bundle() {

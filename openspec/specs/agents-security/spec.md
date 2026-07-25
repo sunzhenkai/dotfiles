@@ -94,3 +94,37 @@ The system SHALL provide checks that catch obvious sensitive data patterns in `a
 - **THEN** doctor SHALL warn according to configured sensitive pattern rules
 - **THEN** the user SHALL be directed to move that information into local override when appropriate
 
+### Requirement: Browser debugging uses isolated state unless explicitly overridden
+The system SHALL protect user browser state by using isolated browser state for agent browser debugging unless the user explicitly opts into a higher-risk local configuration.
+
+#### Scenario: Default browser profile is generated
+- **WHEN** sync generates browser MCP configuration without a local override
+- **THEN** the configuration SHALL use an isolated browser user data directory
+- **THEN** the configuration SHALL NOT reference the user's primary browser profile
+
+#### Scenario: Real browser state is requested
+- **WHEN** a local override enables a real browser profile or CDP endpoint
+- **THEN** the override SHALL remain outside committed repository files
+- **THEN** doctor SHALL warn that authenticated pages and private browsing state may be exposed to the agent
+
+### Requirement: Browser debugging artifacts are treated as private
+The system SHALL treat screenshots, traces, downloads, and browser profiles created during agent browser debugging as private local artifacts.
+
+#### Scenario: Browser artifact directory is documented
+- **WHEN** documentation describes browser debugging output
+- **THEN** it SHALL direct artifacts to a temporary, cache, or ignored directory outside tracked source files
+- **THEN** it SHALL warn users not to commit screenshots or traces containing private information
+
+#### Scenario: Browser artifacts are detected in repository-managed paths
+- **WHEN** doctor or validation detects likely browser artifacts under repository-managed paths
+- **THEN** it SHALL report a warning or failure according to severity
+- **THEN** it SHALL recommend moving the artifacts to the configured artifact directory or adding an appropriate ignore rule
+
+### Requirement: Browser debugging avoids secret expansion in generated templates
+The system SHALL keep generated browser MCP repository templates free of expanded secrets and private machine state.
+
+#### Scenario: Browser MCP template is regenerated
+- **WHEN** sync updates repository-managed MCP templates for the browser profile
+- **THEN** the generated template SHALL contain only shared command declarations and safe placeholders
+- **THEN** the generated template SHALL NOT contain cookies, tokens, internal page URLs, CDP endpoints, or private browser profile paths
+

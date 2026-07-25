@@ -3,7 +3,6 @@
 ## Purpose
 为工具型模块提供一等 doctor 能力：CLI `-d` 与组合动作、L0 默认诊断、agents 深度诊断入口，以及退出码与旁路清理约定。
 ## Requirements
-
 ### Requirement: 工具型模块强制 doctor 能力
 系统 SHALL 将注册表中除非工具型排除名单（`system`、`homebrew`、`fonts`）以外、具备 install 和/或 config 的模块视为工具型模块。每个工具型模块 SHALL 声明 `doctor: true`。校验发现工具型模块缺少该声明时 SHALL 以非零退出失败。
 
@@ -114,3 +113,39 @@ doctor 在存在任一 fail 或执行错误时 SHALL 以非零退出；若仅有
 - **WHEN** 运行 `dotf agents -c --doctor`
 - **THEN** 系统以非零退出码失败
 - **THEN** 错误信息 SHALL 提示使用 `-d` 或 `-cd`
+
+### Requirement: L0 与可选 L1 分层诊断
+系统 SHALL 为所有具备 doctor 能力的模块提供公共 L0 检查；模块 MAY 通过约定式 `doctor.sh` 提供 L1 深度检查。`dotf <module> -d --deep` SHALL 在 L0 后运行可用 L1；缺少 L1 SHALL 报告 intentional skip 而非失败。已有 agents 专用 doctor SHALL 作为其 L1 保留。
+
+#### Scenario: 仅有 L0 的模块
+- **WHEN** 用户对没有专用 doctor 处理器的模块运行 `-d --deep`
+- **THEN** 系统 SHALL 执行 L0
+- **THEN** L1 SHALL 标记为 skip 且不单独导致非零退出
+
+#### Scenario: 具备 L1 的模块
+- **WHEN** 用户对具备专用 doctor 处理器的模块运行 `-d --deep`
+- **THEN** 系统 SHALL 先执行 L0 再执行 L1
+- **THEN** 任一检查 fail SHALL 导致整体非零退出
+
+#### Scenario: Agents 深度诊断
+- **WHEN** 用户运行 `dotf agents -d --deep`
+- **THEN** 系统 SHALL 运行公共适用检查和 agents 领域深度诊断
+
+### Requirement: Status 只使用只读诊断
+`dotf status` SHALL 默认只执行确定为只读的 L0 检查。L1 检查只有声明为只读且由用户显式请求时才可纳入 status。
+
+#### Scenario: 默认状态检查
+- **WHEN** 用户运行 `dotf status`
+- **THEN** 系统 SHALL NOT 运行可能产生网络访问、写文件或外部副作用的 L1
+
+### Requirement: 诊断结果映射到统一动作状态
+doctor 的 pass/warn/fail/skip 检查结果 SHALL 映射到 runner 的统一结果：存在 fail 为 failed；仅 pass 为 unchanged；仅含 pass/warn/skip 且无 fail SHALL 为 unchanged 或 skipped，并保持零退出。
+
+#### Scenario: L0 检查失败
+- **WHEN** doctor 至少产生一个 fail
+- **THEN** runner 动作结果 SHALL 为 failed
+- **THEN** 整体进程 SHALL 非零退出
+
+#### Scenario: 仅有警告和跳过
+- **WHEN** doctor 仅产生 warn 或 skip 且没有 fail
+- **THEN** runner SHALL 保持零退出并提供对应脱敏原因

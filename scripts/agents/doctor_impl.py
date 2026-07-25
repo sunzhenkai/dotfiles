@@ -6,10 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
 import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -25,6 +28,31 @@ STATUS_PASS = "pass"
 STATUS_WARN = "warn"
 STATUS_FAIL = "fail"
 STATUS_SKIP = "skip"
+
+
+def sanitize_browser_text(text: str, cat: Catalog) -> str:
+    """Redact local browser paths/endpoints before adding them to reports."""
+    out = text
+    b = cat.browser_local()
+    for key in (
+        "user_data_dir",
+        "isolated_user_data_dir",
+        "artifact_dir",
+        "browser_executable",
+        "cdp_endpoint",
+    ):
+        val = b.get(key) or os.environ.get(f"AGENT_ENV_{key.upper()}")
+        if not val:
+            continue
+        raw = str(val)
+        expanded = os.path.expanduser(raw)
+        for candidate in {raw, expanded}:
+            if len(candidate) >= 4:
+                out = out.replace(candidate, "<redacted-browser-local>")
+    cdp = os.environ.get("AGENT_ENV_CDP_ENDPOINT")
+    if cdp:
+        out = out.replace(cdp, "<redacted-browser-local>")
+    return out
 
 
 @dataclass
@@ -104,6 +132,111 @@ def run_cmd(cmd: Sequence[str], timeout: float = 15.0) -> tuple[int, str]:
         return proc.returncode, out.strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, str(exc)
+
+
+def run_mcp_browser_probe(cmd: Sequence[str], timeout: float = 30.0) -> tuple[int, str]:
+    """Start a stdio MCP server and trigger a minimal browser launch."""
+    try:
+        proc = subprocess.Popen(
+            list(cmd),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+    except OSError as exc:
+        return 127, str(exc)
+
+    assert proc.stdin is not None
+    assert proc.stdout is not None
+    assert proc.stderr is not None
+    out_q: "queue.Queue[str]" = queue.Queue()
+    err_lines: List[str] = []
+
+    def read_stdout() -> None:
+        for line in proc.stdout:
+            out_q.put(line)
+
+    def read_stderr() -> None:
+        for line in proc.stderr:
+            err_lines.append(line)
+
+    threading.Thread(target=read_stdout, daemon=True).start()
+    threading.Thread(target=read_stderr, daemon=True).start()
+
+    def send(obj: Dict[str, Any]) -> None:
+        proc.stdin.write(json.dumps(obj) + "\n")
+        proc.stdin.flush()
+
+    def recv_id(id_: int, deadline: float) -> Dict[str, Any]:
+        while time.monotonic() < deadline:
+            try:
+                line = out_q.get(timeout=0.25)
+            except queue.Empty:
+                if proc.poll() is not None:
+                    break
+                continue
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if msg.get("id") == id_:
+                return msg
+        raise TimeoutError(f"MCP response timeout for id={id_}")
+
+    deadline = time.monotonic() + timeout
+    try:
+        send(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "agents-doctor", "version": "1"},
+                },
+            }
+        )
+        init = recv_id(1, deadline)
+        if "error" in init:
+            return 1, json.dumps(init["error"], ensure_ascii=False)
+        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        send(
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "browser_navigate",
+                    "arguments": {"url": "about:blank"},
+                },
+            }
+        )
+        nav = recv_id(2, deadline)
+        if nav.get("result", {}).get("isError") or "error" in nav:
+            return 1, json.dumps(nav, ensure_ascii=False)
+        send(
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "browser_snapshot", "arguments": {"depth": 1}},
+            }
+        )
+        snap = recv_id(3, deadline)
+        if snap.get("result", {}).get("isError") or "error" in snap:
+            return 1, json.dumps(snap, ensure_ascii=False)
+        return 0, "MCP browser navigate/snapshot ok"
+    except (BrokenPipeError, TimeoutError) as exc:
+        return 1, f"{exc}; {''.join(err_lines)[-300:]}"
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 def check_env(cat: Catalog, report: DoctorReport, profile: str) -> None:
@@ -311,6 +444,16 @@ def _mcp_drift(
         if data is None:
             return None
         actual = data.get("mcpServers") or {}
+    elif tool == "qoder":
+        data = _read_json(Path.home() / ".qoder" / "settings.json")
+        if data is None:
+            return None
+        actual = data.get("mcpServers") or {}
+    elif tool == "codebuddy-code":
+        data = _read_json(Path.home() / ".codebuddy" / ".mcp.json")
+        if data is None:
+            return None
+        actual = data.get("mcpServers") or {}
     else:
         return None
 
@@ -351,7 +494,7 @@ def check_browser(
         "risk",
         STATUS_WARN,
         "browser 自动化为 high risk（隔离 profile；勿提交截图/trace）",
-        hint=str((cat.browser.get("artifact_dir") or "")),
+        hint="artifact_dir 使用仓库外缓存目录；不要提交截图、trace、downloads 或 profile",
     )
 
     b = cat.browser_local()
@@ -365,12 +508,11 @@ def check_browser(
             "已配置真实浏览器 profile / CDP；可能暴露登录态",
         )
     else:
-        ud = b.get("user_data_dir") or b.get("isolated_user_data_dir")
         report.add(
             "browser",
             "isolate",
             STATUS_PASS,
-            f"默认隔离 profile: {ud}",
+            "默认隔离 profile 已配置（本机路径已隐藏）",
         )
 
     provider = b.get("provider") or b.get("default_provider") or "playwright"
@@ -424,23 +566,34 @@ def check_browser(
                 )
 
     if deep:
-        deep_meta = meta.get("deep_check") or {}
-        cmd = deep_meta.get("command")
+        cmd: List[str] = []
+        if provider == "playwright":
+            tool = report.tool if report.tool in TOOLS else "cursor"
+            srv = cat.selected_servers(tool or "cursor", profile).get("playwright")
+            if srv:
+                cmd = [str(srv["command"]), *[str(a) for a in (srv.get("args") or [])]]
+                code, out = run_mcp_browser_probe(cmd, timeout=45)
+            else:
+                code, out = 1, "playwright server is not selected for this profile/tool"
+        else:
+            deep_meta = meta.get("deep_check") or {}
+            cmd = [str(x) for x in (deep_meta.get("command") or [])]
+            code, out = run_cmd(cmd, timeout=60) if cmd else (0, "skip")
         if cmd:
-            code, out = run_cmd(cmd, timeout=60)
             if code == 0:
                 report.add(
                     "browser",
                     "deep-launch",
                     STATUS_PASS,
-                    "provider --help / 最小启动检查通过",
+                    "provider 最小启动检查通过",
                 )
             else:
+                safe_out = sanitize_browser_text(out[:200], cat)
                 report.add(
                     "browser",
                     "deep-launch",
                     STATUS_FAIL,
-                    f"provider 深度检查失败: {out[:200]}",
+                    f"provider 深度检查失败: {safe_out}",
                     hint=str((meta.get("checks") or [{}])[-1].get("hint") or ""),
                 )
 
@@ -465,6 +618,8 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
         cat.root / "agents" / "vendors" / "cursor" / "mcp.json",
         cat.root / "agents" / "vendors" / "opencode" / "opencode.json",
         cat.root / "agents" / "vendors" / "kimi-code" / "mcp.json",
+        cat.root / "agents" / "vendors" / "qoder" / "settings.json",
+        cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json",
     ]
     # 跳过 local overrides（允许私有路径）
     skip_names = {"local.yaml"}
@@ -512,22 +667,32 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
                     break
 
     # browser state in repo
-    for kind in ("screenshot", "trace.zip", "browser-profile", "playwright-report"):
-        hits = list(cat.root.glob(f"**/*{kind}*")) if "*" not in kind else []
-        # 简单检查常见目录名
-    for dirname in ("browser-profile", "playwright-report"):
-        hit = cat.root / dirname
-        if hit.exists():
+    forbidden = ((cat.security.get("browser_state") or {}).get("forbidden_in_repo") or [])
+    artifact_hint = str(
+        ((cat.security.get("browser_state") or {}).get("artifact_hint"))
+        or "移到 ~/.cache/agent-env/browser/ 并加入 gitignore"
+    )
+    artifact_findings = 0
+    for pattern in forbidden:
+        for hit in cat.root.glob(pattern):
+            if ".git" in hit.parts:
+                continue
+            artifact_findings += 1
+            try:
+                rel = hit.relative_to(cat.root)
+            except ValueError:
+                rel = hit
             report.add(
                 "security",
-                f"browser-state:{dirname}",
+                f"browser-state:{pattern}",
                 STATUS_WARN,
-                f"仓库内发现浏览器产物目录 {dirname}",
-                hint="移到 ~/.cache/agent-env/browser/ 并加入 gitignore",
+                f"仓库内发现疑似浏览器调试产物 @ {rel}",
+                hint=artifact_hint,
             )
+            break
 
-    if findings == 0:
-        report.add("security", "scan", STATUS_PASS, "未发现明显密钥/内网 URL 泄漏")
+    if findings == 0 and artifact_findings == 0:
+        report.add("security", "scan", STATUS_PASS, "未发现明显密钥/内网 URL 或浏览器产物泄漏")
 
 
 def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> None:
@@ -555,8 +720,10 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         "codex": Path.home() / ".codex" / "skills",
         "kimi-code": Path.home() / ".kimi-code" / "skills",
         "pi": Path.home() / ".pi" / "agent" / "skills",
+        "qoder": Path.home() / ".qoder" / "skills",
+        "codebuddy-code": Path.home() / ".codebuddy" / "skills",
     }
-    # 更可靠：对 opencode / kimi / pi 仓库内或用户目录 skills 做存在性抽查
+    # 更可靠：对常用工具目录 skills 做存在性抽查（opt-in 工具仅在 --tool 时检查）
     sample = next(skills_src.iterdir(), None) if skills_src.is_dir() else None
     check_tools = [tool] if tool else ["opencode", "cursor", "kimi-code", "pi"]
     drifted = False
@@ -638,6 +805,36 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
                 )
             else:
                 report.add("agents", f"{t}-drift", STATUS_PASS, "Pi skills 目录存在")
+        elif t in ("qoder", "codebuddy-code"):
+            dest = targets[t]
+            label = "Qoder" if t == "qoder" else "CodeBuddy"
+            if sample and sample.is_dir():
+                marker = dest / sample.name
+                if not dest.is_dir() or not marker.exists():
+                    drifted = True
+                    report.add(
+                        "agents",
+                        f"{t}-drift",
+                        STATUS_WARN,
+                        f"{t} skills 可能未同步（缺 {sample.name}）",
+                        hint=f"运行 scripts/agents/sync.sh {t}",
+                    )
+                else:
+                    report.add(
+                        "agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步"
+                    )
+            elif not dest.is_dir():
+                report.add(
+                    "agents",
+                    f"{t}-drift",
+                    STATUS_WARN,
+                    f"{label} skills 目录不存在",
+                    hint=f"运行 scripts/agents/sync.sh {t}",
+                )
+            else:
+                report.add(
+                    "agents", f"{t}-drift", STATUS_PASS, f"{label} skills 目录存在"
+                )
         else:
             report.add(
                 "agents",

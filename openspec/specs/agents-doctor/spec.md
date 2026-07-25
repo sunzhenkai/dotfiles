@@ -99,3 +99,34 @@ The doctor command SHALL support a machine-readable output mode for automation.
 - **THEN** doctor SHALL emit valid JSON containing check groups, item statuses, messages, and exit status meaning
 - **THEN** secret values SHALL remain redacted or omitted
 
+### Requirement: Doctor reports browser profile readiness
+The doctor command SHALL report whether the selected browser profile is ready for agent browser debugging.
+
+#### Scenario: Browser profile dependencies are present
+- **WHEN** doctor runs with the browser profile
+- **THEN** it SHALL check required browser runtime commands declared by the provider
+- **THEN** it SHALL report present dependencies as pass without requiring optional advanced settings
+
+#### Scenario: Browser profile dependency is missing
+- **WHEN** doctor runs with the browser profile and a required browser dependency is unavailable
+- **THEN** it SHALL report the missing dependency
+- **THEN** it SHALL include the documented install or setup hint
+
+#### Scenario: Optional CDP settings are absent
+- **WHEN** doctor runs with the default Playwright browser provider and no CDP endpoint is configured
+- **THEN** it SHALL NOT fail because CDP settings are absent
+- **THEN** it MAY report those settings as optional warnings or skips
+
+### Requirement: Doctor supports browser deep validation
+The doctor command SHALL support deep validation for the selected browser provider.
+
+#### Scenario: Browser deep check is requested
+- **WHEN** doctor runs with the browser profile and deep validation enabled
+- **THEN** it SHALL attempt a minimal provider launch check or equivalent command-level validation
+- **THEN** it SHALL report actionable output if the provider cannot start
+
+#### Scenario: Browser MCP target configuration is stale
+- **WHEN** the selected target tool does not contain the browser MCP entry expected for the selected profile
+- **THEN** doctor SHALL report managed MCP drift
+- **THEN** doctor SHALL recommend syncing that target tool with the browser profile
+

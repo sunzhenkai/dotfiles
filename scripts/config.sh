@@ -247,6 +247,29 @@ install_cursor() {
   echo "Cursor vendor 目录已就绪；共享 sync 请运行: dotf agents -c"
 }
 
+# 特殊配置：qoder（opt-in）
+# ~/.qoder/settings.json 可能含本机 trustedDirectories / MCP；已存在则不覆盖。
+install_qoder_config() {
+  local source="$DOTFILES_ROOT/agents/vendors/qoder/settings.json"
+  local target="$HOME/.qoder/settings.json"
+
+  mkdir -p "$HOME/.qoder"
+
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    echo "已存在: ~/.qoder/settings.json（跳过覆盖，避免丢失本机状态）"
+  else
+    cp "$source" "$target"
+    echo "已安装: ~/.qoder/settings.json 骨架"
+  fi
+  echo "skills/MCP：dotf agents -c --tool qoder 或 sync.sh qoder"
+}
+
+# 特殊配置：codebuddy-code（opt-in）
+# MCP/skills 走统一 agents sync，此处只确保目录就绪。
+install_codebuddy_code_config() {
+  mkdir -p "$HOME/.codebuddy"
+  echo "CodeBuddy 目录已就绪；共享 sync 请运行: dotf agents -c --tool codebuddy-code"
+}
 
 install_opencode() {
   install_config "opencode"

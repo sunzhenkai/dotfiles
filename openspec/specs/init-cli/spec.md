@@ -3,35 +3,31 @@
 ## Purpose
 提供主体优先的 `dotf` CLI：模块选择、install/config/doctor 动作组合、交互与全量模式，并委托现有子脚本执行。
 ## Requirements
-
 ### Requirement: 参数解析
-脚本 SHALL 支持主体优先的调用模型：`dotf <module...> -i|-c|-d|-ic|-id|-cd|-icd`（及 `--install`/`--config`/`--doctor` 与分写等价组合），以及无模块时的 `dotf -i|-c|-d|...`（进入交互选择）。全量标志行为：
-- `dotf -i -a` / `dotf --install --all`：仅安装全部（按当前 OS 适用性过滤）
-- `dotf -c -a` / `dotf --config --all`：仅配置全部（按当前 OS 适用性过滤）
-- `dotf -d -a` / `dotf --doctor --all`：仅诊断全部具备 doctor 的适用模块
-- `dotf -a` / `dotf --all`：安装全部 + 配置全部（按当前 OS 适用性过滤；**不含 doctor**；不含专属 init 的系统包分发，除非 system 模块本身被包含）
+脚本 SHALL 支持主体优先调用：`dotf <module...> -i|-c|-d|-ic|-id|-cd|-icd`（及长选项和分写等价组合），无模块动作进入交互选择。`-i -a`、`-c -a`、`-d -a` 分别表示全量安装、配置、诊断；单独 `-a` 表示全量安装和配置且不含 doctor。所有入口 SHALL 支持 `--dry-run`；会执行动作的入口 SHALL 支持显式 `--yes`。动作优先旧语法 SHALL NOT 被接受。
 
-组合动作对每个指定模块的执行顺序 SHALL 为 install → config → doctor（仅执行动作集合中包含的步骤）。前一步骤失败（非零退出）时 SHALL 终止该模块后续步骤及后续模块。
-
-动作优先旧语法（`dotf -i <module>`、`dotf -c <module>`、`dotf -i x -c y` 模式切换）SHALL NOT 再被接受。
-
-`--all` 模式不得设置可跳过确认的全局绕过；每个模块仍需用户单独确认。所有确认提示 SHALL 默认 N（需显式输入 y/Y），用户不可通过直接回车跳过确认。
+组合动作对每个模块 SHALL 按 install → config → doctor 执行；前序失败 SHALL 终止该模块后续动作及默认的后续模块。系统 SHALL 在确认前生成并展示或准备完整执行计划。默认确认 SHALL 为 N；`--yes` SHALL 作为唯一公开的全局自动确认方式，且不得绕过校验、备份或错误处理。
 
 #### Scenario: 显示帮助
 - **WHEN** 运行 `dotf`（无参数）或 `dotf -h`
-- **THEN** 显示帮助信息，包含主体优先用法（含 `-d` 与组合）、选项、示例
+- **THEN** 显示主体优先用法、动作组合、plan 控制选项和示例
 
 #### Scenario: 安装指定模块
 - **WHEN** 运行 `dotf sdk golang -i`
-- **THEN** 依次对 sdk、golang 执行安装调度
+- **THEN** planner SHALL 生成包含 sdk、golang 及必要依赖的安装计划
+- **THEN** 确认后 SHALL 按计划执行
 
 #### Scenario: 配置指定模块
 - **WHEN** 运行 `dotf nvim kitty -c`
-- **THEN** 依次对 nvim、kitty 执行配置调度
+- **THEN** planner SHALL 生成对应配置计划并在确认后执行
 
 #### Scenario: 诊断指定模块
 - **WHEN** 运行 `dotf nvim -d`
 - **THEN** 对 nvim 执行 doctor 调度
+
+#### Scenario: 安装配置诊断
+- **WHEN** 运行 `dotf agents -icd`
+- **THEN** SHALL 对 agents 按 install、config、doctor 顺序执行
 
 #### Scenario: 安装并配置
 - **WHEN** 运行 `dotf agents -ic`
@@ -46,26 +42,39 @@
 - **THEN** SHALL NOT 执行 agents 的 config
 - **THEN** 进程以非零退出码结束
 
+#### Scenario: 前序失败终止
+- **WHEN** 组合动作中的 install 或 config 失败
+- **THEN** 同一模块后续动作及默认的后续模块 SHALL NOT 执行
+- **THEN** 进程 SHALL 以非零退出
+
 #### Scenario: 仅配置全部
-- **WHEN** 运行 `dotf -c -a` 或 `dotf --config --all`
-- **THEN** 仅配置全部适用模块，不执行安装全集，不执行 doctor
+- **WHEN** 运行 `dotf -c -a`
+- **THEN** 仅配置当前 OS 适用且具备 config 的全部计划模块
 
 #### Scenario: 仅安装全部
-- **WHEN** 运行 `dotf -i -a` 或 `dotf --install --all`
-- **THEN** 仅安装全部适用模块，不执行配置全集，不执行 doctor
+- **WHEN** 运行 `dotf -i -a`
+- **THEN** 仅安装当前 OS 适用且具备 install 的全部计划模块
 
 #### Scenario: 仅诊断全部
-- **WHEN** 运行 `dotf -d -a` 或 `dotf --doctor --all`
-- **THEN** 仅诊断全部具备 doctor 的适用模块，不执行安装/配置全集
+- **WHEN** 运行 `dotf -d -a`
+- **THEN** 仅诊断当前 OS 适用且具备 doctor 的全部计划模块
 
 #### Scenario: 全部模式不含 doctor
-- **WHEN** 运行 `dotf -a` 或 `dotf --all`
-- **THEN** 先安装全部适用模块，再配置全部适用模块
+- **WHEN** 运行 `dotf -a`
+- **THEN** SHALL 先安装再配置全部适用计划模块
 - **THEN** SHALL NOT 执行 doctor
+
+#### Scenario: Dry-run
+- **WHEN** 在有效动作请求后传入 `--dry-run`
+- **THEN** SHALL 输出最终执行计划且不执行任何动作
+
+#### Scenario: 自动确认
+- **WHEN** 在有效动作请求后传入 `--yes`
+- **THEN** SHALL 在计划校验成功后跳过交互确认执行
 
 #### Scenario: 旧语法拒绝
 - **WHEN** 运行 `dotf -i sdk`
-- **THEN** 以非零退出码失败并提示新用法（或等价的明确错误）
+- **THEN** SHALL 以非零退出并提示主体优先用法
 
 #### Scenario: 未知选项报错
 - **WHEN** 运行 `dotf -x`
@@ -74,6 +83,11 @@
 #### Scenario: 未知模块名报错
 - **WHEN** 运行 `dotf nonexistent -i`
 - **THEN** 显示错误信息和可用模块列表，以非零退出码退出
+
+#### Scenario: --all 经计划确认而非逐模块确认
+- **WHEN** 运行 `dotf -i -a` 且未传 `--yes`，用户通过计划确认
+- **THEN** 系统 SHALL 按计划执行适用模块的 install
+- **THEN** SHALL NOT 对每个模块再弹出「是否安装」类确认
 
 ### Requirement: 交互选择
 当动作旗标（`-i`、`-c`、`-d` 或组合）未携带模块参数时，脚本 SHALL 显示对应能力下的模块编号列表，提示用户输入选择，支持数字序号、模块名称、`a`（全部）的混合输入。`-d` 交互列表 SHALL 为具备 doctor 能力的模块。含多动作的交互列表 SHALL 按能力展示可执行模块，或对所选模块按动作集合校验能力并在缺失时按注册表规则报错（实施时取一致策略并在 help 说明）。
@@ -129,23 +143,24 @@
 - **THEN** 使用 `/bin/bash` 执行 `config.sh`
 
 ### Requirement: 委托调用
-脚本 SHALL 通过委托调用现有子脚本完成实际操作，不复制子脚本的逻辑。
+CLI SHALL 将模块选择、依赖展开与动作排序委托给统一 planner，将动作执行委托给统一 runner；CLI SHALL NOT 复制处理器逻辑。runner SHALL 通过约定式模块目录或迁移期兼容适配器调用实现。
 
 #### Scenario: 安装委托
-- **WHEN** 执行安装操作
-- **THEN** 调用 `scripts/install.sh`，将模块名作为参数传入
+- **WHEN** 执行安装计划
+- **THEN** CLI SHALL 将计划交给 runner
+- **THEN** runner SHALL 调用对应模块 install 处理器
 
 #### Scenario: 配置委托
-- **WHEN** 执行配置操作
-- **THEN** 对每个选中的配置模块，分别调用 `scripts/config.sh <模块名>`
+- **WHEN** 执行配置计划
+- **THEN** runner SHALL 调用对应模块 config 处理器
 
 #### Scenario: 诊断委托
-- **WHEN** 执行诊断操作
-- **THEN** 对每个选中的诊断模块，分别调用 `scripts/doctor.sh <模块名>`（或等价统一 doctor 入口）
+- **WHEN** 执行诊断计划
+- **THEN** runner SHALL 调用 L0 doctor 与适用的模块 L1 处理器
 
 #### Scenario: 脚本路径解析
 - **WHEN** 从任意目录执行 `bin/dotf`
-- **THEN** 通过 `BASH_SOURCE[0]` 正确解析项目根目录，找到 `scripts/` 下的子脚本
+- **THEN** SHALL 正确解析仓库根目录并找到 planner、runner 与模块目录
 
 ### Requirement: doctor 组合与 agents 诊断旗标
 当动作集合包含 doctor 且模块为 `agents` 时，系统 SHALL 允许将 agents 诊断专用选项（如 `--json`、`--deep`、`--profile`）透传给 doctor 实现。这些选项 SHALL NOT 再作为 `config`/`sync` 的旁路挂载点。
@@ -153,3 +168,18 @@
 #### Scenario: agents 诊断透传 deep
 - **WHEN** 运行 `dotf agents -d --deep`
 - **THEN** agents doctor SHALL 以 deep 模式运行
+
+### Requirement: 状态与重试命令
+CLI SHALL 提供 `dotf status` 与 `dotf retry` 独立命令，并支持适用的 `--profile`、`--json`、`--dry-run` 或 `--yes` 控制选项。两者 SHALL NOT 与模块动作旗标产生歧义。
+
+#### Scenario: 查看状态
+- **WHEN** 运行 `dotf status --profile remote`
+- **THEN** SHALL 只读检查 remote profile 的期望环境
+
+#### Scenario: 重试失败动作
+- **WHEN** 运行 `dotf retry --yes`
+- **THEN** SHALL 校验最近失败计划后非交互重试其中的 failed 动作
+
+#### Scenario: 命令与动作混用
+- **WHEN** 用户将 `status` 或 `retry` 与模块动作旗标以不兼容方式混用
+- **THEN** CLI SHALL 在执行前以非零退出并显示正确用法

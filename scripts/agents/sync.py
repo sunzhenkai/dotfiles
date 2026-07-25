@@ -12,7 +12,16 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code", "pi")
+TOOLS = (
+    "claude",
+    "cursor",
+    "opencode",
+    "codex",
+    "kimi-code",
+    "pi",
+    "qoder",
+    "codebuddy-code",
+)
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 
@@ -275,6 +284,10 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
         return [home / ".kimi-code"]
     if tool == "pi":
         return [home / ".pi" / "agent"]
+    if tool == "qoder":
+        return [home / ".qoder"]
+    if tool == "codebuddy-code":
+        return [home / ".codebuddy"]
     die(f"unknown tool: {tool}")
     return []
 
@@ -355,7 +368,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|opencode|codex|kimi-code|pi|all",
+        help="claude|cursor|opencode|codex|kimi-code|pi|qoder|codebuddy-code|all",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")

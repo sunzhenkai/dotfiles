@@ -94,11 +94,15 @@ modules:
     bin: npm
 
   - name: qoder
-    desc: 安装 Qoder CLI（默认跳过，显式点名可装）
+    desc: Qoder CLI + 配置（默认跳过，显式点名可装）
     group: agents
     enabled: false
     install: true
     doctor: true
+    bin: qoder
+    config:
+      source: agents/vendors/qoder
+      target: ~/.qoder
 
   - name: trae-cli
     desc: 安装 Trae CLI
@@ -107,11 +111,15 @@ modules:
     doctor: true
 
   - name: codebuddy-code
-    desc: 安装 CodeBuddy Code CLI（默认跳过，显式点名可装）
+    desc: CodeBuddy Code CLI + 配置（默认跳过，显式点名可装）
     group: agents
     enabled: false
     install: true
     doctor: true
+    bin: codebuddy
+    config:
+      source: agents/vendors/codebuddy-code/.mcp.json
+      target: ~/.codebuddy/.mcp.json
 
   - name: vcpkg
     desc: 安装 vcpkg C++ 包管理器

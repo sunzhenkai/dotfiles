@@ -83,3 +83,42 @@ The system SHALL choose active MCP servers from the selected profile and per-too
 - **THEN** browser MCP servers SHALL NOT be installed for any target tool
 - **THEN** doctor SHALL not require browser automation dependencies for that profile
 
+### Requirement: Browser stdio MCP servers are rendered per target tool
+The system SHALL render browser automation stdio MCP servers into each compatible target tool format using the shared `agents/env` declaration.
+
+#### Scenario: Cursor or Claude browser MCP is generated
+- **WHEN** sync generates MCP configuration for `cursor` or `claude` with the browser profile
+- **THEN** the browser MCP server SHALL be rendered with `command` and `args`
+- **THEN** the generated args SHALL include headless mode and an isolated user data directory unless a local override changes those settings
+
+#### Scenario: OpenCode browser MCP is generated
+- **WHEN** sync generates MCP configuration for `opencode` with the browser profile
+- **THEN** the browser MCP server SHALL be rendered as a local command entry
+- **THEN** the command array SHALL include the shared command and generated arguments
+
+#### Scenario: Kimi Code browser MCP is generated
+- **WHEN** sync generates MCP configuration for `kimi-code` with the browser profile
+- **THEN** the browser MCP server SHALL be rendered as a stdio command with args
+- **THEN** HTTP-only authentication placeholder handling SHALL NOT be applied to the stdio browser server
+
+### Requirement: Browser MCP follows profile selection
+The system SHALL include browser automation MCP servers when the resolved profile enables them (default `browser` / `full`), and SHALL omit them for `research` / `coding`.
+
+#### Scenario: Default agents config sync includes browser MCP
+- **WHEN** sync runs without an explicit profile override
+- **THEN** the resolved default profile SHALL include browser automation MCP servers for compatible tools
+
+#### Scenario: Research profile is synced
+- **WHEN** sync runs with the research profile
+- **THEN** browser automation MCP servers SHALL NOT be included in generated target configuration
+
+#### Scenario: Browser profile is synced
+- **WHEN** sync runs with the browser profile for a compatible tool
+- **THEN** browser automation MCP servers SHALL be included in generated target configuration
+- **THEN** generated repository templates SHALL remain auditable without private browser state or secrets
+
+#### Scenario: Browser MCP drift is detected
+- **WHEN** doctor compares a target tool configuration against the selected browser profile output
+- **THEN** missing or stale managed browser MCP entries SHALL be reported as configuration drift
+- **THEN** the report SHALL recommend the existing agents sync command
+

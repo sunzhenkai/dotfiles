@@ -74,10 +74,18 @@ def test_disabled_modules_excluded_from_default_lists() -> None:
     codebuddy = modules.find_module(mods, "codebuddy-code")
     assert qoder and not modules.is_enabled(qoder)
     assert codebuddy and not modules.is_enabled(codebuddy)
+    assert qoder.get("config")
+    assert codebuddy.get("config")
+    assert qoder.get("bin") == "qoder"
+    assert codebuddy.get("bin") == "codebuddy"
 
     install_names = {m["name"] for m in modules.filter_modules(mods, capability="install")}
     assert "qoder" not in install_names
     assert "codebuddy-code" not in install_names
+
+    config_names = {m["name"] for m in modules.filter_modules(mods, capability="config")}
+    assert "qoder" not in config_names
+    assert "codebuddy-code" not in config_names
 
     with_disabled = {
         m["name"]

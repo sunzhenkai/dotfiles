@@ -7,7 +7,7 @@ dotf agents -c
 scripts/agents/sync.sh cursor
 ```
 
-默认 profile 为 `research`（智谱 web-search / web-reader / zread）。  
-浏览器自动化需 `--profile browser`。
+默认 profile 为 `browser`（智谱 web MCP + Playwright）。
+只要搜索不要浏览器时用 `--profile research`。
 
 密钥使用占位符 `${ZHIPU_API_KEY}`，在环境变量中设置真实值。详见 `agents/env/README.md`。

@@ -81,3 +81,33 @@ The system SHALL provide health checks for browser automation readiness.
 - **THEN** it SHALL attempt a minimal provider startup or equivalent validation
 - **THEN** it SHALL report success only if the provider is usable for agent automation
 
+### Requirement: Agent browser debugging workflow is available
+The system SHALL document and support an agent browser debugging workflow that can inspect rendered pages in remote headless environments.
+
+#### Scenario: Agent inspects a rendered page
+- **WHEN** the browser profile is enabled for a compatible agent tool
+- **THEN** the generated browser MCP configuration SHALL allow the agent to navigate to a URL
+- **THEN** the agent SHALL be able to read a structured page snapshot after navigation
+
+#### Scenario: Agent diagnoses frontend runtime issues
+- **WHEN** the agent opens a page through the browser MCP server
+- **THEN** the agent SHALL be able to inspect browser console messages
+- **THEN** the agent SHALL be able to inspect network request summaries when the MCP provider exposes them
+
+#### Scenario: Agent diagnoses visual layout issues
+- **WHEN** a rendered page needs visual inspection
+- **THEN** the agent SHALL be able to request a screenshot artifact from the browser MCP provider
+- **THEN** documentation SHALL warn that screenshots may contain private or internal information
+
+### Requirement: Browser provider smoke test is documented
+The system SHALL provide a documented smoke test for confirming that the browser profile is usable after sync.
+
+#### Scenario: User enables browser profile
+- **WHEN** a user syncs a compatible agent tool with the browser profile
+- **THEN** documentation SHALL show how to run doctor for that profile and target tool
+- **THEN** documentation SHALL show a minimal page navigation or screenshot validation flow
+
+#### Scenario: Browser provider cannot start
+- **WHEN** the browser MCP provider fails to start because browser binaries or system dependencies are missing
+- **THEN** documentation SHALL include remediation commands or hints for installing Playwright Chromium and Linux dependencies
+

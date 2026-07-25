@@ -2,12 +2,14 @@
 #
 # cp agents/env/local.yaml.example agents/env/local.yaml
 
-# 覆盖默认 profile（仓库默认 research）
-# profile: browser
+# 覆盖默认 profile（仓库默认 browser，含 Playwright MCP）
+# profile: research
 
 # 禁用某些托管 MCP server
 # disabled_servers:
 #   - zread
+#   # 禁用 Playwright browser MCP（即使使用 browser/full profile）
+#   # - playwright
 
 # 额外启用（须在 servers.yaml 中已声明）
 # enabled_servers:
@@ -16,12 +18,19 @@
 # 浏览器本机设置（仅放路径/开关，不要放密钥）
 # browser:
 #   provider: playwright          # playwright | chrome-devtools
-#   headed: true                  # 可视化调试
+#   headed: true                  # 可视化调试；无 GUI 机器通常需要 xvfb
 #   browser_executable: /usr/bin/google-chrome
 #   user_data_dir: ~/.cache/agent-env/browser/profile
-#   # 危险：连接真实浏览器 / 主 profile
+#   artifact_dir: ~/.cache/agent-env/browser/artifacts
+#
+#   # 高风险 opt-in：连接真实浏览器 / 主 profile / CDP endpoint。
+#   # 这些值只应放 local override 或环境变量，不要提交到仓库。
 #   # use_real_profile: true
 #   # cdp_endpoint: http://127.0.0.1:9222
+#
+# 也可用环境变量覆盖本机浏览器细节（不要写入仓库）：
+# export AGENT_ENV_BROWSER_EXECUTABLE=/usr/bin/google-chrome
+# export AGENT_ENV_CDP_ENDPOINT=http://127.0.0.1:9222
 
 # 按工具排除模块（可选）
 # exclude:

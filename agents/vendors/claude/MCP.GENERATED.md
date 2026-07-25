@@ -5,3 +5,9 @@
 ```shell
 scripts/agents/sync.sh claude
 ```
+
+启用浏览器调试能力时使用 browser profile 并重载 Claude：
+
+```shell
+scripts/agents/sync.sh claude --env-only --profile browser
+```

@@ -16,7 +16,16 @@ except ImportError as exc:  # pragma: no cover
         "error: 需要 PyYAML（pip install pyyaml / apt install python3-yaml）"
     ) from exc
 
-TOOLS = ("claude", "cursor", "opencode", "codex", "kimi-code", "pi")
+TOOLS = (
+    "claude",
+    "cursor",
+    "opencode",
+    "codex",
+    "kimi-code",
+    "pi",
+    "qoder",
+    "codebuddy-code",
+)
 KNOWN_PROFILES = ("coding", "research", "browser", "full")
 SERVER_ALLOWED_KEYS = {
     "transport",
@@ -128,7 +137,7 @@ class Catalog:
     def default_profile(self) -> str:
         if isinstance(self.local.get("profile"), str):
             return self.local["profile"]
-        return str(self.manifest.get("default_profile") or "research")
+        return str(self.manifest.get("default_profile") or "browser")
 
     def validate(self) -> None:
         errs: List[str] = []
@@ -287,6 +296,9 @@ class Catalog:
             # 避免重复
             if uarg not in args:
                 args.extend([uarg, user_data])
+        artifact_dir = b.get("artifact_dir")
+        if artifact_dir and "--output-dir" not in args:
+            args.extend(["--output-dir", os.path.expanduser(str(artifact_dir))])
         exe = b.get("browser_executable") or os.environ.get(
             "AGENT_ENV_BROWSER_EXECUTABLE"
         )
@@ -328,7 +340,7 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             entry["bearerTokenEnvVar"] = env_name
         return entry
 
-    if tool in ("cursor", "claude"):
+    if tool in ("cursor", "claude", "qoder", "codebuddy-code"):
         if transport == "stdio":
             entry = {
                 "command": srv["command"],
@@ -337,17 +349,19 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             if srv.get("env"):
                 entry["env"] = srv["env"]
             return entry
-        # HTTP
-        tname = "http" if tool == "claude" else "streamable-http"
-        if transport == "http":
+        # HTTP：cursor 用 streamable-http；其余用 http
+        tname = "streamable-http" if tool == "cursor" else "http"
+        if transport == "http" and tool != "cursor":
             tname = "http"
         entry = {
             "type": tname,
             "url": srv["url"],
         }
         if env_name:
+            # Authorization 占位符风格与 cursor/claude 相同
+            style = "cursor" if tool == "cursor" else "claude"
             entry["headers"] = {
-                "Authorization": auth_header(env_name, tool)
+                "Authorization": auth_header(env_name, style)
             }
         return entry
 

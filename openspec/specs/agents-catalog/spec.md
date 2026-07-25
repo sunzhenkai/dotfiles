@@ -32,15 +32,16 @@ The system SHALL define an agent environment manifest that declares supported ta
 ### Requirement: Profiles compose environment capabilities
 The system SHALL support named profiles that compose MCP servers, browser capabilities, tool checks, risk level, and documentation into reusable agent modes.
 
-#### Scenario: Default profile is safe
+#### Scenario: Default profile includes browser MCP
 - **WHEN** no local override selects a profile
-- **THEN** the default profile SHALL include low-risk coding and research capabilities
-- **THEN** it SHALL NOT enable high-risk browser automation by default
-
-#### Scenario: Browser profile is explicit
-- **WHEN** a user selects a browser-focused profile
-- **THEN** the selected profile SHALL include browser automation MCP capabilities
+- **THEN** the default profile SHALL be `browser`
+- **THEN** it SHALL include research capabilities plus Playwright browser automation MCP
 - **THEN** the profile SHALL be marked as high risk in catalog metadata
+
+#### Scenario: Research profile remains low risk
+- **WHEN** a user selects the `research` profile (CLI flag or local override)
+- **THEN** the selected profile SHALL include coding and research capabilities
+- **THEN** it SHALL NOT enable high-risk browser automation MCP
 
 ### Requirement: Environment variable schema is documented
 The system SHALL define an environment variable schema listing variable names, purpose, requiredness, sensitive classification, and the checks that use them.
