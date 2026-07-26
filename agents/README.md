@@ -91,7 +91,7 @@ agents/commands/my-command.exclude
 codex
 ```
 
-未声明 `exclude` 时，默认对全部 `TOOLS`（含 opt-in 的 `qoder` / `codebuddy-code`）启用。
+未声明 `exclude` 时，默认对全部 `TOOLS`（含 opt-in 的 `codebuddy-code`）启用。
 
 ## 同步
 
@@ -115,7 +115,7 @@ scripts/config.sh agents
 ```
 
 共享 sync：`dotf agents -c [--tool <name>]`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
-`qoder` / `codebuddy-code` 为 **opt-in**（`enabled: false`）：不随 `dotf agents -i` / `--all` 安装，但参与 sync/doctor。
+`codebuddy-code` 为 **opt-in**（`enabled: false`）：不随 `dotf agents -i` / `--all` 安装，但参与 sync/doctor。
 
 ## 安装目标
 
@@ -128,7 +128,7 @@ scripts/config.sh agents
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |
 | pi | `~/.pi/agent/skills/` | `~/.pi/agent/prompts/`（prompt templates） |
 | zcode | `~/.zcode/skills/` | `~/.zcode/commands/`（MCP：`~/.zcode/cli/config.json` → `mcp.servers`） |
-| qoder | `~/.qoder/skills/` | `~/.qoder/commands/` |
+| qoder | `~/.qoder-cn/skills/` | `~/.qoder-cn/commands/` |
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
 
 **不要手改** `.claude/`、`.cursor/`、`agents/vendors/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。

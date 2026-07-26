@@ -94,15 +94,14 @@ modules:
     bin: npm
 
   - name: qoder
-    desc: Qoder CLI + 配置（默认跳过，显式点名可装）
+    desc: Qoder CLI + 配置
     group: agents
-    enabled: false
     install: true
     doctor: true
     bin: qoder
     config:
       source: agents/vendors/qoder
-      target: ~/.qoder
+      target: ~/.qoder-cn
 
   - name: trae-cli
     desc: 安装 Trae CLI

@@ -252,12 +252,12 @@ def sync_qoder(
     dry_run: bool,
     also_repo: bool,
 ) -> str:
-    """Merge mcpServers into ~/.qoder/settings.json（保留其它本机字段）。"""
+    """Merge mcpServers into ~/.qoder-cn/settings.json（保留其它本机字段）。"""
     servers = cat.selected_servers("qoder", profile)
     rendered = {
         sid: render_server_for_tool(sid, srv, "qoder") for sid, srv in servers.items()
     }
-    target = Path.home() / ".qoder" / "settings.json"
+    target = Path.home() / ".qoder-cn" / "settings.json"
     existing: Dict[str, Any] = {}
     if target.is_file():
         try:

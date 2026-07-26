@@ -293,7 +293,7 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
     if tool == "zcode":
         return [home / ".zcode"]
     if tool == "qoder":
-        return [home / ".qoder"]
+        return [home / ".qoder-cn"]
     if tool == "codebuddy-code":
         return [home / ".codebuddy"]
     die(f"unknown tool: {tool}")

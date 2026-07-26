@@ -445,7 +445,7 @@ def _mcp_drift(
             return None
         actual = data.get("mcpServers") or {}
     elif tool == "qoder":
-        data = _read_json(Path.home() / ".qoder" / "settings.json")
+        data = _read_json(Path.home() / ".qoder-cn" / "settings.json")
         if data is None:
             return None
         actual = data.get("mcpServers") or {}
@@ -728,7 +728,7 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         "kimi-code": Path.home() / ".kimi-code" / "skills",
         "pi": Path.home() / ".pi" / "agent" / "skills",
         "zcode": Path.home() / ".zcode" / "skills",
-        "qoder": Path.home() / ".qoder" / "skills",
+        "qoder": Path.home() / ".qoder-cn" / "skills",
         "codebuddy-code": Path.home() / ".codebuddy" / "skills",
     }
     # 更可靠：对常用工具目录 skills 做存在性抽查（opt-in 工具仅在 --tool 时检查）
