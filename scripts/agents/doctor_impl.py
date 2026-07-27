@@ -627,6 +627,7 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
         cat.root / "agents" / "vendors" / "zcode" / "mcp.json",
         cat.root / "agents" / "vendors" / "qoder" / "settings.json",
         cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json",
+        cat.root / "agents" / "vendors" / "minimax",
     ]
     # 跳过 local overrides（允许私有路径）
     skip_names = {"local.yaml"}

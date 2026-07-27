@@ -279,6 +279,13 @@ install_zcode_config() {
   echo "skills/MCP：dotf agents -c --tool zcode 或 sync.sh zcode"
 }
 
+# 特殊配置：minimax
+# ~/.mmx/config.json 存 OAuth/API key 凭证（mmx auth login 生成），绝不能覆盖；只确保目录就绪。
+install_minimax_config() {
+  mkdir -p "${MMX_CONFIG_DIR:-$HOME/.mmx}"
+  echo "MiniMax 目录已就绪（~/.mmx）；凭证请用 mmx auth login 生成，dotfiles 不管理 config.json"
+}
+
 install_opencode() {
   install_config "opencode"
   # skills/MCP：dotf agents -c 或 sync.sh opencode

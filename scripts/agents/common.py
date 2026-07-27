@@ -26,6 +26,7 @@ TOOLS = (
     "zcode",
     "qoder",
     "codebuddy-code",
+    "minimax",
 )
 KNOWN_PROFILES = ("coding", "research", "browser", "full")
 SERVER_ALLOWED_KEYS = {

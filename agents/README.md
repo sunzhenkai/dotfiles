@@ -116,6 +116,7 @@ scripts/config.sh agents
 
 共享 sync：`dotf agents -c [--tool <name>]`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `codebuddy-code` 为 **opt-in**（`enabled: false`）：不随 `dotf agents -i` / `--all` 安装，但参与 sync/doctor。
+`minimax`（MiniMax CLI，bin: `mmx`）随 `dotf agents -i` 安装并参与 doctor；无 skills/commands/MCP 布局，**不参与 sync**（env_sync 为 skip stub）。
 
 ## 安装目标
 
@@ -130,6 +131,7 @@ scripts/config.sh agents
 | zcode | `~/.zcode/skills/` | `~/.zcode/commands/`（MCP：`~/.zcode/cli/config.json` → `mcp.servers`） |
 | qoder | `~/.qoder-cn/skills/` | `~/.qoder-cn/commands/` |
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
+| minimax | 不同步（mmx 无此布局） | 不同步（mmx 无此布局；MCP 亦 skip） |
 
 **不要手改** `.claude/`、`.cursor/`、`agents/vendors/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。
 

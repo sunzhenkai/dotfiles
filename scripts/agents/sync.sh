@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 统一 agents sync：skills/commands + MCP/env。
 # 用法:
-#   sync.sh [claude|cursor|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|all]
+#   sync.sh [claude|cursor|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|minimax|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
 # 诊断请用: dotf agents -d  或  python3 scripts/agents/doctor.py
 set -euo pipefail
@@ -24,7 +24,7 @@ EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  claude | cursor | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | all)
+  claude | cursor | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | minimax | all)
     TOOL="$1"
     ;;
   --skills-only)
@@ -75,11 +75,16 @@ echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-defa
 
 if [ "$SKILLS" -eq 1 ]; then
   echo "--- skills/commands ---"
-  skills_args=(--root "$ROOT" "$TOOL")
-  if [ "$DRY_RUN" -eq 1 ]; then
-    skills_args+=(--dry-run)
+  if [ "$TOOL" = "minimax" ]; then
+    # mmx 无 skills/commands 布局，sync.py 不包含该工具
+    echo "minimax: skip skills/commands（mmx 无此布局）"
+  else
+    skills_args=(--root "$ROOT" "$TOOL")
+    if [ "$DRY_RUN" -eq 1 ]; then
+      skills_args+=(--dry-run)
+    fi
+    python3 "$SCRIPT_DIR/sync.py" "${skills_args[@]}"
   fi
-  python3 "$SCRIPT_DIR/sync.py" "${skills_args[@]}"
 fi
 
 if [ "$ENV" -eq 1 ]; then

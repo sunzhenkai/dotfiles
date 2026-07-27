@@ -254,6 +254,16 @@ modules:
       source: agents/vendors/zcode
       target: ~/.zcode
 
+  - name: minimax
+    desc: MiniMax CLI + 配置（~/.mmx）
+    group: agents
+    install: true
+    doctor: true
+    bin: mmx
+    config:
+      source: agents/vendors/minimax
+      target: ~/.mmx
+
   # ---------- config-only: shell ----------
   - name: zsh
     desc: Zsh shell 配置

@@ -407,6 +407,21 @@ def sync_pi(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     return "skip"
 
 
+def sync_minimax(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    reason = (
+        (cat.manifest.get("unsupported") or {})
+        .get("minimax", {})
+        .get("reason")
+        or "MiniMax MCP unsupported"
+    )
+    msg = f"minimax: skip MCP sync ({reason})"
+    if dry_run:
+        print(f"[dry-run] {msg}")
+    else:
+        print(msg)
+    return "skip"
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     root = args.root or repo_root_from(Path(__file__))
@@ -476,6 +491,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     ),
                 )
             )
+        elif tool == "minimax":
+            results.append((tool, sync_minimax(cat, profile, args.dry_run)))
         else:
             die(f"未知工具: {tool}")
 
