@@ -204,6 +204,16 @@ modules:
       source: agents/vendors/cursor/mcp.json
       target: ~/.cursor/mcp.json
 
+  - name: kiro
+    desc: Kiro CLI + skills/prompts/MCP 配置
+    group: agents
+    install: true
+    doctor: true
+    bin: kiro-cli
+    config:
+      source: agents/vendors/kiro
+      target: ~/.kiro
+
   - name: opencode
     desc: OpenCode CLI + 配置
     group: agents

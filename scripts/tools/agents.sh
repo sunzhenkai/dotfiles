@@ -3,7 +3,7 @@
 # 由 install.sh source。
 
 # Bundle 成员 ⊂ agents sync TOOLS（opt-in：codebuddy-code 仅在 TOOLS，不进默认安装包）
-AGENTS_BUNDLE_MODULES=(claude cursor opencode codex kimi-code pi zcode qoder)
+AGENTS_BUNDLE_MODULES=(claude cursor kiro opencode codex kimi-code pi zcode qoder)
 
 install_agents_bundle() {
   echo "========================================"
@@ -60,6 +60,28 @@ install_agents_bundle() {
             status="skip"
             detail="未安装"
           fi
+        fi
+      fi
+      ;;
+    kiro)
+      if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
+      fi
+      if command -v kiro-cli &>/dev/null; then
+        status="skip"
+        detail="已安装: $(command -v kiro-cli)"
+      else
+        if install_kiro; then
+          if command -v kiro-cli &>/dev/null; then
+            status="ok"
+            detail="新装完成"
+          else
+            status="skip"
+            detail="用户跳过或未在 PATH"
+          fi
+        else
+          status="fail"
+          detail="安装失败"
         fi
       fi
       ;;

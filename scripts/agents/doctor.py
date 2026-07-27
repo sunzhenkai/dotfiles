@@ -62,6 +62,11 @@ def check_skills_drift(
             Path.home() / ".cursor" / "commands",
             "dir",
         ),
+        "kiro": (
+            Path.home() / ".kiro" / "skills",
+            Path.home() / ".kiro" / "prompts",
+            "dir",
+        ),
         "opencode": (
             cat.root / "agents" / "vendors" / "opencode" / "skills",
             cat.root / "agents" / "vendors" / "opencode" / "commands",
@@ -87,6 +92,26 @@ def check_skills_drift(
             Path.home() / ".pi" / "agent" / "prompts",
             "dir",
         ),
+        "zcode": (
+            Path.home() / ".zcode" / "skills",
+            Path.home() / ".zcode" / "commands",
+            "dir",
+        ),
+        "qoder": (
+            Path.home() / ".qoder-cn" / "skills",
+            Path.home() / ".qoder-cn" / "commands",
+            "dir",
+        ),
+        "codebuddy-code": (
+            Path.home() / ".codebuddy" / "skills",
+            Path.home() / ".codebuddy" / "commands",
+            "dir",
+        ),
+        "minimax": (
+            None,  # no skills layout
+            None,
+            "dir",
+        ),
     }
 
     targets = [tool] if tool else list(TOOLS)
@@ -100,6 +125,20 @@ def check_skills_drift(
             )
             continue
         skill_dest, cmd_dest, _ = dest_map[t]
+        if skill_dest is None:
+            report.add(
+                "skills",
+                f"{t}-skills-drift",
+                STATUS_SKIP,
+                f"{t} skills 无稳定布局，已 skip",
+            )
+            report.add(
+                "skills",
+                f"{t}-commands-drift",
+                STATUS_SKIP,
+                f"{t} commands 无稳定布局，已 skip",
+            )
+            continue
         missing_skills = []
         if not skill_dest.is_dir():
             report.add(

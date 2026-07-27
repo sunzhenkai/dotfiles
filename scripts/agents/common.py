@@ -19,6 +19,7 @@ except ImportError as exc:  # pragma: no cover
 TOOLS = (
     "claude",
     "cursor",
+    "kiro",
     "opencode",
     "codex",
     "kimi-code",
@@ -342,7 +343,7 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             entry["bearerTokenEnvVar"] = env_name
         return entry
 
-    if tool in ("cursor", "claude", "qoder", "codebuddy-code", "zcode"):
+    if tool in ("cursor", "claude", "qoder", "codebuddy-code", "zcode", "kiro"):
         if transport == "stdio":
             entry = {
                 "command": srv["command"],
@@ -354,7 +355,14 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             if srv.get("env"):
                 entry["env"] = srv["env"]
             return entry
-        # HTTP：cursor 用 streamable-http；其余用 http
+        # HTTP：cursor 用 streamable-http；kiro 文档无 type 字段；其余用 http
+        if tool == "kiro":
+            entry = {"url": srv["url"]}
+            if env_name:
+                entry["headers"] = {
+                    "Authorization": auth_header(env_name, "claude")
+                }
+            return entry
         tname = "streamable-http" if tool == "cursor" else "http"
         if transport == "http" and tool != "cursor":
             tname = "http"

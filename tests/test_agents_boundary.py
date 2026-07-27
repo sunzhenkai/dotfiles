@@ -34,7 +34,7 @@ def test_agents_install_plan_expands_tools() -> None:
     )
     assert r.returncode == 0, r.stderr + r.stdout
     assert "PLAN_OK" in r.stdout
-    for tool in ("claude", "cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax"):
+    for tool in ("claude", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax"):
         assert f"install\t{tool}" in r.stdout.replace(" ", "\t") or (
             f"\tinstall\t{tool}\t" in r.stdout
         )
@@ -48,9 +48,10 @@ def test_opt_in_agents_in_tools_not_bundle() -> None:
     assert "codebuddy-code" in TOOLS
     assert "zcode" in TOOLS
     assert "minimax" in TOOLS
+    assert "kiro" in TOOLS
     bundle = (ROOT / "scripts" / "planner.py").read_text(encoding="utf-8")
     assert (
-        'AGENTS_INSTALL_BUNDLE = ("claude", "cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax")'
+        'AGENTS_INSTALL_BUNDLE = ("claude", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax")'
         in bundle
     )
 
@@ -111,6 +112,7 @@ def test_single_tool_config_source_has_no_sync_call() -> None:
     text = (ROOT / "scripts" / "config.sh").read_text(encoding="utf-8")
     # install_claude / install_cursor 等函数体内不应再调用 sync
     assert "sync_agents cursor" not in text
+    assert "sync_agents kiro" not in text
     assert "sync_agents codex" not in text
     assert "sync_agents opencode" not in text
     assert "sync_agents kimi-code" not in text

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 统一 agents sync：skills/commands + MCP/env。
 # 用法:
-#   sync.sh [claude|cursor|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|minimax|all]
+#   sync.sh [claude|cursor|kiro|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|minimax|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
 # 诊断请用: dotf agents -d  或  python3 scripts/agents/doctor.py
 set -euo pipefail
@@ -24,7 +24,7 @@ EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  claude | cursor | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | minimax | all)
+  claude | cursor | kiro | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | minimax | all)
     TOOL="$1"
     ;;
   --skills-only)

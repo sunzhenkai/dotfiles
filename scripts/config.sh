@@ -247,6 +247,19 @@ install_cursor() {
   echo "Cursor vendor 目录已就绪；共享 sync 请运行: dotf agents -c"
 }
 
+# 特殊配置：kiro
+# MCP → ~/.kiro/settings/mcp.json；skills → ~/.kiro/skills；commands → ~/.kiro/prompts
+install_kiro_config() {
+  if [ -z "$ZHIPU_API_KEY" ]; then
+    echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
+    echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
+  fi
+
+  mkdir -p "$HOME/.kiro/skills" "$HOME/.kiro/prompts" "$HOME/.kiro/settings"
+  echo "Kiro 目录已就绪（~/.kiro/{skills,prompts,settings}）"
+  echo "skills/MCP：dotf agents -c --tool kiro 或 sync.sh kiro"
+}
+
 # 特殊配置：qoder
 # ~/.qoder-cn/settings.json 可能含本机 trustedDirectories / MCP；已存在则不覆盖。
 install_qoder_config() {

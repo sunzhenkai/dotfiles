@@ -1,6 +1,6 @@
 # Shared agent skills & commands
 
-跨 Claude Code / Cursor / OpenCode / Codex / Kimi Code / Pi / ZCode / Qoder / CodeBuddy 的 **skills / commands 唯一真相源**。
+跨 Claude Code / Cursor / Kiro / OpenCode / Codex / Kimi Code / Pi / ZCode / Qoder / CodeBuddy 的 **skills / commands 唯一真相源**。
 
 ## 统一入口（推荐）
 
@@ -74,7 +74,7 @@ tags: [a, b]          # 可选
 | 工具 | `opsx-apply` 示例 |
 |------|-------------------|
 | claude | `/opsx:apply` |
-| cursor / opencode / codex / kimi-code / pi / zcode / qoder / codebuddy-code | `/opsx-apply` |
+| cursor / kiro / opencode / codex / kimi-code / pi / zcode / qoder / codebuddy-code | `/opsx-apply` |
 
 ## 排除某一工具
 
@@ -102,6 +102,7 @@ scripts/agents/sync.sh all
 # 或单个
 scripts/agents/sync.sh claude
 scripts/agents/sync.sh cursor
+scripts/agents/sync.sh kiro
 scripts/agents/sync.sh opencode
 scripts/agents/sync.sh codex
 scripts/agents/sync.sh kimi-code
@@ -124,6 +125,7 @@ scripts/config.sh agents
 |------|--------|----------|
 | claude | `~/.claude/skills/` + 仓库 `.claude/skills/`（生成） | `~/.claude/commands/` + `.claude/commands/` |
 | cursor | `~/.cursor/skills/` + `.cursor/skills/` | `~/.cursor/commands/` + `.cursor/commands/` |
+| kiro | `~/.kiro/skills/` | `~/.kiro/prompts/`（prompts 映射） |
 | opencode | `agents/vendors/opencode/skills/`（随 `~/.config/opencode` symlink） | `agents/vendors/opencode/commands/` |
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |

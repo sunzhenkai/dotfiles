@@ -100,7 +100,7 @@ Smoke test：
 
 ## 安全
 
-- 仓库只存变量**名**与占位符（Cursor/Claude: `${ZHIPU_API_KEY}`；OpenCode: `{env:ZHIPU_API_KEY}`；Kimi: `bearerTokenEnvVar`）
+- 仓库只存变量**名**与占位符（Cursor/Claude/Kiro: `${ZHIPU_API_KEY}`；OpenCode: `{env:ZHIPU_API_KEY}`；Kimi: `bearerTokenEnvVar`）
 - 真实密钥只放环境变量或系统 keychain
 - 本机路径只放 `local.yaml`
 - doctor 会扫描明显 secret / 内网 URL，且**永不打印** secret 值
@@ -110,13 +110,13 @@ Smoke test：
 
 ## 与工具配置的关系
 
-Claude / Cursor / OpenCode / Kimi / ZCode / Qoder / CodeBuddy 的 MCP 片段由本目录生成或合并：
+Claude / Cursor / Kiro / OpenCode / Kimi / ZCode / Qoder / CodeBuddy 的 MCP 片段由本目录生成或合并：
 
 ```shell
-scripts/agents/sync.sh claude|cursor|opencode|kimi-code|zcode|qoder|codebuddy-code|pi
+scripts/agents/sync.sh claude|cursor|kiro|opencode|kimi-code|zcode|qoder|codebuddy-code|pi
 ```
 
 Codex / Pi 当前无稳定 MCP 入口 → sync/doctor 记为 `skip`（skills/prompts 仍走 `agents/`）。
 `codebuddy-code` 为 opt-in 安装模块，但仍参与 MCP sync。
 
-仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json`、`agents/vendors/zcode/mcp.json`（`mcp.servers`）、`agents/vendors/qoder/settings.json`（仅 `mcpServers`）、`agents/vendors/codebuddy-code/.mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。
+仓库内 `agents/vendors/claude/.mcp.json`、`agents/vendors/cursor/mcp.json`、`agents/vendors/kiro/mcp.json`、`agents/vendors/opencode/opencode.json`、`agents/vendors/kimi-code/mcp.json`、`agents/vendors/zcode/mcp.json`（`mcp.servers`）、`agents/vendors/qoder/settings.json`（仅 `mcpServers`）、`agents/vendors/codebuddy-code/.mcp.json` 的 MCP 段视为**生成物**；请改 `agents/env/mcp/` 后重新 sync，不要手写多源漂移。

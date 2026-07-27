@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 TOOLS = (
     "claude",
     "cursor",
+    "kiro",
     "opencode",
     "codex",
     "kimi-code",
@@ -231,7 +232,7 @@ def command_relpath(tool: str, cmd_id: str) -> str:
             action = cmd_id[len("opsx-") :]
             return f"commands/opsx/{action}.md"
         return f"commands/{cmd_id}.md"
-    if tool in ("codex", "pi"):
+    if tool in ("codex", "pi", "kiro"):
         return f"prompts/{cmd_id}.md"
     return f"commands/{cmd_id}.md"
 
@@ -281,6 +282,8 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
         return [home / ".claude", root / ".claude"]
     if tool == "cursor":
         return [home / ".cursor", root / ".cursor"]
+    if tool == "kiro":
+        return [home / ".kiro"]
     if tool == "opencode":
         # Generate into vendors/opencode/; user symlink covers ~/.config/opencode
         return [root / "agents" / "vendors" / "opencode"]
@@ -376,7 +379,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|all",
+        help="claude|cursor|kiro|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|all",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
