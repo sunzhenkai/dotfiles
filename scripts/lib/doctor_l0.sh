@@ -98,11 +98,15 @@ dotf_doctor_map_status() {
     return 0
   fi
   if [ "$has_skip" -eq 1 ] && [ "$has_pass" -eq 0 ] && [ "$has_warn" -eq 0 ]; then
+    # shellcheck disable=SC2034 # 跨脚本 setter：被 doctor_run.sh 与外部调用方读取
     DOTF_DOCTOR_STATUS="skipped"
+    # shellcheck disable=SC2034 # 同上
     DOTF_DOCTOR_REASON="doctor skipped"
     return 0
   fi
+  # shellcheck disable=SC2034 # 同上
   DOTF_DOCTOR_STATUS="unchanged"
+  # shellcheck disable=SC2034 # 同上
   DOTF_DOCTOR_REASON="doctor pass/warn/skip"
   return 0
 }

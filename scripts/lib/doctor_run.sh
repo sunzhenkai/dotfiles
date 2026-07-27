@@ -45,6 +45,7 @@ dotf_doctor_run() {
     # shellcheck source=/dev/null
     source "$DOTFILES_ROOT/scripts/lib/doctor_l0.sh"
     dotf_doctor_l0 "$mod"
+    # shellcheck disable=SC2034 # L0 退出码保留，供未来 deep 模式聚合 L0/L1 状态用
     rc_l0=$?
 
     # status 模式禁止 L1（可能有网络/写副作用）；仅显式 --deep 且非 status 时运行

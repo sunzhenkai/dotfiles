@@ -32,7 +32,9 @@ jobs:
 
       - name: ShellCheck
         run: |
-          shellcheck -x bin/dotf scripts/modules.sh scripts/doctor.sh \
+          # -S warning: 仓库对函数提前-return 模式有大量 SC2317 (info) 静态分析假报，
+          # 屏蔽 info 噪音，保留 warning / error 作为失败判据。
+          shellcheck -x -S warning bin/dotf scripts/modules.sh scripts/doctor.sh \
             scripts/bootstrap.sh scripts/run_plan.sh \
             scripts/lib/result.sh scripts/lib/runner.sh scripts/lib/compat_adapter.sh \
             scripts/lib/config_safe.sh scripts/lib/handler_common.sh \

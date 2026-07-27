@@ -158,6 +158,7 @@ dotf_ensure_symlink() {
     reason="created symlink"
   fi
   ln -s "$expected_link" "$target"
+  # shellcheck disable=SC2034 # 跨脚本 setter：被 scripts/config.sh / handler_common.sh / 模块 config.sh 读取
   DOTF_CFG_STATUS="changed"
   if [ "${DOTF_CFG_EMIT_RESULT:-0}" = "1" ]; then
     # shellcheck source=/dev/null
