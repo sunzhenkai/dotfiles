@@ -137,6 +137,19 @@ have_pyyaml() {
   python3 -c 'import yaml' >/dev/null 2>&1
 }
 
+# PyYAML 是通用 Python 库：用 pip 安装，不绑发行版包名
+install_pyyaml() {
+  have_python || return 1
+  have_pyyaml && return 0
+  python3 -m pip install --user PyYAML >/dev/null 2>&1 && have_pyyaml && return 0
+  python3 -m pip install --user --break-system-packages PyYAML >/dev/null 2>&1 && have_pyyaml && return 0
+  python3 -m pip install --break-system-packages PyYAML >/dev/null 2>&1 && have_pyyaml && return 0
+  if have_cmd uv; then
+    uv pip install --python "$(command -v python3)" PyYAML >/dev/null 2>&1 && have_pyyaml && return 0
+  fi
+  return 1
+}
+
 have_fetcher() {
   have_cmd curl || have_cmd wget
 }
@@ -163,26 +176,30 @@ print_guidance() {
   case "$family" in
   debian)
     log "  sudo apt-get update"
-    log "  sudo apt-get install -y bash git curl python3 python3-yaml"
+    log "  sudo apt-get install -y bash git curl python3"
     ;;
   rhel)
     if have_cmd dnf; then
-      log "  sudo dnf install -y bash git curl python3 python3-pyyaml"
+      log "  sudo dnf install -y bash git curl python3"
     else
-      log "  sudo yum install -y bash git curl python3 python3-pyyaml"
+      log "  sudo yum install -y bash git curl python3"
     fi
     ;;
   arch)
-    log "  sudo pacman -Sy --needed bash git curl python python-yaml"
+    log "  sudo pacman -Sy --needed bash git curl python"
     ;;
   darwin)
     log "  # 需要 Homebrew 或官方 Python"
     log "  brew install python git || true"
-    log "  python3 -m pip install --user PyYAML"
     ;;
   *)
     log "  当前平台未提供自动安装命令。"
-    log "  请手动安装: bash, git, curl 或 wget, python3, PyYAML"
+    log "  请手动安装: bash, git, curl 或 wget, python3"
+    ;;
+  esac
+  case " $MISSING " in
+  *" PyYAML "*)
+    log "  python3 -m pip install --user PyYAML"
     ;;
   esac
 }
@@ -209,29 +226,30 @@ try_install_deps() {
   case "$family" in
   debian)
     sudo apt-get update
-    sudo apt-get install -y bash git curl python3 python3-yaml
+    sudo apt-get install -y bash git curl python3
     ;;
   rhel)
     if have_cmd dnf; then
-      sudo dnf install -y bash git curl python3 python3-pyyaml
+      sudo dnf install -y bash git curl python3
     else
-      sudo yum install -y bash git curl python3 python3-pyyaml
+      sudo yum install -y bash git curl python3
     fi
     ;;
   arch)
-    sudo pacman -Sy --needed --noconfirm bash git curl python python-yaml
+    sudo pacman -Sy --needed --noconfirm bash git curl python
     ;;
   darwin)
     if have_cmd brew; then
       brew install python git || true
     fi
-    python3 -m pip install --user PyYAML
     ;;
   *)
     log "错误: 不支持的平台，无法自动安装" >&2
     return 1
     ;;
   esac
+  # PyYAML 统一走 pip，不绑发行版包
+  install_pyyaml || true
 }
 
 # ---- main ----
@@ -248,6 +266,13 @@ if [ "$FAMILY" = "unsupported" ]; then
 fi
 
 check_runtime
+
+# 仅缺 PyYAML 时无感 pip 安装（通用库，无需确认；check-only 不安装）
+if [ "$CHECK_ONLY" -eq 0 ] && [ "$MISSING" = "PyYAML" ]; then
+  if install_pyyaml; then
+    check_runtime
+  fi
+fi
 
 if [ -n "$MISSING" ]; then
   for item in $MISSING; do

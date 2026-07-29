@@ -12,16 +12,21 @@ TBD - created by archiving change overhaul-dotfiles-lifecycle. Update Purpose af
 - **THEN** SHALL NOT 因加载模块注册表而提前失败
 
 ### Requirement: 基础运行时预检与引导
-bootstrap SHALL 检测当前 OS、Python、PyYAML 及进入主流程所需的基础命令，并为缺失项输出可操作的安装引导。自动安装系统依赖前 SHALL 获得明确确认。
+bootstrap SHALL 检测当前 OS、Python、PyYAML 及进入主流程所需的基础命令，并为缺失项输出可操作的安装引导。自动安装系统依赖（bash/git/curl/python3 等）前 SHALL 获得明确确认。PyYAML 作为通用 Python 库，SHALL 通过 `pip` 安装，不依赖发行版包名。
 
 #### Scenario: 基础依赖完整
 - **WHEN** bootstrap 检测到所有基础依赖可用
 - **THEN** SHALL 委托进入 `dotf init` 主流程
 
+#### Scenario: 仅缺 PyYAML
+- **WHEN** bootstrap 检测到 python3 可用但缺少 PyYAML，且非 `--check-only`
+- **THEN** SHALL 通过 `python3 -m pip install --user PyYAML`（及兼容回退）自动安装
+- **THEN** SHALL NOT 为此单独要求确认
+
 #### Scenario: 基础依赖缺失
-- **WHEN** bootstrap 检测到受支持平台缺少基础依赖
+- **WHEN** bootstrap 检测到受支持平台缺少基础依赖（含非仅 PyYAML 的组合）
 - **THEN** SHALL 输出缺失项和平台适用的修复方式
-- **THEN** 未经确认 SHALL NOT 修改系统
+- **THEN** 未经确认 SHALL NOT 修改系统包
 
 #### Scenario: 不支持的平台
 - **WHEN** bootstrap 无法识别或不支持当前平台

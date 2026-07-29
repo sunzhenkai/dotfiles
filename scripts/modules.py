@@ -13,11 +13,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-try:
-    import yaml
-except ImportError:
-    print("错误: 需要 PyYAML（python3 -c 'import yaml'）", file=sys.stderr)
-    sys.exit(1)
+from ensure_pyyaml import ensure_yaml
+
+yaml = ensure_yaml()
 
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = ROOT / "modules.yaml"

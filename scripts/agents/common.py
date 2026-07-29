@@ -6,15 +6,18 @@ from __future__ import annotations
 import copy
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-try:
-    import yaml
-except ImportError as exc:  # pragma: no cover
-    raise SystemExit(
-        "error: 需要 PyYAML（pip install pyyaml / apt install python3-yaml）"
-    ) from exc
+# agents/ 下运行时把 scripts/ 加入 path，复用无感安装
+_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from ensure_pyyaml import ensure_yaml  # noqa: E402
+
+yaml = ensure_yaml()
 
 TOOLS = (
     "claude",
