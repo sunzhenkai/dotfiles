@@ -89,6 +89,9 @@ alias arcd='arc diff main'
 alias arcp='arc diff --preview main'
 alias arcl='arc land --onto main'
 
+# codex
+alias cx='codex --dangerously-bypass-approvals-and-sandbox'
+
 # others
 alias rmf='rm -f'
 
