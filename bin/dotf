@@ -326,6 +326,16 @@ cmd_retry() {
 # 交互选择
 # ============================================================
 
+_modules_for_capability() {
+  case "$1" in
+  install) modules_list install --filter-os --registry-order ;;
+  config) modules_list config --filter-os --registry-order ;;
+  doctor) modules_list doctor --filter-os --registry-order ;;
+  both) modules_list both --filter-os --registry-order ;;
+  *) modules_list --filter-os --registry-order ;;
+  esac
+}
+
 # 交互选择模块；capability: install|config|doctor|both|all
 # 将选中的模块名写入全局数组 SELECTED_MODULES
 interactive_select() {
@@ -340,15 +350,7 @@ interactive_select() {
   while IFS= read -r name; do
     [ -z "$name" ] && continue
     list+=("$name")
-  done < <(
-    case "$capability" in
-    install) modules_list install --filter-os --registry-order ;;
-    config) modules_list config --filter-os --registry-order ;;
-    doctor) modules_list doctor --filter-os --registry-order ;;
-    both) modules_list both --filter-os --registry-order ;;
-    *) modules_list --filter-os --registry-order ;;
-    esac
-  )
+  done < <(_modules_for_capability "$capability")
 
   if [ ${#list[@]} -eq 0 ]; then
     echo "当前 OS 下无可用模块"
