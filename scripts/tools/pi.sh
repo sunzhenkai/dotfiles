@@ -47,13 +47,18 @@ install_pi_packages() {
 
   local pkg
   echo "正在确保 Pi packages..."
+  # pi install 内部走 npm，镜像可能未收录这些包
+  local saved_registry="${npm_config_registry:-}"
+  export npm_config_registry=https://registry.npmjs.org
   for pkg in "${PI_DEFAULT_PACKAGES[@]}"; do
     echo "  → $pkg"
     if ! pi install "$pkg"; then
       echo "✗ 安装失败: $pkg"
+      [[ -n "$saved_registry" ]] && export npm_config_registry="$saved_registry" || unset npm_config_registry
       return 1
     fi
   done
+  [[ -n "$saved_registry" ]] && export npm_config_registry="$saved_registry" || unset npm_config_registry
 
   _patch_virdis_subagents_skill
   echo "✓ Pi packages 已就绪"
@@ -72,7 +77,8 @@ install_pi() {
 
     echo "正在安装 Pi coding agent（官方 install.sh）..."
     # 无 TTY 时官方脚本会自动确认 install，不阻塞 CI/非交互
-    curl -fsSL https://pi.dev/install.sh | sh
+    # 强制官方源：npmmirror 等镜像未收录 @earendil-works 包
+    curl -fsSL https://pi.dev/install.sh | npm_config_registry=https://registry.npmjs.org sh
 
     _ensure_pi_path
 
