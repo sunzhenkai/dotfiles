@@ -139,4 +139,4 @@ scripts/config.sh agents
 
 ## 示例条目
 
-仓库自带：`commit-push`、`en-chat`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
+仓库自带：`commit-push`、`en-chat`、`senior-reviewer`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
