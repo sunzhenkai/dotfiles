@@ -11,4 +11,9 @@
  :logseq-emoji-picker-fork {:version "v0.0.6", :repo "walsvid/logseq-emoji-picker-fork", :effect false, :theme false}
  :logseq-agenda {:version "v3.13.1", :repo "haydenull/logseq-plugin-agenda", :effect true, :theme false}
  :logseq-heatmap {:version "v2.4.3", :repo "pengx17/logseq-plugin-heatmap", :effect true, :theme false}
- :logseq-kanban-plugin {:version "v3.8.1", :repo "benjypng/logseq-kanban-plugin", :effect true, :theme false}}
+ :logseq-kanban-plugin {:version "v3.8.1", :repo "benjypng/logseq-kanban-plugin", :effect true, :theme false}
+ :logseq-excalidraw {:version "v1.5.1", :repo "haydenull/logseq-plugin-excalidraw", :effect true, :theme false}
+ :logseq-drawio-plugin {:version "v1.7.0", :repo "lee88688/logseq-drawio-plugin", :effect true, :theme false}
+ :logseq-todo-exploder {:version "1.0.3", :repo "sawhney17/logseq-todo-exploder", :effect true, :theme false}
+ :db-activity-heatmap {:version "v0.1.0", :repo "vivanotica/logseq-plugin-heatmap", :effect false, :theme false}
+ :logseq-todoist-plugin {:version "v8.0.2", :repo "benjypng/logseq-todoist-plugin", :effect true, :theme false}}

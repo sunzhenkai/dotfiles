@@ -1,0 +1,19 @@
+{
+  "disabled": false,
+  "apiToken": "",
+  "": "",
+  "enableSync": false,
+  "sendDefaultProject": "--- ---",
+  "sendDefaultLabel": "--- ---",
+  "sendDefaultDeadline": true,
+  "sendAppendUri": true,
+  "retrieveDefaultProject": "--- ---",
+  "projectNameAsParentBlk": false,
+  "retrieveAppendTodo": true,
+  "retrieveAppendTodoistId": true,
+  "retrieveAppendUrl": false,
+  "retrieveClearTasks": false,
+  "retrieveAppendCreationDateTime": false,
+  "retrieveAppendLabels": false,
+  "userInboxId": null
+}

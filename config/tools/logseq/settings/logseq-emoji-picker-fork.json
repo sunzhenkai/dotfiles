@@ -1,4 +1,5 @@
 {
+  "disabled": false,
   "customEmojiSettings": [
     {
       "emoji": "doge",
@@ -51,6 +52,5 @@
         "id": 4
       }
     }
-  ],
-  "disabled": false
+  ]
 }
