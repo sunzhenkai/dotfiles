@@ -42,8 +42,11 @@ browser_state:
     - "**/browser-profile/**"
     - "**/playwright-report/**"
     - "**/*screenshot*.png"
+    - "**/page-*.png"
+    - "**/page-*.jpeg"
+    - "**/page-*.jpg"
     - "**/trace.zip"
-  artifact_hint: "/tmp/agent-env/browser/ 或本机 ignored/cache 目录；不要提交截图/trace"
+  artifact_hint: "/tmp/agent-env/browser/ 或本机 ignored/cache 目录；不要提交截图/trace；截图勿传自定义 filename"
 
 private_boundary:
   local_override_files:
