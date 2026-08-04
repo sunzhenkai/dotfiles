@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Design"
+  short_description: "Code design lifecycle — explore, design, land; no impl"
+  default_prompt: "Use $code-design to explore, design, and land a technical solution without writing implementation code."

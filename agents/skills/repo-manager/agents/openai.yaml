@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Manager"
+  short_description: "Multi-repo batch ops via grepom and glab"
+  default_prompt: "Use $repo-manager to clone, sync, status, and operate across many GitLab/GitHub repositories."
