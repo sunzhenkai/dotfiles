@@ -230,3 +230,34 @@ glab --help
 ```
 
 Prefer running actual help over guessing — both tools iterate quickly and flags change.
+
+## Gotchas (lessons learned)
+
+可复用的踩坑经验。**只记跨实例通用的规律**，具体 host / IP / token / 路径等特例不放这里。
+
+### glab CLI
+
+- **HTTP-only 实例必须显式 `--api-protocol http`**：默认走 https，遇到 TLS 错误优先怀疑这个 flag 没带。
+  ```bash
+  glab auth login --hostname <host> --api-protocol http --git-protocol ssh --stdin
+  ```
+- **glab 全局默认 host 是 `gitlab.com`**：所有 `glab api /xxx`、`glab mr list` 等命令不显式 `--hostname` 都会用到默认值。多实例环境永远带 `--hostname <host>` 或 `GITLAB_HOST=<host>`。
+- **keyring 不可用时 fallback 到 plaintext**（常见于 Linux server / 无 desktop env）：token 落到 `~/.config/glab-cli/config.yml`（权限 0600）。可手动 `chmod 600` 加固；启用 desktop 后再 `glab auth login` 一次会搬回 keyring。
+- **`glab mr list` 在 cwd repo 没匹配 host 时报 "remote not known"**：用 `--hostname <host> -R <group>/<repo>` 解决，或 `cd` 到目标 repo。
+
+### GitLab REST API
+
+- **GitLab 17.9+ transfer API 用 `PUT /projects/:id/transfer`**（不是 `POST`）。参数是 `namespace=<group_path>`，不是 `namespace_id=<id>`。
+  ```bash
+  glab api --hostname <host> -X PUT projects/<id>/transfer -f namespace=<group_path>
+  ```
+- **`DELETE /projects/:id` 默认是软删除**：标 `marked_for_deletion_at` + 30 天后悔期。path 自动加 `-deletion_scheduled-<id>` 后缀防冲突。
+- **恢复软删除**：`POST /projects/:id/restore`，path 自动回到原值。
+- **物理硬删要走 admin 内部接口**：`glab` 不暴露；要在 GitLab 主机上 `gitlab-rails console` 跑 `Project.unscoped.find(<id>).really_destroy!`。
+- **搜 namespace 不要只查一处**：自托管 group/user 命名易混，三个 API 并行查：
+  ```bash
+  glab api --hostname <host> 'groups?search=<kw>'
+  glab api --hostname <host> 'users?username=<kw>'
+  glab api --hostname <host> 'namespaces?search=<kw>'   # 同时含 group + user
+  ```
+- **`/api/v4/version` 401 不一定是 TLS 错**：很多自托管实例把 version 也要求认证，反而说明 HTTP/API 路径对，继续带 token 测 `/user` 即可。
