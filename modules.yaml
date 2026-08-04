@@ -221,6 +221,7 @@ modules:
     doctor: true
     bin: opencode
     config:
+      # 手写模板在 vendor；运行时目标为 home 真实目录（不再整目录软链）
       source: agents/vendors/opencode
       target: ~/.config/opencode
 

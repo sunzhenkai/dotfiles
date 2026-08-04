@@ -299,9 +299,75 @@ install_minimax_config() {
   echo "MiniMax 目录已就绪（~/.mmx）；凭证请用 mmx auth login 生成，dotfiles 不管理 config.json"
 }
 
+# 特殊配置：opencode
+# 不再整目录软链 vendors → ~/.config/opencode（skills/MCP 写穿会污染仓库）。
+# 与 kiro/cursor 一致：home 真实目录 + 从 vendor 安装手写配置；skills/MCP 走 sync。
+install_opencode_config() {
+  local vendor="$DOTFILES_ROOT/agents/vendors/opencode"
+  local target="$HOME/.config/opencode"
+
+  if [ ! -d "$vendor" ]; then
+    echo "✗ 缺少仓库模板: $vendor"
+    return 1
+  fi
+
+  # 拆掉整目录软链（只删 link，不动 vendor）
+  if [ -L "$target" ]; then
+    local link_dest
+    link_dest=$(readlink -f "$target" 2>/dev/null || readlink "$target")
+    rm "$target"
+    echo "已移除整目录软链: ~/.config/opencode → ${link_dest:-?}"
+  elif [ -e "$target" ] && [ ! -d "$target" ]; then
+    mkdir -p "$BACKUP_DIR"
+    mv "$target" "$BACKUP_DIR/opencode-${TIMESTAMP}"
+    echo "已备份非目录目标到 $BACKUP_DIR/opencode-${TIMESTAMP}"
+  fi
+
+  mkdir -p "$target/skills" "$target/commands" "$target/agents"
+
+  # 手写人格 / 插件清单：每次从 vendor 刷新
+  if [ -d "$vendor/agents" ]; then
+    cp -a "$vendor/agents/." "$target/agents/"
+    echo "已安装: ~/.config/opencode/agents/"
+  fi
+  if [ -f "$vendor/plugins.json" ]; then
+    cp "$vendor/plugins.json" "$target/plugins.json"
+    echo "已安装: ~/.config/opencode/plugins.json"
+  fi
+  if [ -f "$vendor/package.json" ]; then
+    cp "$vendor/package.json" "$target/package.json"
+    echo "已安装: ~/.config/opencode/package.json"
+  fi
+
+  # opencode.json：仅在缺失时用仓库骨架；已存在则留给 MCP sync 合并
+  if [ ! -f "$target/opencode.json" ]; then
+    if [ -f "$vendor/opencode.json" ]; then
+      cp "$vendor/opencode.json" "$target/opencode.json"
+      echo "已安装: ~/.config/opencode/opencode.json（骨架）"
+    else
+      echo "⚠️  缺少仓库骨架 agents/vendors/opencode/opencode.json"
+    fi
+  else
+    echo "已存在: ~/.config/opencode/opencode.json（跳过覆盖）"
+  fi
+
+  # 插件依赖：home 下无 node_modules 时安装（优先复用 vendor 已有目录）
+  if [ ! -d "$target/node_modules" ]; then
+    if [ -d "$vendor/node_modules" ]; then
+      cp -a "$vendor/node_modules" "$target/node_modules"
+      echo "已复制: ~/.config/opencode/node_modules（来自 vendor）"
+    elif [ -f "$target/package.json" ] && command -v npm >/dev/null 2>&1; then
+      (cd "$target" && npm install --omit=dev) || echo "⚠️  npm install 失败，请稍后在 ~/.config/opencode 手动安装"
+    fi
+  fi
+
+  echo "OpenCode 目录已就绪（~/.config/opencode 真实目录）"
+  echo "skills/MCP：dotf agents -c --tool opencode 或 sync.sh opencode"
+}
+
+# 兼容旧入口名（modules/opencode/config.sh、部分脚本仍可能调用）
 install_opencode() {
-  install_config "opencode"
-  # skills/MCP：dotf agents -c 或 sync.sh opencode
+  install_opencode_config
 }
 
 # 特殊配置：kimi-code

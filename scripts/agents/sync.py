@@ -285,8 +285,8 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
     if tool == "kiro":
         return [home / ".kiro"]
     if tool == "opencode":
-        # Generate into vendors/opencode/; user symlink covers ~/.config/opencode
-        return [root / "agents" / "vendors" / "opencode"]
+        # 与其他 agent 一致：写入 home 真实目录（不再依赖整目录软链到 vendor）
+        return [Path.home() / ".config" / "opencode"]
     if tool == "codex":
         return [home / ".codex"]
     if tool == "kimi-code":
