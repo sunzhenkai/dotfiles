@@ -160,6 +160,51 @@ glab variable list               # CI/CD variables
 glab api projects/:id/variables  # raw API
 ```
 
+## Multi-instance authentication
+
+`glab` stores credentials per hostname; there is no `switch` command. Log in once per
+instance, then select the host for a command or the current shell:
+
+```bash
+# --stdin avoids putting the token in shell history
+glab auth login --hostname gitlab.example.com --stdin
+glab auth login --hostname gitlab.other.com --stdin
+glab auth status --all
+
+GITLAB_HOST=gitlab.other.com glab mr list   # one command
+export GITLAB_HOST=gitlab.example.com       # current shell
+glab auth logout --hostname gitlab.other.com
+```
+
+Host resolution is `GITLAB_HOST` → the current repository's Git remote →
+`~/.config/glab-cli/config.yml`. Use `--device` for headless login on GitLab 17.9+.
+Credentials use the OS keyring by default; only use `--insecure-storage` when necessary.
+
+For `grepom`, model each GitLab instance as a named `resource`; bind groups to it:
+
+```yaml
+resources:
+  corp:
+    provider: gitlab
+    url: https://gitlab.example.com
+    token: ${CORP_GITLAB_TOKEN}
+  oss:
+    provider: gitlab
+    url: https://gitlab.com
+    token: ${OSS_GITLAB_TOKEN}
+
+groups:
+  - name: backend
+    resource: corp
+    path: my-org/backend
+    recursive: true
+```
+
+Use `grepom clone --resource corp`, `grepom status --resource corp`, or
+`grepom pull --resource corp` as needed; each resource may override
+its own `token`/`ssh_key`. Keep tokens in environment variables, use least-privilege PATs,
+and revoke/rotate a token if exposed.
+
 ## Maintenance
 
 ```bash
