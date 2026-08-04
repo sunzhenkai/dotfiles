@@ -1,7 +1,7 @@
 ---
 id: repo-manager
 name: repo-manager
-description: Manage multiple GitLab / GitHub / generic Git repositories via `grepom` (primary, cross-platform batch operations on a workspace of repos) and `glab` (GitLab-specific fallback for issues, variables, snippets, and fine-grained MR flags). Use when the user asks to clone, sync, list, status, pull, search, scan, push, create MR/PR, or watch CI pipelines across many repos; when working with `.grepom.yml` configs; when discovering new repos in a remote group/org; when scanning for secrets before push; when bumping release tags; or when quickly jumping between repo directories in a workspace. Do NOT use for single-file git operations, code review of specific diffs, or work that has nothing to do with repository plumbing.
+description: Manage multiple GitLab / GitHub / generic Git repositories via `grepom` (primary, cross-platform batch operations on a workspace of repos) and `glab` (GitLab-specific fallback for issues, variables, snippets, and fine-grained MR flags). Maintain a cwd ledger in `.repo-manager.md` when that file already exists (prompt before creating). Use when the user asks to clone, sync, list, status, pull, search, scan, push, create MR/PR, or watch CI pipelines across many repos; when working with `.grepom.yml` configs; when discovering new repos in a remote group/org; when scanning for secrets before push; when bumping release tags; or when quickly jumping between repo directories in a workspace. Do NOT use for single-file git operations, code review of specific diffs, or work that has nothing to do with repository plumbing.
 ---
 
 # repo-manager
@@ -9,6 +9,70 @@ description: Manage multiple GitLab / GitHub / generic Git repositories via `gre
 Two CLI layers. Prefer `grepom` for cross-repo batch work; reach for `glab` only when grepom doesn't cover the operation.
 
 Config lookup: `grepom` reads `.grepom.yml` from the current directory or any parent. Override with `-c <path>`.
+
+## 台账（`.repo-manager.md`）
+
+在**当前工作目录**维护 `.repo-manager.md`，记录本工作区的仓库台账与操作手帐，供人与后续 agent 复用。
+
+### 创建门禁（强制）
+
+| 情况 | 行为 |
+|------|------|
+| `./.repo-manager.md` **不存在** | **禁止自动创建**。向用户提示：「当前目录没有 `.repo-manager.md`，是否创建台账？」仅当用户明确同意（如「创建」「写台账」「初始化 .repo-manager.md」）后再按下方模板新建。 |
+| `./.repo-manager.md` **已存在** | **自动更新**：会话开始先读；有实质操作或新踩坑后立刻写回，无需再问。 |
+| 用户明确要求创建/初始化台账 | 即使原先不存在，也按模板创建并写入本次信息。 |
+
+路径始终是 **cwd 下的** `./.repo-manager.md`（不要写到 home、cache 或父目录，除非用户另行指定）。
+
+### 何时读写
+
+1. **任何 repo-manager 操作开始时**：若文件存在，先读一遍——优先采用其中的 resource/group 约定、exclude、鉴权环境变量名、已知坑。
+2. **文件存在且完成实质操作后**：自动追加/更新手帐与稳定信息（见下）。只读查询（如单纯 `status` / `list` 且无发现）可不写。
+3. **遇到坑时立刻写入**：鉴权失败、sync/clone 异常、prune 误伤、secret scan 命中策略、host/protocol 踩坑等——确认原因或绕过后马上记入「踩坑」，同一问题更新已有条目，不重复堆砌。
+4. **文件不存在时**：照常执行 grepom/glab；仅提示一次可建台账，**不**因提示未答复而阻断操作。
+
+### 应记录的内容
+
+- **概览**：工作区用途、`.grepom.yml` 位置（相对 cwd）、主要 resource / group / vgroup、本地 base 路径约定。
+- **约定**：常用 filter（`--group` / `--resource` / `--vgroup`）、exclude 策略、token 环境变量**名**（不写值）、SSH/HTTP 协议偏好。
+- **手帐**：有状态变化的操作——`sync` / `clone` / `pull` / `prune` / `push` / `mr` / `tag` / 批量 discovery 等；一行一条，含日期与结果摘要。
+- **踩坑**：本工作区特有问题与绕过方式。
+
+### 文件模板
+
+新建时使用（按实际删减，保持简洁）：
+
+```markdown
+# Repo Manager — <工作区目录名>
+
+## 概览
+
+- 一句话说明本工作区管理哪些仓库
+- 配置：`.grepom.yml`（或相对路径）
+- base / 主要 group、resource
+
+## 约定
+
+- 常用命令或 filter
+- 鉴权：环境变量名（如 `${GITLAB_TOKEN}`），禁止写明文
+- exclude / prune 注意点
+
+## 手帐
+
+- YYYY-MM-DD：操作 → 范围 → 结果（如 sync 新增 N 仓；clone 失败的 repo）
+
+## 踩坑
+
+- YYYY-MM-DD：现象 → 原因 → 解决/绕过
+```
+
+### 写入原则
+
+- 只写与**多仓管理 / 同步 / 鉴权 / 扫描 / MR·流水线**相关的信息；不写业务代码细节。
+- **禁止**写入 token、密码、私钥、内部未公开 URL 中的凭据部分。
+- 手帐要可回溯：后人能看出「何时对哪些 group 做了什么」。
+- 稳定约定放「概览/约定」，一次性操作放「手帐」；不要把整份 `grepom status` 原文贴进文件。
+- 用户若明确要求不提交该文件，提醒可加入 `.gitignore`，但仍在本地维护。
 
 ## Tool selection
 
@@ -220,6 +284,7 @@ grepom version                   # installed version
 - **Never `--force` push without confirming with the user**.
 - **Stale config**: `sync` only adds; if upstream repos are renamed/removed, edit the config manually or rebuild with `grepom init` + `grepom add group`.
 - **Verbose mode**: add `-v` for debug output when a command misbehaves.
+- **Ledger**: respect `.repo-manager.md` create-gate — never auto-create; auto-update only when the file already exists (see 台账 section).
 
 ## When unsure
 
