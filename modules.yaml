@@ -93,6 +93,14 @@ modules:
     doctor: true
     bin: npm
 
+  - name: dws
+    desc: 安装 DingTalk Workspace CLI
+    group: tools
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: dws
+
   - name: qoder
     desc: Qoder CLI + 配置
     group: agents
