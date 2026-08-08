@@ -18,4 +18,10 @@ __pycache__
 **/browser-profile/
 **/playwright-report/
 **/*screenshot*.png
+# Playwright MCP 自动命名；自定义 filename 仍可能漏进仓库根目录
+**/page-*.png
+**/page-*.jpeg
+**/page-*.jpg
 **/trace.zip
+
+.zcode

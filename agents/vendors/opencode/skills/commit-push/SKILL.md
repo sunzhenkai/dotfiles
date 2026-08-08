@@ -30,6 +30,7 @@ description: 分析当前 git 变更、起草提交说明、创建 commit 并 pu
 4. **暂存策略**
    - 大改动用路径级 `git add -- <paths>`，避免盲目 `git add -A` 带入无关或敏感文件
    - 先看 `git status` / untracked，排除 `.env`、密钥、大产物
+   - 排除浏览器调试产物：工作区根目录或任意路径下的 `page-*.png` / `*screenshot*.png`、`trace.zip`、`playwright-report/`；勿提交 Playwright MCP 截图
 
 ## 安全协议
 

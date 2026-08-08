@@ -68,6 +68,12 @@ The system SHALL prevent browser-generated private state from being treated as r
 - **THEN** the system MAY place them in a documented temporary or artifact directory
 - **THEN** the user SHALL be warned not to commit screenshots containing private or internal information
 
+#### Scenario: Agent requests a screenshot via Playwright MCP
+- **WHEN** an agent takes a screenshot through the Playwright MCP provider
+- **THEN** documentation and skills SHALL prefer omitting the custom `filename` argument so output uses `--output-dir`
+- **THEN** documentation and skills SHALL forbid absolute paths or directory separators in `filename` when a name is required
+- **THEN** ignore rules SHALL cover common auto-generated names such as `page-*.png`
+
 ### Requirement: Browser MCP health checks are available
 The system SHALL provide health checks for browser automation readiness.
 

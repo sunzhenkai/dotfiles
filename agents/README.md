@@ -126,7 +126,7 @@ scripts/config.sh agents
 | claude | `~/.claude/skills/` + 仓库 `.claude/skills/`（生成） | `~/.claude/commands/` + `.claude/commands/` |
 | cursor | `~/.cursor/skills/` + `.cursor/skills/` | `~/.cursor/commands/` + `.cursor/commands/` |
 | kiro | `~/.kiro/skills/` | `~/.kiro/prompts/`（prompts 映射） |
-| opencode | `agents/vendors/opencode/skills/`（随 `~/.config/opencode` symlink） | `agents/vendors/opencode/commands/` |
+| opencode | `~/.config/opencode/skills/` | `~/.config/opencode/commands/` |
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |
 | pi | `~/.pi/agent/skills/` | `~/.pi/agent/prompts/`（prompt templates） |
@@ -135,8 +135,8 @@ scripts/config.sh agents
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
 | minimax | 不同步（mmx 无此布局） | 不同步（mmx 无此布局；MCP 亦 skip） |
 
-**不要手改** `.claude/`、`.cursor/`、`agents/vendors/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。
+**不要手改** `.claude/`、`.cursor/`、`~/.config/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。
 
 ## 示例条目
 
-仓库自带：`commit-push`、`en-chat`、`senior-reviewer`、`service-manager`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
+仓库自带：`browser`、`commit-push`、`en-chat`、`code-design`、`code-implement`、`repo-manager`、`senior-reviewer`、`service-manager`、`skills-store`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。

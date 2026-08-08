@@ -220,30 +220,54 @@ def sync_opencode(
         sid: render_server_for_tool(sid, srv, "opencode")
         for sid, srv in servers.items()
     }
+    target = Path.home() / ".config" / "opencode" / "opencode.json"
     repo_cfg = cat.root / "agents" / "vendors" / "opencode" / "opencode.json"
-    if not repo_cfg.is_file():
-        die(f"缺少 OpenCode 配置: {repo_cfg}")
-    try:
-        data = json.loads(repo_cfg.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        die(f"无法解析 {repo_cfg}: {exc}")
 
-    cur = data.get("mcp") or {}
+    existing: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {target}: {exc}")
+    elif repo_cfg.is_file():
+        # home 尚未有配置时，以仓库模板为骨架
+        try:
+            existing = json.loads(repo_cfg.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {repo_cfg}: {exc}")
+
+    cur = existing.get("mcp") or {}
     if not isinstance(cur, dict):
         cur = {}
+    data = dict(existing)
     data["mcp"] = merge_mcp_servers(cur, rendered, cat.managed_server_ids())
 
-    status = f"opencode: {len(rendered)} managed servers → {repo_cfg}"
+    status = f"opencode: {len(rendered)} managed servers → {target}"
     if dry_run:
         print(f"[dry-run] {status}")
         print(json.dumps({"mcp": rendered}, indent=2, ensure_ascii=False))
         return "ok"
 
-    backup_file(repo_cfg, Path.home() / ".config" / "backups")
-    atomic_write_json(repo_cfg, data, dry_run=False)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup_file(target, Path.home() / ".config" / "backups")
+    atomic_write_json(target, data, dry_run=False)
     print(f"已同步: {status}")
+
     if also_repo:
-        print("（OpenCode MCP 已写入 agents/vendors/opencode/opencode.json，随 symlink 生效）")
+        if not repo_cfg.is_file():
+            die(f"缺少 OpenCode 仓库模板: {repo_cfg}")
+        try:
+            repo_data = json.loads(repo_cfg.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            die(f"无法解析 {repo_cfg}: {exc}")
+        repo_cur = repo_data.get("mcp") or {}
+        if not isinstance(repo_cur, dict):
+            repo_cur = {}
+        repo_data["mcp"] = merge_mcp_servers(repo_cur, rendered, cat.managed_server_ids())
+        backup_file(repo_cfg, Path.home() / ".config" / "backups")
+        atomic_write_json(repo_cfg, repo_data, dry_run=False)
+        print(f"已更新仓库模板: {repo_cfg.relative_to(cat.root)}")
     return "ok"
 
 

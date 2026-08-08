@@ -1,12 +1,15 @@
-# Generated MCP template
+# MCP 生成物
 
-`agents/vendors/opencode/opencode.json` 的 `mcp` 段由 `agents/env` 生成。请编辑 `agents/env/mcp/` 后运行：
+`~/.config/opencode/opencode.json` 的 `mcp` 段由 `agents/env` 生成并合并。
+仓库内 `agents/vendors/opencode/opencode.json` 为模板（可用 `--also-repo-templates` 更新）。
+
+请编辑 `agents/env/mcp/` 后运行：
 
 ```shell
 scripts/agents/sync.sh opencode
 ```
 
-启用浏览器调试能力时使用 browser profile 并重载 OpenCode：
+或：
 
 ```shell
 scripts/agents/sync.sh opencode --env-only --profile browser

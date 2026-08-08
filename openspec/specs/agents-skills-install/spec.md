@@ -5,7 +5,7 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 ## Requirements
 ### Requirement: 配置工具时安装适配后的 skills/commands
 
-当用户通过现有配置入口安装 Claude Code、Cursor、OpenCode 或 Codex 时，系统 SHALL 读取共享源、执行对应适配，并将结果安装到该工具的用户级配置位置（或 OpenCode 所 symlink 的仓库配置树中约定子目录）。
+当用户通过现有配置入口安装 Claude Code、Cursor、OpenCode 或 Codex 时，系统 SHALL 读取共享源、执行对应适配，并将结果安装到该工具的用户级配置位置（home 真实目录下的约定子目录）。
 
 #### Scenario: 配置 Claude 时安装到 ~/.claude
 
@@ -18,10 +18,12 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 - **WHEN** 用户执行 `dotf cursor -c` 或等价调用
 - **THEN** 系统 SHALL 将启用的 skills/commands 安装到 `~/.cursor/skills/` 与 `~/.cursor/commands/`
 
-#### Scenario: 配置 OpenCode 时 skills/commands 对用户可见
+#### Scenario: 配置 OpenCode 时安装到 ~/.config/opencode
 
-- **WHEN** 用户执行 `dotf opencode -c` 或等价调用
-- **THEN** 适配后的 skills/commands SHALL 出现在 OpenCode 实际加载的配置树中（`~/.config/opencode` 或其 symlink 目标下的 `skills/`、`commands/`）
+- **WHEN** 用户执行 `dotf opencode -c` 或等价调用，并随后（或一并）运行 agents sync
+- **THEN** 系统 SHALL 将启用的 skills 安装到 `~/.config/opencode/skills/`
+- **THEN** 系统 SHALL 将启用的 commands 安装到 `~/.config/opencode/commands/`
+- **THEN** `~/.config/opencode` SHALL 为真实目录，SHALL NOT 整目录软链到仓库 `agents/vendors/opencode`
 
 #### Scenario: 配置 Codex 时安装 skills
 

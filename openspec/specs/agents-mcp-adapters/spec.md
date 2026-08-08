@@ -31,7 +31,7 @@ The system SHALL adapt shared MCP declarations into the configuration format use
 
 #### Scenario: OpenCode MCP configuration is generated
 - **WHEN** sync runs for `opencode`
-- **THEN** enabled MCP servers SHALL be written or merged into the `mcp` section of `opencode/opencode.json`
+- **THEN** enabled MCP servers SHALL be written or merged into the `mcp` section of `~/.config/opencode/opencode.json`
 - **THEN** the generated configuration SHALL use OpenCode-compatible remote or local server syntax
 
 #### Scenario: Codex MCP configuration is unsupported

@@ -72,4 +72,5 @@ warnings:
   - "浏览器自动化为 high risk；默认 profile=browser 会启用 Playwright MCP，research/coding 不会"
   - "默认使用隔离 profile，不读取用户主浏览器 cookie/扩展"
   - "截图、trace、downloads 放到 artifact_dir，不要提交到仓库"
+  - "截图默认不要传 filename（自动进 --output-dir）；自定义 filename 可能落到工作区根目录"
   - "Chrome DevTools / 真实 profile 需 local override 显式 opt-in"

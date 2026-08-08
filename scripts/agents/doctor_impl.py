@@ -438,9 +438,7 @@ def _mcp_drift(
             return None
         actual = data.get("mcpServers") or {}
     elif tool == "opencode":
-        data = _read_json(
-            cat.root / "agents" / "vendors" / "opencode" / "opencode.json"
-        )
+        data = _read_json(Path.home() / ".config" / "opencode" / "opencode.json")
         if data is None:
             return None
         actual = data.get("mcp") or {}
@@ -731,7 +729,7 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         "claude": Path.home() / ".claude" / "skills",
         "cursor": Path.home() / ".cursor" / "skills",
         "kiro": Path.home() / ".kiro" / "skills",
-        "opencode": cat.root / "agents" / "vendors" / "opencode" / "skills",
+        "opencode": Path.home() / ".config" / "opencode" / "skills",
         "codex": Path.home() / ".codex" / "skills",
         "kimi-code": Path.home() / ".kimi-code" / "skills",
         "pi": Path.home() / ".pi" / "agent" / "skills",
@@ -745,10 +743,10 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
     drifted = False
     for t in check_tools:
         if t == "opencode":
-            dest = cat.root / "agents" / "vendors" / "opencode" / "skills"
+            dest = Path.home() / ".config" / "opencode" / "skills"
             if sample and sample.is_dir():
                 marker = dest / sample.name
-                if not marker.exists():
+                if not dest.is_dir() or not marker.exists():
                     drifted = True
                     report.add(
                         "agents",

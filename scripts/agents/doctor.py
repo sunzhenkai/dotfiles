@@ -68,8 +68,8 @@ def check_skills_drift(
             "dir",
         ),
         "opencode": (
-            cat.root / "agents" / "vendors" / "opencode" / "skills",
-            cat.root / "agents" / "vendors" / "opencode" / "commands",
+            Path.home() / ".config" / "opencode" / "skills",
+            Path.home() / ".config" / "opencode" / "commands",
             "dir",
         ),
         "claude": (

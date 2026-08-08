@@ -93,6 +93,14 @@ modules:
     doctor: true
     bin: npm
 
+  - name: dws
+    desc: 安装 DingTalk Workspace CLI
+    group: tools
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: dws
+
   - name: qoder
     desc: Qoder CLI + 配置
     group: agents
@@ -229,6 +237,7 @@ modules:
     doctor: true
     bin: opencode
     config:
+      # 手写模板在 vendor；运行时目标为 home 真实目录（不再整目录软链）
       source: agents/vendors/opencode
       target: ~/.config/opencode
 

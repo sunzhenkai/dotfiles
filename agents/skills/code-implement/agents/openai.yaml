@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Implement"
+  short_description: "Drive OpenSpec pipeline with confirmation gates"
+  default_prompt: "Use $code-implement to drive a feature through OpenSpec's explore → propose → apply → archive pipeline, with confirmation gates between each phase."
