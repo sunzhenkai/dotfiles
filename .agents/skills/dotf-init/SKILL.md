@@ -1,5 +1,4 @@
 ---
-id: dotf-init
 name: dotf-init
 description: "新系统/新用户首次初始化：探测运行时与多用户共用性，选定 profile，委托 bootstrap.sh + dotf init 完成从裸机到可用环境。在用户要求初始化新机、setup、bootstrap、dotf init、装机、配置新开发环境时使用。多用户/共用开发机默认走用户级安装，系统级操作（sudo/chsh/改 /etc）必须显式确认。在已初始化的系统上补装单个模块请改用 dotf-install。"
 ---

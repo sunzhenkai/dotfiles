@@ -1,5 +1,4 @@
 ---
-id: dotf-check
 name: dotf-check
 description: "环境体检：跨模块聚合检查基础运行时、shell 环境、程序/模块（按能力域而非机械罗列）、agents/skills 生态健康、配置健康与安全隐患，给出分级结论与修复建议，询问后可委托 dotf-init/dotf-install 修复。在用户要求体检、检查环境、check、诊断整体、看看缺啥、健康检查、env audit 时使用。与 dotf status（逐模块被动 L0）的区别：本 skill 做整体聚合、能力视角、主动发现、修复闭环。"
 ---

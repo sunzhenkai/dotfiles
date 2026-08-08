@@ -1,5 +1,4 @@
 ---
-id: dotf-install
 name: dotf-install
 description: "在已初始化的系统上按需安装/配置单个或多个模块，或全量补装。委托 dotf <module> -i/-c/-ic / dotf -a / dotf status / dotf retry。在用户要求装某个工具、配置某个模块、补装、全量装、跑 doctor 诊断、重试失败时使用。多用户/共用开发机默认走用户级模块，系统级模块（system/homebrew/docker/chsh）必须显式确认。新机首次初始化请改用 dotf-init。"
 ---
