@@ -92,9 +92,6 @@ init_homebrew() {
   # Git
   brew install lazygit gitui
 
-  # C/C++
-  brew install pkg-config ninja bear ctags valgrind llvm make cmake gcc
-
   # Java
   brew install openjdk@17 bison flex
 

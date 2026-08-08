@@ -127,6 +127,14 @@ modules:
     doctor: true
     bin: vcpkg
 
+  - name: cpp-dev
+    desc: C/C++ 工具链（llvm/gcc/cmake/ninja 等，可选）
+    group: dev
+    install: true
+    doctor: true
+    bin: cmake       # L0 doctor 用 cmake 代表整个工具链
+    enabled: false   # 不进 full/profile/--all；dotf install cpp-dev 显式装
+
   - name: ossutil
     desc: 安装 ossutil 2.0（阿里云 OSS CLI）
     group: tools
