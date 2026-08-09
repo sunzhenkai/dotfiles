@@ -8,7 +8,7 @@ description: UI 设计门卫/路由器：按用户意图路由到本 skill 内�
 
 本 skill 是**路由器**，不直接堆设计知识。被显式触发后：确认意图 → Read 本 skill `references/` 下的某一个 refer skill 执行；没有合适的 refer skill 时回退到文末的内置准则。
 
-refer skill 已 vendor 在本 skill 的 `references/` 下并随分发到位，**无需任何额外安装**。它们是上游快照：**不修改**；且不在 agent 的 skill 注册路径上（只是数据文件），不会被独立自动触发。
+refer skill 已放在本 skill 的 `references/` 下并随分发到位，**无需任何额外安装**。第三方上游快照一般不修改；first-party 策展（如 `solo-ui-design`）可随规范演进修订。它们不在 agent 的 skill 注册路径上（只是数据文件），不会被独立自动触发。
 
 ## 三道门禁（防误触、防上下文膨胀）
 
@@ -18,7 +18,7 @@ refer skill 已 vendor 在本 skill 的 `references/` 下并随分发到位，**
    - ② 翻新/改造已有项目 UI
    - ③ 设计新页面/组件（通用）
    - ④ 查配色/字体/设计模式推荐
-   - ⑤ 套特定视觉风格（极简/工业/高端等）
+   - ⑤ 套特定视觉风格（极简/工业/高端/纸墨编辑感等）
    - ⑥ 不加载 refer skill，直接用内置准则自检
    **用户未明确选择前，禁止 Read 任何 refer skill。** 选择后若路由目标仍不明确（多个候选都沾边），**必须再问用户确认**，不猜。
 3. **门 3 · 一次只加载一个**：确定目标后用 **Read** 读对应 SKILL.md，按其指引执行。除非用户明确要求组合，否则不同时加载多个。任务结束后不再持续引用其内容（用完即弃）。
@@ -36,6 +36,7 @@ refer skill 已 vendor 在本 skill 的 `references/` 下并随分发到位，**
 | 极简风（Notion/Linear 式，SaaS/工具/后台） | `minimalist-ui` | `references/minimalist-ui/SKILL.md` |
 | 工业粗野风（瑞士排版、硬边框、极端字号对比） | `industrial-brutalist-ui` | `references/industrial-brutalist-ui/SKILL.md` |
 | 高端克制 premium 风（品牌/营销页） | `high-end-visual-design` | `references/high-end-visual-design/SKILL.md` |
+| 纸墨编辑感（内容站/知识库/编辑器型产品，同构后台） | `solo-ui-design`（克制排版、单一强调色、分段壳层、图标操作语法） | `references/solo-ui-design/SKILL.md` |
 | 无匹配 / 用户选择不外加载 | 内置准则（见文末，兜底） | — |
 
 注意：`ui-ux-pro-max` 为上游快照（vendored），其数据库可能随上游更新而过期；以实际可用性为准。
@@ -113,7 +114,7 @@ refer skill 已 vendor 在本 skill 的 `references/` 下并随分发到位，**
 
 ## 边界
 
-- 不自动触发；一次只加载一个 refer skill；**不修改 references/ 下的上游快照**（发现问题记录到 `.dotf-ui-design.md`，升级走重新 vendor 流程）。
+- 不自动触发；一次只加载一个 refer skill；**不修改 references/ 下的第三方上游快照**（发现问题记录到 `.dotf-ui-design.md`，升级走重新 vendor 流程）。first-party 策展（`solo-ui-design`）除外，可按 `ORIGIN.md` 演进。
 - 不引入项目没有的设计体系或组件库依赖，确有需要先征得用户同意。
 - 与项目现有规范冲突时以项目为准并提示用户。
 - 大改版（整站换肤、设计体系迁移）先出方案讨论再动手。

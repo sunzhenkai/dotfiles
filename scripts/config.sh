@@ -112,6 +112,9 @@ install_agents() {
     tool="$1"
     shift
   fi
+  # modules.yaml 中 agents 模块声明了 config target；统一 sync 入口补建该软链，
+  # 避免 dotf status 报「目标不存在」。
+  dotf_ensure_symlink "agents" "$HOME/.local/share/dotfiles-agents"
   sync_agents "$tool" "$@"
 }
 
