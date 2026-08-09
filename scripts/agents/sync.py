@@ -342,6 +342,25 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
                 else:
                     written += 1
                     print(f"  + {dest}")
+            # references/：原样拷贝（不渲染 frontmatter、不做 slash 替换），第三方内容保持字节一致
+            refs_root = skill_dir / "references"
+            if refs_root.is_dir():
+                for ref_file in sorted(p for p in refs_root.rglob("*") if p.is_file()):
+                    rel = f"skills/{skill_id}/references/{ref_file.relative_to(refs_root)}"
+                    for base in bases:
+                        dest = base / rel
+                        dest = dest.expanduser()
+                        data = ref_file.read_bytes()
+                        if dest.is_file() and dest.read_bytes() == data:
+                            skipped += 1
+                            print(f"  = {dest}")
+                            continue
+                        written += 1
+                        print(f"  + {dest}")
+                        if dry_run:
+                            continue
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(data)
 
     # Commands（kimi-code 无稳定 commands 布局 → skip，不阻断 skills）
     if tool == "kimi-code":

@@ -25,10 +25,11 @@ python3 scripts/agents/doctor.py
 
 ```text
 agents/
-  skills/<skill-id>/SKILL.md   # skill 源
-  commands/<command-id>.md     # command 源
-  vendors/<tool>/              # 工具专属 settings / 人格 / 生成物
-  env/                         # MCP / profiles / browser / security 真相源
+  skills/<skill-id>/SKILL.md       # skill 源（frontmatter 渲染后分发）
+  skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
+  commands/<command-id>.md         # command 源
+  vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
+  env/                             # MCP / profiles / browser / security 真相源
   README.md
 ```
 
