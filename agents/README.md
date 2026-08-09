@@ -139,4 +139,4 @@ scripts/config.sh agents
 
 ## 示例条目
 
-仓库自带：`browser`、`commit-push`、`en-chat`、`code-design`、`code-implement`、`repo-manager`、`senior-reviewer`、`service-manager`、`skills-store`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
+仓库自带：`browser`、`commit-push`、`en-chat`、`code-design`、`code-implement`、`repo-manager`、`senior-reviewer`、`service-manager`、`skills-store`、`dotf-ui-design`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
