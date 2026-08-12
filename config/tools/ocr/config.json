@@ -1,0 +1,10 @@
+{
+  "provider": "minimax-cn",
+  "model": "MiniMax-M3",
+  "language": "中文",
+  "providers": {
+    "minimax-cn": {
+      "model": "MiniMax-M3"
+    }
+  }
+}

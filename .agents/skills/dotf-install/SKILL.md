@@ -38,7 +38,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 |-------|--------------|----------|---------------|
 | core | system, homebrew | **系统级**（sudo 装 / 改源） | ❌ 需显式确认 |
 | core | sdk (mise), golang | 用户级（~/.local/share/mise, GOPATH） | ✅ 可直接装 |
-| tools | delta, grepom, senv, mdserve, dws, npm | 多为用户级（cargo/go/bin） | ✅（确认依赖） |
+| tools | delta, grepom, senv, mdserve, dws, ocr, npm | 多为用户级（cargo/go/bin） | ✅（确认依赖） |
 | tools | ossutil, aws, aliyun, gcp | 用户级二进制 | ✅ |
 | tools | vcpkg, d2 | 用户级 | ✅ |
 | agents | agents, claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, minimax, qoder, trae-cli, codebuddy-code | 用户级 CLI + 配置 | ✅ |
@@ -56,7 +56,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 以下模块在 shared-user / shared-home 下通常可直接装（用户级、不改系统、不 chsh）：
 
 ```
-sdk golang delta grepom senv mdserve dws npm ossutil aws aliyun gcp vcpkg d2
+sdk golang delta grepom senv mdserve dws ocr npm ossutil aws aliyun gcp vcpkg d2
 agents claude cursor kiro opencode codex kimi-code pi zcode minimax qoder trae-cli
 nvim helix tmux zellij yazi k9s shell_gpt
 git starship（仅配置，不 chsh）

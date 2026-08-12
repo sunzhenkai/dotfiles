@@ -101,6 +101,17 @@ modules:
     doctor: true
     bin: dws
 
+  - name: ocr
+    desc: Open Code Review CLI + 配置（MiniMax-M3）
+    group: tools
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: ocr
+    config:
+      source: config/tools/ocr
+      target: ~/.opencodereview
+
   - name: qoder
     desc: Qoder CLI + 配置
     group: agents

@@ -302,6 +302,86 @@ install_minimax_config() {
   echo "MiniMax 目录已就绪（~/.mmx）；凭证请用 mmx auth login 生成，dotfiles 不管理 config.json"
 }
 
+# 特殊配置：ocr（Open Code Review）
+# ~/.opencodereview/config.json 可能含本机会话/api_key；合并仓库托管默认，不写 API Key。
+# 鉴权走环境变量 MINIMAX_API_KEY（内置 provider minimax-cn 的回退）。
+# 优先走 `ocr config set`（官方会写好 providers.<name> 段）；无二进制时回退 JSON 合并。
+install_ocr_config() {
+  local src="$DOTFILES_ROOT/config/tools/ocr/config.json"
+  local tgt="$HOME/.opencodereview/config.json"
+
+  if [ ! -f "$src" ]; then
+    echo "✗ 缺少仓库模板: $src"
+    return 1
+  fi
+
+  mkdir -p "$HOME/.opencodereview"
+
+  # npm 全局 bin 可能尚未进当前 PATH
+  local npm_bin
+  npm_bin="$(npm prefix -g 2>/dev/null || true)"
+  if [ -n "$npm_bin" ] && [ -d "$npm_bin/bin" ] && [[ ":$PATH:" != *":$npm_bin/bin:"* ]]; then
+    export PATH="$npm_bin/bin:$PATH"
+  fi
+
+  if command -v ocr >/dev/null 2>&1; then
+    ocr config set provider minimax-cn
+    ocr config set model MiniMax-M3
+    ocr config set language 中文
+    echo "已通过 ocr config set 对齐: provider=minimax-cn model=MiniMax-M3 language=中文"
+  else
+    python3 - "$src" "$tgt" <<'PY'
+import json, sys
+from pathlib import Path
+
+src_path, tgt_path = Path(sys.argv[1]), Path(sys.argv[2])
+src = json.loads(src_path.read_text(encoding="utf-8"))
+tgt = {}
+if tgt_path.exists():
+    try:
+        tgt = json.loads(tgt_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        tgt = {}
+    if not isinstance(tgt, dict):
+        tgt = {}
+
+changed = []
+for key in ("provider", "model", "language"):
+    if key in src and tgt.get(key) != src[key]:
+        tgt[key] = src[key]
+        changed.append(key)
+
+# providers.minimax-cn.model（保留同段已有 api_key 等字段）
+src_providers = src.get("providers") if isinstance(src.get("providers"), dict) else {}
+tgt_providers = tgt.get("providers") if isinstance(tgt.get("providers"), dict) else {}
+for pname, pcfg in src_providers.items():
+    if not isinstance(pcfg, dict):
+        continue
+    cur = tgt_providers.get(pname) if isinstance(tgt_providers.get(pname), dict) else {}
+    merged = dict(cur)
+    for k, v in pcfg.items():
+        if merged.get(k) != v:
+            merged[k] = v
+            changed.append(f"providers.{pname}.{k}")
+    tgt_providers[pname] = merged
+tgt["providers"] = tgt_providers
+
+tgt_path.write_text(json.dumps(tgt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+if changed:
+    print(f"已更新: ~/.opencodereview/config.json（托管键: {', '.join(changed)}）")
+else:
+    print("已存在: ~/.opencodereview/config.json（托管键已对齐）")
+print("提示: ocr 未在 PATH 中，已用模板合并；装好后可再跑: dotf ocr -c")
+PY
+  fi
+
+  if [ -z "${MINIMAX_API_KEY:-}" ]; then
+    echo "⚠️  未检测到 MINIMAX_API_KEY；provider minimax-cn 鉴权会失败"
+    echo "   国内站约定：export MINIMAX_API_KEY=...（与 Codex 同源）"
+  fi
+  echo "提示: ocr llm test 可验证连通性；勿改用海外 provider minimax（需 MINIMAX_GLOBAL_API_KEY）"
+}
+
 # 特殊配置：opencode
 # 不再整目录软链 vendors → ~/.config/opencode（skills/MCP 写穿会污染仓库）。
 # 与 kiro/cursor 一致：home 真实目录 + 从 vendor 安装手写配置；skills/MCP 走 sync。
