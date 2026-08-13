@@ -32,14 +32,15 @@ refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原�
 | 门 2 · 先定介质 | HTML/Markdown 猜错；未定介质就拖进大 refer |
 | 门 3 · HTML 一次一个 refer | 上下文膨胀；ppt 与 slides 抢路由 |
 | 门 4 · 产物不写进 references/；默认 `docs/pretty-view/` | 污染快照；落盘散落 |
+| 门 5 · 单介质；md→html 须显式说明 | 选 HTML 却先写 `.md` 再转 html、两份都留；把「阅读页」当成转换任务 |
 
-介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。**
+介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。** 默认只交 Markdown 或 HTML 其中一种；转换器需要的 md 用临时文件，不作为产物。
 
 ## 5. refer skill 清单（2026-08）
 
 | references/ 目录 | 场景 | 来源 |
 |------------------|------|------|
-| `baoyu-markdown-to-html` | 长文阅读页、公众号风格 HTML、md → 带内联 CSS 的 HTML | `jimliu/baoyu-skills` |
+| `baoyu-markdown-to-html` | 长文阅读页（临时 md，只留 html）；或用户**显式**把已有 md 转成带样式 HTML | `jimliu/baoyu-skills` |
 | `html-ppt` | 静态 HTML PPT（主题/布局/演讲者模式）；未点名 reveal.js 时的默认幻灯片 | `lewislulu/html-ppt-skill` |
 | `html-slides` | reveal.js 交互式幻灯片（CDN） | `claude-office-skills/skills` |
 
@@ -70,6 +71,7 @@ scripts/agents/sync.sh all
 - `docs/pretty-view/`（或用户指定路径）**已存在 → 直接写**；**不存在 → 先确认再创建**。
 - 根下只放 `INDEX.md` 与可选 `_assets/`；正文按 kind 分目录（`articles` / `knowledge` / `reports` / `proposals` / `reviews` / `slides`）。
 - 每写一篇更新 `INDEX.md`，保持链接可点。明确只要对话里看则不落盘。
+- 同篇默认只落 `.md` **或** `.html`。把已有 md 转成 html 须用户显式说「md 转 html」或点名已有 `.md`；未说则不要在 pretty-view 树里再写一份源稿。
 
 细则在 `SKILL.md`「落盘」节。
 
