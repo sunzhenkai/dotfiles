@@ -120,10 +120,10 @@ dotf dws lark-cli -i
 
 #### lark-cli（飞书 / Lark CLI）
 
-官方推荐一键安装（与 `dotf lark-cli -i` 等价）：
+只装 CLI 二进制（与 `dotf lark-cli -i` 等价）。**不要**跑官方 `npx @larksuite/cli@latest install` / `npx skills add larksuite/cli -g`，那些会把 20+ 个 `lark-*` 写入 `~/.agents/skills`，所有 agent 都会当独立 skill 扫到。
 
 ```bash
-npx @larksuite/cli@latest install
+npm install -g @larksuite/cli
 ```
 
 安装后须用户在浏览器配合完成配置与登录（Agent 提取链接发给用户）：
@@ -141,7 +141,7 @@ lark-cli auth status
 
 参考：[飞书 CLI 安装指南](https://open.feishu.cn/document/no_class/mcp-archive/feishu-cli-installation-guide.md)
 
-Agent 操作飞书业务时用本仓 `agents/skills/lark-cli`（薄路由，按需 Read `~/.agents/skills/lark-*`，勿一次加载全部上游 skill）。
+Agent 操作飞书业务时用本仓 `agents/skills/lark-cli`（薄路由，按需 `lark-cli skills read <id>`，勿一次加载全部上游 skill，也勿把上游 skill 落盘到 agent skills 目录）。
 
 #### dws（钉钉 Workspace CLI）
 

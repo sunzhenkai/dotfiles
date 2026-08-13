@@ -1,9 +1,10 @@
 # 上游 lark-* 路由表（精简）
 
-路径：`~/.agents/skills/<id>/SKILL.md`  
-源：https://github.com/larksuite/cli/tree/main/skills  
+加载：`lark-cli skills read <id>`（正文嵌在 CLI 里，不要读 `~/.agents/skills`）  
+对照：https://github.com/larksuite/cli/tree/main/skills  
+清单：`lark-cli skills list`（与本表冲突时以 CLI 为准）
 
-只据此选 id；**不要**把本表当成操作手册。选定后再 Read 对应 SKILL.md。
+只据此选 id；**不要**把本表当成操作手册。选定后再 `skills read`。
 
 ## 始终优先
 

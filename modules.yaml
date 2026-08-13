@@ -102,7 +102,7 @@ modules:
     bin: dws
 
   - name: lark-cli
-    desc: 安装飞书 / Lark CLI（npx @larksuite/cli）
+    desc: 安装飞书 / Lark CLI 二进制（npm -g @larksuite/cli；skill 走内嵌 skills read）
     group: 办公
     depends_on: [sdk]
     install: true
