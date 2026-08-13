@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, design]
 ---
 
-在已解析的 task 上下文中做决策级设计（不写业务代码）。resolve 后先 Checkout Gate；文档只写入该 task 的 `design/`；`task-archive` 时再晋升到 `docs/design` / ADR / knowledge。
+在已解析的 task 上下文中做决策级设计（不写业务代码）。resolve 后对必须目标仓跑 Checkout Gate（无关仓与当前仓不切）；文档只写入该 task 的 `design/`；`task-archive` 时再晋升到 `docs/design` / ADR / knowledge。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

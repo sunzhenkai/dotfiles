@@ -55,6 +55,7 @@ class TaskctlTest(unittest.TestCase):
         status: str = "draft",
         numbered_dir: bool = True,
         openspec: bool = False,
+        scope_block: str = "",
     ) -> Path:
         dirname = f"{task_id}-{slug}" if numbered_dir else slug
         root = self.tmp / "tasks" / day / dirname
@@ -79,7 +80,7 @@ class TaskctlTest(unittest.TestCase):
 ## 概述
 
 hello
-{openspec_block}
+{scope_block}{openspec_block}
 ## 验收标准
 
 - [ ] done
@@ -434,6 +435,137 @@ hello
         self.assertEqual(payload["confidence"], "heuristic")
         self.assertEqual(payload["candidates"][0]["task"]["task_id"], "T0002")
         self.assertIn("请确认", payload["exit_markdown"])
+
+    def test_parse_scope_must_only_and_skips_placeholder(self) -> None:
+        text = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| （待补） | `.` 或 `path/to/repo` | 必须 / 建议 / 排除 |
+| svc | `svc` | 必须 |
+| notes | `notes` | 建议 |
+| vendor | `vendor` | 排除 |
+"""
+        scope = tc.parse_scope(text)
+        self.assertEqual(scope["checkout"], ["svc"])
+        self.assertEqual([r["path"] for r in scope["must"]], ["svc"])
+        self.assertEqual([r["path"] for r in scope["suggested"]], ["notes"])
+        self.assertEqual([r["path"] for r in scope["excluded"]], ["vendor"])
+
+    def test_prepare_branches_requires_explicit_repo(self) -> None:
+        code, payload = self._run("prepare-branches", "--slug", "x")
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["ok"])
+        self.assertIn("do not default to cwd", payload["error"])
+
+    def test_prepare_branches_from_task_skips_unrelated_and_cwd(self) -> None:
+        target = self._init_git_repo("svc")
+        other = self._init_git_repo("other")
+        workspace = self._init_git_repo(".")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+| notes | `other` | 建议 |
+"""
+        self._seed_task("T0001", "demo-feature", scope_block=scope_block)
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "prepare-branches",
+            "--slug",
+            "demo-feature",
+            "--from-task",
+            "T0001",
+            "--cwd",
+            str(workspace),
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(len(payload["repos"]), 1)
+        self.assertEqual(payload["repos"][0]["git_root"].rstrip("/"), "svc")
+        self.assertEqual(payload["repos"][0]["action"], "created")
+        self.assertTrue(payload["cwd_untouched"])
+        self.assertFalse(payload["cwd_in_targets"])
+        self.assertEqual(
+            subprocess.run(
+                ["git", "-C", str(target), "branch", "--show-current"],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip(),
+            "feat-demo-feature",
+        )
+        self.assertEqual(
+            subprocess.run(
+                ["git", "-C", str(other), "branch", "--show-current"],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip(),
+            "main",
+        )
+        self.assertEqual(
+            subprocess.run(
+                ["git", "-C", str(workspace), "branch", "--show-current"],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip(),
+            "main",
+        )
+
+    def test_prepare_branches_from_task_empty_skips(self) -> None:
+        workspace = self._init_git_repo(".")
+        self._seed_task("T0001", "no-target")
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "prepare-branches",
+            "--slug",
+            "no-target",
+            "--from-task",
+            "T0001",
+            "--cwd",
+            str(workspace),
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["skipped"], "no_target_repos")
+        self.assertEqual(payload["repos"], [])
+        self.assertTrue(payload["cwd_untouched"])
+        self.assertEqual(
+            subprocess.run(
+                ["git", "-C", str(workspace), "branch", "--show-current"],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip(),
+            "main",
+        )
+
+    def test_scope_repos_checkout_must_only(self) -> None:
+        self._init_git_repo("svc")
+        self._init_git_repo("other")
+        workspace = self._init_git_repo(".")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+| notes | `other` | 建议 |
+"""
+        self._seed_task("T0001", "demo-feature", scope_block=scope_block)
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "scope-repos",
+            "T0001",
+            "--cwd",
+            str(workspace),
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["checkout"], ["svc"])
+        self.assertTrue(payload["cwd_untouched"])
 
     def test_prepare_branches_dirty_asks_confirm(self) -> None:
         repo = self._init_git_repo("svc")

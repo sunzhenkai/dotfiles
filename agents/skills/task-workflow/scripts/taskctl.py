@@ -9,11 +9,13 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py set-status T0002 exploring
   python3 scripts/taskctl.py new --slug my-feature --title "标题"
   python3 scripts/taskctl.py archive T0002
-  python3 scripts/taskctl.py prepare-branches --slug my-feature --repo .
-  python3 scripts/taskctl.py git-summary --repo . --branch feat-my-feature
+  python3 scripts/taskctl.py prepare-branches --slug my-feature --from-task T0002
+  python3 scripts/taskctl.py prepare-branches --slug my-feature --repo path/to/target
+  python3 scripts/taskctl.py git-summary --repo path/to/target --branch feat-my-feature
 
 `--root` defaults to the nearest ancestor that contains `tasks/`.
-`--repo` is a workspace-relative path to a git root (`.` for a single-repo workspace).
+`--repo` is a workspace-relative path to a git root that this task will modify.
+Do not pass cwd or `.` unless the workspace git root itself is a must-modify target.
 """
 
 from __future__ import annotations
@@ -93,6 +95,10 @@ class TaskRow:
     section: str = "active"  # active | archived
 
 
+def empty_scope() -> dict[str, Any]:
+    return {"must": [], "suggested": [], "excluded": [], "checkout": []}
+
+
 @dataclass
 class TaskInfo:
     task_id: str
@@ -102,6 +108,7 @@ class TaskInfo:
     status: str
     readme: str
     openspec: list[dict[str, str]] = field(default_factory=list)
+    scope: dict[str, Any] = field(default_factory=empty_scope)
     index_path: str = ""
     updated: str = ""
 
@@ -241,6 +248,81 @@ def parse_openspec(text: str) -> list[dict[str, str]]:
         elif in_table and line.strip() == "":
             break
     return rows
+
+
+_SCOPE_SKIP_NAMES = {"", "—", "-", "（待补）", "(待补)", "待补", "（尚无）"}
+_SCOPE_ROLE_MUST = {"必须", "must", "required", "target"}
+_SCOPE_ROLE_SUGGESTED = {"建议", "suggested", "optional"}
+_SCOPE_ROLE_EXCLUDED = {"排除", "exclude", "excluded"}
+
+
+def normalize_scope_role(raw: str) -> str | None:
+    key = raw.strip().strip("`")
+    low = key.lower()
+    if key in _SCOPE_ROLE_MUST or low in _SCOPE_ROLE_MUST:
+        return "must"
+    if key in _SCOPE_ROLE_SUGGESTED or low in _SCOPE_ROLE_SUGGESTED:
+        return "suggested"
+    if key in _SCOPE_ROLE_EXCLUDED or low in _SCOPE_ROLE_EXCLUDED:
+        return "excluded"
+    return None
+
+
+def _is_placeholder_scope_row(name: str, path: str, role: str) -> bool:
+    if name in _SCOPE_SKIP_NAMES:
+        return True
+    if path in _SCOPE_SKIP_NAMES:
+        return True
+    if "path/to" in path or "或" in path:
+        return True
+    if "必须" in role and "建议" in role:
+        return True
+    return False
+
+
+def parse_scope(text: str) -> dict[str, Any]:
+    """Parse README 「涉及面」 table. checkout = must paths only (never cwd)."""
+    scope = empty_scope()
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^#{2,3}\s*涉及面", line):
+            start = i + 1
+            break
+    if start is None:
+        return scope
+    in_table = False
+    seen_checkout: set[str] = set()
+    for line in lines[start:]:
+        if re.match(r"^#{2,3}\s+", line):
+            break
+        if line.strip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if not cells:
+                continue
+            head = cells[0].lower()
+            if set(cells[0]) <= {"-", ":"} or head in {"逻辑库", "仓库", "库", "name", "repo"}:
+                in_table = True
+                continue
+            if not in_table:
+                continue
+            name = strip_md_link(cells[0]).strip("`")
+            path = strip_md_link(cells[1]).strip("`") if len(cells) > 1 else ""
+            role_raw = cells[2] if len(cells) > 2 else "必须"
+            if _is_placeholder_scope_row(name, path, role_raw):
+                continue
+            role = normalize_scope_role(role_raw) or "must"
+            logical = normalize_repo_path(path) if path else ""
+            if not logical:
+                continue
+            row = {"name": name, "path": logical, "role": role}
+            scope[role].append(row)
+            if role == "must" and logical not in seen_checkout:
+                seen_checkout.add(logical)
+                scope["checkout"].append(logical)
+        elif in_table and line.strip() == "":
+            break
+    return scope
 
 
 def read_readme_info(root: Path, task_root: Path) -> tuple[str, str, list[dict[str, str]]]:
@@ -463,6 +545,7 @@ def enrich_row(root: Path, row: TaskRow) -> TaskInfo | None:
         status=status,
         readme=rel_posix(root, readme),
         openspec=parse_openspec(text),
+        scope=parse_scope(text),
         index_path=rel_posix(root, index_path(root)) if index_path(root).exists() else "",
         updated=row.updated,
     )
@@ -921,7 +1004,7 @@ def scaffold_readme(
 
 | 逻辑库 | 路径 | 角色 |
 |--------|------|------|
-| （待补） | `.` 或 `path/to/repo` | 必须 / 建议 / 排除 |
+| （待补） | `path/to/repo`（仅工作区自身是目标时才写 `.`） | 必须 / 建议 / 排除 |
 
 ### 关联 OpenSpec
 
@@ -1088,6 +1171,119 @@ def repo_display_path(git_root_rel: str, file_path: str) -> str:
     return f"{base}/{fp}"
 
 
+def cwd_checkout_report(
+    root: Path,
+    cwd: Path | None,
+    target_abs: set[str],
+) -> dict[str, Any]:
+    """Report whether the current working repo is in the checkout set.
+
+    Unrelated cwd git roots must stay untouched.
+    """
+    start = (cwd or Path.cwd()).resolve()
+    git = find_git_root(start)
+    report: dict[str, Any] = {
+        "cwd": str(start),
+        "cwd_git_root": None,
+        "cwd_in_targets": False,
+        "cwd_untouched": True,
+    }
+    if git is None:
+        return report
+    git_abs = str(git.resolve())
+    try:
+        rel = rel_posix(root, git)
+        report["cwd_git_root"] = "." if rel in ("", ".") else rel
+    except ValueError:
+        report["cwd_git_root"] = git_abs
+    in_targets = git_abs in target_abs
+    report["cwd_in_targets"] = in_targets
+    report["cwd_untouched"] = not in_targets
+    return report
+
+
+def collect_prepare_repo_inputs(
+    root: Path, args: argparse.Namespace
+) -> tuple[list[str], dict[str, Any] | None]:
+    """`--from-task` supplies must-repos; `--repo` is explicit extra/override paths.
+
+    Never infers cwd or `.`. Empty checkout is a successful skip.
+    """
+    extras: dict[str, Any] = {}
+    raw: list[str] = list(args.repos or [])
+    if args.from_task:
+        infos = list_active_infos(root)
+        matches = match_query(infos, args.from_task)
+        if len(matches) != 1:
+            payload = {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "exit_markdown": exit_markdown(
+                    infos if not matches else matches, "prepare-branches"
+                ),
+            }
+            return [], payload
+        extras["from_task"] = matches[0].task_id
+        extras["from_task_checkout"] = list(matches[0].scope.get("checkout") or [])
+        raw.extend(extras["from_task_checkout"])
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw:
+        key = normalize_repo_path(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out, extras if extras else None
+
+
+def cmd_scope_repos(root: Path, args: argparse.Namespace) -> int:
+    infos = list_active_infos(root)
+    matches = match_query(infos, args.query)
+    if len(matches) != 1:
+        return emit(
+            {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "exit_markdown": exit_markdown(
+                    infos if not matches else matches, "scope-repos"
+                ),
+            },
+            code=2,
+        )
+    info = matches[0]
+    checkout = list(info.scope.get("checkout") or [])
+    target_abs: set[str] = set()
+    resolved = []
+    errors = []
+    for raw in checkout:
+        try:
+            repo_info = resolve_repo(root, raw)
+            target_abs.add(str(Path(repo_info["git_root_abs"]).resolve()))
+            resolved.append(repo_info)
+        except TaskError as e:
+            errors.append({"input": raw, "error": str(e)})
+    cwd = Path(args.cwd) if args.cwd else Path.cwd()
+    report = cwd_checkout_report(root, cwd, target_abs)
+    print(
+        f"scope-repos: {info.task_id} checkout={len(checkout)} cwd_untouched={report['cwd_untouched']}",
+        file=sys.stderr,
+    )
+    return emit(
+        {
+            "ok": not errors,
+            "result": "scope_repos",
+            "task": asdict(info),
+            "scope": info.scope,
+            "checkout": checkout,
+            "repos": resolved,
+            "errors": errors,
+            **report,
+        },
+        code=0 if not errors else 1,
+    )
+
+
 def cmd_repo_roots(root: Path, args: argparse.Namespace) -> int:
     repos = []
     errors = []
@@ -1116,11 +1312,43 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         raise TaskError(f"invalid prefix: {prefix}; expected one of {', '.join(VALID_BRANCH_PREFIXES)}")
     branch = f"{prefix}-{slug}"
 
+    raw_repos, extra = collect_prepare_repo_inputs(root, args)
+    if extra and extra.get("ok") is False:
+        return emit(extra, code=2)
+    if not raw_repos:
+        if not args.from_task:
+            raise TaskError(
+                "pass --repo for each must-modify git root, or --from-task; "
+                "do not default to cwd or `.`"
+            )
+        cwd = Path(args.cwd) if getattr(args, "cwd", None) else Path.cwd()
+        report = cwd_checkout_report(root, cwd, set())
+        print(
+            f"prepare-branches: {branch} — skipped (no must-modify repos)",
+            file=sys.stderr,
+        )
+        payload = {
+            "ok": True,
+            "result": "prepare_branches",
+            "branch": branch,
+            "prefix": prefix,
+            "slug": slug,
+            "dry_run": bool(args.dry_run),
+            "skipped": "no_target_repos",
+            "repos": [],
+            "errors": [],
+            "needs_user_confirm": False,
+            **(extra or {}),
+            **report,
+        }
+        return emit(payload)
+
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     seen: set[str] = set()
+    target_abs: set[str] = set()
 
-    for raw in args.repos:
+    for raw in raw_repos:
         try:
             info = resolve_repo(root, raw)
         except TaskError as e:
@@ -1140,6 +1368,7 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         if key in seen:
             continue
         seen.add(key)
+        target_abs.add(str(Path(info["git_root_abs"]).resolve()))
 
         repo = Path(info["git_root_abs"])
         entry: dict[str, Any] = {
@@ -1273,6 +1502,8 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         + (" (dry-run)" if args.dry_run else ""),
         file=sys.stderr,
     )
+    cwd = Path(args.cwd) if getattr(args, "cwd", None) else Path.cwd()
+    report = cwd_checkout_report(root, cwd, target_abs)
     payload: dict[str, Any] = {
         "ok": ok,
         "result": "prepare_branches",
@@ -1283,6 +1514,8 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         "repos": results,
         "errors": errors,
         "needs_user_confirm": needs_confirm,
+        **(extra or {}),
+        **report,
     }
     if needs_confirm:
         payload["exit_markdown"] = "\n".join(confirm_lines)
@@ -1786,7 +2019,7 @@ def build_parser() -> argparse.ArgumentParser:
     arch_p.set_defaults(func=cmd_archive)
 
     roots_p = sub.add_parser("repo-roots", help="resolve workspace-relative paths to unique git roots")
-    roots_p.add_argument("repos", nargs="+", help="workspace-relative git path (`.` = workspace)")
+    roots_p.add_argument("repos", nargs="+", help="workspace-relative git path (`.` = workspace itself, only if it is a target)")
     roots_p.add_argument(
         "--include-excluded",
         action="store_true",
@@ -1794,17 +2027,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     roots_p.set_defaults(func=cmd_repo_roots)
 
+    scope_p = sub.add_parser(
+        "scope-repos",
+        help="list 涉及面 repos; checkout = 必须 only (never cwd)",
+    )
+    scope_p.add_argument("query", help="TNNNN / slug / path")
+    scope_p.add_argument(
+        "--cwd",
+        default=None,
+        help="path whose git root is reported; not added to checkout",
+    )
+    scope_p.set_defaults(func=cmd_scope_repos)
+
     prep_p = sub.add_parser(
         "prepare-branches",
-        help="git safety check + create/checkout <prefix>-<slug> on target git repos",
+        help="git safety check + create/checkout <prefix>-<slug> on must-modify git repos only",
     )
     prep_p.add_argument("--slug", required=True, help="task slug (not TNNNN dirname)")
     prep_p.add_argument(
         "--repo",
         dest="repos",
         action="append",
-        required=True,
-        help="workspace-relative git path; repeatable (`.` = workspace)",
+        default=None,
+        help="must-modify git root (workspace-relative); repeatable. Do not pass cwd or `.` unless the workspace itself is a target",
+    )
+    prep_p.add_argument(
+        "--from-task",
+        default=None,
+        help="load checkout list from task README 涉及面 (role=必须 only); skip if empty",
+    )
+    prep_p.add_argument(
+        "--cwd",
+        default=None,
+        help="path whose git root is reported as cwd; never auto-checked-out",
     )
     prep_p.add_argument("--prefix", default="feat", help="feat|fix|chore|refactor")
     prep_p.add_argument("--base", default=None, help="base branch (default: origin/HEAD or main)")
