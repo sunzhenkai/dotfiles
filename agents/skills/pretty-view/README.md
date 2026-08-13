@@ -12,15 +12,22 @@
      ↓
   pretty-view（门卫）
      ↓ 推断或确认介质：HTML / Markdown
-  HTML 阅读页 → 内置准则（默认全宽；Read references/html-page.md）
-  HTML 公众号 / 显式 md→html → baoyu
-  HTML 幻灯片 → Read 某一个 vendor refer → 执行 → 用完即弃
+  HTML 先定形式：阅读页 / 公众号 / 幻灯片
+     阅读页 → 门 3.1 再路由，只 Read 一个第一方 .md
+       规格/对齐 → spec-to-readable-html
+       图解/对比 → html-artifact
+       技术文档 → html-doc
+       其余长文 → html-page（全宽）
+     公众号 / 显式 md→html → baoyu
+     幻灯片 → html-ppt（默认）或 html-slides（点名 reveal.js）
   Markdown → 内置准则，不加载 refer
 ```
 
+跨形式禁止静默切换（阅读页 ↛ baoyu / html-ppt），见 `SKILL.md`「切换门禁」。
+
 ## 2. 架构
 
-refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原样分发。它们不在 agent 的一级 skill 注册路径上，**不会独立触发**。`html-page.md` 是第一方阅读页说明；其余第三方快照一般不修改，升级走第 6 节。
+refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原样分发。**第一方阅读页 refer 必须是 `references/*.md`，禁止写成 `SKILL.md`**：Cursor 会递归发现嵌套 `SKILL.md` 并独立自动触发（baoyu 抢「html」就是这个洞）。vendor 目录里的 `SKILL.md` 仍有泄漏风险，门卫路由不得依赖「它们不会被触发」。`html-page.md` 与三份蒸馏稿是第一方；其余第三方快照一般不修改，升级走第 6 节。
 
 ## 3. 触发
 
@@ -32,24 +39,27 @@ refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原�
 |------|--------|
 | 门 1 · 收窄触发 | 日常写作被当成「展示」 |
 | 门 2 · 先定介质 | HTML/Markdown 猜错；未定介质就拖进大 refer |
-| 门 3 · HTML 再路由；阅读页默认内置全宽 | 上下文膨胀；ppt 与 slides 抢路由；阅读页误走 baoyu 窄栏 |
+| 门 3 · HTML 再路由 + 阅读页再路由 + 切换门禁 | 阅读页误走 baoyu/PPT；变体之间静默乱切；ppt 与 slides 抢路由 |
 | 门 4 · 产物不写进 references/；默认 `docs/pretty-view/` | 污染快照；落盘散落 |
 | 门 5 · 单介质；md→html 须显式说明 | 选 HTML 却先写 `.md` 再转 html、两份都留；把「阅读页」当成转换任务 |
 
-介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。** 阅读页默认直写全宽 HTML；baoyu 只用于公众号/微信或显式 md→html。默认只交 Markdown 或 HTML 其中一种。
+介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。** 阅读页按门 3.1 再路由后直写 HTML；baoyu 只用于公众号/微信或显式 md→html。默认只交 Markdown 或 HTML 其中一种。
 
-**主题**：同一项目同一 refer 尽量沿用（`.pretty-view.md` 或最近产物）；多主题路径（html-ppt / html-slides / baoyu）须给出推荐并确认，禁止静默乱换。阅读页默认 `stone-ink`，不必每次确认。**交付结尾**必须写明本次 reference 与主题。
+**主题**：同一项目同一 refer 尽量沿用（`.pretty-view.md` 或最近产物）；多主题路径（html-ppt / html-slides / baoyu）须给出推荐并确认，禁止静默乱换。阅读页变体各有默认主题，不必每次确认。**交付结尾**必须写明本次 reference 与主题。
 
 ## 5. refer / 生成路径清单（2026-08）
 
 | 路径 | 场景 | 来源 |
 |------|------|------|
-| `references/html-page.md` | 长文阅读页，**默认全宽直写 HTML** | 本仓库第一方（不是第三方 skill） |
+| `references/html-page.md` | 未再细分的长文阅读页，全宽直写 HTML | 本仓库第一方 |
+| `references/spec-to-readable-html.md` | 规格 / RFC / 对齐 / 可追溯阅读页 | 蒸馏自 `kemezz/spec-to-readable-html`（不 vendor SKILL.md） |
+| `references/html-artifact.md` | 图解 / 对比 / 可交互思考面 | 蒸馏自 `mesomya/html-artifact`（不 vendor SKILL.md） |
+| `references/html-doc.md` | 通用技术文档阅读页（组件化） | 蒸馏自 `jeffpoulton/html-doc` 公开摘要（上游仓未能拉取） |
 | `baoyu-markdown-to-html` | 公众号/微信排版；或用户**显式**把已有 md 转成带样式 HTML | `jimliu/baoyu-skills` |
-| `html-ppt` | 静态 HTML PPT（主题/布局/演讲者模式）；未点名 reveal.js 时的默认幻灯片 | `lewislulu/html-ppt-skill` |
+| `html-ppt` | 静态 HTML PPT；未点名 reveal.js 时的默认幻灯片 | `lewislulu/html-ppt-skill` |
 | `html-slides` | reveal.js 交互式幻灯片（CDN） | `claude-office-skills/skills` |
 
-commit 与审计说明见 `references/UPSTREAM.md`。`html-page.md` 不在上游清单里，改它即可，不要当成 vendor 快照。
+commit 与审计说明见 `references/UPSTREAM.md`。上表第一方 `.md` 不在 vendor 清单里，改它们即可。**不要**把蒸馏稿改成目录 + `SKILL.md`。
 
 Markdown 展示没有第三方 refer，走 `SKILL.md` 内置准则。
 
@@ -67,7 +77,7 @@ rm -rf "$AUDIT_DIR"
 scripts/agents/sync.sh all
 ```
 
-新增时同步改 `SKILL.md` 路由表与本文第 5 节。MIT License 中 `without limitation` 可能误报 `jailbreak_role`，对照 `UPSTREAM.md` 处理。不要把第一方 `html-page.md` 覆盖进 vendor 目录。
+新增时同步改 `SKILL.md` 路由表与本文第 5 节。MIT License 中 `without limitation` 可能误报 `jailbreak_role`，对照 `UPSTREAM.md` 处理。第一方阅读页 refer 用单文件 `.md` 蒸馏，不要 `cp -a` 成带 `SKILL.md` 的目录。
 
 ## 7. 默认落盘
 
@@ -87,6 +97,7 @@ scripts/agents/sync.sh all
 |----------|--------|
 | 门禁、介质推断、路由、主题、落盘、HTML/Markdown 准则、交付结尾 | `agents/skills/pretty-view/SKILL.md`，然后 `scripts/agents/sync.sh all` |
 | 全宽阅读页骨架 | `agents/skills/pretty-view/references/html-page.md`（第一方；改完同样 sync） |
+| 规格/对齐、图解、技术文档阅读页 | `references/spec-to-readable-html.md`、`html-artifact.md`、`html-doc.md`（第一方蒸馏；改完同样 sync） |
 | HTML 目录页生成 | `agents/skills/pretty-view/scripts/update-catalog.py`（随分发；改完同样 sync） |
 | catalog 脚本测试 | `python3 agents/skills/pretty-view/tests/test_update_catalog.py`（不随分发） |
 | 升级/新增/移除第三方 refer | 第 6 节 + 路由表 + 本文第 5 节 |

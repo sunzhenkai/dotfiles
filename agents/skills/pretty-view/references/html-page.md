@@ -1,10 +1,12 @@
 # 全宽 HTML 阅读页
 
-本文件是 pretty-view **第一方**说明，不是第三方 skill，不会独立触发。仅在介质已定为 HTML、形式为阅读页、且不走 baoyu / html-ppt / html-slides 时 Read。
+本文件是 pretty-view **第一方**说明，不是第三方 skill，**禁止**做成 `SKILL.md`。仅在介质已定为 HTML、形式为阅读页、且门 3.1 **未命中** `spec-to-readable-html` / `html-artifact` / `html-doc` 时 Read。
 
-**直写一个可打开的 `.html`。** 不要写临时 Markdown，不要加载 baoyu。落盘与索引仍走门卫 `SKILL.md`。
+**直写一个可打开的 `.html`。** 不要写临时 Markdown，不要加载 baoyu / html-ppt。落盘与索引仍走门卫 `SKILL.md`。
 
-主题名：`stone-ink`（本骨架 `:root` 的石色墨水 token）。同项目阅读页保持这套 token，不要每篇换色；用户要求换气质时再改。
+主题名：`stone-ink`。同项目阅读页保持这套 token，不要每篇换色；用户要求换气质时再改。
+
+规格对齐、图解对照、通用技术文档不要用本骨架顶掉对应变体。
 
 ## 布局合同
 

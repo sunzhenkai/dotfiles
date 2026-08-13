@@ -1,20 +1,20 @@
 ---
 id: pretty-view
 name: pretty-view
-description: 把文档、知识、报告、code review、方案等以优雅的 HTML 或 Markdown 展示。HTML 阅读页默认直写全宽页面（内置准则）；公众号或显式 md→html 才走 baoyu-markdown-to-html；PPT/slides 走 html-ppt / html-slides。默认只生成 Markdown 或 HTML 其中一种；把已有 md 转成 html 须用户显式说明。用户点名 pretty-view，或明确要求展示/呈现/做成漂亮的网页、阅读页、PPT、slides 时使用。普通写文档、写方案、做 code review 本身不要加载本 skill。
+description: 把文档、知识、报告、code review、方案等以优雅的 HTML 或 Markdown 展示。HTML 阅读页再路由：规格/对齐→spec-to-readable-html，图解/对比→html-artifact，技术文档→html-doc，其余→html-page（全宽）；公众号或显式 md→html 才走 baoyu-markdown-to-html；PPT/slides 走 html-ppt / html-slides。禁止把「出 HTML」当成 md→html 或 PPT。默认只生成 Markdown 或 HTML 其中一种。用户点名 pretty-view，或明确要求展示/呈现/做成漂亮的网页、阅读页、PPT、slides 时使用。普通写文档、写方案、做 code review 本身不要加载本 skill。
 ---
 
 # pretty-view（优雅展示门卫）
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
 
-本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML 阅读页：走内置 HTML 准则（**默认全宽**，直写 `.html`）；若公众号 / 显式 md→html / 幻灯片：再 Read `references/` 下某一个 refer skill；若 Markdown：走文末内置准则。**主题**在 refer 已定后选：同一项目同一 refer 尽量沿用，多主题路径须推荐并确认。**交付结尾**必须写明本次 reference 与主题。vendor refer 已随分发到位，**无需额外安装**；它们不在 agent 的 skill 注册路径上，不会被独立自动触发。
+本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML：先定形式（阅读页 / 公众号 / 幻灯片），阅读页再按「阅读页再路由」只 Read **一个**第一方 `.md`；公众号或显式 md→html 才 Read baoyu；幻灯片才 Read html-ppt / html-slides。若 Markdown：走文末内置准则。**主题**在 refer 已定后选：同一项目同一 refer 尽量沿用，多主题路径须推荐并确认。**交付结尾**必须写明本次 reference 与主题。vendor refer 已随分发到位；第一方阅读页 refer 是 `references/*.md`，**禁止**写成 `SKILL.md`（Cursor 会递归注册并抢触发）。
 
 ## 五道门禁
 
 1. **门 1 · 收窄触发**：仅在用户点名 `pretty-view`，或明确要**展示/呈现**（做成网页、阅读页、PPT、slides、漂亮的 Markdown）时使用。用户只是在写方案、写文档、做 code review，不要加载。
 2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按下方「介质推断」自动选择；**不明确时必须向用户确认，禁止猜测。** 介质未定时，禁止 Read `references/`。
-3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选路径。阅读页默认走内置 HTML 准则（Read `references/html-page.md`，**不要**加载 baoyu）。公众号 / 显式 md→html / 幻灯片才 Read 对应 vendor refer 的 `SKILL.md`。多条都沾边时再问用户。一次只 **Read** 一个；用完即弃。路径已定后按「主题」节选主题（一致优先，推荐后确认），未确认前不写文件。
+3. **门 3 · HTML 再路由**：介质为 HTML 后，先定**形式**，再定**阅读页变体**（见下表与「切换门禁」）。一次只 **Read** 一个 refer；用完即弃。路径已定后按「主题」节选主题，未确认前不写文件。**禁止**因为用户说了 `html` 就加载 baoyu 或 html-ppt。
 4. **门 4 · 产物不污染快照**：落盘规则见下节。**禁止**写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把 `assets/` 与所选模板拷到落盘目录，按相对路径引用。
 5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种（`INDEX.md` / `index.html` 是目录，不算正文）。选 HTML ≠ 先写一份 `.md` 再转 html 并两份都留。把已有 Markdown 转成 HTML 须显式说明，见「单介质与 md→html 强门禁」。
 
@@ -54,7 +54,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 | 用户意图 | 落盘 | 怎么生成 |
 |----------|------|----------|
-| 只要 HTML 阅读页（正文来自讨论 / 草稿，**没**说转 md、也不是公众号） | 只 `.html` | **直写 HTML**（内置准则，默认全宽）。禁止为转换写临时 md，禁止加载 baoyu |
+| 只要 HTML 阅读页（正文来自讨论 / 草稿，**没**说转 md、也不是公众号） | 只 `.html` | **直写 HTML**（阅读页再路由选变体）。禁止为转换写临时 md，禁止加载 baoyu / html-ppt |
 | 公众号 / 微信排版 | 只 `.html` | baoyu（窄栏是预期） |
 | 只要 Markdown | 只 `.md` 或对话 | **禁止**加载 baoyu，禁止生成 `.html` |
 | **显式** md→html | 只新增 `.html`；用户原有 `.md` 留在原处，**不复制**进 `docs/pretty-view/` | baoyu，用用户已有文件当 `<markdown_file>` |
@@ -64,11 +64,13 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 ## HTML 路由表（意图 → 路径）
 
-路径相对本 SKILL.md 所在目录。
+路径相对本 SKILL.md 所在目录。先定**形式**，阅读页再定**变体**。
+
+### 形式（门 3）
 
 | 用户意图 | 走哪 | 路径 |
 |----------|------|------|
-| 长文阅读页（只要 HTML）：文档、知识、报告、方案正文 | **内置 HTML 准则**（默认全宽，直写） | `references/html-page.md` |
+| 阅读页（给人滚着读的 HTML，不是 PPT、不是公众号） | 阅读页再路由（下一表） | `references/<变体>.md` |
 | 公众号 / 微信排版 | `baoyu-markdown-to-html` | `references/baoyu-markdown-to-html/SKILL.md` |
 | **显式**把已有 Markdown 转成带样式 HTML（须命中转换口令或点名已有 `.md`） | `baoyu-markdown-to-html` | `references/baoyu-markdown-to-html/SKILL.md` |
 | 静态 HTML PPT / 路演 / 分享会 / 演讲者模式 / 小红书图文（默认幻灯片） | `html-ppt` | `references/html-ppt/SKILL.md` |
@@ -77,24 +79,59 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 不要因为要出 HTML 就走 baoyu。baoyu 只服务公众号/微信，或用户显式 md→html。走 baoyu 时也不要再落一份 `.md`。
 
+### 阅读页再路由（门 3.1）
+
+仅当形式已是**阅读页**时使用。第一方 `.md`，**禁止**改名为 `SKILL.md`。直写 `.html`，不要先写源稿再转。
+
+| 用户意图（强信号） | 走哪 | 路径 | 主题 |
+|--------------------|------|------|------|
+| 规格、spec、RFC、PRD、需求、设计说明、问题对齐、可追溯、OpenAPI | `spec-to-readable-html` | `references/spec-to-readable-html.md` | `spec-paper` |
+| 图解、对比矩阵、时间线、架构图、可交互说明、视觉思考面 | `html-artifact` | `references/html-artifact.md` | `technical`（默认） |
+| 技术文档、给人读/打印的说明、要稳定文档组件 | `html-doc` | `references/html-doc.md` | `ink-paper` |
+| 其他长文 / 知识页 / 未再细分 | `html-page` | `references/html-page.md` | `stone-ink` |
+
+用户点名 refer 名 → 直接用。一条强信号命中 → 直接用，一句话告知。多条沾边 → 问，给 1 个推荐。都未命中 → `html-page`。
+
+### 切换门禁（禁止静默跨形式 / 跨变体）
+
+未改口时**禁止**下列切换。改口必须是用户明确说（点名 refer、点名 PPT/公众号、或否定当前路径）。
+
+| 当前 / 命中 | 禁止切到 | 除非用户 |
+|-------------|---------|----------|
+| 阅读页（含四变体） | baoyu | 要公众号/微信，或显式 md→html |
+| 阅读页 | `html-ppt` / `html-slides` | 要 PPT、路演、翻页、小红书图文 |
+| 幻灯片 | 任一阅读页 refer | 要文档/阅读页/不要翻页 |
+| 公众号 / md→html | 阅读页四变体或 PPT | 明确不要公众号栏 |
+| `spec-to-readable-html` | `html-artifact` / `html-doc` / `html-page` | 改口图解、通用技术文档、或普通长文 |
+| `html-artifact` | 规格对齐 / 通用文档骨架 / 全宽长文 | 改口 |
+| `html-doc` | 规格对齐 / 图解思考面 / PPT | 改口 |
+| `html-page` | 上面三变体 | 强信号已命中变体（此时应一开始就走变体，不要先 html-page 再改） |
+
+「生成一个问题对齐文档，html」→ 阅读页 + `spec-to-readable-html`，不是 baoyu，不是 `html-ppt`。
+「做好看的技术文档」→ 阅读页 + `html-doc`。
+「不要用 baoyu，直接用 html-ppt」→ 这才是改口到幻灯片。
+
 ### 内容类型 → 默认（仅当介质已定为 HTML、形式未说清）
 
 | 内容 | 默认 | 改口 |
 |------|------|------|
-| 文档 / 知识 / 长报告 / 方案（给人读） | 内置 HTML 准则（全宽） | 公众号/微信 → baoyu；汇报、路演、翻页 → `html-ppt` |
+| 规格 / 对齐 / RFC / 需求 / 设计说明 | `spec-to-readable-html` | 图解为主 → `html-artifact`；翻页 → `html-ppt` |
+| 图解 / 对比 / 时间线 / 可交互说明 | `html-artifact` | 规格溯源 → `spec-to-readable-html` |
+| 技术文档 / 给人读的说明 | `html-doc` | 规格对齐 / 图解 / 普通长文见上 |
+| 其他长文 / 知识 / 报告 / 方案（未再细分） | `html-page`（全宽） | 公众号 → baoyu；翻页 → `html-ppt` |
 | 方案答辩、技术分享、周报演示、pitch | `html-ppt` | 用户点名 reveal.js → `html-slides` |
 | code review | **默认走 Markdown**（PR 友好）；仅当用户要「给团队讲这次 review」才用 `html-ppt` | — |
 
-`html-ppt` 与 `html-slides` 都做幻灯片：**未点名 reveal.js 时默认 `html-ppt`**（自带主题/布局/演讲者模式，不依赖 reveal.js CDN）。两者都沾边时必须再问。
+`html-ppt` 与 `html-slides` 都做幻灯片：**未点名 reveal.js 时默认 `html-ppt`**。两者都沾边时必须再问。
 
 ### 加载 refer 时的约束
 
-- 内置阅读页：Read `references/html-page.md`（本仓库文件，**不是**第三方 skill）。按其骨架直写 `.html`。
-- `{baseDir}` = 被 Read 的那个 vendor refer 目录（含 `SKILL.md` 的那一层），不是当前 git 仓库根。
+- 阅读页四变体：只 Read 对应 `references/<name>.md`（第一方）。按其规则直写 `.html`。**不要**去搜同名 `SKILL.md`，不要安装上游 skill。
+- `{baseDir}` = 被 Read 的那个 vendor refer 目录（含 `SKILL.md` 的那一层），不是当前 git 仓库根。只适用于 baoyu / html-ppt / html-slides。
 - `baoyu-markdown-to-html` 仅用于公众号/微信或显式 md→html。若要求先跑 `baoyu-format-markdown`：本仓库未 vendor 该 skill，**跳过**，直接转换。脚本默认把 HTML 写在源 `.md` 同目录 → **转完立刻把 html 移到落盘路径**，不要把展示产物留在源旁或 `references/`。显式 md→html 时用用户已有文件，**不要**把源 md 复制进 `docs/pretty-view/`。主题由门卫按「主题」节确认；vendor EXTEND.md 的 `default_theme` 只当作推荐候选，不要静默跳过确认（用户已点名或项目 `.pretty-view.md` 已有默认且用户同意沿用除外）。
 - `html-ppt`：只 Read 其 `SKILL.md` 与按需的 `references/*.md`；主题/布局从 `assets/`、`templates/` 复制到落盘目录，不在快照里改模板。共享静态资源放到 `docs/pretty-view/_assets/`（已有则复用）。**主题已由门卫确认则跳过 vendor 里「再问一遍 36 主题」**，直接用已确认的名字。
 - `html-slides` 依赖 jsDelivr 上的 reveal.js；离线或用户禁止外链时改走 `html-ppt`，并说明原因。主题同样由门卫确认，不要再甩一遍 reveal 主题清单。
-- 不要修改 `references/` 里的第三方文件（`html-page.md` 除外）；升级走重新 vendor（见同目录 `README.md`）。
+- 不要修改 `references/` 里的第三方快照（第一方 `.md` 除外）；升级走重新 vendor（见同目录 `README.md`）。
 
 ## 主题（一致优先，推荐后确认）
 
@@ -113,7 +150,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 | 用户已点名主题 | 直接用 |
 | `.pretty-view.md` 或同 refer 近期产物已有主题 | **推荐沿用**，一句话确认（「沿用 `tokyo-night`？」） |
 | 以上都没有 | 给 **1 个推荐** + 至多 2 个备选（按下表），确认后再写文件 |
-| 该路径只有一种外观（`html-page` / 内置 Markdown） | 沿用默认，不必每次确认；用户要换气质时再确认 |
+| 该路径只有一种外观或已有默认视觉系统（`html-page` / `spec-to-readable-html` / `html-doc` / `html-artifact` 默认 `technical` / 内置 Markdown） | 沿用默认，不必每次确认；用户要换气质时再确认 |
 
 未确认前不写文件（可与落盘路径确认合并）。
 
@@ -121,7 +158,10 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 | 路径 | 默认推荐 | 备选（最多再列 2 个） |
 |------|----------|------------------------|
-| 内置阅读页 `html-page` | `stone-ink`（骨架 `:root` token） | 仅用户要求换气质时改 token |
+| 内置阅读页 `html-page` | `stone-ink` | 仅用户要求换气质时改 token |
+| `spec-to-readable-html` | `spec-paper` | 仅换 token，不换路径 |
+| `html-artifact` | `technical` | `editorial` / `operational` |
+| `html-doc` | `ink-paper` | 只改 `--accent` 色相 |
 | `baoyu-markdown-to-html` | `simple` | `grace`（优雅）/ `modern`（活泼） |
 | `html-ppt` | 技术分享 `tokyo-night`；正式汇报 `corporate-clean`；学术报告 `academic-paper`；小红书 `xiaohongshu-white` | 不要把 36 个都甩给用户；细节见 html-ppt `references/themes.md` |
 | `html-slides` | 技术分享 `night`；日间/文档 `white` | `black` / `serif` / `moon` |
@@ -142,7 +182,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 | kind | 用于 |
 |------|------|
-| `articles` | 长文阅读页（默认全宽 HTML；公众号才 baoyu） |
+| `articles` | 长文阅读页（变体见门 3.1；公众号才 baoyu） |
 | `knowledge` | 知识整理 |
 | `reports` | 报告 |
 | `proposals` | 方案 |
@@ -217,17 +257,22 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 ## 偏好
 
 - 默认介质：
-- 默认 HTML 形式：阅读页（全宽） / 幻灯片 / 公众号
+- 默认 HTML 形式：阅读页（`html-page` / `spec-to-readable-html` / `html-artifact` / `html-doc`） / 幻灯片 / 公众号
 - 默认主题（同一 refer 保持一致）：
   - html-page：stone-ink
+  - spec-to-readable-html：spec-paper
+  - html-artifact：technical
+  - html-doc：ink-paper
   - baoyu-markdown-to-html：
   - html-ppt：
   - html-slides：
 ```
 
-## 内置 HTML 准则（阅读页默认）
+## 内置 HTML 准则（`html-page` 兜底）
 
-介质为 HTML、形式为阅读页、且**不是**公众号/微信、也**不是**显式 md→html 时使用。生成前 Read `references/html-page.md`。**直写 `.html`。** 主题名 `stone-ink`，同项目阅读页保持这套 token。
+仅当形式为阅读页、且门 3.1 **未命中**另外三个变体时使用。生成前 Read `references/html-page.md`。**直写 `.html`。** 主题名 `stone-ink`。
+
+规格对齐、图解对照、通用技术文档不要用本节顶掉变体 refer。全宽合同只约束 `html-page`，不要强加给 `spec-to-readable-html`（文档栏+TOC）或 `html-doc`（正文栏）。
 
 ### 默认全宽
 
@@ -246,7 +291,8 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 ### 反例
 
 - 先写 `.md` 再 baoyu 转阅读页（除非用户显式 md→html 或要公众号）。
-- 紫渐变 + Inter 灰卡片；居中窄栏冒充全宽。
+- 阅读页任务加载 baoyu / html-ppt。
+- 紫渐变 + Inter 灰卡片；居中窄栏冒充全宽（仅 `html-page`）。
 
 ## 内置 Markdown 准则（兜底）
 
@@ -282,8 +328,8 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 
 ## 边界
 
-- 不自动触发普通写作/评审；HTML 一次只走一条路径（内置阅读页 **或** 一个 vendor refer）；**不修改** `references/` 下的第三方快照。
-- 阅读页默认全宽直写 HTML；md→html 与公众号才走 baoyu（见「单介质与 md→html 强门禁」）。
+- 不自动触发普通写作/评审；HTML 一次只走一条路径（一个阅读页变体 **或** 一个 vendor refer）；**不修改** `references/` 下的第三方快照。第一方阅读页 refer 必须是 `.md`，禁止 `SKILL.md`。
+- 阅读页按门 3.1 再路由；md→html 与公众号才走 baoyu；PPT 才走 html-ppt。见「切换门禁」。
 - 默认只生成 Markdown / HTML 其中一种。
 - 不把密钥、内部 URL、公司代码贴进可公开的 HTML/PPT。
 - 本 skill 不替代内容创作 skill；输入应是已有草稿、仓库文件或本轮已生成的正文。
@@ -303,7 +349,10 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 
 | 路径 | `reference` 怎么写 | `主题` 怎么写 |
 |------|-------------------|---------------|
-| 内置阅读页 | `html-page` | `stone-ink` |
+| 全宽长文 | `html-page` | `stone-ink` |
+| 规格 / 对齐 | `spec-to-readable-html` | `spec-paper` |
+| 图解 / 对照 | `html-artifact` | `technical` / `editorial` / `operational` |
+| 通用技术文档 | `html-doc` | `ink-paper` |
 | 公众号 / 显式 md→html | `baoyu-markdown-to-html` | 实际 `--theme` 名（如 `simple`） |
 | 静态 PPT | `html-ppt` | 实际主题文件名（如 `tokyo-night`） |
 | reveal.js | `html-slides` | 实际 reveal 主题（如 `night`） |

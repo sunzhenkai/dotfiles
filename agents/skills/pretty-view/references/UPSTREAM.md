@@ -1,6 +1,6 @@
 # references/ 上游快照清单
 
-vendor 日期：2026-08-13。升级流程见 `../README.md`。第三方快照不要直接修改。`html-page.md` 是本仓库第一方阅读页说明（默认全宽），不在上表，改它即可。
+vendor 日期：2026-08-13。升级流程见 `../README.md`。第三方快照不要直接修改。第一方阅读页说明（`html-page.md`、`spec-to-readable-html.md`、`html-artifact.md`、`html-doc.md`）不在 vendor 表，改它们即可；**禁止**改成带 `SKILL.md` 的目录。
 
 | 目录 | 上游仓库 | 上游路径 | commit |
 |------|----------|----------|--------|
@@ -8,7 +8,17 @@ vendor 日期：2026-08-13。升级流程见 `../README.md`。第三方快照不
 | html-ppt | lewislulu/html-ppt-skill | 仓库根（skill 即仓库） | f3a8435d3901697d5ac5e64d356c933637e43107 |
 | html-slides | claude-office-skills/skills | html-slides | 9c4c7d5cd2813a8936bf2c9fdb174ea883b85a11 |
 
-审计：vendor 前均跑 `agents/skills/skills-store/scripts/audit-skill.sh`。
+## 第一方蒸馏（非快照）
+
+蒸馏日期：2026-08-13。只吸收规则，不拷贝上游 `SKILL.md`（避免 Cursor 递归注册）。
+
+| 文件 | 上游 | 对照 commit / 说明 | 审计 |
+|------|------|---------------------|------|
+| `spec-to-readable-html.md` | kemezz/spec-to-readable-html | `ff57433e7d1b2ed068511746426c30ed14e6fd29`；语言覆盖为 zh-CN | MIT `without limitation` 误报 `jailbreak_role`（同 html-ppt） |
+| `html-artifact.md` | mesomya/html-artifact | `3948b97cec0860f180af6e7ef472a3d750193d35` | 同上 MIT 误报 |
+| `html-doc.md` | jeffpoulton/html-doc | 仓库 404 / 需认证，未能 clone；按 skills.sh 公开 SKILL 摘要重写 token 与组件，**无上游 CSS 原文** | 未跑本地审计 |
+
+审计脚本：`agents/skills/skills-store/scripts/audit-skill.sh`。vendor 前均跑。
 
 - `baoyu-markdown-to-html`、`html-slides`：通过，无 findings。
 - `html-ppt`：1 项 BLOCK 为误报——`LICENSE` 第 7 行 MIT 原文 `without limitation` 命中 `jailbreak_role`（「without … limit」）。9 项 WARN：`localStorage` 命中 `browser_session`（演讲者窗口记住卡片布局，非窃取会话）；`scripts/*.sh` 被 `file` 判为 executable（正常 shell 脚本）。
