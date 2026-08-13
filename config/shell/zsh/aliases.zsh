@@ -92,6 +92,9 @@ alias arcl='arc land --onto main'
 # codex
 alias cx='codex --dangerously-bypass-approvals-and-sandbox'
 
+# kiro-cli
+alias kiroc='kiro-cli chat --trust-all-tools'
+
 # others
 alias rmf='rm -f'
 
