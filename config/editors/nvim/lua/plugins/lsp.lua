@@ -3,6 +3,11 @@ return {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
+        -- 默认 single-file：不用 .git 当 root，避免 ~/work 这类巨型库全量扫 md 超时。
+        -- 需要跨文件 wiki/引用时，在该笔记库根目录放 .marksman.toml 即可。
+        marksman = {
+          root_markers = { ".marksman.toml" },
+        },
         gopls = {
           settings = {
             gopls = {
