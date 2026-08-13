@@ -38,6 +38,8 @@ refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原�
 
 介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。** 阅读页默认直写全宽 HTML；baoyu 只用于公众号/微信或显式 md→html。默认只交 Markdown 或 HTML 其中一种。
 
+**主题**：同一项目同一 refer 尽量沿用（`.pretty-view.md` 或最近产物）；多主题路径（html-ppt / html-slides / baoyu）须给出推荐并确认，禁止静默乱换。阅读页默认 `stone-ink`，不必每次确认。**交付结尾**必须写明本次 reference 与主题。
+
 ## 5. refer / 生成路径清单（2026-08）
 
 | 路径 | 场景 | 来源 |
@@ -83,7 +85,7 @@ scripts/agents/sync.sh all
 
 | 要做什么 | 改哪里 |
 |----------|--------|
-| 门禁、介质推断、路由、落盘、HTML/Markdown 准则 | `agents/skills/pretty-view/SKILL.md`，然后 `scripts/agents/sync.sh all` |
+| 门禁、介质推断、路由、主题、落盘、HTML/Markdown 准则、交付结尾 | `agents/skills/pretty-view/SKILL.md`，然后 `scripts/agents/sync.sh all` |
 | 全宽阅读页骨架 | `agents/skills/pretty-view/references/html-page.md`（第一方；改完同样 sync） |
 | HTML 目录页生成 | `agents/skills/pretty-view/scripts/update-catalog.py`（随分发；改完同样 sync） |
 | catalog 脚本测试 | `python3 agents/skills/pretty-view/tests/test_update_catalog.py`（不随分发） |

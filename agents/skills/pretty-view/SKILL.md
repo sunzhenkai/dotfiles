@@ -8,13 +8,13 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
 
-本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML 阅读页：走内置 HTML 准则（**默认全宽**，直写 `.html`）；若公众号 / 显式 md→html / 幻灯片：再 Read `references/` 下某一个 refer skill；若 Markdown：走文末内置准则。vendor refer 已随分发到位，**无需额外安装**；它们不在 agent 的 skill 注册路径上，不会被独立自动触发。
+本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML 阅读页：走内置 HTML 准则（**默认全宽**，直写 `.html`）；若公众号 / 显式 md→html / 幻灯片：再 Read `references/` 下某一个 refer skill；若 Markdown：走文末内置准则。**主题**在 refer 已定后选：同一项目同一 refer 尽量沿用，多主题路径须推荐并确认。**交付结尾**必须写明本次 reference 与主题。vendor refer 已随分发到位，**无需额外安装**；它们不在 agent 的 skill 注册路径上，不会被独立自动触发。
 
 ## 五道门禁
 
 1. **门 1 · 收窄触发**：仅在用户点名 `pretty-view`，或明确要**展示/呈现**（做成网页、阅读页、PPT、slides、漂亮的 Markdown）时使用。用户只是在写方案、写文档、做 code review，不要加载。
 2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按下方「介质推断」自动选择；**不明确时必须向用户确认，禁止猜测。** 介质未定时，禁止 Read `references/`。
-3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选路径。阅读页默认走内置 HTML 准则（Read `references/html-page.md`，**不要**加载 baoyu）。公众号 / 显式 md→html / 幻灯片才 Read 对应 vendor refer 的 `SKILL.md`。多条都沾边时再问用户。一次只 **Read** 一个；用完即弃。
+3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选路径。阅读页默认走内置 HTML 准则（Read `references/html-page.md`，**不要**加载 baoyu）。公众号 / 显式 md→html / 幻灯片才 Read 对应 vendor refer 的 `SKILL.md`。多条都沾边时再问用户。一次只 **Read** 一个；用完即弃。路径已定后按「主题」节选主题（一致优先，推荐后确认），未确认前不写文件。
 4. **门 4 · 产物不污染快照**：落盘规则见下节。**禁止**写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把 `assets/` 与所选模板拷到落盘目录，按相对路径引用。
 5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种（`INDEX.md` / `index.html` 是目录，不算正文）。选 HTML ≠ 先写一份 `.md` 再转 html 并两份都留。把已有 Markdown 转成 HTML 须显式说明，见「单介质与 md→html 强门禁」。
 
@@ -91,10 +91,41 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 - 内置阅读页：Read `references/html-page.md`（本仓库文件，**不是**第三方 skill）。按其骨架直写 `.html`。
 - `{baseDir}` = 被 Read 的那个 vendor refer 目录（含 `SKILL.md` 的那一层），不是当前 git 仓库根。
-- `baoyu-markdown-to-html` 仅用于公众号/微信或显式 md→html。若要求先跑 `baoyu-format-markdown`：本仓库未 vendor 该 skill，**跳过**，直接转换。脚本默认把 HTML 写在源 `.md` 同目录 → **转完立刻把 html 移到落盘路径**，不要把展示产物留在源旁或 `references/`。显式 md→html 时用用户已有文件，**不要**把源 md 复制进 `docs/pretty-view/`。
-- `html-ppt`：只 Read 其 `SKILL.md` 与按需的 `references/*.md`；主题/布局从 `assets/`、`templates/` 复制到落盘目录，不在快照里改模板。共享静态资源放到 `docs/pretty-view/_assets/`（已有则复用）。
-- `html-slides` 依赖 jsDelivr 上的 reveal.js；离线或用户禁止外链时改走 `html-ppt`，并说明原因。
+- `baoyu-markdown-to-html` 仅用于公众号/微信或显式 md→html。若要求先跑 `baoyu-format-markdown`：本仓库未 vendor 该 skill，**跳过**，直接转换。脚本默认把 HTML 写在源 `.md` 同目录 → **转完立刻把 html 移到落盘路径**，不要把展示产物留在源旁或 `references/`。显式 md→html 时用用户已有文件，**不要**把源 md 复制进 `docs/pretty-view/`。主题由门卫按「主题」节确认；vendor EXTEND.md 的 `default_theme` 只当作推荐候选，不要静默跳过确认（用户已点名或项目 `.pretty-view.md` 已有默认且用户同意沿用除外）。
+- `html-ppt`：只 Read 其 `SKILL.md` 与按需的 `references/*.md`；主题/布局从 `assets/`、`templates/` 复制到落盘目录，不在快照里改模板。共享静态资源放到 `docs/pretty-view/_assets/`（已有则复用）。**主题已由门卫确认则跳过 vendor 里「再问一遍 36 主题」**，直接用已确认的名字。
+- `html-slides` 依赖 jsDelivr 上的 reveal.js；离线或用户禁止外链时改走 `html-ppt`，并说明原因。主题同样由门卫确认，不要再甩一遍 reveal 主题清单。
 - 不要修改 `references/` 里的第三方文件（`html-page.md` 除外）；升级走重新 vendor（见同目录 `README.md`）。
+
+## 主题（一致优先，推荐后确认）
+
+主题在 **refer / 路径已定** 之后选。未定路径不谈主题。介质、路径、主题能一次问清就合并，不要拆成多轮。
+
+### 一致
+
+同一项目、同一 refer：优先沿用 `.pretty-view.md` 里该 refer 的默认主题，其次沿用该 refer 最近一次产物。不要每篇换一套。用户点名换主题才换。
+
+### 推荐并确认
+
+生成前必须有明确主题。禁止从一长串主题里静默随机挑。
+
+| 情况 | 做法 |
+|------|------|
+| 用户已点名主题 | 直接用 |
+| `.pretty-view.md` 或同 refer 近期产物已有主题 | **推荐沿用**，一句话确认（「沿用 `tokyo-night`？」） |
+| 以上都没有 | 给 **1 个推荐** + 至多 2 个备选（按下表），确认后再写文件 |
+| 该路径只有一种外观（`html-page` / 内置 Markdown） | 沿用默认，不必每次确认；用户要换气质时再确认 |
+
+未确认前不写文件（可与落盘路径确认合并）。
+
+### 无项目偏好时的推荐
+
+| 路径 | 默认推荐 | 备选（最多再列 2 个） |
+|------|----------|------------------------|
+| 内置阅读页 `html-page` | `stone-ink`（骨架 `:root` token） | 仅用户要求换气质时改 token |
+| `baoyu-markdown-to-html` | `simple` | `grace`（优雅）/ `modern`（活泼） |
+| `html-ppt` | 技术分享 `tokyo-night`；正式汇报 `corporate-clean`；学术报告 `academic-paper`；小红书 `xiaohongshu-white` | 不要把 36 个都甩给用户；细节见 html-ppt `references/themes.md` |
+| `html-slides` | 技术分享 `night`；日间/文档 `white` | `black` / `serif` / `moon` |
+| 内置 Markdown | 无主题；沿用仓库已有 md 风格 | — |
 
 ## 落盘（默认 `docs/pretty-view/`）
 
@@ -149,7 +180,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 1. 先改 `INDEX.md`：**每个包或每个单文件只一行**（首次不存在则创建）。类型用上表 kind。多文件包的路径指向主文件 `…/<slug>/index.html`，不要为包内附属页各加一行。
 2. 只要树里存在任意 HTML 产物（不含 `_assets/`、不含根上这份 catalog）：立刻跑 catalog 脚本，**禁止手写/重设计** `index.html`。
 3. 仅 Markdown、树里没有任何 HTML 时：不创建 `index.html`。删掉最后一篇 HTML 后同样跑脚本（脚本会去掉 catalog，避免指向空页）。
-4. 交付 HTML 时把 `docs/pretty-view/index.html` 当作入口告诉用户；单篇/主文件路径可以附上，但不能只给单篇、也不能罗列包内每一页。
+4. 交付 HTML 时把 `docs/pretty-view/index.html` 当作入口告诉用户；单篇/主文件路径可以附上，但不能只给单篇、也不能罗列包内每一页。面向用户的**最后一段**必须报本次 reference 与主题（见文末「交付结尾」）。
 
 ```bash
 python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
@@ -172,26 +203,31 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 
 ## 项目记录：`.pretty-view.md`（可选）
 
-项目根的 `.pretty-view.md` 是给人看的偏好记录，不是路由依据。不存在时不主动创建；用户要求，或某 refer 首次成功使用后征得同意再写。只记元信息，不写密钥。
+项目根的 `.pretty-view.md` 是给人看的偏好记录，不是路由依据。不存在时不主动创建；用户要求，或某 refer 首次成功使用后征得同意再写。只记元信息，不写密钥。记下本次主题，便于同一 refer 下次沿用。
 
 ```markdown
 # pretty-view — <项目名>
 
 ## 使用记录
 
-| 日期 | 介质 | refer skill | 用于 | 效果/笔记 |
-|------|------|-------------|------|-----------|
-| 2026-08-13 | HTML | html-ppt | 技术方案分享 | tokyo-night 合适 |
+| 日期 | 介质 | refer skill | 主题 | 用于 | 效果/笔记 |
+|------|------|-------------|------|------|-----------|
+| 2026-08-13 | HTML | html-ppt | tokyo-night | 技术方案分享 | 合适 |
 
 ## 偏好
 
 - 默认介质：
 - 默认 HTML 形式：阅读页（全宽） / 幻灯片 / 公众号
+- 默认主题（同一 refer 保持一致）：
+  - html-page：stone-ink
+  - baoyu-markdown-to-html：
+  - html-ppt：
+  - html-slides：
 ```
 
 ## 内置 HTML 准则（阅读页默认）
 
-介质为 HTML、形式为阅读页、且**不是**公众号/微信、也**不是**显式 md→html 时使用。生成前 Read `references/html-page.md`。**直写 `.html`。**
+介质为 HTML、形式为阅读页、且**不是**公众号/微信、也**不是**显式 md→html 时使用。生成前 Read `references/html-page.md`。**直写 `.html`。** 主题名 `stone-ink`，同项目阅读页保持这套 token。
 
 ### 默认全宽
 
@@ -240,7 +276,7 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 
 ### 落点
 
-- 只要对话里看 → 直接输出 Markdown，不落盘。
+- 只要对话里看 → 直接输出 Markdown，不落盘。回复**最后一段**仍须报 reference 与主题（`markdown` / `—`）。
 - 需要落盘 → 走「落盘」节（默认 `docs/pretty-view/`，维护 INDEX.md；有 HTML 时再维护 index.html）。
 - 默认不同时落盘 `.md` 与 `.html`。仅当用户**显式**要求保留源稿时才并存；并存时 Markdown 是源、HTML 是生成物，不要两套手改正文。
 
@@ -252,3 +288,25 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 - 不把密钥、内部 URL、公司代码贴进可公开的 HTML/PPT。
 - 本 skill 不替代内容创作 skill；输入应是已有草稿、仓库文件或本轮已生成的正文。
 - 大改已有展示页/deck 前，先说明会动哪些文件。
+- 主题：同一 refer 保持一致；多主题路径须推荐并确认，禁止静默乱换。
+- 面向用户的回复**最后一段**必须说明本次 reference 与主题。
+
+## 交付结尾（MUST）
+
+生成完成（或只在对话给出展示）后，面向用户的**最后一段**写清本次用了哪个 reference、哪个主题。不要只埋在 HTML 注释里。格式固定：
+
+```
+本次使用
+- reference: html-ppt
+- 主题: tokyo-night（沿用项目偏好）
+```
+
+| 路径 | `reference` 怎么写 | `主题` 怎么写 |
+|------|-------------------|---------------|
+| 内置阅读页 | `html-page` | `stone-ink` |
+| 公众号 / 显式 md→html | `baoyu-markdown-to-html` | 实际 `--theme` 名（如 `simple`） |
+| 静态 PPT | `html-ppt` | 实际主题文件名（如 `tokyo-night`） |
+| reveal.js | `html-slides` | 实际 reveal 主题（如 `night`） |
+| 内置 Markdown | `markdown`（内置准则） | `—` |
+
+沿用偏好时在主题后加「（沿用项目偏好）」；用户本轮点名的则加「（用户指定）」。换主题后若已有 `.pretty-view.md`，征得同意再改默认主题。
