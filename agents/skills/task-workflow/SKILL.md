@@ -1,0 +1,263 @@
+---
+id: task-workflow
+name: task-workflow
+description: 跟踪一次需求交付（new/explore/design?/propose/apply/archive）；task-* 家族入口。在用户要立项、跟进需求任务、把 OpenSpec change 与交付生命周期串起来时使用。复杂任务可在 explore 之后走可选的 task-design。
+---
+
+# 任务工作流
+
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
+
+`task-*` 命令的共享执行细节（SSOT）。各 `{{slash:task-new}}` 等 command 仅为薄壳，**MUST** 先读本 skill 再执行对应「各命令职责」小节。
+
+推荐链路：
+
+```
+task-new → task-explore? → task-design? → task-propose → task-apply → task-archive
+```
+
+`task-design` 为**可选**环节：新子系统、多方案权衡、跨模块契约时用；范围局部且路径唯一则可跳过，explore 后直接 propose。设计方法见 skill `task-design`；本 skill 管 Gate、`design/` 落盘与归档晋升。
+
+`tasks/` 与 `openspec/changes/` 为并行容器：tasks 跟踪交付生命周期，OpenSpec 承载可验证契约；互不替代。task 侧通过委托 `openspec-explore` / `openspec-propose` / `openspec-apply-change` / `openspec-archive-change`（若已安装对应 skill；否则用 `openspec` CLI 与仓库 `openspec/` 约定完成同等步骤）完成契约工作。
+
+## taskctl（优先）
+
+机械步骤 **MUST** 走 CLI，避免手改 `tasks/INDEX.md` 表格或多轮猜测解析。脚本与本 `SKILL.md` 同级，位于 `scripts/taskctl.py`：
+
+```bash
+python3 <this-skill>/scripts/taskctl.py <cmd> ...
+```
+
+`<this-skill>` 是包含本 `SKILL.md` 的目录（安装后常见于 `~/.cursor/skills/task-workflow/` 或项目 `.cursor/skills/task-workflow/`）。**不要**假设脚本在当前仓库根下。
+
+| 子命令 | 用途 | 退出码 |
+|--------|------|--------|
+| `list` | 列出活跃任务（JSON） | 0 |
+| `resolve [query] --command <cmd> [--hint ...] [--cwd ...] [--git-branch ...]` | Task Resolution Gate；无 query 时自动推断 | 0 确定性唯一；**2** 零/多命中/需确认 |
+| `set-status <query> <status>` | 同步写 README status + INDEX 行 | 0 / 2 |
+| `new --slug <slug> [--title ...] [--date YYYY-MM-DD]` | 分配 `TNNNN`、建目录与 README 骨架、更新 INDEX | 0 |
+| `archive <query> [--allow-missing-changes]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
+| `repo-roots <path> [...]` | 解析为去重后的 git 根（工作区相对路径；`.` = 工作区自身） | 0 / 1 |
+| `prepare-branches --slug <slug> --repo <path>` | dirty 门禁 + `fetch`/基线/`checkout -b <prefix>-<slug>` | 0 / 1 |
+| `git-summary --repo <path> [--branch ...] [--base ...]` | 只读 log/diff，产出 `changes.md` 素材（含 `markdown`） | 0 / 1 |
+
+- stdout：**仅 JSON**（`ok` / `result` / `task` 或 `exit_markdown`）。
+- stderr：一行人读摘要（如「当前任务：T0002 — path」）。
+- `resolve`/`set-status`/`archive` 在零/多命中或 `needs_confirm` 时打印 `exit_markdown`，**中止主流程**，等待用户选择。
+- `new` 只建骨架；概述/现状缺口/涉及面/验收等正文仍由 Agent 填写。
+- `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。
+- `prepare-branches`：写代码前 **MUST** 先跑；解析**远端默认分支**（`origin/HEAD`，未必是 main/master）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b <prefix>-<slug>`。`--repo` 为工作区相对 git 路径（单仓用 `.`；多仓重复 `--repo`）。脏仓 / pull 失败 → `needs_user_confirm` + `user_actions` + `exit_markdown`，**停下来让用户确认**；仅用户明确同意后才可 `--skip-dirty`。已在目标分支则跳过；支持 `--dry-run`；不 `push`；禁止擅自 `stash`/`reset --hard`/`checkout -f`。
+- `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区。
+- 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。
+
+## 任务编号与索引
+
+SSOT：`tasks/INDEX.md`（由 `taskctl` 维护；勿手搓表格除非 CLI 不可用）。
+
+### 编号
+
+- 格式：`T` + 四位数字，如 `T0001`（大小写不敏感，规范化为大写 `T` + 零填充）
+- 分配：`taskctl new` 读取 INDEX frontmatter `next_id`，分配后 `next_id += 1`
+- 快捷指定：后续命令可用 `T0001` 唯一命中任务（优先于 slug）
+
+### 目录
+
+- 活跃：`tasks/YYYY-MM-DD/TNNNN-<slug>/`
+- 归档：`tasks/archive/YYYY-MM-DD-TNNNN-<slug>/`（日期取自原活跃目录的创建日）
+- `<slug>`：kebab-case，全小写，仅字母、数字、连字符
+- 遗留无编号目录（仅 `<slug>`）仍可通过 INDEX 登记的 ID 或 slug 解析；**新任务 MUST 使用带编号目录名**
+
+### INDEX.md
+
+frontmatter：
+
+```yaml
+---
+next_id: 3
+---
+```
+
+正文维护两张表（活跃 / 已归档）。
+每次 `{{slash:task-new}}`、status 变更、`{{slash:task-archive}}` MUST 经 `taskctl` 更新 INDEX。
+
+## Task Resolution Gate
+
+除 `{{slash:task-new}}` 外，所有 task command **第一步 MUST** 调用 `resolve`。有编号/路径时传入 query；**未指定时省略 query 并带上下文做自动推断**：
+
+```bash
+# 显式
+python3 <this-skill>/scripts/taskctl.py resolve <TNNNN|slug|path> --command <当前命令名>
+
+# 未指定：自动推断（把用户原话放进 --hint）
+python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令名> \
+  --hint "<用户消息原文>" [--cwd "$PWD"] [--git-branch "<当前分支>"]
+```
+
+- 退出码 **0**（`result=unique`，`confidence=deterministic`）：继续主流程。
+- 退出码 **2**：输出 `exit_markdown` 并**中止**；`needs_confirm` 时列出候选，**等用户选择编号**后再继续。不得写 task 文档、委托 OpenSpec 写操作、建分支或移动目录。
+
+### 解析 / 推断优先级（由 taskctl 实现）
+
+**显式 query（确定性）**
+
+1. 任务编号 `T0001`
+2. `TNNNN-<slug>` / `<slug>` / `tasks/<date>/.../`
+
+**无 query 时自动推断**
+
+| 优先级 | 来源 | 置信度 | 行为 |
+|--------|------|--------|------|
+| 1 | 仅 1 个活跃 task（`sole_active`） | deterministic | 直接采用 |
+| 2 | `--hint` 中的 `TNNNN` / `tasks/...` 路径（唯一） | deterministic | 直接采用 |
+| 3 | `--cwd` 落在某活跃 task 目录下 | deterministic | 直接采用 |
+| 4 | `--git-branch` 形如 `feat-<slug>` 且唯一命中 | deterministic | 直接采用 |
+| 5 | 按命令偏好 status（如 apply→`in_progress`/`proposed`） | heuristic | **needs_confirm** |
+| 6 | 最新创建日 / 更新日排序 | heuristic | **needs_confirm** |
+
+- heuristic（非确定性）无论候选 1 个还是多个，都 **MUST** 让用户确认/选择。
+- **禁止**仅凭模糊对话印象或 OpenSpec change 名在未跑 `resolve` 的情况下擅自选定 task。
+
+## README status
+
+| status | 含义 | 写入方 |
+|--------|------|--------|
+| `draft` | 已创建 | task-new / `taskctl new` |
+| `exploring` | 方案探索中 | task-explore → `taskctl set-status` |
+| `designed` | 已有 task 内设计文档 | task-design → `taskctl set-status` |
+| `proposed` | 已有关联 OpenSpec change | task-propose → `taskctl set-status` |
+| `in_progress` | 实施中 | task-apply → `taskctl set-status` |
+| `blocked` | 有阻塞项 | task-apply → `taskctl set-status` |
+| `archived` | 已归档 | task-archive → `taskctl archive` |
+
+缺 status 时 Gate 视为 `draft`。状态以 README 为准；INDEX 经 `set-status`/`archive` 对齐。
+
+## README 必填
+
+- 文首元信息：`id`（TNNNN）、`status`、`slug`、创建时间（`taskctl new` 骨架已含）
+- 概述、背景、目标、**现状缺口**、需求说明、验收标准（checkbox）、变更记录
+- **现状缺口**（task-new 必填）：对照目标列出需补充的内容；类型用 `信息 / 实现 / 资产 / 配置 / 依赖确认`；每条附建议补齐方式（追问 / `{{slash:task-explore}}` / 调研等）。未知标「待确认」；确无缺口写「暂无（目标范围内现状已齐）」。后续 explore/propose 可修订。
+- **涉及面**：目标仓库相对路径 / 是否跨仓（task-new 梳理；后续可修正）
+- **关联 OpenSpec**：change 名与路径列表（task-propose 写入；可多个；`taskctl resolve` 会解析该表）
+- **设计文档**（task-design 写入）：`design/` 下文件与归档落点表；未做设计则保持「尚无」
+- 不得含明文密钥或数据库凭证；需要时写环境变量名 `$VAR_NAME`
+
+## 路径与仓库
+
+- 工作区：含 `tasks/` 的目录（`taskctl --root` 的探测目标）
+- 目标 git 仓：工作区相对路径；单仓项目用 `.`；多仓工作区用各子目录（重复 `--repo`）
+- git 操作：从给定路径向上定位含 `.git` 的仓库根；不得逃出工作区
+
+**涉及面识别优先级（task-new / design / propose / apply）：**
+
+1. 用户消息明确指定的代码库
+2. README「涉及面」
+3. 关联 OpenSpec change `tasks.md` 中的仓库路径 → 向上定位 git 根
+
+同一仓库根去重；标注必须 / 建议 / 排除。涉及面全量节点 ≠ 本阶段全部建分支。
+
+## 分支命名与 Git 安全（task-apply）
+
+- 格式：`<prefix>-<slug>`（用 slug，不用带 T 前缀的目录名）
+- prefix：`feat`（默认）| `fix` | `chore` | `refactor`
+- **写业务代码前 MUST** 完成分支准备（默认分支拉最新 → 新分支）
+
+**检查范围：** README 涉及面中的目标 git 仓（单仓即为工作区 `.`）。
+
+```bash
+python3 <this-skill>/scripts/taskctl.py prepare-branches \
+  --slug <slug> --prefix feat --repo . [--repo path/to/other] [--dry-run]
+```
+
+流程（脚本内）：检测默认分支（`origin/HEAD` / `remote show`，**不假设 main**）→ 脏仓门禁 → `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b`（或切到已有同名分支）。
+
+若 JSON `needs_user_confirm=true`（脏工作区、pull 失败等）：
+
+1. **立即停止**，展示 `exit_markdown` / `user_actions` / `dirty_porcelain`
+2. 等用户明确指示（提交清理 / 允许 `--skip-dirty` / 中止）
+3. **禁止** Agent 自行 stash、reset --hard、checkout -f
+
+可用 `--base` 覆盖默认分支（记入 README）；不自动 `git push`。
+
+## 各命令职责（摘要）
+
+### task-new
+
+1. 从描述推导 `slug`；不足则追问
+2. 梳理涉及面（代码库表：必须/建议/排除）
+3. 对照目标梳理**现状缺口**（已有 vs 仍缺；信息/实现/资产/配置/依赖确认）
+4. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX
+5. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准
+6. 输出 ID、路径、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
+
+### task-explore
+
+1. `taskctl resolve` Gate（有 ID 显式传；否则 `--infer --hint ...`；`needs_confirm` 则停）
+2. 加载 README 涉及面与 `task.openspec`
+3. **委托** `openspec-explore`：把 task 概述/涉及面作为探索上下文；不写业务代码
+4. 将结论要点写回 README「变更记录」或「方案笔记」；若原 status 为 `draft` → `taskctl set-status <id> exploring`
+5. 输出探索摘要 + 桥接：仍有架构分叉 / 新子系统 / 用户要全面设计 → `{{slash:task-design}}`；范围已清、路径唯一 → `{{slash:task-propose}}`
+
+### task-design
+
+可选。无 task 则先 `{{slash:task-new}}`。方法细节读 skill `task-design`。
+
+1. `taskctl resolve` Gate（同上，可推断）
+2. 加载 README 概述、涉及面、explore 结论
+3. **只写入** `<taskRoot>/design/`（`README.md` 索引 + 归档落点表 + 设计正文）。**禁止**此时写 `docs/design/`、ADR、knowledge
+4. 在 task README「设计文档」记录文件与计划落点；`taskctl set-status <id> designed`
+5. 输出 staged 路径、归档落点表、未决问题、`{{slash:task-propose}} TNNNN` 桥接
+
+跳过条件：explore 后改动局部、可行路径只有一条、无跨模块契约。跳过则 status 保持 `exploring`，直接 propose。
+
+### task-propose
+
+1. `taskctl resolve` Gate（同上，可推断）
+2. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
+3. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change
+4. 对每个计划中的 change **委托** `openspec-propose`
+5. 将全部 change 名与路径写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
+6. 输出 change 列表与 `{{slash:task-apply}} TNNNN` 桥接
+
+### task-apply
+
+1. `taskctl resolve` Gate（同上，可推断）
+2. 若 `task.openspec` 为空 → 中止并建议 `{{slash:task-propose}}`
+3. 识别目标仓 → `taskctl repo-roots` → **先** `prepare-branches`（默认分支拉最新 + 新分支）；`needs_user_confirm` 则停等用户
+4. 分支就绪后，对每个未完成 change **委托** `openspec-apply-change`；用户可指定子集
+5. `taskctl set-status <id> in_progress`（或 `blocked`）；可选覆盖写 `progress.md`
+6. 输出：分支表、各 change 进度、交接（续作：`{{slash:task-apply}} TNNNN`）
+
+### task-archive
+
+1. `taskctl resolve` Gate（同上，可推断）
+2. 对 README 中仍活跃的关联 change，依次 **委托** `openspec-archive-change`；已归档则跳过；用户确认后可跳过失败项
+3. **晋升设计文档**（若 `<taskRoot>/design/` 存在）：按 `design/README.md` 归档落点表，把文档复制到目标仓正式位置（`docs/design/<domain>/`、ADR、knowledge）；更新该仓 INDEX/README 交叉引用并核对链接。落点不明则停下来问，不要发明目录。`design/` **原件保留**，随 task 目录归档作快照。无 `design/` 则跳过
+4. `taskctl git-summary --repo ... [--branch feat-<slug>]` 取素材 → 人工核对后写入 `changes.md`（可补 PR/备注；写明已晋升的设计路径）
+5. 验收未勾选须警告并获确认
+6. `taskctl archive <id>`（移动目录 + INDEX；内置 status→`archived`）
+7. 桥接：列出已晋升文档路径
+
+## 产物字段
+
+### changes.md（task-archive）
+
+涉及代码库、改动摘要、提交记录、文件变更（按仓库）、关联 OpenSpec/PR、备注。
+
+### design/（task-design）
+
+仅存在于 task 目录：`design/README.md`（索引 + 归档落点表）与一篇或多篇设计正文。归档前不是仓库正式文档；晋升规则见 task-archive。
+
+### progress.md（task-apply 可选）
+
+元信息（时间、阶段 `implementing|testing|blocked`）、关联 OpenSpec、本轮完成、累计进展、Git 快照（只读）、阻塞、下一步。
+MUST NOT 在采集快照时 stash/reset/force checkout；只读引用 change 内 `tasks.md`，不修改 OpenSpec 工件。
+
+## 桥接块（各 command 输出末尾）
+
+```
+- 方案未定 → {{slash:task-explore}} TNNNN
+- 复杂 / 多方案 → {{slash:task-design}} TNNNN
+- 范围已清 → {{slash:task-propose}} TNNNN
+- 契约就绪 → {{slash:task-apply}} TNNNN
+- 交付完成 → {{slash:task-archive}} TNNNN
+```

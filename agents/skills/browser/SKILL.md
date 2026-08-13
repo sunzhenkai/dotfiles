@@ -3,7 +3,9 @@ name: browser
 description: 浏览器自动化（Playwright MCP）使用规范：导航、页面快照、截图与产物路径。在启用 browser profile、调用浏览器 MCP、截图或视觉调试时使用。
 ---
 
-# Browser
+# 浏览器
+
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
 使用 Playwright 等浏览器自动化能力时遵循本规范。策略真相源见 `agents/env/browser.yaml`。
 

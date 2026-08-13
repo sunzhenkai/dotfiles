@@ -4,7 +4,9 @@ name: skills-store
 description: "用 vercel-labs/skills（npx skills）发现、搜索、安装、移除、更新 Agent Skills。用户提及 skills store、技能商店、安装 skill、搜索 skill、npx skills、skills.sh 时使用。安装/移除/更新必须明确指定项目目录或全局。外部 skill 安装前必须做安全审计。"
 ---
 
-# Skills Store
+# 技能商店
+
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
 通过 [vercel-labs/skills](https://github.com/vercel-labs/skills) CLI 管理 Agent Skills。入口：`npx skills`（无需全局安装）。发现目录：https://skills.sh/
 

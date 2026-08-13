@@ -27,6 +27,7 @@ python3 scripts/agents/doctor.py
 agents/
   skills/<skill-id>/SKILL.md       # skill 源（frontmatter 渲染后分发）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
+  skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
   commands/<command-id>.md         # command 源
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
   env/                             # MCP / profiles / browser / security 真相源
@@ -61,6 +62,12 @@ tags: [a, b]          # 可选
 ```
 
 共享 command 源 **不要** 写 OpenCode-only 字段（如 `agent:`）；需要时由适配层注入。
+
+## 语言
+
+skills / commands 面向用户的说明与输出默认 **简体中文**。
+id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如 OpenSpec、Gate、Blocker）保持原文，不要逐词硬翻。
+`en-chat` 除外（陪练回复用英语）。`references/` 原样分发，不要求翻译。
 
 ## 占位符
 
@@ -140,4 +147,4 @@ scripts/config.sh agents
 
 ## 示例条目
 
-仓库自带：`browser`、`commit-push`、`en-chat`、`code-design`、`code-implement`、`repo-manager`、`senior-reviewer`、`service-manager`、`skills-store`、`dotf-ui-design`（skill + command）。OpenSpec 等工作流请用各工具 CLI 初始化，不必放进本目录。
+仓库自带：`browser`、`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`dotf-ui-design`（skill + command）、`lark-cli`（飞书 CLI 薄路由，按需加载 `~/.agents/skills/lark-*`）、`task-workflow`（skill + `task-new`/`task-explore`/`task-design`/`task-propose`/`task-apply`/`task-archive` commands）、`task-design`（复杂任务可选设计环节）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`task-workflow` 在已安装时委托它们。

@@ -95,11 +95,19 @@ modules:
 
   - name: dws
     desc: 安装 DingTalk Workspace CLI
-    group: tools
+    group: 办公
     depends_on: [sdk]
     install: true
     doctor: true
     bin: dws
+
+  - name: lark-cli
+    desc: 安装飞书 / Lark CLI（npx @larksuite/cli）
+    group: 办公
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: lark-cli
 
   - name: ocr
     desc: Open Code Review CLI + 配置（MiniMax-M3）

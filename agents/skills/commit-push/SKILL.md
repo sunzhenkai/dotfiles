@@ -4,7 +4,9 @@ name: commit-push
 description: "分析当前 git 变更、起草提交说明、创建 commit 并 push 到远程。在用户要求提交、commit、push、提交并推送时使用。针对大改动做耗时优化，避免通读巨型 diff。"
 ---
 
-# Commit & Push
+# 提交并推送
+
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。commit message 跟随仓库已有 log 风格（中英均可，不另强制翻译）。
 
 将当前工作区变更提交并推送到远程。默认执行 **commit + push**；若用户只要 commit 或只要 push，按其指示。
 

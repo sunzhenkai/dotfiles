@@ -241,6 +241,45 @@ def skill_relpath(skill_id: str) -> str:
     return f"skills/{skill_id}/SKILL.md"
 
 
+def _skip_sidecar_file(path: Path) -> bool:
+    if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+        return True
+    return False
+
+
+def install_skill_sidecars(
+    skill_dir: Path,
+    skill_id: str,
+    bases: List[Path],
+    dry_run: bool,
+) -> Tuple[int, int]:
+    """Copy references/ and scripts/ as-is (no frontmatter render, no slash replace)."""
+    written = 0
+    skipped = 0
+    for name in ("references", "scripts"):
+        src_root = skill_dir / name
+        if not src_root.is_dir():
+            continue
+        for src_file in sorted(p for p in src_root.rglob("*") if p.is_file()):
+            if _skip_sidecar_file(src_file):
+                continue
+            rel = f"skills/{skill_id}/{name}/{src_file.relative_to(src_root)}"
+            data = src_file.read_bytes()
+            for base in bases:
+                dest = (base / rel).expanduser()
+                if dest.is_file() and dest.read_bytes() == data:
+                    skipped += 1
+                    print(f"  = {dest}")
+                    continue
+                written += 1
+                print(f"  + {dest}")
+                if dry_run:
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+    return written, skipped
+
+
 def install_file(content: str, dest: Path, dry_run: bool = False) -> str:
     """Write content to dest with backup/idempotent skip. Returns status."""
     dest = dest.expanduser()
@@ -342,25 +381,9 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
                 else:
                     written += 1
                     print(f"  + {dest}")
-            # references/：原样拷贝（不渲染 frontmatter、不做 slash 替换），第三方内容保持字节一致
-            refs_root = skill_dir / "references"
-            if refs_root.is_dir():
-                for ref_file in sorted(p for p in refs_root.rglob("*") if p.is_file()):
-                    rel = f"skills/{skill_id}/references/{ref_file.relative_to(refs_root)}"
-                    for base in bases:
-                        dest = base / rel
-                        dest = dest.expanduser()
-                        data = ref_file.read_bytes()
-                        if dest.is_file() and dest.read_bytes() == data:
-                            skipped += 1
-                            print(f"  = {dest}")
-                            continue
-                        written += 1
-                        print(f"  + {dest}")
-                        if dry_run:
-                            continue
-                        dest.parent.mkdir(parents=True, exist_ok=True)
-                        dest.write_bytes(data)
+            w, s = install_skill_sidecars(skill_dir, skill_id, bases, dry_run)
+            written += w
+            skipped += s
 
     # Commands（kimi-code 无稳定 commands 布局 → skip，不阻断 skills）
     if tool == "kimi-code":

@@ -6,6 +6,8 @@ description: UI 设计门卫/路由器：按用户意图路由到本 skill 内�
 
 # dotf-ui-design（UI 设计门卫）
 
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。界面文案语言与项目一致。
+
 本 skill 是**路由器**，不直接堆设计知识。被显式触发后：确认意图 → Read 本 skill `references/` 下的某一个 refer skill 执行；没有合适的 refer skill 时回退到文末的内置准则。
 
 refer skill 已放在本 skill 的 `references/` 下并随分发到位，**无需任何额外安装**。第三方上游快照一般不修改；first-party 策展（如 `solo-ui-design`）可随规范演进修订。它们不在 agent 的 skill 注册路径上（只是数据文件），不会被独立自动触发。

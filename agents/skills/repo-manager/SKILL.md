@@ -1,14 +1,16 @@
 ---
 id: repo-manager
 name: repo-manager
-description: Manage multiple GitLab / GitHub / generic Git repositories via `grepom` (primary, cross-platform batch operations on a workspace of repos) and `glab` (GitLab-specific fallback for issues, variables, snippets, and fine-grained MR flags). Maintain a cwd ledger in `.repo-manager.md` when that file already exists (prompt before creating). Use when the user asks to clone, sync, list, status, pull, search, scan, push, create MR/PR, or watch CI pipelines across many repos; when working with `.grepom.yml` configs; when discovering new repos in a remote group/org; when scanning for secrets before push; when bumping release tags; or when quickly jumping between repo directories in a workspace. Do NOT use for single-file git operations, code review of specific diffs, or work that has nothing to do with repository plumbing.
+description: 通过 `grepom`（首选，跨平台批量操作工作区多仓）和 `glab`（GitLab 专用回退：issues、variables、snippets、细粒度 MR 参数）管理多个 GitLab / GitHub / 通用 Git 仓库。若已有 `.repo-manager.md` 则维护 cwd 台账（创建前先询问）。在用户要求跨多仓 clone、sync、list、status、pull、search、scan、push、创建 MR/PR、看 CI pipeline、处理 `.grepom.yml`、从远端 group/org 发现新仓、push 前扫密钥、打 release tag、或在工作区仓库间跳转时使用。不要用于单文件 git 操作、特定 diff 的 code review、或与仓库基础设施无关的工作。
 ---
 
-# repo-manager
+# 仓库管理
 
-Two CLI layers. Prefer `grepom` for cross-repo batch work; reach for `glab` only when grepom doesn't cover the operation.
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
-Config lookup: `grepom` reads `.grepom.yml` from the current directory or any parent. Override with `-c <path>`.
+两层 CLI：跨仓批量优先用 `grepom`；`grepom` 覆盖不到时再用 `glab`。
+
+配置查找：`grepom` 从当前目录或任意父目录读取 `.grepom.yml`。用 `-c <path>` 覆盖。
 
 ## 台账（`.repo-manager.md`）
 
@@ -43,7 +45,7 @@ Config lookup: `grepom` reads `.grepom.yml` from the current directory or any pa
 新建时使用（按实际删减，保持简洁）：
 
 ```markdown
-# Repo Manager — <工作区目录名>
+# 仓库管理 — <工作区目录名>
 
 ## 概览
 
@@ -74,30 +76,30 @@ Config lookup: `grepom` reads `.grepom.yml` from the current directory or any pa
 - 稳定约定放「概览/约定」，一次性操作放「手帐」；不要把整份 `grepom status` 原文贴进文件。
 - 用户若明确要求不提交该文件，提醒可加入 `.gitignore`，但仍在本地维护。
 
-## Tool selection
+## 工具选择
 
-| Need | Tool |
+| 需求 | 工具 |
 |------|------|
-| Batch clone / pull / status across many repos | `grepom` |
-| Discover new repos from a remote group/org | `grepom sync` + `grepom clone` |
-| Cross-platform (GitLab + GitHub + generic) | `grepom` |
-| Safe push with secret scan | `grepom push` |
-| GitLab-only ops: issues, variables, snippets, raw API | `glab` |
-| Fine-grained MR flags (`--squash-before-merge`, `--label`, `--reviewer`, `--remove-source-branch`) | `glab mr create` |
+| 跨多仓批量 clone / pull / status | `grepom` |
+| 从远端 group/org 发现新仓 | `grepom sync` + `grepom clone` |
+| 跨平台（GitLab + GitHub + 通用 Git） | `grepom` |
+| 带 secret scan 的安全 push | `grepom push` |
+| 仅 GitLab：issues、variables、snippets、raw API | `glab` |
+| 细粒度 MR 参数（`--squash-before-merge`、`--label`、`--reviewer`、`--remove-source-branch`） | `glab mr create` |
 
-`glab` is optional. Install via `brew install glab` / `apt install glab` / `scoop install glab`. For most MR/PR work, `grepom mr` is enough.
+`glab` 可选。安装：`brew install glab` / `apt install glab` / `scoop install glab`。多数 MR/PR 用 `grepom mr` 即可。
 
-## Setup (one-time per workspace)
+## 初始化（每个工作区一次）
 
 ```bash
-# Interactive — writes ./.grepom.yml
+# 交互式 — 写入 ./.grepom.yml
 grepom init
 
-# Non-interactive
+# 非交互
 grepom init --base ~/projects --provider gitlab \
   --url https://gitlab.example.com --token '${GITLAB_TOKEN}'
 
-# Append resources / groups / standalone repos later
+# 之后追加 resource / group / 独立仓库
 grepom add resource --name work-gl --provider gitlab \
   --url https://gitlab.example.com --token '${GITLAB_TOKEN}'
 
@@ -107,109 +109,109 @@ grepom add group --name frontend --resource work-gl \
 grepom add repo --name dotfiles --resource github \
   --url https://github.com/me/dotfiles.git
 
-# Regenerate a clean example config
+# 重新生成一份干净的 example 配置
 grepom example
 ```
 
-Token values use `${ENV_VAR}` substitution. Keep secrets in the shell env (1Password CLI / direnv / vault); never literal in YAML.
+token 值用 `${ENV_VAR}` 替换。密钥放在 shell 环境（1Password CLI / direnv / vault），禁止写进 YAML 明文。
 
-## Discover and clone
+## 发现与克隆
 
 ```bash
-grepom sync                     # populate config from remote groups (no clone)
-grepom clone                    # clone everything, 4 workers in parallel
-grepom clone --group frontend   # single group
-grepom clone --resource work-gl # all repos from one resource
-grepom clone --concurrency 1    # sequential (compat mode)
-grepom clone web-app            # single repo by name
-grepom clone --vgroup work      # virtual group of groups
+grepom sync                     # 从远端 group 填充配置（不 clone）
+grepom clone                    # 全量克隆，4 worker 并行
+grepom clone --group frontend   # 单个 group
+grepom clone --resource work-gl # 某个 resource 下全部仓
+grepom clone --concurrency 1    # 串行（compat）
+grepom clone web-app            # 按名称克隆单仓
+grepom clone --vgroup work      # 虚拟 group
 ```
 
-`sync` only adds new repos — it never removes. After editing `exclude_repos` in YAML, run `grepom prune --apply` to drop the now-excluded clones from disk.
+`sync` 只追加新仓，从不删除。在 YAML 里改完 `exclude_repos` 后，用 `grepom prune --apply` 从磁盘去掉已排除的克隆。
 
-## Workspace hygiene
+## 工作区卫生
 
 ```bash
-grepom status                   # dirty / ahead summary per repo
-grepom list                     # only repos needing attention (default filter)
-grepom list --all               # every repo, including clean
-grepom list --no-push           # only unpushed
-grepom list --no-commit         # only dirty
-grepom list groups              # list configured groups
-grepom list --remote            # query provider API instead of local config
-grepom search web --group fe    # case-insensitive substring search
-grepom pull                     # update clean, default-branch repos (parallel)
-grepom pull --force             # update regardless of state
-grepom dedup                    # find duplicates within/across groups
-grepom prune                    # dry-run: list excluded repos still on disk
-grepom prune --apply            # actually delete
+grepom status                   # 各仓 dirty / ahead 摘要
+grepom list                     # 仅需关注的仓（默认 filter）
+grepom list --all               # 全部仓，含干净的
+grepom list --no-push           # 仅未 push
+grepom list --no-commit         # 仅 dirty
+grepom list groups              # 列出已配置 group
+grepom list --remote            # 查 provider API，不用本地配置
+grepom search web --group fe    # 大小写不敏感子串搜索
+grepom pull                     # 更新干净且在默认分支的仓（并行）
+grepom pull --force             # 不论状态都更新
+grepom dedup                    # 查 group 内/跨 group 重复
+grepom prune                    # dry-run：磁盘上仍在的已排除仓
+grepom prune --apply            # 真正删除
 ```
 
-## Safe push and secret scan
+## 安全 push 与 secret scan
 
 ```bash
-grepom push                     # gitleaks scan → git push; aborts on hit
-grepom push -f                  # force (with warning)
-grepom push -- origin main      # pass through to git push
-grepom scan                     # scan workspace files (gitleaks rules)
-grepom scan --history           # also scan git history (incl. deleted commits)
+grepom push                     # gitleaks scan → git push；命中则中止
+grepom push -f                  # force（会警告）
+grepom push -- origin main      # 透传给 git push
+grepom scan                     # 扫工作区文件（gitleaks 规则）
+grepom scan --history           # 含 git 历史（含已删 commit）
 grepom scan --format json -o report.json
-grepom scan -p /path/to/repo    # ad-hoc path, no config needed
-grepom scan --gitleaks-config rules.toml   # project-specific allowlist
+grepom scan -p /path/to/repo    # 临时路径，不需要配置
+grepom scan --gitleaks-config rules.toml   # 项目级 allowlist
 ```
 
-`grepom push` does NOT require a config file — it works in any git repo. Default behavior: scan, then push only if clean.
+`grepom push` **不需要**配置文件，任意 git 仓库都能用。默认：先 scan，干净才 push。
 
 ## MR / PR / Pipeline
 
 ```bash
-# MR/PR — auto-detects branch, target, title from HEAD
+# MR/PR — 从 HEAD 自动推断 branch、target、title
 grepom mr
 grepom mr --from feat-x --to main --title "Add X" --draft
-grepom mr --body-file desc.md --web    # open browser instead of CLI
-grepom pr                              # alias of `mr`
+grepom mr --body-file desc.md --web    # 用浏览器打开，不用 CLI
+grepom pr                              # `mr` 的别名
 
 # Pipeline
-grepom pipeline list                   # recent pipelines
-grepom pipeline watch                  # wait for current
-grepom watch                           # auto-detect repo from cwd
-grepom watch web-app --id 1234         # specific repo + pipeline
+grepom pipeline list                   # 最近的 pipeline
+grepom pipeline watch                  # 等待当前 pipeline
+grepom watch                           # 从 cwd 自动识别仓
+grepom watch web-app --id 1234         # 指定仓 + pipeline
 ```
 
-`grepom mr` reads the title and body from the HEAD commit. Write a Conventional Commit subject first.
+`grepom mr` 从 HEAD commit 读 title 和 body。先写好 Conventional Commit 主题。
 
-When you need `--squash-before-merge`, `--label`, `--assignee`, `--reviewer`, `--remove-source-branch`, `--milestone` — fall back to `glab mr create`.
+需要 `--squash-before-merge`、`--label`、`--assignee`、`--reviewer`、`--remove-source-branch`、`--milestone` 时，回退到 `glab mr create`。
 
-## Release tags
+## Release tag
 
 ```bash
-grepom tag                       # v0.1.5 → v0.1.6 (lightweight)
+grepom tag                       # v0.1.5 → v0.1.6（lightweight）
 grepom tag -m "release notes"    # annotated
-grepom tag -p                    # push to all remotes
-grepom tag -t -p                 # t-prefix (test release)
-grepom tag -w                    # tag, then watch pipeline
-grepom tag --dry-run             # preview only
+grepom tag -p                    # push 到全部 remote
+grepom tag -t -p                 # t-prefix（测试 release）
+grepom tag -w                    # tag 后 watch pipeline
+grepom tag --dry-run             # 只预览
 ```
 
-## Navigation
+## 跳转
 
-Add once to `~/.zshrc` (or `~/.bashrc`):
+在 `~/.zshrc`（或 `~/.bashrc`）加一次：
 
 ```bash
 eval "$(grepom dir --shell)"
 ```
 
-Then:
+然后：
 
 ```bash
-gcd web-app                      # exact match → cd
-gcd web                          # substring; one match → cd, many → list
-grepom dir web-app               # scriptable: cd "$(grepom dir web-app)"
+gcd web-app                      # 精确匹配 → cd
+gcd web                          # 子串；唯一则 cd，多个则列出
+grepom dir web-app               # 可脚本化：cd "$(grepom dir web-app)"
 ```
 
-## glab: GitLab-specific fallbacks
+## glab：GitLab 专用回退
 
-Single-repo scope. Use when grepom doesn't cover it.
+单仓范围。`grepom` 覆盖不到时再用。
 
 ```bash
 glab auth login --hostname gitlab.example.com
@@ -219,32 +221,29 @@ glab mr create --title "..." --description "..." --target-branch main \
 glab mr list
 glab issue list --assignee @me
 glab ci status
-glab ci trace                    # live job logs
+glab ci trace                    # 实时 job 日志
 glab variable list               # CI/CD variables
 glab api projects/:id/variables  # raw API
 ```
 
-## Multi-instance authentication
+## 多实例鉴权
 
-`glab` stores credentials per hostname; there is no `switch` command. Log in once per
-instance, then select the host for a command or the current shell:
+`glab` 按 hostname 存凭据，没有 `switch` 命令。每个实例登录一次，再按命令或当前 shell 选 host：
 
 ```bash
-# --stdin avoids putting the token in shell history
+# --stdin 避免 token 进 shell history
 glab auth login --hostname gitlab.example.com --stdin
 glab auth login --hostname gitlab.other.com --stdin
 glab auth status --all
 
-GITLAB_HOST=gitlab.other.com glab mr list   # one command
-export GITLAB_HOST=gitlab.example.com       # current shell
+GITLAB_HOST=gitlab.other.com glab mr list   # 单条命令
+export GITLAB_HOST=gitlab.example.com       # 当前 shell
 glab auth logout --hostname gitlab.other.com
 ```
 
-Host resolution is `GITLAB_HOST` → the current repository's Git remote →
-`~/.config/glab-cli/config.yml`. Use `--device` for headless login on GitLab 17.9+.
-Credentials use the OS keyring by default; only use `--insecure-storage` when necessary.
+host 解析顺序：`GITLAB_HOST` → 当前仓库 Git remote → `~/.config/glab-cli/config.yml`。无图形界面登录用 `--device`（GitLab 17.9+）。凭据默认走 OS keyring；仅必要时才用 `--insecure-storage`。
 
-For `grepom`, model each GitLab instance as a named `resource`; bind groups to it:
+对 `grepom`：每个 GitLab 实例建模成命名 `resource`，再把 group 绑上去：
 
 ```yaml
 resources:
@@ -264,29 +263,26 @@ groups:
     recursive: true
 ```
 
-Use `grepom clone --resource corp`, `grepom status --resource corp`, or
-`grepom pull --resource corp` as needed; each resource may override
-its own `token`/`ssh_key`. Keep tokens in environment variables, use least-privilege PATs,
-and revoke/rotate a token if exposed.
+按需用 `grepom clone --resource corp`、`grepom status --resource corp` 或 `grepom pull --resource corp`；每个 resource 可覆盖自己的 `token`/`ssh_key`。token 放环境变量，用最小权限 PAT；泄露则立刻 revoke/rotate。
 
-## Maintenance
+## 维护
 
 ```bash
-grepom update                    # self-update to latest release
-grepom completion zsh > ~/.zsh/completions/_grepom   # shell completion
-grepom version                   # installed version
+grepom update                    # 自更新到最新 release
+grepom completion zsh > ~/.zsh/completions/_grepom   # shell 补全
+grepom version                   # 已安装版本
 ```
 
-## Conventions
+## 约定
 
-- **Token sources**: always `${ENV_VAR}` placeholders in YAML; export secrets via 1Password CLI / direnv / vault — never literal.
-- **Commit before MR**: `grepom mr` reads the HEAD message — write a Conventional Commit subject first.
-- **Never `--force` push without confirming with the user**.
-- **Stale config**: `sync` only adds; if upstream repos are renamed/removed, edit the config manually or rebuild with `grepom init` + `grepom add group`.
-- **Verbose mode**: add `-v` for debug output when a command misbehaves.
-- **Ledger**: respect `.repo-manager.md` create-gate — never auto-create; auto-update only when the file already exists (see 台账 section).
+- **token 来源**：YAML 里一律 `${ENV_VAR}` 占位；密钥经 1Password CLI / direnv / vault 导出，禁止明文。
+- **先 commit 再 MR**：`grepom mr` 读 HEAD 消息，先写好 Conventional Commit 主题。
+- **未经用户确认，禁止 `--force` push**。
+- **过期配置**：`sync` 只追加；上游仓改名/删除时手动改配置，或用 `grepom init` + `grepom add group` 重建。
+- **verbose**：命令异常时加 `-v` 看调试输出。
+- **台账**：遵守 `.repo-manager.md` 创建门禁——禁止自动创建；仅文件已存在时自动更新（见「台账」节）。
 
-## When unsure
+## 不确定时
 
 ```bash
 grepom --help
@@ -294,9 +290,9 @@ grepom <command> --help
 glab --help
 ```
 
-Prefer running actual help over guessing — both tools iterate quickly and flags change.
+优先跑真实 `--help`，不要猜参数——两个工具迭代快，flag 会变。
 
-## Gotchas (lessons learned)
+## 踩坑（可复用经验）
 
 可复用的踩坑经验。**只记跨实例通用的规律**，具体 host / IP / token / 路径等特例不放这里。
 

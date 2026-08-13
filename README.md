@@ -46,6 +46,7 @@ dotf agents -ic
 | `full` | 当前 OS 适用全集（默认） |
 
 模块清单与分组见 `modules.yaml`（`group` / `depends_on`）。
+AI Agent 按分组初始化提示词见 [`Dotfiles.md`](./Dotfiles.md)。
 
 ## Usage
 

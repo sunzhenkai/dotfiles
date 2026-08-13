@@ -1,6 +1,6 @@
 ---
 id: en-chat
-title: "English Chat"
+title: "英语陪练"
 description: 英语陪练 — 模拟对话，简洁纠错
 category: Learning
 tags: [english, chat, practice]

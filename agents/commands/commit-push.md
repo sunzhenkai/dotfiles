@@ -1,6 +1,6 @@
 ---
 id: commit-push
-title: "Commit & Push"
+title: "提交并推送"
 description: 分析 git 变更、创建 commit 并 push；大改动下避免通读巨型 diff
 category: Workflow
 tags: [git, commit, push, workflow]
@@ -8,7 +8,9 @@ tags: [git, commit, push, workflow]
 
 分析当前 git 变更，起草提交说明，创建 commit 并 push 到远程。
 
-**Input**：可选说明（例如「只 commit 不 push」「消息侧重修复」）。默认 **commit + push**。
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。commit message 跟随仓库已有 log 风格。
+
+**输入**：可选说明（例如「只 commit 不 push」「消息侧重修复」）。默认 **commit + push**。
 
 ## 大改动耗时优化
 

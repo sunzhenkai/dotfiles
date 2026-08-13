@@ -1,6 +1,6 @@
 ---
 id: service-manager
-title: "Service Manager"
+title: "服务管理"
 description: 探索项目服务启动方式（Makefile / package.json / docker-compose），执行 list / start / stop / restart / status / logs；缓存加速启动，并把启动信息与踩坑写入 .service-manager.md
 category: Workflow
 tags: [service, dev, workflow]
@@ -8,7 +8,9 @@ tags: [service, dev, workflow]
 
 管理当前项目的服务生命周期。
 
-**Input**：phase（`list` / `start` / `stop` / `restart` / `status` / `logs`）+ 可选服务名与行数。缺省 phase 为 `list`。
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
+
+**输入**：phase（`list` / `start` / `stop` / `restart` / `status` / `logs`）+ 可选服务名与行数。缺省 phase 为 `list`。
 
 ## 步骤
 

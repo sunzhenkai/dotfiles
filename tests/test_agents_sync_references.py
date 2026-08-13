@@ -26,8 +26,8 @@ def _run_sync(tmp_home: Path, tool: str) -> subprocess.CompletedProcess:
 def test_sync_copies_skill_references(tmp_path: Path) -> None:
     r = _run_sync(tmp_path, "kimi-code")
     assert r.returncode == 0, r.stderr + r.stdout
-    src = ROOT / "agents" / "skills" / "code-design" / "references" / "design-template.md"
-    dest = tmp_path / ".kimi-code" / "skills" / "code-design" / "references" / "design-template.md"
+    src = ROOT / "agents" / "skills" / "task-design" / "references" / "design-template.md"
+    dest = tmp_path / ".kimi-code" / "skills" / "task-design" / "references" / "design-template.md"
     assert dest.is_file(), f"references 未分发: {dest}\n{r.stdout}"
     # 原样拷贝：字节一致（不做 frontmatter 渲染 / slash 替换）
     assert dest.read_bytes() == src.read_bytes()
@@ -42,3 +42,12 @@ def test_sync_references_idempotent(tmp_path: Path) -> None:
     assert "references/design-template.md" not in "\n".join(
         line for line in r2.stdout.splitlines() if line.startswith("  +")
     )
+
+
+def test_sync_copies_skill_scripts(tmp_path: Path) -> None:
+    r = _run_sync(tmp_path, "kimi-code")
+    assert r.returncode == 0, r.stderr + r.stdout
+    src = ROOT / "agents" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
+    dest = tmp_path / ".kimi-code" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
+    assert dest.is_file(), f"scripts 未分发: {dest}\n{r.stdout}"
+    assert dest.read_bytes() == src.read_bytes()

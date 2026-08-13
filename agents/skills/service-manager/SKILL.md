@@ -4,7 +4,9 @@ name: service-manager
 description: 项目服务管理：从 Makefile、package.json、docker-compose 等探索服务启动方式，统一执行 list / start / stop / restart / status / logs。缓存服务清单与运行信息以加速后续启动；把启动相关信息与踩坑写入项目根 .service-manager.md。在启动、停止、查看项目服务时使用。
 ---
 
-# Service Manager
+# 服务管理
+
+面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
 管理当前项目的服务生命周期。单一 skill，通过 phase（`list` / `start` / `stop` / `restart` / `status` / `logs`）分派行为，不拆 skill 族。
 
@@ -54,7 +56,7 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 新建时使用以下结构（按实际删减，保持简洁）：
 
 ```markdown
-# Service Manager — <项目名或目录名>
+# 服务管理 — <项目名或目录名>
 
 ## 概览
 
@@ -97,14 +99,14 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 
 无法确定任何启动方式时，列出看到的线索并问用户，不要瞎猜命令。
 
-## Phases
+## 阶段
 
 用户消息中的第一个词（或语义）决定 phase；缺省为 `list`。
 
 ### list
 
 - 读 `.service-manager.md`（若有）与缓存，或执行 discover；输出表格：name、source、command、port、运行状态（见 status 判定）。
-- 缓存命中时说明 "from cache"；发现源文件已变更时先重新 discover。
+- 缓存命中时说明「来自缓存」；发现源文件已变更时先重新 discover。
 
 ### start `<name>`（缺 name 时启动全部或问用户）
 
