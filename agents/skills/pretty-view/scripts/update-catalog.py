@@ -331,7 +331,7 @@ def render_catalog(entries: list[Entry], md_count: int) -> str:
   * {{ box-sizing:border-box }}
   body {{ margin:0; background:var(--bg); color:var(--ink);
     font:16px/1.5 ui-sans-serif,system-ui,sans-serif; }}
-  main {{ max-width:720px; margin:0 auto; padding:48px 24px 80px; }}
+  main {{ width:100%; padding:48px clamp(24px,4vw,56px) 80px; }}
   h1 {{ font-size:28px; font-weight:650; letter-spacing:-.02em; margin:0 0 8px; }}
   .lede {{ color:var(--muted); margin:0 0 8px; }}
   .empty {{ color:var(--muted); }}

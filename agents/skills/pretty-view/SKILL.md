@@ -1,20 +1,20 @@
 ---
 id: pretty-view
 name: pretty-view
-description: 把文档、知识、报告、code review、方案等以优雅的 HTML 或 Markdown 展示；按意图路由到内置 references/ 下的 baoyu-markdown-to-html、html-ppt、html-slides，或走 Markdown 内置准则。默认只生成 Markdown 或 HTML 其中一种；把已有 md 转成 html 须用户显式说明，不要先写源稿再转并两份都留。用户点名 pretty-view，或明确要求展示/呈现/做成漂亮的网页、阅读页、PPT、slides 时使用。普通写文档、写方案、做 code review 本身不要加载本 skill。
+description: 把文档、知识、报告、code review、方案等以优雅的 HTML 或 Markdown 展示。HTML 阅读页默认直写全宽页面（内置准则）；公众号或显式 md→html 才走 baoyu-markdown-to-html；PPT/slides 走 html-ppt / html-slides。默认只生成 Markdown 或 HTML 其中一种；把已有 md 转成 html 须用户显式说明。用户点名 pretty-view，或明确要求展示/呈现/做成漂亮的网页、阅读页、PPT、slides 时使用。普通写文档、写方案、做 code review 本身不要加载本 skill。
 ---
 
 # pretty-view（优雅展示门卫）
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
 
-本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML，再 Read `references/` 下某一个 refer skill 执行；若 Markdown，走文末内置准则。refer skill 已随分发到位，**无需额外安装**；它们不在 agent 的 skill 注册路径上，不会被独立自动触发。
+本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。被触发后：推断或确认 **介质（HTML / Markdown）** → 若 HTML 阅读页：走内置 HTML 准则（**默认全宽**，直写 `.html`）；若公众号 / 显式 md→html / 幻灯片：再 Read `references/` 下某一个 refer skill；若 Markdown：走文末内置准则。vendor refer 已随分发到位，**无需额外安装**；它们不在 agent 的 skill 注册路径上，不会被独立自动触发。
 
 ## 五道门禁
 
 1. **门 1 · 收窄触发**：仅在用户点名 `pretty-view`，或明确要**展示/呈现**（做成网页、阅读页、PPT、slides、漂亮的 Markdown）时使用。用户只是在写方案、写文档、做 code review，不要加载。
-2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按下方「介质推断」自动选择；**不明确时必须向用户确认，禁止猜测。** 介质未定时，禁止 Read 任何 refer skill。
-3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选一个 refer skill。多条都沾边时再问用户。一次只 **Read** 一个 refer skill 的 `SKILL.md`，按其指引执行；用完即弃。
+2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按下方「介质推断」自动选择；**不明确时必须向用户确认，禁止猜测。** 介质未定时，禁止 Read `references/`。
+3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选路径。阅读页默认走内置 HTML 准则（Read `references/html-page.md`，**不要**加载 baoyu）。公众号 / 显式 md→html / 幻灯片才 Read 对应 vendor refer 的 `SKILL.md`。多条都沾边时再问用户。一次只 **Read** 一个；用完即弃。
 4. **门 4 · 产物不污染快照**：落盘规则见下节。**禁止**写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把 `assets/` 与所选模板拷到落盘目录，按相对路径引用。
 5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种（`INDEX.md` / `index.html` 是目录，不算正文）。选 HTML ≠ 先写一份 `.md` 再转 html 并两份都留。把已有 Markdown 转成 HTML 须显式说明，见「单介质与 md→html 强门禁」。
 
@@ -30,7 +30,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 确认时只问这两项（可一次问完）；两项互斥，默认只出选中的那一种：
 
 - ① Markdown（对话或 `.md` 文件，便于入库 / PR）— 只出 Markdown，不转 HTML
-- ② HTML（浏览器打开的阅读页或幻灯片）— 只出 HTML，不另写一份 md 源稿
+- ② HTML（浏览器打开的全宽阅读页或幻灯片）— 只出 HTML，不另写一份 md 源稿
 
 用户已指定文件扩展名（`.html` / `.md`）时，以扩展名为准。两种扩展名都出现且未说「都要」→ 再问只留哪一种。
 
@@ -40,7 +40,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 **默认只交一种产物。** 选 HTML → 只落 `.html`（或只在对话给 HTML）；选 Markdown → 只落 `.md` 或只在对话输出。禁止默认同篇同时写入 `.md` 和 `.html`。
 
-`baoyu-markdown-to-html` 的 CLI 入口是已有 Markdown → 带样式 HTML。这是**转换器**，不是「HTML 阅读页」的默认两步工作流（先落盘源稿再生成阅读页）。
+`baoyu-markdown-to-html` 的 CLI 入口是已有 Markdown → 带样式 HTML（公众号窄栏）。这是**转换器**，不是阅读页的默认路径。默认阅读页：**直写全宽 HTML**，见「内置 HTML 准则」。
 
 ### 何时才把用户侧的 Markdown 当转换源
 
@@ -50,36 +50,38 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 - 点名仓库里已有的 `.md` 文件，并要求做成 HTML / 阅读页 / 公众号排版
 - 「把这份 markdown 转成 html」
 
-仅勾选确认项「② HTML（浏览器打开的阅读页）」**不够**。那只是定介质。不够的话：不要先落盘一篇新 `.md` 当「源稿」，不要告诉用户「同目录还有 Markdown 源稿」。
+仅勾选确认项「② HTML（浏览器打开的全宽阅读页或幻灯片）」**不够**当成 md→html。那只是定介质：默认直写全宽 HTML。不要先落盘一篇新 `.md` 当「源稿」，不要告诉用户「同目录还有 Markdown 源稿」。
 
-| 用户意图 | 落盘 | 怎么用 baoyu |
-|----------|------|----------------|
-| 只要 HTML 阅读页（正文来自讨论 / 草稿，**没**说转 md） | 只 `.html` | 允许当实现细节：md 写到 `mktemp` 临时文件 → 转换 → html 移到落盘路径 → **立刻删除临时 md**。临时文件不得出现在 `docs/pretty-view/` |
+| 用户意图 | 落盘 | 怎么生成 |
+|----------|------|----------|
+| 只要 HTML 阅读页（正文来自讨论 / 草稿，**没**说转 md、也不是公众号） | 只 `.html` | **直写 HTML**（内置准则，默认全宽）。禁止为转换写临时 md，禁止加载 baoyu |
+| 公众号 / 微信排版 | 只 `.html` | baoyu（窄栏是预期） |
 | 只要 Markdown | 只 `.md` 或对话 | **禁止**加载 baoyu，禁止生成 `.html` |
-| **显式** md→html | 只新增 `.html`；用户原有 `.md` 留在原处，**不复制**进 `docs/pretty-view/` | 用用户已有文件当 `<markdown_file>` |
+| **显式** md→html | 只新增 `.html`；用户原有 `.md` 留在原处，**不复制**进 `docs/pretty-view/` | baoyu，用用户已有文件当 `<markdown_file>` |
 | 亲口要「md 和 html 都留 / 保留源稿」 | 才允许并存 | 并存时只手改 md，html 由转换生成，不要两套手改正文 |
 
 **反例（禁止）**：用户勾了 HTML 阅读页 → 把总结写成 `docs/pretty-view/knowledge/….md` → 再转成同名 `.html` → 两份都提交，并说「Markdown 是源、HTML 是生成物」。
 
-## HTML 路由表（意图 → refer skill）
+## HTML 路由表（意图 → 路径）
 
 路径相对本 SKILL.md 所在目录。
 
-| 用户意图 | refer skill | 路径 |
-|----------|-------------|------|
-| 长文阅读页（只要 HTML）：文档、知识、报告、方案正文、公众号排版 | `baoyu-markdown-to-html` | `references/baoyu-markdown-to-html/SKILL.md` |
+| 用户意图 | 走哪 | 路径 |
+|----------|------|------|
+| 长文阅读页（只要 HTML）：文档、知识、报告、方案正文 | **内置 HTML 准则**（默认全宽，直写） | `references/html-page.md` |
+| 公众号 / 微信排版 | `baoyu-markdown-to-html` | `references/baoyu-markdown-to-html/SKILL.md` |
 | **显式**把已有 Markdown 转成带样式 HTML（须命中转换口令或点名已有 `.md`） | `baoyu-markdown-to-html` | `references/baoyu-markdown-to-html/SKILL.md` |
 | 静态 HTML PPT / 路演 / 分享会 / 演讲者模式 / 小红书图文（默认幻灯片） | `html-ppt` | `references/html-ppt/SKILL.md` |
 | 明确要 **reveal.js**、交互式 fragments、纵向嵌套幻灯片、单文件 CDN 演示 | `html-slides` | `references/html-slides/SKILL.md` |
-| 介质为 Markdown，或不外加载 HTML refer | 内置 Markdown 准则（见文末） | — |
+| 介质为 Markdown | 内置 Markdown 准则（见文末） | — |
 
-两行都走同一个 refer：差别在输入（临时 md vs 用户已有 md）和产物（默认只留 html）。不要因为走了 baoyu 就再落一份 `.md`。
+不要因为要出 HTML 就走 baoyu。baoyu 只服务公众号/微信，或用户显式 md→html。走 baoyu 时也不要再落一份 `.md`。
 
 ### 内容类型 → 默认（仅当介质已定为 HTML、形式未说清）
 
 | 内容 | 默认 | 改口 |
 |------|------|------|
-| 文档 / 知识 / 长报告 / 方案（给人读） | `baoyu-markdown-to-html` | 用户说要汇报、路演、翻页 → `html-ppt` |
+| 文档 / 知识 / 长报告 / 方案（给人读） | 内置 HTML 准则（全宽） | 公众号/微信 → baoyu；汇报、路演、翻页 → `html-ppt` |
 | 方案答辩、技术分享、周报演示、pitch | `html-ppt` | 用户点名 reveal.js → `html-slides` |
 | code review | **默认走 Markdown**（PR 友好）；仅当用户要「给团队讲这次 review」才用 `html-ppt` | — |
 
@@ -87,11 +89,12 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 ### 加载 refer 时的约束
 
-- `{baseDir}` = 被 Read 的那个 refer 目录（含 `SKILL.md` 的那一层），不是当前 git 仓库根。
-- `baoyu-markdown-to-html` 若要求先跑 `baoyu-format-markdown`：本仓库未 vendor 该 skill，**跳过**，直接转换。脚本默认把 HTML 写在源 `.md` 同目录 → **转完立刻把 html 移到落盘路径**，不要把展示产物留在源旁或 `references/`。用户只要 HTML 时，源 md 必须是临时文件并在移走 html 后删除，**不要**在 `docs/pretty-view/` 留下 `.md`。
+- 内置阅读页：Read `references/html-page.md`（本仓库文件，**不是**第三方 skill）。按其骨架直写 `.html`。
+- `{baseDir}` = 被 Read 的那个 vendor refer 目录（含 `SKILL.md` 的那一层），不是当前 git 仓库根。
+- `baoyu-markdown-to-html` 仅用于公众号/微信或显式 md→html。若要求先跑 `baoyu-format-markdown`：本仓库未 vendor 该 skill，**跳过**，直接转换。脚本默认把 HTML 写在源 `.md` 同目录 → **转完立刻把 html 移到落盘路径**，不要把展示产物留在源旁或 `references/`。显式 md→html 时用用户已有文件，**不要**把源 md 复制进 `docs/pretty-view/`。
 - `html-ppt`：只 Read 其 `SKILL.md` 与按需的 `references/*.md`；主题/布局从 `assets/`、`templates/` 复制到落盘目录，不在快照里改模板。共享静态资源放到 `docs/pretty-view/_assets/`（已有则复用）。
 - `html-slides` 依赖 jsDelivr 上的 reveal.js；离线或用户禁止外链时改走 `html-ppt`，并说明原因。
-- 不要修改 `references/` 里的第三方文件；升级走重新 vendor（见同目录 `README.md`）。
+- 不要修改 `references/` 里的第三方文件（`html-page.md` 除外）；升级走重新 vendor（见同目录 `README.md`）。
 
 ## 落盘（默认 `docs/pretty-view/`）
 
@@ -108,7 +111,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 | kind | 用于 |
 |------|------|
-| `articles` | 长文阅读页（baoyu HTML） |
+| `articles` | 长文阅读页（默认全宽 HTML；公众号才 baoyu） |
 | `knowledge` | 知识整理 |
 | `reports` | 报告 |
 | `proposals` | 方案 |
@@ -183,8 +186,31 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 ## 偏好
 
 - 默认介质：
-- 默认 HTML 形式：阅读页 / 幻灯片
+- 默认 HTML 形式：阅读页（全宽） / 幻灯片 / 公众号
 ```
+
+## 内置 HTML 准则（阅读页默认）
+
+介质为 HTML、形式为阅读页、且**不是**公众号/微信、也**不是**显式 md→html 时使用。生成前 Read `references/html-page.md`。**直写 `.html`。**
+
+### 默认全宽
+
+- 页面铺满视口：`html, body { width: 100%; margin: 0; }`。主栏用 padding（约 `clamp(24px, 4vw, 56px)`），**不要** `max-width: 680–800px; margin: 0 auto` 的公众号栏。
+- 主容器默认**不设** `max-width`。用户说「不要太宽 / 限宽」时可用 `max-width: 1320px; margin: 0 auto`；未说则铺满。
+- 表格、代码块、图、多栏网格与主栏同宽。长段落可读性不够时，只给 `p` / `.lede` 设 `max-width: 72ch`，不要把整个页面收窄。
+- 窄栏仅当用户要公众号、微信、阅读栏，或走 baoyu 时（baoyu 输出窄栏是预期）。
+
+### 结构与技术
+
+- 完整可打开的单文件（或包内 `index.html` + 同目录 css）。`<!DOCTYPE html>`、`lang="zh-CN"`、viewport。
+- `file://` 能开：内联 CSS 或相对路径；不要依赖 skill 目录里的资源。不要默认外链 JS 框架。
+- 一个 H1；开头结论或 TL;DR；语义标签。内容骨架复用下方 Markdown「按内容类型」。
+- 不要手写「← 目录」回链（catalog 脚本会注入）。不要手改根 `index.html`。
+
+### 反例
+
+- 先写 `.md` 再 baoyu 转阅读页（除非用户显式 md→html 或要公众号）。
+- 紫渐变 + Inter 灰卡片；居中窄栏冒充全宽。
 
 ## 内置 Markdown 准则（兜底）
 
@@ -220,8 +246,9 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 
 ## 边界
 
-- 不自动触发普通写作/评审；一次只加载一个 HTML refer skill；**不修改** `references/` 下的第三方快照。
-- 默认只生成 Markdown / HTML 其中一种；md→html 须显式说明（见「单介质与 md→html 强门禁」）。
+- 不自动触发普通写作/评审；HTML 一次只走一条路径（内置阅读页 **或** 一个 vendor refer）；**不修改** `references/` 下的第三方快照。
+- 阅读页默认全宽直写 HTML；md→html 与公众号才走 baoyu（见「单介质与 md→html 强门禁」）。
+- 默认只生成 Markdown / HTML 其中一种。
 - 不把密钥、内部 URL、公司代码贴进可公开的 HTML/PPT。
 - 本 skill 不替代内容创作 skill；输入应是已有草稿、仓库文件或本轮已生成的正文。
 - 大改已有展示页/deck 前，先说明会动哪些文件。

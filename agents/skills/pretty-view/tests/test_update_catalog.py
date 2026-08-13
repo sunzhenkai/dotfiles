@@ -50,6 +50,8 @@ class CatalogTest(unittest.TestCase):
             self.assertEqual(code, 0)
             catalog = (root / "index.html").read_text(encoding="utf-8")
             self.assertIn('href="proposals/2026-08-13-auth.html"', catalog)
+            self.assertIn("width:100%", catalog)
+            self.assertNotIn("max-width:720px", catalog)
             self.assertNotIn("notes.md", catalog)
             self.assertIn("浏览器入口", (root / "INDEX.md").read_text(encoding="utf-8"))
             page = article.read_text(encoding="utf-8")
