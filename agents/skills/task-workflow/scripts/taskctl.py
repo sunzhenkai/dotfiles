@@ -57,7 +57,7 @@ DIRTY_USER_ACTIONS = (
     },
     {
         "id": "abort",
-        "label": "中止，稍后再执行 task-apply",
+        "label": "中止，稍后再执行本命令",
     },
 )
 COMMAND_STATUS_PREFER: dict[str, tuple[str, ...]] = {
@@ -1149,6 +1149,16 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
             "action": "pending",
         }
         try:
+            cur = current_branch(repo)
+            entry["current_branch"] = cur
+            if cur == branch:
+                # Continuing on the task branch: dirty WIP is expected.
+                entry["action"] = "already_on_branch"
+                if is_dirty(repo):
+                    entry["dirty"] = True
+                results.append(entry)
+                continue
+
             if is_dirty(repo):
                 if args.skip_dirty:
                     entry["action"] = "skipped_dirty"
@@ -1157,13 +1167,6 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
                     results.append(entry)
                     continue
                 errors.append(blocked_dirty_entry(entry, repo))
-                continue
-
-            cur = current_branch(repo)
-            entry["current_branch"] = cur
-            if cur == branch:
-                entry["action"] = "already_on_branch"
-                results.append(entry)
                 continue
 
             # Detect default branch before mutating (may be develop/trunk/…).
@@ -1246,7 +1249,7 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
     confirm_lines = [
         "## 分支准备需要你确认",
         "",
-        "写代码前须先基于**远端默认分支**拉最新并检出新分支；下列仓库被阻断：",
+        "继续本任务前须先基于**远端默认分支**拉最新并检出 task 分支；下列仓库被阻断：",
         "",
     ]
     for e in errors:

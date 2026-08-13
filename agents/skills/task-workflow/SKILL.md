@@ -16,7 +16,7 @@ description: 跟踪一次需求交付（new/explore/design?/propose/apply/archiv
 task-new → task-explore? → task-design? → task-propose → task-apply → task-archive
 ```
 
-`task-design` 为**可选**环节：新子系统、多方案权衡、跨模块契约时用；范围局部且路径唯一则可跳过，explore 后直接 propose。设计方法见 skill `task-design`；本 skill 管 Gate、`design/` 落盘与归档晋升。
+`task-design` 为**可选**环节：新子系统、多方案权衡、跨模块契约时用；范围局部且路径唯一则可跳过，explore 后直接 propose。设计方法见 skill `task-design`；本 skill 管 Resolution / Checkout Gate、`design/` 落盘与归档晋升。
 
 `tasks/` 与 `openspec/changes/` 为并行容器：tasks 跟踪交付生命周期，OpenSpec 承载可验证契约；互不替代。task 侧通过委托 `openspec-explore` / `openspec-propose` / `openspec-apply-change` / `openspec-archive-change`（若已安装对应 skill；否则用 `openspec` CLI 与仓库 `openspec/` 约定完成同等步骤）完成契约工作。
 
@@ -38,7 +38,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 | `new --slug <slug> [--title ...] [--date YYYY-MM-DD]` | 分配 `TNNNN`、建目录与 README 骨架、更新 INDEX | 0 |
 | `archive <query> [--allow-missing-changes]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
 | `repo-roots <path> [...]` | 解析为去重后的 git 根（工作区相对路径；`.` = 工作区自身） | 0 / 1 |
-| `prepare-branches --slug <slug> --repo <path>` | dirty 门禁 + `fetch`/基线/`checkout -b <prefix>-<slug>` | 0 / 1 |
+| `prepare-branches --slug <slug> --repo <path>` | Checkout Gate：脏仓门禁 + `fetch`/基线/`checkout -b <prefix>-<slug>` | 0 / 1 |
 | `git-summary --repo <path> [--branch ...] [--base ...]` | 只读 log/diff，产出 `changes.md` 素材（含 `markdown`） | 0 / 1 |
 
 - stdout：**仅 JSON**（`ok` / `result` / `task` 或 `exit_markdown`）。
@@ -46,7 +46,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 - `resolve`/`set-status`/`archive` 在零/多命中或 `needs_confirm` 时打印 `exit_markdown`，**中止主流程**，等待用户选择。
 - `new` 只建骨架；概述/现状缺口/涉及面/验收等正文仍由 Agent 填写。
 - `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。
-- `prepare-branches`：写代码前 **MUST** 先跑；解析**远端默认分支**（`origin/HEAD`，未必是 main/master）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b <prefix>-<slug>`。`--repo` 为工作区相对 git 路径（单仓用 `.`；多仓重复 `--repo`）。脏仓 / pull 失败 → `needs_user_confirm` + `user_actions` + `exit_markdown`，**停下来让用户确认**；仅用户明确同意后才可 `--skip-dirty`。已在目标分支则跳过；支持 `--dry-run`；不 `push`；禁止擅自 `stash`/`reset --hard`/`checkout -f`。
+- `prepare-branches`：Checkout Gate 的机械实现。身份确定后、写仓库前 **MUST** 先跑（不要拖到 `task-apply`）。解析**远端默认分支**（`origin/HEAD`，未必是 main/master）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b <prefix>-<slug>`。`--repo` 为工作区相对 git 路径（单仓用 `.`；多仓重复 `--repo`）。已在目标分支则跳过（**允许脏工作区**，视为续作）。脏仓且不在目标分支 / pull 失败 → `needs_user_confirm` + `user_actions` + `exit_markdown`，**停下来让用户确认**；仅用户明确同意后才可 `--skip-dirty`。支持 `--dry-run`；不 `push`；禁止擅自 `stash`/`reset --hard`/`checkout -f`。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区。
 - 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。
 
@@ -155,22 +155,28 @@ python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令�
 
 同一仓库根去重；标注必须 / 建议 / 排除。涉及面全量节点 ≠ 本阶段全部建分支。
 
-## 分支命名与 Git 安全（task-apply）
+## Checkout Gate（task 分支）
 
-- 格式：`<prefix>-<slug>`（用 slug，不用带 T 前缀的目录名）
+身份确定之后、写入仓库之前，**MUST** 检出 `<prefix>-<slug>`（用 slug，不用带 T 前缀的目录名）。不要等到 `task-apply` 才建分支：task 文档与 OpenSpec 提案应与实现落在同一分支。
+
+| 命令 | 何时跑 |
+|------|--------|
+| `task-new` | slug + 涉及面已定，**先于** `taskctl new`（骨架落在新分支上） |
+| `task-explore` / `task-design` / `task-propose` / `task-apply` | `resolve` 成功后立刻（读 README 涉及面必须仓） |
+
+`task-archive` **不要**跑 `prepare-branches`：分支若已合并删除，脚本会从默认分支重建空枝。归档用 `git-summary --branch <prefix>-<slug>`。
+
 - prefix：`feat`（默认）| `fix` | `chore` | `refactor`
-- **写业务代码前 MUST** 完成分支准备（默认分支拉最新 → 新分支）
-
-**检查范围：** README 涉及面中的目标 git 仓（单仓即为工作区 `.`）。
+- **检查范围：** 涉及面中的**必须** git 仓（task-new 用本轮梳理的必须仓；单仓即为 `.`）。建议仓本阶段不建分支。
 
 ```bash
 python3 <this-skill>/scripts/taskctl.py prepare-branches \
   --slug <slug> --prefix feat --repo . [--repo path/to/other] [--dry-run]
 ```
 
-流程（脚本内）：检测默认分支（`origin/HEAD` / `remote show`，**不假设 main**）→ 脏仓门禁 → `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b`（或切到已有同名分支）。
+流程（脚本内）：已在目标分支则跳过（**允许脏工作区**，视为续作）→ 否则脏仓门禁 → 检测默认分支（`origin/HEAD` / `remote show`，**不假设 main**）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b`（或切到已有同名分支）。
 
-若 JSON `needs_user_confirm=true`（脏工作区、pull 失败等）：
+若 JSON `needs_user_confirm=true`（脏工作区且不在目标分支、pull 失败等）：
 
 1. **立即停止**，展示 `exit_markdown` / `user_actions` / `dirty_porcelain`
 2. 等用户明确指示（提交清理 / 允许 `--skip-dirty` / 中止）
@@ -185,45 +191,49 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 1. 从描述推导 `slug`；不足则追问
 2. 梳理涉及面（代码库表：必须/建议/排除）
 3. 对照目标梳理**现状缺口**（已有 vs 仍缺；信息/实现/资产/配置/依赖确认）
-4. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX
-5. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准
-6. 输出 ID、路径、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
+4. **Checkout Gate**：`prepare-branches --slug <slug>`（必须仓）；`needs_user_confirm` 则停等用户。先切分支再写文件，避免骨架落在默认分支
+5. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX
+6. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准
+7. 输出 ID、路径、分支、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
 
 ### task-explore
 
 1. `taskctl resolve` Gate（有 ID 显式传；否则 `--infer --hint ...`；`needs_confirm` 则停）
-2. 加载 README 涉及面与 `task.openspec`
-3. **委托** `openspec-explore`：把 task 概述/涉及面作为探索上下文；不写业务代码
-4. 将结论要点写回 README「变更记录」或「方案笔记」；若原 status 为 `draft` → `taskctl set-status <id> exploring`
-5. 输出探索摘要 + 桥接：仍有架构分叉 / 新子系统 / 用户要全面设计 → `{{slash:task-design}}`；范围已清、路径唯一 → `{{slash:task-propose}}`
+2. 加载 README 涉及面必须仓 → **Checkout Gate** `prepare-branches --slug <slug>`；`needs_user_confirm` 则停
+3. 加载 `task.openspec` 与其余 README 上下文
+4. **委托** `openspec-explore`：把 task 概述/涉及面作为探索上下文；不写业务代码
+5. 将结论要点写回 README「变更记录」或「方案笔记」；若原 status 为 `draft` → `taskctl set-status <id> exploring`
+6. 输出探索摘要 + 桥接：仍有架构分叉 / 新子系统 / 用户要全面设计 → `{{slash:task-design}}`；范围已清、路径唯一 → `{{slash:task-propose}}`
 
 ### task-design
 
 可选。无 task 则先 `{{slash:task-new}}`。方法细节读 skill `task-design`。
 
 1. `taskctl resolve` Gate（同上，可推断）
-2. 加载 README 概述、涉及面、explore 结论
-3. **只写入** `<taskRoot>/design/`（`README.md` 索引 + 归档落点表 + 设计正文）。**禁止**此时写 `docs/design/`、ADR、knowledge
-4. 在 task README「设计文档」记录文件与计划落点；`taskctl set-status <id> designed`
-5. 输出 staged 路径、归档落点表、未决问题、`{{slash:task-propose}} TNNNN` 桥接
+2. 加载 README 涉及面必须仓 → **Checkout Gate** `prepare-branches --slug <slug>`；`needs_user_confirm` 则停
+3. 加载 README 概述、explore 结论
+4. **只写入** `<taskRoot>/design/`（`README.md` 索引 + 归档落点表 + 设计正文）。**禁止**此时写 `docs/design/`、ADR、knowledge
+5. 在 task README「设计文档」记录文件与计划落点；`taskctl set-status <id> designed`
+6. 输出 staged 路径、归档落点表、未决问题、`{{slash:task-propose}} TNNNN` 桥接
 
 跳过条件：explore 后改动局部、可行路径只有一条、无跨模块契约。跳过则 status 保持 `exploring`，直接 propose。
 
 ### task-propose
 
 1. `taskctl resolve` Gate（同上，可推断）
-2. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
-3. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change
-4. 对每个计划中的 change **委托** `openspec-propose`
-5. 将全部 change 名与路径写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
-6. 输出 change 列表与 `{{slash:task-apply}} TNNNN` 桥接
+2. **Checkout Gate**：按 README 涉及面必须仓 `prepare-branches --slug <slug>`；`needs_user_confirm` 则停（OpenSpec 必须落在 task 分支，禁止写到默认分支）
+3. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
+4. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change
+5. 对每个计划中的 change **委托** `openspec-propose`
+6. 将全部 change 名与路径写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
+7. 输出 change 列表、分支与 `{{slash:task-apply}} TNNNN` 桥接
 
 ### task-apply
 
 1. `taskctl resolve` Gate（同上，可推断）
-2. 若 `task.openspec` 为空 → 中止并建议 `{{slash:task-propose}}`
-3. 识别目标仓 → `taskctl repo-roots` → **先** `prepare-branches`（默认分支拉最新 + 新分支）；`needs_user_confirm` 则停等用户
-4. 分支就绪后，对每个未完成 change **委托** `openspec-apply-change`；用户可指定子集
+2. **Checkout Gate**：识别目标仓 → `taskctl repo-roots` → `prepare-branches`；`needs_user_confirm` 则停等用户（已在目标分支则跳过）
+3. 若 `task.openspec` 为空 → 中止并建议 `{{slash:task-propose}}`
+4. 对每个未完成 change **委托** `openspec-apply-change`；用户可指定子集
 5. `taskctl set-status <id> in_progress`（或 `blocked`）；可选覆盖写 `progress.md`
 6. 输出：分支表、各 change 进度、交接（续作：`{{slash:task-apply}} TNNNN`）
 

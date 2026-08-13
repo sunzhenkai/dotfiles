@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-对 task 已关联的 OpenSpec change 执行实施：必要时在目标仓基于默认分支拉最新并建分支，再委托 `openspec-apply-change`。
+对 task 已关联的 OpenSpec change 执行实施：先 Checkout Gate（已在 task 分支则跳过），再委托 `openspec-apply-change`。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

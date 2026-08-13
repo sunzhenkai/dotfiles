@@ -1,4 +1,4 @@
 interface:
   display_name: "任务工作流"
   short_description: "按 new → explore → design? → propose → apply → archive 跟踪一次交付"
-  default_prompt: "用 $task-workflow 跟踪需求：task-new → task-explore → 可选 task-design → task-propose → task-apply → task-archive；INDEX/Gate/git 记账走 taskctl。"
+  default_prompt: "用 $task-workflow 跟踪需求：task-new → task-explore → 可选 task-design → task-propose → task-apply → task-archive；身份确定后先 Checkout Gate 检出 task 分支；INDEX/Gate/git 记账走 taskctl。"

@@ -336,6 +336,21 @@ hello
         self.assertEqual(code, 0)
         self.assertEqual(payload["repos"][0]["action"], "skipped_dirty")
 
+    def test_prepare_branches_already_on_branch_allows_dirty(self) -> None:
+        repo = self._init_git_repo("svc")
+        self._git(repo, "checkout", "-b", "feat-x")
+        (repo / "dirty.txt").write_text("x\n", encoding="utf-8")
+        code, payload = self._run(
+            "prepare-branches",
+            "--slug",
+            "x",
+            "--repo",
+            "svc",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["repos"][0]["action"], "already_on_branch")
+        self.assertTrue(payload["repos"][0].get("dirty"))
+
     def test_git_summary(self) -> None:
         repo = self._init_git_repo("svc")
         self._git(repo, "checkout", "-b", "feat-sum")

@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-为 task 制定 OpenSpec 提案：按涉及面委托 `openspec-propose`，并在 README 记录全部 change。
+为 task 制定 OpenSpec 提案：resolve 后先 Checkout Gate（提案落在 task 分支），再按涉及面委托 `openspec-propose`，并在 README 记录全部 change。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-在已解析的 task 上下文中探索方案（不写业务代码），主路径委托 `openspec-explore`。
+在已解析的 task 上下文中探索方案（不写业务代码）：resolve 后先 Checkout Gate，再委托 `openspec-explore`。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
