@@ -147,4 +147,4 @@ scripts/config.sh agents
 
 ## 示例条目
 
-仓库自带：`browser`、`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`dotf-ui-design`（skill + command）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-workflow`（skill + `task-new`/`task-explore`/`task-design`/`task-propose`/`task-apply`/`task-archive` commands）、`task-design`（复杂任务可选设计环节）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`task-workflow` 在已安装时委托它们。
+仓库自带：`browser`、`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`dotf-ui-design`（skill + command）、`pretty-view`（文档/知识/报告/code review/方案的 HTML 或 Markdown 展示门卫，按需加载 baoyu-markdown-to-html / html-ppt / html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-workflow`（skill + `task-new`/`task-explore`/`task-design`/`task-propose`/`task-apply`/`task-archive` commands）、`task-design`（复杂任务可选设计环节）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`task-workflow` 在已安装时委托它们。
