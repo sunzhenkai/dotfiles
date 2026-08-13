@@ -16,7 +16,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按下方「介质推断」自动选择；**不明确时必须向用户确认，禁止猜测。** 介质未定时，禁止 Read 任何 refer skill。
 3. **门 3 · HTML 再路由**：介质为 HTML 后，按「HTML 路由表」选一个 refer skill。多条都沾边时再问用户。一次只 **Read** 一个 refer skill 的 `SKILL.md`，按其指引执行；用完即弃。
 4. **门 4 · 产物不污染快照**：落盘规则见下节。**禁止**写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把 `assets/` 与所选模板拷到落盘目录，按相对路径引用。
-5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种（`INDEX.md` 是目录，不算正文）。选 HTML ≠ 先写一份 `.md` 再转 html 并两份都留。把已有 Markdown 转成 HTML 须显式说明，见「单介质与 md→html 强门禁」。
+5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种（`INDEX.md` / `index.html` 是目录，不算正文）。选 HTML ≠ 先写一份 `.md` 再转 html 并两份都留。把已有 Markdown 转成 HTML 须显式说明，见「单介质与 md→html 强门禁」。
 
 ## 介质推断（HTML vs Markdown）
 
@@ -99,12 +99,12 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 1. **路径**：用户指定了就用指定路径；未指定则默认 `docs/pretty-view/<kind>/<slug>`（相对当前项目根）。
 2. **存在性**：目标路径（指定路径，或默认根 `docs/pretty-view/`）**已存在 → 直接写入**；**不存在 → 先确认再创建**，说明将创建的目录与文件名。确认前不 mkdir、不写文件。
-3. **索引**：凡写入 `docs/pretty-view/` 树，必须维护层级与 `INDEX.md`（见下）。写到该树以外时不强制建索引。
+3. **索引**：凡写入 `docs/pretty-view/` 树，必须维护层级、`INDEX.md`，以及（有 HTML 时）`index.html`（见下）。写到该树以外时不强制建索引。
 4. **单介质**：INDEX 只登记实际落盘的那种介质。不要给同一 slug 同时建 `.md` 和 `.html`，除非用户显式要求保留源稿。确认落盘路径时只报将创建的那一种文件（选 HTML 就只报 `.html`）。
 
 ### 层级
 
-不要把产物堆在 `docs/pretty-view/` 根下（根上只放 `INDEX.md`，以及幻灯片共享的 `_assets/`）。
+不要把产物堆在 `docs/pretty-view/` 根下（根上只放 `INDEX.md`、有 HTML 时的 `index.html`，以及幻灯片共享的 `_assets/`）。
 
 | kind | 用于 |
 |------|------|
@@ -115,23 +115,57 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 | `reviews` | code review |
 | `slides` | PPT / 幻灯片（`html-ppt` / `html-slides`） |
 
-- 单文件：`docs/pretty-view/<kind>/YYYY-MM-DD-<slug>.html` 或 `.md`（同 slug 不要两种都建，除非用户显式要求保留源稿）
-- 幻灯片目录：`docs/pretty-view/slides/<slug>/index.html`，资源指向 `../../_assets/` 或目录内相对路径
-- `<slug>`：kebab-case，取自标题；同名已存在则换 slug（加后缀）或先问，禁止静默覆盖
+`<slug>`：kebab-case，取自标题；同名已存在则换 slug（加后缀）或先问，禁止静默覆盖。同 slug 不要同时建 `.md` 和 `.html`，除非用户显式要求保留源稿。
+
+**一次一个文件** → 扁平：
+
+`docs/pretty-view/<kind>/YYYY-MM-DD-<slug>.html` 或 `.md`
+
+**一次多个文件**（多篇阅读页、正文+附属页、幻灯片、html + 局部资源等）→ 同名文件夹：
+
+`docs/pretty-view/<kind>/YYYY-MM-DD-<slug>/`
+
+- 主文件固定为 `index.html`（主文档 / 封面；多篇对等时由它做包内目录）。Markdown 包则用 `index.md`。
+- 其余文件放在同一文件夹内，由**主文件**链过去（包内路由）。
+- 根目录 `INDEX.md` / `index.html` **只登记这一份主文件**，不要把包内每一页都加进去。
+- 幻灯片一律走包：`docs/pretty-view/slides/<slug>/index.html`（可带日期前缀），资源指向 `../../_assets/` 或目录内相对路径。
+
+禁止：把一次生成的多篇 HTML 平铺在 kind 目录下，再逐篇写进根索引。
 
 ### 索引
 
-`docs/pretty-view/INDEX.md` 是该树的目录。首次在已确认的根下写入时若不存在则创建；之后每增一篇就改一行，核对链接可点。
+两份目录，职责不同。缺 `index.html` 时，浏览器 / `file://` / 静态服务器没有入口，生成的 HTML 就是死链。
+
+| 文件 | 给谁 | 内容 |
+|------|------|------|
+| `INDEX.md` | git / GitHub / 人读 | 全部条目（HTML 与 Markdown） |
+| `index.html` | **浏览器入口** | 只列出 HTML **入口**（扁平文件或包内 `index.html`） |
+
+维护顺序（写入 `docs/pretty-view/` 树时 **MUST**）：
+
+1. 先改 `INDEX.md`：**每个包或每个单文件只一行**（首次不存在则创建）。类型用上表 kind。多文件包的路径指向主文件 `…/<slug>/index.html`，不要为包内附属页各加一行。
+2. 只要树里存在任意 HTML 产物（不含 `_assets/`、不含根上这份 catalog）：立刻跑 catalog 脚本，**禁止手写/重设计** `index.html`。
+3. 仅 Markdown、树里没有任何 HTML 时：不创建 `index.html`。删掉最后一篇 HTML 后同样跑脚本（脚本会去掉 catalog，避免指向空页）。
+4. 交付 HTML 时把 `docs/pretty-view/index.html` 当作入口告诉用户；单篇/主文件路径可以附上，但不能只给单篇、也不能罗列包内每一页。
+
+```bash
+python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
+```
+
+`<this-skill>` 是含本 `SKILL.md` 的目录（安装后常见于 `~/.cursor/skills/pretty-view/` 或项目 `.claude/skills/pretty-view/` 等）。**不要**假设脚本在当前仓库根下。脚本会：按 `INDEX.md` + 磁盘上的**入口** HTML（kind 下扁平文件，或包目录里的 `index.html`）生成根 `index.html`；包内其他 HTML 不进根目录、也不当孤儿；给阅读页主文件注入「← 目录」回链（幻灯片不注入）；INDEX 漏登记某个入口会警告并补上。退出码 1 = INDEX 里有指向不存在文件的死链，先补文件或改 INDEX 再重跑。
 
 ```markdown
 # pretty-view
 
+浏览器入口：[index.html](index.html)。
+
 | 日期 | 标题 | 类型 | 介质 | 路径 |
 |------|------|------|------|------|
 | 2026-08-13 | 鉴权方案 | proposals | HTML | [proposals/2026-08-13-auth.html](proposals/2026-08-13-auth.html) |
+| 2026-08-13 | 鉴权系列 | proposals | HTML | [proposals/2026-08-13-auth-series/index.html](proposals/2026-08-13-auth-series/index.html) |
 ```
 
-类型用上表 kind。不要另起平行 README 当第二份目录；需要说明用法时在 INDEX 文首写一小段即可。
+不要另起平行 README 当第二份目录；需要说明用法时在 INDEX 文首写一小段即可。
 
 ## 项目记录：`.pretty-view.md`（可选）
 
@@ -181,7 +215,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 ### 落点
 
 - 只要对话里看 → 直接输出 Markdown，不落盘。
-- 需要落盘 → 走「落盘」节（默认 `docs/pretty-view/`，维护 INDEX）。
+- 需要落盘 → 走「落盘」节（默认 `docs/pretty-view/`，维护 INDEX.md；有 HTML 时再维护 index.html）。
 - 默认不同时落盘 `.md` 与 `.html`。仅当用户**显式**要求保留源稿时才并存；并存时 Markdown 是源、HTML 是生成物，不要两套手改正文。
 
 ## 边界

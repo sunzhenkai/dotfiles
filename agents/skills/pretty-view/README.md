@@ -1,7 +1,7 @@
 # pretty-view 使用文档（人类阅读）
 
 > 本文档面向人：说明 pretty-view 门卫 skill 的设计、用法与维护。
-> 它**不随 sync 分发**（sync 只拷贝 `SKILL.md` 和 `references/`），也**不应被 skill/模型引用加载**；agent 侧行为以 `SKILL.md` 为准。
+> 它**不随 sync 分发**（sync 只拷贝 `SKILL.md`、`references/` 和 `scripts/`），也**不应被 skill/模型引用加载**；agent 侧行为以 `SKILL.md` 为准。
 
 ## 1. 为什么做门卫
 
@@ -69,8 +69,9 @@ scripts/agents/sync.sh all
 未指定路径且需要落盘时，写到当前项目 `docs/pretty-view/<kind>/<slug>`。
 
 - `docs/pretty-view/`（或用户指定路径）**已存在 → 直接写**；**不存在 → 先确认再创建**。
-- 根下只放 `INDEX.md` 与可选 `_assets/`；正文按 kind 分目录（`articles` / `knowledge` / `reports` / `proposals` / `reviews` / `slides`）。
-- 每写一篇更新 `INDEX.md`，保持链接可点。明确只要对话里看则不落盘。
+- 根下只放 `INDEX.md`、有 HTML 时的 `index.html`，与可选 `_assets/`；正文按 kind 分目录（`articles` / `knowledge` / `reports` / `proposals` / `reviews` / `slides`）。
+- 一次一个文件 → `kind/YYYY-MM-DD-<slug>.html`；一次多个文件 → 同名文件夹 `kind/YYYY-MM-DD-<slug>/`，主文件固定 `index.html`。根索引每包只登记这一份主文件，包内其余页由主文件链接。
+- 每写一篇/一包更新 `INDEX.md` 一行。只要树里有 HTML，再跑 `scripts/update-catalog.py` 生成根 `index.html`（浏览器入口）；缺它则生成的 HTML 在浏览器里无路由，等于死链。明确只要对话里看则不落盘。
 - 同篇默认只落 `.md` **或** `.html`。把已有 md 转成 html 须用户显式说「md 转 html」或点名已有 `.md`；未说则不要在 pretty-view 树里再写一份源稿。
 
 细则在 `SKILL.md`「落盘」节。
@@ -80,5 +81,7 @@ scripts/agents/sync.sh all
 | 要做什么 | 改哪里 |
 |----------|--------|
 | 门禁、介质推断、路由、落盘、Markdown 准则 | `agents/skills/pretty-view/SKILL.md`，然后 `scripts/agents/sync.sh all` |
+| HTML 目录页生成 | `agents/skills/pretty-view/scripts/update-catalog.py`（随分发；改完同样 sync） |
+| catalog 脚本测试 | `python3 agents/skills/pretty-view/tests/test_update_catalog.py`（不随分发） |
 | 升级/新增/移除第三方 refer | 第 6 节 + 路由表 + 本文第 5 节 |
 | 项目偏好 | 项目根 `.pretty-view.md`（可选） |
