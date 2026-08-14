@@ -86,15 +86,28 @@ next_id: 3
 
 ## Task Resolution Gate
 
-除 `{{slash:task-new}}` 外，所有 task command **第一步 MUST** 调用 `resolve`。有编号/路径时传入 query；**未指定时省略 query 并带上下文做自动推断**：
+除 `{{slash:task-new}}` 外，所有 task command **第一步 MUST** 调用 `resolve`。
+
+`taskctl` **看不到会话历史**，只看传入的 query 与 `--hint`。Agent **MUST** 先从本条消息和本会话上文抽出明确任务，再决定怎么调 `resolve`。
+
+**组 query / --hint（Agent MUST）**
+
+1. 本条已有唯一 `TNNNN` / `TNNNN-<slug>` / `tasks/...` 路径 → **显式 query**，不要 `--infer`
+2. 本条没有，但本会话上文已有**明确焦点任务** → **同样显式 query**。典型信号（须能指到唯一活跃 task，满足其一即可）：
+   - 本会话刚对该编号跑过 `task-apply` / `task-propose` / `task-design` / `task-explore`
+   - 桥接块已写带编号命令（如 `/task-archive T0007`）
+   - 用户刚对该任务打 tag / push，或说「归档当前任务」且上文编号唯一
+   - 上一条用户或助手已点名唯一 `TNNNN`
+3. 上文出现多个不同 `TNNNN` 且无法判断焦点 → `--infer`，**把这些编号都放进 `--hint`**；`needs_confirm` 时再问
+4. `--hint` MUST 包含：用户本条原文 + 本会话已点名的 `TNNNN`（若有）。**禁止**只传命令名（如 `/task-archive`）丢掉上文编号，再拿多个 `in_progress` 去问用户
 
 ```bash
-# 显式
+# 显式（本条或上文已有唯一编号时 MUST 走这条）
 python3 <this-skill>/scripts/taskctl.py resolve <TNNNN|slug|path> --command <当前命令名>
 
-# 未指定：自动推断（把用户原话放进 --hint）
+# 未指定且上文也无唯一焦点：自动推断
 python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令名> \
-  --hint "<用户消息原文>" [--cwd "$PWD"] [--git-branch "<当前分支>"]
+  --hint "<用户消息原文> <本会话已点名的 TNNNN，若有>" [--cwd "$PWD"] [--git-branch "<当前分支>"]
 ```
 
 - 退出码 **0**（`result=unique`，`confidence=deterministic`）：继续主流程。
@@ -119,7 +132,8 @@ python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令�
 | 6 | 最新创建日 / 更新日排序 | heuristic | **needs_confirm** |
 
 - heuristic（非确定性）无论候选 1 个还是多个，都 **MUST** 让用户确认/选择。
-- **禁止**仅凭模糊对话印象或 OpenSpec change 名在未跑 `resolve` 的情况下擅自选定 task。
+- **禁止**未跑 `resolve` 就选定 task；**禁止**把 OpenSpec change 名当成 task id。
+- **允许且必须**：把本会话已点名的唯一 `TNNNN` 当作显式 query（这不是「模糊印象」）。
 
 ## README status
 
@@ -245,7 +259,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-explore
 
-1. `taskctl resolve` Gate（有 ID 显式传；否则 `--infer --hint ...`；`needs_confirm` 则停）
+1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
 2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停
 3. 加载 `task.openspec`、README 与 `workflow_notes`
 4. **委托** `openspec-explore`：把 task 概述/涉及面与工作区笔记作为探索上下文；不写业务代码
@@ -256,7 +270,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 可选。无 task 则先 `{{slash:task-new}}`。方法细节读 skill `task-design`。
 
-1. `taskctl resolve` Gate（同上，可推断）
+1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
 2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停
 3. 加载 README 概述、explore 结论
 4. **只写入** `<taskRoot>/design/`（`README.md` 索引 + 归档落点表 + 设计正文）。**禁止**此时写 `docs/design/`、ADR、knowledge
@@ -267,7 +281,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-propose
 
-1. `taskctl resolve` Gate（同上，可推断）
+1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
 2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切将写入 OpenSpec 的必须仓）。`needs_user_confirm` 则停（OpenSpec 写进哪个仓，就只在那个仓切 task 分支）
 3. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
 4. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change
@@ -277,7 +291,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-apply
 
-1. `taskctl resolve` Gate（同上，可推断）
+1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
 2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓，不要用 `.` 凑数）。`needs_user_confirm` 则停等用户（已在目标分支则跳过）
 3. 若 `task.openspec` 为空 → 中止并建议 `{{slash:task-propose}}`
 4. 对每个未完成 change **委托** `openspec-apply-change`；用户可指定子集
@@ -286,7 +300,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-archive
 
-1. `taskctl resolve` Gate（同上，可推断）
+1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
 2. 对 README 中仍活跃的关联 change，依次 **委托** `openspec-archive-change`；已归档则跳过；用户确认后可跳过失败项
 3. **晋升设计文档**（若 `<taskRoot>/design/` 存在）：按 `design/README.md` 归档落点表，把文档复制到目标仓正式位置（`docs/design/<domain>/`、ADR、knowledge）；更新该仓 INDEX/README 交叉引用并核对链接。落点不明则停下来问，不要发明目录。`design/` **原件保留**，随 task 目录归档作快照。无 `design/` 则跳过
 4. `taskctl git-summary --repo <必须仓路径> [--branch feat-<slug>]` 取素材 → 人工核对后写入 `changes.md`（可补 PR/备注；写明已晋升的设计路径；不要对无关仓采摘要）

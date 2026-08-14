@@ -12,6 +12,6 @@ tags: [task, workflow, openspec]
 
 **MUST 先读取并执行** skill `task-workflow`（`task-explore` 职责）。机械步骤用 `taskctl`。开始时加载工作区 `.task-workflow.md`（`taskctl notes` 或 `resolve` 的 `workflow_notes`）。
 
-**输入**：任务编号（推荐 `T0001`）、slug 或路径；可省略（自动推断）；可选探索焦点。
+**输入**：任务编号（推荐 `T0001`）、slug 或路径；可省略（自动推断）。本条未写编号时，若本会话上文已有明确任务，MUST 当作已指定并显式传给 `resolve`，不要只把命令名放进 `--hint` 再让用户选。可选探索焦点。
 
 下一步：继续探索 → `{{slash:task-explore}} TNNNN`；复杂/多方案 → `{{slash:task-design}} TNNNN`；范围已清 → `{{slash:task-propose}} TNNNN`。

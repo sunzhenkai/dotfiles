@@ -12,6 +12,6 @@ tags: [task, workflow, openspec]
 
 **MUST 先读取并执行** skill `task-workflow`（`task-apply` 职责）。机械步骤用 `taskctl`。开始时加载工作区 `.task-workflow.md`（`taskctl notes` 或 `resolve` 的 `workflow_notes`）。
 
-**输入**：任务编号（推荐 `T0001`）等；可省略（自动推断）；可选仅实施部分 change 名；可选分支前缀。
+**输入**：任务编号（推荐 `T0001`）等；可省略（自动推断）。本条未写编号时，若本会话上文已有明确任务，MUST 当作已指定并显式传给 `resolve`，不要只把命令名放进 `--hint` 再让用户选。可选仅实施部分 change 名；可选分支前缀。
 
 下一步：续作 → `{{slash:task-apply}} TNNNN`；全部完成 → `{{slash:task-archive}} TNNNN`。
