@@ -10,7 +10,7 @@ tags: [task, workflow, openspec]
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
-**MUST 先读取并执行** skill `task-workflow`（`task-new` 职责）。机械步骤用 `taskctl`。
+**MUST 先读取并执行** skill `task-workflow`（`task-new` 职责）。机械步骤用 `taskctl`。开始时加载工作区 `.task-workflow.md`（`taskctl notes`）。
 
 **输入**：需求描述；可选 kebab-case slug（省略则从描述推导）。
 

@@ -12,6 +12,9 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py prepare-branches --slug my-feature --from-task T0002
   python3 scripts/taskctl.py prepare-branches --slug my-feature --repo path/to/target
   python3 scripts/taskctl.py git-summary --repo path/to/target --branch feat-my-feature
+  python3 scripts/taskctl.py notes
+  python3 scripts/taskctl.py notes --init
+  python3 scripts/taskctl.py notes --set-section 特殊要求 --body "验收必须带回归清单"
 
 `--root` defaults to the nearest ancestor that contains `tasks/`.
 `--repo` is a workspace-relative path to a git root that this task will modify.
@@ -48,6 +51,8 @@ HINT_ID_RE = re.compile(r"\b[Tt](\d{1,4})\b")
 HINT_PATH_RE = re.compile(
     r"(tasks/(?:archive/)?\d{4}-\d{2}-\d{2}/[A-Za-z0-9._-]+/?)"
 )
+WORKFLOW_NOTES_REL = ".task-workflow.md"
+HEADING_LINE_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*$")
 DIRTY_USER_ACTIONS = (
     {
         "id": "commit",
@@ -152,6 +157,153 @@ def find_repo_root(start: Path | None = None) -> Path:
 
 def index_path(root: Path) -> Path:
     return root / "tasks" / "INDEX.md"
+
+
+def workflow_notes_path(root: Path) -> Path:
+    return root / WORKFLOW_NOTES_REL
+
+
+def normalize_heading(raw: str) -> str:
+    return re.sub(r"\s+", " ", raw.strip().lstrip("#").strip()).lower()
+
+
+def ensure_trailing_newline(text: str) -> str:
+    return text if text.endswith("\n") else text + "\n"
+
+
+def parse_markdown_sections(text: str) -> list[dict[str, Any]]:
+    lines = text.splitlines()
+    starts: list[tuple[int, int, str]] = []
+    for i, line in enumerate(lines):
+        m = HEADING_LINE_RE.match(line)
+        if m:
+            starts.append((i, len(m.group(1)), m.group(2).strip()))
+    sections: list[dict[str, Any]] = []
+    for idx, (i, level, title) in enumerate(starts):
+        end = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
+        body = "\n".join(lines[i + 1 : end]).strip()
+        sections.append({"heading": title, "level": level, "body": body})
+    return sections
+
+
+def scaffold_workflow_notes(workspace_name: str) -> str:
+    return f"""# 任务工作流 — {workspace_name}
+
+跨任务仍有效的特殊要求、规格说明与默认涉及面。单次任务的概述/验收写在对应 task README，不要把一次性需求写进本文件。
+
+## 概览
+
+- （待补：本工作区如何走 task-*）
+
+## 特殊要求
+
+- （待补：分支前缀、验收习惯、保密、落盘位置等）
+
+## 规格说明
+
+- （待补：OpenSpec 落点、change 命名、设计晋升路径等）
+
+## 默认涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| — | | （尚无） |
+
+## 约定
+
+- （待补）
+
+## 手帐
+
+- （尚无）
+
+## 踩坑
+
+- （尚无）
+"""
+
+
+def read_workflow_notes(root: Path) -> dict[str, Any]:
+    path = workflow_notes_path(root)
+    if not path.is_file():
+        return {
+            "exists": False,
+            "path": WORKFLOW_NOTES_REL,
+            "markdown": "",
+            "sections": [],
+            "scope": empty_scope(),
+        }
+    text = path.read_text(encoding="utf-8")
+    return {
+        "exists": True,
+        "path": WORKFLOW_NOTES_REL,
+        "markdown": text,
+        "sections": parse_markdown_sections(text),
+        "scope": parse_scope(text),
+    }
+
+
+def write_workflow_notes(root: Path, markdown: str) -> Path:
+    path = workflow_notes_path(root)
+    path.write_text(ensure_trailing_newline(markdown), encoding="utf-8")
+    return path
+
+
+def upsert_markdown_section(text: str, heading: str, body: str) -> str:
+    body = body.strip()
+    lines = text.splitlines()
+    target = normalize_heading(heading)
+    start = None
+    level = 2
+    for i, line in enumerate(lines):
+        m = HEADING_LINE_RE.match(line)
+        if m and normalize_heading(m.group(2)) == target:
+            start = i
+            level = len(m.group(1))
+            break
+    if start is None:
+        base = ensure_trailing_newline(text.rstrip() + "\n") if text.strip() else ""
+        return base + f"## {heading}\n\n{body}\n"
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        m = HEADING_LINE_RE.match(lines[j])
+        if m and len(m.group(1)) <= level:
+            end = j
+            break
+    block = [lines[start], ""]
+    if body:
+        block.extend(body.splitlines())
+        block.append("")
+    return ensure_trailing_newline("\n".join(lines[:start] + block + lines[end:]).rstrip() + "\n")
+
+
+def with_workflow_notes(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    payload["workflow_notes"] = read_workflow_notes(root)
+    return payload
+
+
+def format_scope_table(scope: dict[str, Any] | None = None) -> str:
+    header = "| 逻辑库 | 路径 | 角色 |\n|--------|------|------|"
+    rows: list[str] = []
+    role_zh = {"must": "必须", "suggested": "建议", "excluded": "排除"}
+    if scope:
+        for role in ("must", "suggested", "excluded"):
+            for item in scope.get(role, []):
+                name = item.get("name") or item.get("path") or ""
+                path = item.get("path") or ""
+                rows.append(f"| {name} | `{path}` | {role_zh[role]} |")
+    if not rows:
+        return (
+            f"{header}\n"
+            "| （待补） | `path/to/repo`（仅工作区自身是目标时才写 `.`） | 必须 / 建议 / 排除 |"
+        )
+    return header + "\n" + "\n".join(rows)
+
+
+def scope_has_rows(scope: dict[str, Any] | None) -> bool:
+    if not scope:
+        return False
+    return bool(scope.get("must") or scope.get("suggested") or scope.get("excluded"))
 
 
 def rel_posix(root: Path, path: Path) -> str:
@@ -281,12 +433,12 @@ def _is_placeholder_scope_row(name: str, path: str, role: str) -> bool:
 
 
 def parse_scope(text: str) -> dict[str, Any]:
-    """Parse README 「涉及面」 table. checkout = must paths only (never cwd)."""
+    """Parse README 「涉及面」 or notes 「默认涉及面」 table. checkout = must only."""
     scope = empty_scope()
     lines = text.splitlines()
     start = None
     for i, line in enumerate(lines):
-        if re.match(r"^#{2,3}\s*涉及面", line):
+        if re.match(r"^#{2,3}\s*(?:默认)?涉及面", line):
             start = i + 1
             break
     if start is None:
@@ -968,7 +1120,9 @@ def scaffold_readme(
     slug: str,
     title: str,
     created: str,
+    scope: dict[str, Any] | None = None,
 ) -> str:
+    scope_table = format_scope_table(scope)
     return f"""# {title}
 
 **id：** {task_id}
@@ -1002,9 +1156,7 @@ def scaffold_readme(
 
 ### 涉及面
 
-| 逻辑库 | 路径 | 角色 |
-|--------|------|------|
-| （待补） | `path/to/repo`（仅工作区自身是目标时才写 `.`） | 必须 / 建议 / 排除 |
+{scope_table}
 
 ### 关联 OpenSpec
 
@@ -1692,23 +1844,29 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
             info = matches[0]
             print(f"当前任务：{info.task_id} — {info.task_root}", file=sys.stderr)
             return emit(
-                {
-                    "ok": True,
-                    "result": "unique",
-                    "confidence": "deterministic",
-                    "reason": "explicit_query",
-                    "task": asdict(info),
-                }
+                with_workflow_notes(
+                    root,
+                    {
+                        "ok": True,
+                        "result": "unique",
+                        "confidence": "deterministic",
+                        "reason": "explicit_query",
+                        "task": asdict(info),
+                    },
+                )
             )
         result = "zero" if not matches else "multi"
-        payload = {
-            "ok": False,
-            "result": result,
-            "confidence": "deterministic",
-            "matches": [asdict(m) for m in matches],
-            "active": [asdict(i) for i in infos],
-            "exit_markdown": exit_markdown(infos if result == "zero" else matches, command),
-        }
+        payload = with_workflow_notes(
+            root,
+            {
+                "ok": False,
+                "result": result,
+                "confidence": "deterministic",
+                "matches": [asdict(m) for m in matches],
+                "active": [asdict(i) for i in infos],
+                "exit_markdown": exit_markdown(infos if result == "zero" else matches, command),
+            },
+        )
         return emit(payload, code=2)
 
     # No query: auto-infer (optional --infer is implied when query omitted).
@@ -1728,11 +1886,11 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
             f"(infer:{inferred.get('reason')})",
             file=sys.stderr,
         )
-        return emit(inferred)
+        return emit(with_workflow_notes(root, inferred))
 
     # needs_confirm / zero
     print("任务推断需要确认", file=sys.stderr)
-    return emit(inferred, code=2)
+    return emit(with_workflow_notes(root, inferred), code=2)
 
 
 def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
@@ -1815,21 +1973,33 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     if task_root.exists():
         raise TaskError(f"directory already exists: {rel}")
 
+    notes = read_workflow_notes(root)
+    scope = notes["scope"] if scope_has_rows(notes.get("scope")) else None
+
     if args.dry_run:
         return emit(
-            {
-                "ok": True,
-                "result": "dry_run",
-                "taskId": task_id,
-                "taskRoot": rel,
-                "next_id_after": next_id + 1,
-            }
+            with_workflow_notes(
+                root,
+                {
+                    "ok": True,
+                    "result": "dry_run",
+                    "taskId": task_id,
+                    "taskRoot": rel,
+                    "next_id_after": next_id + 1,
+                },
+            )
         )
 
     task_root.mkdir(parents=True, exist_ok=False)
     readme = task_root / "README.md"
     readme.write_text(
-        scaffold_readme(task_id=task_id, slug=slug, title=title, created=created),
+        scaffold_readme(
+            task_id=task_id,
+            slug=slug,
+            title=title,
+            created=created,
+            scope=scope,
+        ),
         encoding="utf-8",
     )
     active.append(
@@ -1853,7 +2023,7 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         openspec=[],
         updated=created,
     )
-    return emit({"ok": True, "result": "created", "task": asdict(info)})
+    return emit(with_workflow_notes(root, {"ok": True, "result": "created", "task": asdict(info)}))
 
 
 def cmd_archive(root: Path, args: argparse.Namespace) -> int:
@@ -1939,6 +2109,102 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
             "archived_on": archived_on,
         }
     )
+
+
+def cmd_notes(root: Path, args: argparse.Namespace) -> int:
+    init = bool(getattr(args, "init", False))
+    from_file = getattr(args, "from_file", None)
+    set_section = getattr(args, "set_section", None)
+    dry_run = bool(getattr(args, "dry_run", False))
+
+    if sum(bool(x) for x in (init, from_file, set_section)) > 1:
+        raise TaskError("use only one of --init / --from-file / --set-section")
+
+    if init:
+        current = read_workflow_notes(root)
+        if current["exists"]:
+            print("工作区笔记已存在，未覆盖", file=sys.stderr)
+            return emit({"ok": True, "result": "exists", **current})
+        markdown = scaffold_workflow_notes(root.name)
+        if dry_run:
+            return emit(
+                {
+                    "ok": True,
+                    "result": "dry_run",
+                    "action": "init",
+                    "path": WORKFLOW_NOTES_REL,
+                    "markdown": markdown,
+                }
+            )
+        write_workflow_notes(root, markdown)
+        print(f"已创建工作区笔记：{WORKFLOW_NOTES_REL}", file=sys.stderr)
+        return emit({"ok": True, "result": "created", **read_workflow_notes(root)})
+
+    if from_file:
+        src = Path(from_file)
+        if not src.is_file():
+            raise TaskError(f"file not found: {from_file}")
+        markdown = src.read_text(encoding="utf-8")
+        if dry_run:
+            return emit(
+                {
+                    "ok": True,
+                    "result": "dry_run",
+                    "action": "write",
+                    "path": WORKFLOW_NOTES_REL,
+                    "markdown": markdown,
+                }
+            )
+        write_workflow_notes(root, markdown)
+        print(f"已写入工作区笔记：{WORKFLOW_NOTES_REL}", file=sys.stderr)
+        return emit({"ok": True, "result": "updated", **read_workflow_notes(root)})
+
+    if set_section:
+        body = (getattr(args, "body", None) or "").strip()
+        body_file = getattr(args, "body_file", None)
+        if body_file:
+            bp = Path(body_file)
+            if not bp.is_file():
+                raise TaskError(f"file not found: {body_file}")
+            body = bp.read_text(encoding="utf-8").strip()
+        if not body:
+            raise TaskError("--set-section requires --body or --body-file")
+        current = read_workflow_notes(root)
+        base = current["markdown"] if current["exists"] else scaffold_workflow_notes(root.name)
+        markdown = upsert_markdown_section(base, set_section, body)
+        created = not current["exists"]
+        if dry_run:
+            return emit(
+                {
+                    "ok": True,
+                    "result": "dry_run",
+                    "action": "set_section",
+                    "created": created,
+                    "path": WORKFLOW_NOTES_REL,
+                    "heading": set_section,
+                    "markdown": markdown,
+                }
+            )
+        write_workflow_notes(root, markdown)
+        print(
+            f"{'已创建并写入' if created else '已更新'}工作区笔记：{WORKFLOW_NOTES_REL} / {set_section}",
+            file=sys.stderr,
+        )
+        return emit(
+            {
+                "ok": True,
+                "result": "created" if created else "updated",
+                "heading": set_section,
+                **read_workflow_notes(root),
+            }
+        )
+
+    notes = read_workflow_notes(root)
+    if notes["exists"]:
+        print(f"已加载工作区笔记：{WORKFLOW_NOTES_REL}", file=sys.stderr)
+    else:
+        print("工作区尚无 .task-workflow.md", file=sys.stderr)
+    return emit({"ok": True, "result": "missing" if not notes["exists"] else "loaded", **notes})
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2097,6 +2363,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="allow roots matching default exclude markers (none by default)",
     )
     sum_p.set_defaults(func=cmd_git_summary)
+
+    notes_p = sub.add_parser(
+        "notes",
+        help="read/write workspace .task-workflow.md (standing requirements / specs)",
+    )
+    notes_p.add_argument(
+        "--init",
+        action="store_true",
+        help="create skeleton if missing; never overwrite an existing file",
+    )
+    notes_p.add_argument(
+        "--from-file",
+        dest="from_file",
+        help="replace the whole file with this markdown",
+    )
+    notes_p.add_argument(
+        "--set-section",
+        dest="set_section",
+        help="upsert a ## / ### section (creates skeleton if file is missing)",
+    )
+    notes_p.add_argument("--body", default="", help="section body for --set-section")
+    notes_p.add_argument(
+        "--body-file",
+        dest="body_file",
+        help="read --set-section body from a file",
+    )
+    notes_p.add_argument("--dry-run", action="store_true")
+    notes_p.set_defaults(func=cmd_notes)
 
     return p
 

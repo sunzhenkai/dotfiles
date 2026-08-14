@@ -1,7 +1,7 @@
 ---
 id: task-workflow
 name: task-workflow
-description: 跟踪一次需求交付（new/explore/design?/propose/apply/archive）；task-* 家族入口。在用户要立项、跟进需求任务、把 OpenSpec change 与交付生命周期串起来时使用。复杂任务可在 explore 之后走可选的 task-design。
+description: 跟踪一次需求交付（new/explore/design?/propose/apply/archive）；task-* 家族入口。工作区根 `.task-workflow.md` 保存跨任务特殊要求与规格。在用户要立项、跟进需求任务、把 OpenSpec change 与交付生命周期串起来时使用。复杂任务可在 explore 之后走可选的 task-design。
 ---
 
 # 任务工作流
@@ -41,6 +41,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 | `scope-repos <query> [--cwd ...]` | 解析 README 涉及面；`checkout` 仅为角色=必须的仓（不含 cwd） | 0 / 2 |
 | `prepare-branches --slug <slug> [--from-task <query>] [--repo <path>]` | Checkout Gate：只对必须修改的目标仓做脏仓门禁 + `fetch`/基线/`checkout -b <prefix>-<slug>` | 0 / 1 / 2 |
 | `git-summary --repo <path> [--branch ...] [--base ...]` | 只读 log/diff，产出 `changes.md` 素材（含 `markdown`） | 0 / 1 |
+| `notes` | 读写工作区根 `.task-workflow.md`（`--init` / `--from-file` / `--set-section`） | 0 / 1 |
 
 - stdout：**仅 JSON**（`ok` / `result` / `task` 或 `exit_markdown`）。
 - stderr：一行人读摘要（如「当前任务：T0002 — path」）。
@@ -50,6 +51,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 - `prepare-branches`：身份确定后、**写入目标代码仓之前**跑（不要拖到 `task-apply`）。**只切本任务需要修改的目标 git 仓**；解析远端默认分支（`origin/HEAD`，未必是 main/master）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b <prefix>-<slug>`。优先 `--from-task TNNNN`（从 README 涉及面取角色=必须的仓）。`--repo` 仅用于显式列出那些必须仓（task-new 时尚无 README 时）。**禁止**把 cwd / `.` 当作缺省目标：当前所在仓若不是必须修改的目标仓，**不得**切换。无必须仓则跳过（`skipped=no_target_repos`），不要用 `.` 凑数。已在目标分支则跳过（**允许脏工作区**，视为续作）。脏仓且不在目标分支 / pull 失败 → `needs_user_confirm` + `user_actions` + `exit_markdown`，**停下来让用户确认**；仅用户明确同意后才可 `--skip-dirty`。支持 `--dry-run`；不 `push`；禁止擅自 `stash`/`reset --hard`/`checkout -f`。
 - `scope-repos`：只读解析涉及面。`checkout` = 必须仓路径；建议/排除不在内；cwd 只出现在 `cwd_*` 报告里，不会加入 checkout。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区；`--repo` 同样只传必须仓。
+- `notes`：读/建/改工作区根 `.task-workflow.md`。`--init` 仅在文件不存在时建骨架；`--set-section` 在缺失时先建骨架再写入一节；`--from-file` 整文件替换。`resolve` / `new` JSON 亦含 `workflow_notes`。
 - 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。
 
 ## 任务编号与索引
@@ -164,6 +166,26 @@ python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令�
 
 涉及面全量节点 ≠ 本阶段全部建分支。写 `tasks/` 记账**不构成**切换工作区仓的理由。
 
+## 工作区笔记（`.task-workflow.md`）
+
+工作区根（含 `tasks/` 的目录）的 `.task-workflow.md` 记录**跨任务仍有效**的特殊要求、规格说明与默认涉及面。单次任务的概述/验收仍写 task README，不要把一次性需求塞进此文件。
+
+### 何时读写
+
+1. **每个 task-* 命令开始时**：`taskctl notes`（`resolve` / `new` JSON 的 `workflow_notes` 亦可）。`exists=true` 则把其中特殊要求 / 规格说明当作硬约束。
+2. **用户给出跨任务约定**（默认仓、分支前缀、保密、OpenSpec 落点、验收习惯等）或发现本工作区稳定规格 / 踩坑：立刻写回，不要等会话结束。
+3. **文件不存在**：不阻断。有内容要落盘时再 `--init` 或 `--set-section`（后者会先建骨架）。禁止为「空骨架」在每个 `task-new` 自动创建。
+4. **默认涉及面**：仅作 `task-new` 涉及面初值（`taskctl new` 会预填骨架表）；本任务仍以 README 涉及面为准。
+5. **禁止**写入密钥、token、内部未公开凭据。
+
+```bash
+python3 <this-skill>/scripts/taskctl.py notes
+python3 <this-skill>/scripts/taskctl.py notes --init
+python3 <this-skill>/scripts/taskctl.py notes --set-section 特殊要求 --body "- 验收必须带回归清单"
+```
+
+新建骨架含：概览、特殊要求、规格说明、默认涉及面、约定、手帐、踩坑。按实际删减，保持简洁。
+
 ## Checkout Gate（task 分支）
 
 身份确定之后、**写入目标代码仓之前**，对**必须修改的目标仓**检出 `<prefix>-<slug>`（用 slug，不用带 T 前缀的目录名）。不要等到 `task-apply` 才建分支：OpenSpec 与实现写进哪个仓，就只在那个仓切 task 分支。
@@ -208,22 +230,25 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ## 各命令职责（摘要）
 
+**每个命令开始时**先加载工作区笔记（见上）。`exists=true` 则遵守其中硬约束。
+
 ### task-new
 
-1. 从描述推导 `slug`；不足则追问
-2. 梳理涉及面（代码库表：必须=会修改 / 建议=只读 / 排除=无关）。当前仓若不是修改目标，标排除或不要列入必须
-3. 对照目标梳理**现状缺口**（已有 vs 仍缺；信息/实现/资产/配置/依赖确认）
-4. **Checkout Gate**：仅对必须仓 `prepare-branches --slug <slug> --repo <path>`（可重复 `--repo`；无必须仓则跳过）。**不要**传 cwd / `.`，除非工作区自身就是必须仓。`needs_user_confirm` 则停等用户
-5. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX（写在工作区 `tasks/`，不因此切工作区仓）
-6. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准
-7. 输出 ID、路径、分支、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
+1. `taskctl notes`：默认涉及面作为涉及面初值；特殊要求 / 规格写入本任务时仍须遵守
+2. 从描述推导 `slug`；不足则追问
+3. 梳理涉及面（代码库表：必须=会修改 / 建议=只读 / 排除=无关）。当前仓若不是修改目标，标排除或不要列入必须；笔记里的默认涉及面可作起点，按本任务修正
+4. 对照目标梳理**现状缺口**（已有 vs 仍缺；信息/实现/资产/配置/依赖确认）
+5. **Checkout Gate**：仅对必须仓 `prepare-branches --slug <slug> --repo <path>`（可重复 `--repo`；无必须仓则跳过）。**不要**传 cwd / `.`，除非工作区自身就是必须仓。`needs_user_confirm` 则停等用户
+6. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX（写在工作区 `tasks/`，不因此切工作区仓）
+7. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准（遵守工作区笔记硬约束）
+8. 输出 ID、路径、分支、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
 
 ### task-explore
 
 1. `taskctl resolve` Gate（有 ID 显式传；否则 `--infer --hint ...`；`needs_confirm` 则停）
 2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过；当前仓无关则不动）。`needs_user_confirm` 则停
-3. 加载 `task.openspec` 与其余 README 上下文
-4. **委托** `openspec-explore`：把 task 概述/涉及面作为探索上下文；不写业务代码
+3. 加载 `task.openspec`、README 与 `workflow_notes`
+4. **委托** `openspec-explore`：把 task 概述/涉及面与工作区笔记作为探索上下文；不写业务代码
 5. 将结论要点写回 README「变更记录」或「方案笔记」；若原 status 为 `draft` → `taskctl set-status <id> exploring`
 6. 输出探索摘要 + 桥接：仍有架构分叉 / 新子系统 / 用户要全面设计 → `{{slash:task-design}}`；范围已清、路径唯一 → `{{slash:task-propose}}`
 
@@ -270,6 +295,10 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 7. 桥接：列出已晋升文档路径
 
 ## 产物字段
+
+### `.task-workflow.md`（工作区根）
+
+跨任务仍有效的特殊要求、规格说明、默认涉及面。由 `taskctl notes` 读写；不是某个 task 目录的附件。
 
 ### changes.md（task-archive）
 

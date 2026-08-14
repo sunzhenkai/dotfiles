@@ -582,6 +582,107 @@ hello
         self.assertTrue(payload["errors"][0]["user_actions"])
         self.assertIn("确认", payload["exit_markdown"])
 
+    def test_notes_missing_then_init(self) -> None:
+        code, payload = self._run("notes")
+        self.assertEqual(code, 0)
+        self.assertFalse(payload["exists"])
+        self.assertEqual(payload["result"], "missing")
+        self.assertEqual(payload["path"], ".task-workflow.md")
+
+        code, payload = self._run("notes", "--init")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "created")
+        self.assertTrue(payload["exists"])
+        path = self.tmp / ".task-workflow.md"
+        self.assertTrue(path.is_file())
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("## 特殊要求", text)
+        self.assertIn("## 规格说明", text)
+        self.assertIn("## 默认涉及面", text)
+
+        code, payload = self._run("notes", "--init")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "exists")
+        self.assertEqual(path.read_text(encoding="utf-8"), text)
+
+    def test_notes_set_section_and_from_file(self) -> None:
+        code, payload = self._run(
+            "notes",
+            "--set-section",
+            "特殊要求",
+            "--body",
+            "- 验收必须带回归清单",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "created")
+        self.assertTrue(payload["exists"])
+        text = (self.tmp / ".task-workflow.md").read_text(encoding="utf-8")
+        self.assertIn("- 验收必须带回归清单", text)
+        self.assertIn("## 规格说明", text)
+
+        code, payload = self._run(
+            "notes",
+            "--set-section",
+            "特殊要求",
+            "--body",
+            "- 禁止提交密钥",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "updated")
+        text = (self.tmp / ".task-workflow.md").read_text(encoding="utf-8")
+        self.assertIn("- 禁止提交密钥", text)
+        self.assertNotIn("回归清单", text)
+        self.assertIn("## 规格说明", text)
+
+        src = self.tmp / "notes-in.md"
+        src.write_text("# 自定义\n\n## 规格说明\n\n- OpenSpec 落在目标仓\n", encoding="utf-8")
+        code, payload = self._run("notes", "--from-file", str(src))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "updated")
+        self.assertIn("OpenSpec 落在目标仓", payload["markdown"])
+        headings = [s["heading"] for s in payload["sections"]]
+        self.assertIn("规格说明", headings)
+
+    def test_notes_parse_default_scope_and_new_prefill(self) -> None:
+        (self.tmp / ".task-workflow.md").write_text(
+            """# 任务工作流
+
+## 默认涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+| notes | `other` | 建议 |
+""",
+            encoding="utf-8",
+        )
+        code, payload = self._run("notes")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["scope"]["checkout"], ["svc"])
+        self.assertEqual(payload["scope"]["suggested"][0]["path"], "other")
+
+        code, payload = self._run("new", "--slug", "from-notes", "--date", "2026-08-14")
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["workflow_notes"]["exists"])
+        readme = (self.tmp / "tasks/2026-08-14/T0001-from-notes/README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("| svc | `svc` | 必须 |", readme)
+        self.assertIn("| notes | `other` | 建议 |", readme)
+        self.assertNotIn("（待补）", readme.split("### 涉及面", 1)[1].split("### 关联", 1)[0])
+
+    def test_resolve_includes_workflow_notes(self) -> None:
+        self._seed_task("T0001", "alpha")
+        self._write_index(next_id=2)
+        (self.tmp / ".task-workflow.md").write_text(
+            "## 特殊要求\n\n- 分支前缀用 feat\n",
+            encoding="utf-8",
+        )
+        code, payload = self._run("resolve", "T0001")
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["workflow_notes"]["exists"])
+        self.assertIn("分支前缀用 feat", payload["workflow_notes"]["markdown"])
+
 
 if __name__ == "__main__":
     unittest.main()
