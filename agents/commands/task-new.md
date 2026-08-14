@@ -12,6 +12,6 @@ tags: [task, workflow, openspec]
 
 **MUST 先读取并执行** skill `task-workflow`（`task-new` 职责）。机械步骤用 `taskctl`。开始时加载工作区 `.task-workflow.md`（`taskctl notes`）。
 
-**输入**：需求描述；可选 kebab-case slug（省略则从描述推导）。
+**输入**：同一条里 `{{slash:task-new}}` 后的正文就是需求；slug 可省略（自动推导）。本 command 的流程说明不是需求。能一句话概括要做什么就创建，不要要用户重述或确认 slug。只有完全没有主题（光秃命令、或整段都是套话）才问一句「要做什么」。
 
 下一步：缺口偏方案 → `{{slash:task-explore}}`；范围已清 → `{{slash:task-propose}}`。

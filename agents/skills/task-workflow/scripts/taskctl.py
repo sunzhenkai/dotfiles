@@ -8,6 +8,7 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py resolve --infer --command task-apply --hint "继续 T0002"
   python3 scripts/taskctl.py set-status T0002 exploring
   python3 scripts/taskctl.py new --slug my-feature --title "标题"
+  python3 scripts/taskctl.py new --title "Optimize providers from model.dev"
   python3 scripts/taskctl.py archive T0002
   python3 scripts/taskctl.py prepare-branches --slug my-feature --from-task T0002
   python3 scripts/taskctl.py prepare-branches --slug my-feature --repo path/to/target
@@ -158,6 +159,51 @@ def validate_slug(slug: str) -> str:
     if not SLUG_RE.match(s):
         raise TaskError(f"invalid slug (kebab-case required): {slug}")
     return s
+
+
+_SLUG_STOP = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "of",
+        "to",
+        "from",
+        "for",
+        "with",
+        "in",
+        "on",
+        "at",
+        "by",
+        "as",
+        "is",
+        "be",
+        "this",
+        "that",
+        "it",
+    }
+)
+
+
+def slugify_from_text(text: str, *, max_parts: int = 6) -> str:
+    raw = re.sub(r"[._/:+]+", " ", (text or "").strip().lower())
+    parts: list[str] = []
+    seen: set[str] = set()
+    for tok in re.findall(r"[a-z0-9]+", raw):
+        if tok in _SLUG_STOP or tok in seen:
+            continue
+        if len(tok) == 1 and tok.isalpha():
+            continue
+        seen.add(tok)
+        parts.append(tok)
+        if len(parts) >= max_parts:
+            break
+    slug = "-".join(parts)
+    if not SLUG_RE.match(slug):
+        raise TaskError("cannot infer slug from text; pass --slug")
+    return slug
 
 
 def find_repo_root(start: Path | None = None) -> Path:
@@ -2821,8 +2867,16 @@ def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
 
 
 def _cmd_new_unlocked(root: Path, args: argparse.Namespace) -> int:
-    slug = validate_slug(args.slug)
-    title = (args.title or slug).strip()
+    title = (args.title or "").strip()
+    slug_arg = (getattr(args, "slug", None) or "").strip()
+    if slug_arg:
+        slug = validate_slug(slug_arg)
+    elif title:
+        slug = slugify_from_text(title)
+    else:
+        raise TaskError("new requires --slug or --title")
+    if not title:
+        title = slug
     created = args.date or today_str()
     next_id, active, archived = parse_index(root)
 
@@ -3348,7 +3402,11 @@ def build_parser() -> argparse.ArgumentParser:
     status_p.set_defaults(func=cmd_set_status)
 
     new_p = sub.add_parser("new", help="allocate id, scaffold task dir, update INDEX")
-    new_p.add_argument("--slug", required=True)
+    new_p.add_argument(
+        "--slug",
+        default="",
+        help="kebab-case; omit to infer from --title (ASCII tokens)",
+    )
     new_p.add_argument("--title", default="")
     new_p.add_argument("--date", help="create date YYYY-MM-DD (default: today)")
     new_p.add_argument("--dry-run", action="store_true")

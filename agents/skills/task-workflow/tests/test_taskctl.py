@@ -227,6 +227,39 @@ hello
         self.assertEqual(code, 1)
         self.assertIn("invalid slug", payload["error"])
 
+    def test_slugify_from_text(self) -> None:
+        self.assertEqual(
+            tc.slugify_from_text(
+                "优化 Providers：从 model.dev 拉取 provider/models 信息，Adapter kind"
+            ),
+            "providers-model-dev-provider-models-adapter",
+        )
+        self.assertEqual(
+            tc.slugify_from_text("Optimize providers from model.dev"),
+            "optimize-providers-model-dev",
+        )
+        with self.assertRaises(tc.TaskError):
+            tc.slugify_from_text("增加一键启动脚本")
+
+    def test_new_infers_slug_from_title(self) -> None:
+        code, payload = self._run(
+            "new",
+            "--title",
+            "优化 Providers：从 model.dev 拉取 provider/models",
+            "--date",
+            "2026-08-14",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["task"]["slug"], "providers-model-dev-provider-models")
+        self.assertTrue(
+            (self.tmp / "tasks/2026-08-14/T0001-providers-model-dev-provider-models").is_dir()
+        )
+
+    def test_new_requires_slug_or_title(self) -> None:
+        code, payload = self._run("new")
+        self.assertEqual(code, 1)
+        self.assertIn("requires --slug or --title", payload["error"])
+
     def test_archive(self) -> None:
         root = self._seed_task("T0001", "alpha", openspec=True)
         (root / "changes.md").write_text("# changes\n", encoding="utf-8")
