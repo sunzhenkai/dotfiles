@@ -1,69 +1,68 @@
 # pretty-view 使用文档（人类阅读）
 
-> 本文档面向人：说明 pretty-view 门卫 skill 的设计、用法与维护。
-> 它**不随 sync 分发**（sync 只拷贝 `SKILL.md`、`references/` 和 `scripts/`），也**不应被 skill/模型引用加载**；agent 侧行为以 `SKILL.md` 为准。
+> 本文面向维护者。它不随 sync 分发；agent 行为以 `SKILL.md` 为准。
 
 ## 1. 为什么做门卫
 
-直接给 agent 装 baoyu / html-ppt / html-slides 的问题：每份 description 都可能自动触发，且一次可能加载多个大 SKILL。门卫把展示能力收成单一入口：
+直接安装 baoyu / html-ppt / html-slides 会让多份 description 同时触发。pretty-view 把展示能力收成单一入口，并把普通阅读页进一步收敛为一套视觉系统：
 
-```
-用户点名 pretty-view，或明确要「展示/呈现」
-     ↓
-  pretty-view（门卫）
-     ↓ 推断或确认介质：HTML / Markdown
-  HTML 先定形式：阅读页 / 公众号 / 幻灯片
-     阅读页 → 门 3.1 再路由，只 Read 一个第一方 .md
-       规格/对齐 → spec-to-readable-html
-       图解/对比 → html-artifact
-       技术文档 → html-doc
-       其余长文 → html-page（全宽）
-     公众号 / 显式 md→html → baoyu
-     幻灯片 → html-ppt（默认）或 html-slides（点名 reveal.js）
-  Markdown → 内置准则，不加载 refer
+```text
+用户点名 pretty-view，或明确要展示/呈现
+  ↓
+推断或确认介质：HTML / Markdown
+  ├─ Markdown → 内置准则
+  └─ HTML
+       ├─ 显式 PPT / 幻灯片 / html-ppt → html-ppt
+       ├─ 显式 reveal.js / html-slides → html-slides
+       ├─ 显式 md→html / baoyu / 公众号排版 → baoyu-markdown-to-html
+       └─ 其他全部 → html-page + stone-ink
+                         只按 spec / visual / doc / article / review 组合组件
 ```
 
-跨形式禁止静默切换（阅读页 ↛ baoyu / html-ppt），见 `SKILL.md`「切换门禁」。
+PPT、reveal.js、baoyu 仍只认显式口令。技术分享、路演、小红书或只说 HTML 不足以进入这些专用路径。
 
-## 2. 架构
+## 2. 统一阅读页设计
 
-refer skill 在 `references/`，由 `scripts/agents/sync.py` 随 `SKILL.md` 原样分发。**第一方阅读页 refer 必须是 `references/*.md`，禁止写成 `SKILL.md`**：Cursor 会递归发现嵌套 `SKILL.md` 并独立自动触发（baoyu 抢「html」就是这个洞）。vendor 目录里的 `SKILL.md` 仍有泄漏风险，门卫路由不得依赖「它们不会被触发」。`html-page.md` 与三份蒸馏稿是第一方；其余第三方快照一般不修改，升级走第 6 节。
+过去规格、图解、技术文档和普通长文分别进入多套 reference，导致页面壳、token、字体和组件不一致。现在所有阅读页只 Read `references/html-page.md`：
 
-## 3. 触发
+- 唯一 reference：`html-page`
+- 唯一默认主题：`stone-ink`
+- 统一页面壳、排版、语义 token 和组件族
+- 内容差异仅通过 `spec`、`visual`、`doc`、`article`、`review` 模式表达
+- 图解、宽表、目录和少量交互仍可按需使用，但不再形成独立视觉系统
 
-用户说「用 pretty-view」，或明确要把文档 / 知识 / 报告 / code review / 方案做成漂亮的 HTML 或 Markdown。普通写方案、做 review 不触发。
+这保证同一项目生成的规格、方案、报告和技术说明看起来属于同一个产品，同时保留不同信息结构。
 
-## 4. 门禁
+### 单页与多页策略
+
+阅读页**默认单页**。内容长、章节多或同时有图表/代码时，优先使用页内目录与锚点，不因此拆页。只有命中强信号才自动拆页：用户明确要求多页；输入由多个独立文档构成；存在总览加至少两个独立查阅模块；或不同部分面向不同受众/维护周期。无法确定时保持单页，不向用户确认。
+
+自动拆页不需要确认，但必须先用一句话告知推断结果和页面地图。多页包保持一层结构：`index.html` 是唯一根入口并链接全部附属页；附属页用相对路径返回主文件；所有页面继续使用 `html-page` / `stone-ink`。路径不存在或文件冲突仍走原有落盘确认门。
+
+## 3. 门禁
 
 | 门禁 | 防什么 |
 |------|--------|
-| 门 1 · 收窄触发 | 日常写作被当成「展示」 |
-| 门 2 · 先定介质 | HTML/Markdown 猜错；未定介质就拖进大 refer |
-| 门 3 · HTML 再路由 + 阅读页再路由 + 切换门禁 | 阅读页误走 baoyu/PPT；变体之间静默乱切；ppt 与 slides 抢路由 |
-| 门 4 · 产物不写进 references/；默认 `docs/pretty-view/` | 污染快照；落盘散落 |
-| 门 5 · 单介质；md→html 须显式说明 | 选 HTML 却先写 `.md` 再转 html、两份都留；把「阅读页」当成转换任务 |
+| 门 1 · 收窄触发 | 日常写作被当成展示 |
+| 门 2 · 先定介质 | HTML / Markdown 猜错 |
+| 门 3 · 专用路径只认显式口令 | 技术分享或 HTML 误进 PPT / baoyu |
+| 门 4 · 产物不写进 references | 污染 vendor 快照 |
+| 门 5 · 单介质 | 默认同时维护 `.md` 和 `.html` 两套正文 |
 
-介质与路由规则写在 `SKILL.md`：**强信号自动推断，不明确必须确认。** 阅读页按门 3.1 再路由后直写 HTML；baoyu 只用于公众号/微信或显式 md→html。默认只交 Markdown 或 HTML 其中一种。
+主题规则：`html-page` 固定使用 `stone-ink`；多主题路径（html-ppt / html-slides / baoyu）仍须推荐并确认。交付结尾必须报告 reference 与主题。
 
-**主题**：同一项目同一 refer 尽量沿用（`.pretty-view.md` 或最近产物）；多主题路径（html-ppt / html-slides / baoyu）须给出推荐并确认，禁止静默乱换。阅读页变体各有默认主题，不必每次确认。**交付结尾**必须写明本次 reference 与主题。
-
-## 5. refer / 生成路径清单（2026-08）
+## 4. reference / 生成路径
 
 | 路径 | 场景 | 来源 |
 |------|------|------|
-| `references/html-page.md` | 未再细分的长文阅读页，全宽直写 HTML | 本仓库第一方 |
-| `references/spec-to-readable-html.md` | 规格 / RFC / 对齐 / 可追溯阅读页 | 蒸馏自 `kemezz/spec-to-readable-html`（不 vendor SKILL.md） |
-| `references/html-artifact.md` | 图解 / 对比 / 可交互思考面 | 蒸馏自 `mesomya/html-artifact`（不 vendor SKILL.md） |
-| `references/html-doc.md` | 通用技术文档阅读页（组件化） | 蒸馏自 `jeffpoulton/html-doc` 公开摘要（上游仓未能拉取） |
-| `baoyu-markdown-to-html` | 公众号/微信排版；或用户**显式**把已有 md 转成带样式 HTML | `jimliu/baoyu-skills` |
-| `html-ppt` | 静态 HTML PPT；未点名 reveal.js 时的默认幻灯片 | `lewislulu/html-ppt-skill` |
-| `html-slides` | reveal.js 交互式幻灯片（CDN） | `claude-office-skills/skills` |
+| `references/html-page.md` | 所有普通 HTML 阅读页 | 本仓库第一方统一设计系统 |
+| `baoyu-markdown-to-html` | **仅显式** md→html / baoyu / 公众号或微信排版 | `jimliu/baoyu-skills` |
+| `html-ppt` | **仅显式** HTML PPT / 幻灯片 / slides / html-ppt | `lewislulu/html-ppt-skill` |
+| `html-slides` | **仅显式** reveal.js / html-slides | `claude-office-skills/skills` |
 
-commit 与审计说明见 `references/UPSTREAM.md`。上表第一方 `.md` 不在 vendor 清单里，改它们即可。**不要**把蒸馏稿改成目录 + `SKILL.md`。
+当前 vendor commit 与审计说明见 `references/UPSTREAM.md`。第三方快照不要直接修改。
 
-Markdown 展示没有第三方 refer，走 `SKILL.md` 内置准则。
-
-## 6. 升级 / 新增 refer skill
+## 5. 升级 vendor
 
 ```bash
 AUDIT_DIR="$(mktemp -d /tmp/skills-audit.XXXXXX)"
@@ -71,34 +70,35 @@ git clone --depth 1 <上游仓库 URL> "$AUDIT_DIR/src"
 bash <dotfiles>/agents/skills/skills-store/scripts/audit-skill.sh "$AUDIT_DIR/src/<skill 目录>"
 
 rm -rf agents/skills/pretty-view/references/<name>
-cp -a "$AUDIT_DIR/src/<skill 目录>" agents/skills/pretty-view/references/<name>
-# 更新 references/UPSTREAM.md；html-ppt 继续排除 docs 动图与 scripts/verify-output
+rsync -a --exclude '.git' "$AUDIT_DIR/src/<skill 目录>/" agents/skills/pretty-view/references/<name>/
+# 更新 references/UPSTREAM.md
 rm -rf "$AUDIT_DIR"
 scripts/agents/sync.sh all
 ```
 
-新增时同步改 `SKILL.md` 路由表与本文第 5 节。MIT License 中 `without limitation` 可能误报 `jailbreak_role`，对照 `UPSTREAM.md` 处理。第一方阅读页 refer 用单文件 `.md` 蒸馏，不要 `cp -a` 成带 `SKILL.md` 的目录。
+`html-page.md` 是第一方 reference，不走 vendor 升级。新增普通阅读页能力应优先扩展其内容模式或组件，不再引入平行阅读页 reference。只有具有明确不同介质/运行时的能力才考虑新专用路径。
 
-## 7. 默认落盘
+## 6. 默认落盘
 
-未指定路径且需要落盘时，写到当前项目 `docs/pretty-view/<kind>/<slug>`。
+未指定路径且需要落盘时写到 `docs/pretty-view/<kind>/<slug>`：
 
-- `docs/pretty-view/`（或用户指定路径）**已存在 → 直接写**；**不存在 → 先确认再创建**。
-- 根下只放 `INDEX.md`、有 HTML 时的 `index.html`，与可选 `_assets/`；正文按 kind 分目录（`articles` / `knowledge` / `reports` / `proposals` / `reviews` / `slides`）。
-- 一次一个文件 → `kind/YYYY-MM-DD-<slug>.html`；一次多个文件 → 同名文件夹 `kind/YYYY-MM-DD-<slug>/`，主文件固定 `index.html`。根索引每包只登记这一份主文件，包内其余页由主文件链接。
-- 每写一篇/一包更新 `INDEX.md` 一行。只要树里有 HTML，再跑 `scripts/update-catalog.py` 生成根 `index.html`（浏览器入口）；缺它则生成的 HTML 在浏览器里无路由，等于死链。明确只要对话里看则不落盘。
-- 同篇默认只落 `.md` **或** `.html`。阅读页默认直写全宽 HTML。把已有 md 转成 html 须用户显式说「md 转 html」或点名已有 `.md`；公众号/微信才走 baoyu。未说则不要在 pretty-view 树里再写一份源稿。
+- 默认根不存在时先确认再创建。
+- 根下只放 `INDEX.md`、有 HTML 时的 `index.html` 与可选 `_assets/`。
+- 单文件用 `kind/YYYY-MM-DD-<slug>.html`；多文件用 `kind/YYYY-MM-DD-<slug>/index.html`。
+- 每个单文件或包只在 `INDEX.md` 登记一行。
+- 树里有 HTML 时运行 `scripts/update-catalog.py` 生成根 `index.html`。
+- 默认只落 `.md` 或 `.html` 一种；显式 md→html 才使用 baoyu。
 
-细则在 `SKILL.md`「落盘」节。
-
-## 8. 维护
+## 7. 维护索引
 
 | 要做什么 | 改哪里 |
 |----------|--------|
-| 门禁、介质推断、路由、主题、落盘、HTML/Markdown 准则、交付结尾 | `agents/skills/pretty-view/SKILL.md`，然后 `scripts/agents/sync.sh all` |
-| 全宽阅读页骨架 | `agents/skills/pretty-view/references/html-page.md`（第一方；改完同样 sync） |
-| 规格/对齐、图解、技术文档阅读页 | `references/spec-to-readable-html.md`、`html-artifact.md`、`html-doc.md`（第一方蒸馏；改完同样 sync） |
-| HTML 目录页生成 | `agents/skills/pretty-view/scripts/update-catalog.py`（随分发；改完同样 sync） |
-| catalog 脚本测试 | `python3 agents/skills/pretty-view/tests/test_update_catalog.py`（不随分发） |
-| 升级/新增/移除第三方 refer | 第 6 节 + 路由表 + 本文第 5 节 |
+| 门禁、介质推断、路由、主题、落盘、交付结尾 | `agents/skills/pretty-view/SKILL.md` |
+| 统一阅读页页面壳、token、组件、内容模式 | `agents/skills/pretty-view/references/html-page.md` |
+| HTML catalog | `agents/skills/pretty-view/scripts/update-catalog.py` |
+| catalog 测试 | `agents/skills/pretty-view/tests/test_update_catalog.py` |
+| 路由契约测试 | `agents/skills/pretty-view/tests/test_skill_contract.py` |
+| vendor 清单与审计 | `agents/skills/pretty-view/references/UPSTREAM.md` |
 | 项目偏好 | 项目根 `.pretty-view.md`（可选） |
+
+修改后运行针对性测试，并用 `scripts/agents/sync.sh all --dry-run` 检查分发内容。
