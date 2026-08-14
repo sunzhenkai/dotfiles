@@ -1,4 +1,4 @@
 interface:
   display_name: "任务工作流"
   short_description: "按 new → explore → design? → propose → apply → archive 跟踪一次交付"
-  default_prompt: "用 $task-workflow 跟踪需求：task-new → task-explore → 可选 task-design → task-propose → task-apply → task-archive；先读工作区 .task-workflow.md（特殊要求/规格）；身份确定后 Checkout Gate 只切必须修改的目标仓；INDEX/Gate/git/笔记记账走 taskctl。"
+  default_prompt: "用 $task-workflow 跟踪需求：task-new → task-explore → 可选 task-design → task-propose → task-apply → task-archive；Checkout Gate 绑定并续用真实 worktree/checkout；apply 用 execution-context 定位 change 且每项完成或暂停都 checkpoint；archive 通过 OpenSpec/验收/验证/clean 门禁；INDEX/Gate/git/进度记账走 taskctl。"

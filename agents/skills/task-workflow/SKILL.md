@@ -39,16 +39,20 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 | `archive <query> [--allow-missing-changes]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
 | `repo-roots <path> [...]` | 解析为去重后的 git 根（工作区相对路径；`.` = 工作区自身，仅当工作区就是目标仓时使用） | 0 / 1 |
 | `scope-repos <query> [--cwd ...]` | 解析 README 涉及面；`checkout` 仅为角色=必须的仓 | 0 / 2 |
-| `prepare-branches --slug <slug> [--from-task <query>] [--repo <path>]` | Checkout Gate：只对必须修改的目标仓做脏仓门禁 + `fetch`/基线/`checkout -b <prefix>-<slug>` | 0 / 1 / 2 |
-| `git-summary --repo <path> [--branch ...] [--base ...]` | 只读 log/diff，产出 `changes.md` 素材（含 `markdown`） | 0 / 1 |
+| `prepare-branches --slug <slug> [--from-task <query>] [--repo <path>] [--worktree REPO=CHECKOUT]` | Checkout Gate：解析/创建/续用真实 checkout，刷新基线并自动记账 | 0 / 1 / 2 |
+| `execution-context <query>` | 解析 task 的真实 checkout、OpenSpec planning root 与现有进度 | 0 / 2 |
+| `checkpoint <query> --phase ...` | 强制保存 apply 阶段、当前项、阻塞、验证证据、下一步与 Git 快照 | 0 / 2 |
+| `git-summary --repo <path> [--checkout REPO=CHECKOUT] [--branch ...] [--base ...]` | 只读提交及工作树 diff，产出 `changes.md` 素材 | 0 / 1 |
 | `notes` | 读写工作区根 `.task-workflow.md`（`--init` / `--from-file` / `--set-section`） | 0 / 1 |
 
 - stdout：**仅 JSON**（`ok` / `result` / `task` 或 `exit_markdown`）。
 - stderr：一行人读摘要（如「当前任务：T0002 — path」）。
 - `resolve`/`set-status`/`archive` 在零/多命中或 `needs_confirm` 时打印 `exit_markdown`，**中止主流程**，等待用户选择。
-- `new` 只建骨架；概述/现状缺口/涉及面/验收等正文仍由 Agent 填写。
+- `new` 只建骨架；概述/现状缺口/涉及面/工作上下文/验收等正文仍由 Agent 填写。
 - `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。
-- `prepare-branches`：身份确定后、**写入目标代码仓之前**跑（不要拖到 `task-apply`）。**只切本任务需要修改的目标 git 仓**；解析远端默认分支（`origin/HEAD`，未必是 main/master）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b <prefix>-<slug>`。优先 `--from-task TNNNN`（从 README 涉及面取角色=必须的仓）。`--repo` 仅用于显式列出那些必须仓（task-new 时尚无 README 时）；不要把 cwd / `.` 当缺省（仅工作区自身就是必须仓时才用 `.`）。无必须仓则跳过（`skipped=no_target_repos`），不要用 `.` 凑数。已在目标分支则跳过（**允许脏工作区**，视为续作）。脏仓且不在目标分支 / pull 失败 → `needs_user_confirm` + `user_actions` + `exit_markdown`，**停下来让用户确认**；仅用户明确同意后才可 `--skip-dirty`。支持 `--dry-run`；不 `push`；禁止擅自 `stash`/`reset --hard`/`checkout -f`。
+- `prepare-branches`：身份确定后、**写入目标代码仓之前**跑。优先级为显式 `--worktree` → README 已记录 checkout → 已持有 task 分支的 worktree → canonical 仓。显式 checkout 不存在时创建 linked worktree；工作区外路径仅在 `git-common-dir` 同源时可续用。配置了 `origin` 但 fetch 失败必须阻断，禁止从旧本地基线继续。`--from-task` 会自动回写工作上下文；部分仓成功后也保存成功项。无必须仓则跳过。已在目标分支允许 dirty 续作；其他 dirty 情况停下来确认。支持 `--dry-run`；不 push；禁止擅自 stash/reset/force checkout。
+- `execution-context`：`task-apply` / archive 写操作前 MUST 调用；不得依赖当前 cwd 猜 OpenSpec 根。
+- `checkpoint`：`task-apply` 开始、每个 OpenSpec task 完成、暂停/错误、进入测试和全部完成时 MUST 调用；`progress.md` 不再可选。
 - `scope-repos`：只读解析涉及面。`checkout` = 必须仓路径；建议/排除不在内。cwd 出现在 `cwd_*` 报告里，不自动进入 checkout。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区；`--repo` 同样只传必须仓。
 - `notes`：读/建/改工作区根 `.task-workflow.md`。`--init` 仅在文件不存在时建骨架；`--set-section` 在缺失时先建骨架再写入一节；`--from-file` 整文件替换。`resolve` / `new` JSON 亦含 `workflow_notes`。
@@ -155,9 +159,26 @@ python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令�
 - 概述、背景、目标、**现状缺口**、需求说明、验收标准（checkbox）、变更记录
 - **现状缺口**（task-new 必填）：对照目标列出需补充的内容；类型用 `信息 / 实现 / 资产 / 配置 / 依赖确认`；每条附建议补齐方式（追问 / `{{slash:task-explore}}` / 调研等）。未知标「待确认」；确无缺口写「暂无（目标范围内现状已齐）」。后续 explore/propose 可修订。
 - **涉及面**：本任务会**修改**的目标仓库相对路径 / 是否跨仓（task-new 梳理；后续可修正）。角色=必须 才会被 Checkout Gate 切分支。只读参考仓不要写进必须。
+- **工作上下文**：实际执行环境（是否 git worktree、实际写入的代码库与分支）。事实一出现或变化就立刻改，不要等 archive。详见下节。
 - **关联 OpenSpec**：change 名与路径列表（task-propose 写入；可多个；`taskctl resolve` 会解析该表）
 - **设计文档**（task-design 写入）：`design/` 下文件与归档落点表；未做设计则保持「尚无」
 - 不得含明文密钥或数据库凭证；需要时写环境变量名 `$VAR_NAME`
+
+## 工作上下文（及时落盘）
+
+每个 task README **MUST** 有「工作上下文」节，记录**实际执行环境**（与「涉及面」的计划范围分开）。事实一出现或变化就立刻改 README，**禁止**只记在对话里或攒到 archive。跨会话续作以本节为准。缺节时，下一个 `task-*` 命令补上，不要因此失败。
+
+**必记（有则写，无则写「未使用 / 无」）：**
+
+| 项 | 记什么 |
+|----|--------|
+| git worktree | 是否使用；canonical 仓路径 + 实际 checkout 路径 |
+| 改动代码库 | 本任务实际写入的 git 仓；**多个必须逐行**，不要只写「多个」 |
+| 分支 | 各仓当前 task 分支（`prefix-slug`）与基线（若覆盖默认分支） |
+
+也可记：隔离目录、用户指定的 checkout 路径、与涉及面必须仓不一致之处。禁止写入密钥。
+
+**何时写：** 由 `prepare-branches --from-task` 自动更新；task-new 时根据返回结果补写。用户改用 worktree、增删必须仓、换写入路径时重新运行 Gate。无必须仓写「无必须仓（仅工作区 `tasks/` 记账）」。表列：仓库 / 仓库路径 / checkout 路径 / worktree / 分支 / 基线。
 
 ## 路径与仓库
 
@@ -202,7 +223,7 @@ python3 <this-skill>/scripts/taskctl.py notes --set-section 特殊要求 --body 
 
 ## Checkout Gate（task 分支）
 
-身份确定之后、**写入目标代码仓之前**，对**必须修改的目标仓**检出 `<prefix>-<slug>`（用 slug，不用带 T 前缀的目录名）。不要等到 `task-apply` 才建分支：OpenSpec 与实现写进哪个仓，就只在那个仓切 task 分支。
+身份确定之后、**写入目标代码仓之前**，对必须仓绑定真实 checkout 并检出 `<prefix>-<slug>`。默认仍在 canonical checkout 工作；仅用户显式指定 `--worktree REPO=CHECKOUT` 时创建/采用 worktree。后续命令必须续用记录的 checkout。
 
 **硬规则（只切目标仓）：**
 
@@ -228,11 +249,16 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 # task-new（尚无 README）：显式列出必须仓
 python3 <this-skill>/scripts/taskctl.py prepare-branches \
   --slug <slug> --prefix feat --repo path/to/target [--dry-run]
+
+# 显式在 worktree 中开发；CHECKOUT 不存在时创建
+python3 <this-skill>/scripts/taskctl.py prepare-branches \
+  --slug <slug> --repo path/to/target \
+  --worktree path/to/target=path/to/checkout
 ```
 
 单仓且工作区自身就是目标时才加 `--repo .`。JSON `cwd_untouched` 仅作报告字段。
 
-流程（脚本内，仅针对传入的必须仓）：已在目标分支则跳过（**允许脏工作区**，视为续作）→ 否则脏仓门禁 → 检测默认分支（`origin/HEAD` / `remote show`，**不假设 main**）→ `fetch` → checkout 默认分支 → `pull --ff-only` → `checkout -b`（或切到已有同名分支）。无关仓不进入该流程。
+流程（脚本内，仅针对必须仓）：解析真实 checkout → 若 task 分支已被某 worktree 持有则路由到该 worktree → 已在目标分支则续作（允许 dirty）→ 否则脏仓门禁 → 检测默认分支 → 有 origin 则 fetch（失败即阻断）→ 从 `origin/<base>` 或 local-only base 创建/切换 task 分支。linked worktree 不先 checkout 可能被主工作树占用的 base。
 
 若 JSON `needs_user_confirm=true`（脏工作区且不在目标分支、pull 失败等）：
 
@@ -240,7 +266,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 2. 等用户明确指示（提交清理 / 允许 `--skip-dirty` / 中止）
 3. **禁止** Agent 自行 stash、reset --hard、checkout -f
 
-可用 `--base` 覆盖默认分支（记入 README）；不自动 `git push`。
+可用 `--base` 覆盖默认分支；不自动 push。`--from-task` 成功或部分成功后自动把 canonical repo / checkout / worktree / branch / base 写入 README。
 
 ## 各命令职责（摘要）
 
@@ -252,15 +278,15 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 2. 从描述推导 `slug`；不足则追问
 3. 梳理涉及面（代码库表：必须=会修改 / 建议=只读 / 排除=无关）。笔记里的默认涉及面可作起点，按本任务修正
 4. 对照目标梳理**现状缺口**（已有 vs 仍缺；信息/实现/资产/配置/依赖确认）
-5. **Checkout Gate**：仅对必须仓 `prepare-branches --slug <slug> --repo <path>`（可重复 `--repo`；无必须仓则跳过）。仅当工作区自身就是必须仓时才传 `.`。`needs_user_confirm` 则停等用户
+5. **Checkout Gate**：仅对必须仓 `prepare-branches --slug <slug> --repo <path>`（可重复 `--repo`；无必须仓则跳过）。仅当工作区自身就是必须仓时才传 `.`。`needs_user_confirm` 则停等用户。返回后把 worktree / 改动仓 / 分支记入稍后填写的「工作上下文」
 6. `taskctl new --slug ... --title ...` 分配 ID、建骨架 README（status=`draft`）、更新 INDEX（写在工作区 `tasks/`；Checkout Gate 仍只针对必须仓）
-7. Agent 补全概述/背景/目标/现状缺口/涉及面/验收标准（遵守工作区笔记硬约束）
-8. 输出 ID、路径、分支、涉及面、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
+7. Agent 补全概述/背景/目标/现状缺口/涉及面/**工作上下文**/验收标准（遵守工作区笔记硬约束）。Checkout Gate 已跑则立刻把 worktree / 改动仓 / 分支写入工作上下文
+8. 输出 ID、路径、分支、涉及面、工作上下文、现状缺口摘要、下一步桥接（缺口偏方案 → explore；范围已清且无需架构决策 → propose）
 
 ### task-explore
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停
+2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停。返回后立刻更新 README「工作上下文」
 3. 加载 `task.openspec`、README 与 `workflow_notes`
 4. **委托** `openspec-explore`：把 task 概述/涉及面与工作区笔记作为探索上下文；不写业务代码
 5. 将结论要点写回 README「变更记录」或「方案笔记」；若原 status 为 `draft` → `taskctl set-status <id> exploring`
@@ -271,7 +297,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 可选。无 task 则先 `{{slash:task-new}}`。方法细节读 skill `task-design`。
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停
+2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓；无必须仓则跳过）。`needs_user_confirm` 则停。返回后立刻更新 README「工作上下文」
 3. 加载 README 概述、explore 结论
 4. **只写入** `<taskRoot>/design/`（`README.md` 索引 + 归档落点表 + 设计正文）。**禁止**此时写 `docs/design/`、ADR、knowledge
 5. 在 task README「设计文档」记录文件与计划落点；`taskctl set-status <id> designed`
@@ -282,30 +308,31 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 ### task-propose
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切将写入 OpenSpec 的必须仓）。`needs_user_confirm` 则停（OpenSpec 写进哪个仓，就只在那个仓切 task 分支）
+2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切将写入 OpenSpec 的必须仓）。`needs_user_confirm` 则停（OpenSpec 写进哪个仓，就只在那个仓切 task 分支）。返回后立刻更新 README「工作上下文」
 3. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
-4. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change
+4. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change。若会写工作区，`.` 必须作为「必须」仓通过 Checkout Gate
 5. 对每个计划中的 change **委托** `openspec-propose`
-6. 将全部 change 名与路径写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
+6. 将全部 change 的名称、**canonical 仓库**、仓内相对路径和 store 写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
 7. 输出 change 列表、分支与 `{{slash:task-apply}} TNNNN` 桥接
 
 ### task-apply
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓，不要用 `.` 凑数）。`needs_user_confirm` 则停等用户（已在目标分支则跳过）
-3. 若 `task.openspec` 为空 → 中止并建议 `{{slash:task-propose}}`
-4. 对每个未完成 change **委托** `openspec-apply-change`；用户可指定子集
-5. `taskctl set-status <id> in_progress`（或 `blocked`）；可选覆盖写 `progress.md`
-6. 输出：分支表、各 change 进度、交接（续作：`{{slash:task-apply}} TNNNN`）
+2. **Checkout Gate**：`prepare-branches --slug <slug> --from-task <id>`（只切必须仓，不要用 `.` 凑数）。`needs_user_confirm` 则停等用户（已在目标分支则跳过）。返回后立刻更新 README「工作上下文」（多仓逐行；标明是否 worktree）
+3. `taskctl execution-context <id>`；若 OpenSpec 为空中止并建议 propose。读取已有 `progress.md` 与各 change checkbox，严格使用每个 target 的 `planning_root` / store，不得从当前 cwd 猜
+4. **实施前 checkpoint**：`taskctl checkpoint <id> --phase implementing --change ... --current-task ...`
+5. 对每个未完成 change 委托 `openspec-apply-change`。每完成一个 checkbox，立刻再次 checkpoint；然后继续下一项，直到全部完成或阻塞
+6. 暂停、错误或用户中断前 MUST checkpoint `--phase blocked`（含 blocker/next）；进入测试时 checkpoint `testing --verification ...`；全部完成 checkpoint `done`
+7. 输出：真实 checkout/分支表、各 change 进度、checkpoint 路径、交接（续作：`{{slash:task-apply}} TNNNN`）
 
 ### task-archive
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. 对 README 中仍活跃的关联 change，依次 **委托** `openspec-archive-change`；已归档则跳过；用户确认后可跳过失败项
+2. `taskctl execution-context <id>`，在各 target 的 planning root/store 依次委托 `openspec-archive-change`；任一 change 归档或 delta sync 失败即停止，不得继续 task 归档
 3. **晋升设计文档**（若 `<taskRoot>/design/` 存在）：按 `design/README.md` 归档落点表，把文档复制到目标仓正式位置（`docs/design/<domain>/`、ADR、knowledge）；更新该仓 INDEX/README 交叉引用并核对链接。落点不明则停下来问，不要发明目录。`design/` **原件保留**，随 task 目录归档作快照。无 `design/` 则跳过
-4. `taskctl git-summary --repo <必须仓路径> [--branch feat-<slug>]` 取素材 → 人工核对后写入 `changes.md`（可补 PR/备注；写明已晋升的设计路径；不要对无关仓采摘要）
-5. 验收未勾选须警告并获确认
-6. `taskctl archive <id>`（移动目录 + INDEX；内置 status→`archived`）
+4. 按 execution-context 对每仓运行 `git-summary --repo <canonical> --checkout <canonical>=<checkout> --branch <记录分支> --base <记录基线>`，同时纳入提交、staged 与 working-tree diff
+5. `taskctl archive <id>` 机械校验：无活跃 OpenSpec、验收全勾选、progress 有验证证据、checkout clean。确需跳过时使用对应显式 `--allow-*`，覆盖原因自动写入 `changes.md`
+6. archive 内置 status→archived，并在移动/INDEX 写入失败时回滚
 7. 桥接：列出已晋升文档路径
 
 ## 产物字段
@@ -316,16 +343,19 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### changes.md（task-archive）
 
-涉及代码库、改动摘要、提交记录、文件变更（按仓库）、关联 OpenSpec/PR、备注。
+涉及代码库、是否 worktree、改动摘要、提交记录、文件变更（按仓库）、关联 OpenSpec/PR、备注。
 
 ### design/（task-design）
 
 仅存在于 task 目录：`design/README.md`（索引 + 归档落点表）与一篇或多篇设计正文。归档前不是仓库正式文档；晋升规则见 task-archive。
 
-### progress.md（task-apply 可选）
+### 工作上下文（task README）
 
-元信息（时间、阶段 `implementing|testing|blocked`）、关联 OpenSpec、本轮完成、累计进展、Git 快照（只读）、阻塞、下一步。
-MUST NOT 在采集快照时 stash/reset/force checkout；只读引用 change 内 `tasks.md`，不修改 OpenSpec 工件。
+实际执行环境：git worktree 是否使用及路径、实际改动的代码库（多仓逐行）、各仓分支与基线。Checkout Gate 后与环境变化时立刻更新；不替代「涉及面」。
+
+### progress.md（task-apply 必填）
+
+由 `taskctl checkpoint` 维护：阶段 `implementing|testing|blocked|done`、当前 change/task、OpenSpec checkbox 进度、本轮完成、验证证据、Git 快照、阻塞与下一步。MUST NOT 手工攒到会话结束；每项完成或暂停时立即写。
 
 ## 桥接块（各 command 输出末尾）
 

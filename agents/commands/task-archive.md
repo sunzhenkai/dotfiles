@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-归档关联 OpenSpec change，把 `design/` 晋升到仓库正式位置（若有），再移动 task 目录并更新 `tasks/INDEX.md`。
+按 `execution-context` 在真实 checkout 归档全部 OpenSpec change，把 `design/` 晋升到仓库正式位置（若有），通过完成度/验证/clean 门禁后再原子移动 task 并更新索引。任一 change 或 delta sync 失败必须停止。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

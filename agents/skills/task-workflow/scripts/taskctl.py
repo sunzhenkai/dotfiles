@@ -24,11 +24,17 @@ Do not pass cwd or `.` unless the workspace git root itself is a must-modify tar
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
+import hashlib
+import io
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -114,6 +120,7 @@ class TaskInfo:
     readme: str
     openspec: list[dict[str, str]] = field(default_factory=list)
     scope: dict[str, Any] = field(default_factory=empty_scope)
+    checkouts: list[dict[str, Any]] = field(default_factory=list)
     index_path: str = ""
     updated: str = ""
 
@@ -169,6 +176,37 @@ def normalize_heading(raw: str) -> str:
 
 def ensure_trailing_newline(text: str) -> str:
     return text if text.endswith("\n") else text + "\n"
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Atomically replace a UTF-8 text file in its current directory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
+
+
+@contextlib.contextmanager
+def index_lock(root: Path):
+    """Serialize task id allocation and archive index transitions."""
+    digest = hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:20]
+    lock_path = Path(tempfile.gettempdir()) / f"taskctl-{digest}.lock"
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def parse_markdown_sections(text: str) -> list[dict[str, Any]]:
@@ -245,7 +283,7 @@ def read_workflow_notes(root: Path) -> dict[str, Any]:
 
 def write_workflow_notes(root: Path, markdown: str) -> Path:
     path = workflow_notes_path(root)
-    path.write_text(ensure_trailing_newline(markdown), encoding="utf-8")
+    atomic_write_text(path, ensure_trailing_newline(markdown))
     return path
 
 
@@ -381,6 +419,7 @@ def parse_openspec(text: str) -> list[dict[str, str]]:
         return []
     rows: list[dict[str, str]] = []
     in_table = False
+    table_header: list[str] = []
     for line in lines[start:]:
         if re.match(r"^#{2,3}\s+", line):
             break
@@ -388,7 +427,11 @@ def parse_openspec(text: str) -> list[dict[str, str]]:
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if not cells:
                 continue
-            if set(cells[0]) <= {"-", ":"} or cells[0].lower() in {"change", "名称", "name"}:
+            if cells[0].lower() in {"change", "名称", "name"}:
+                in_table = True
+                table_header = [c.lower() for c in cells]
+                continue
+            if set(cells[0]) <= {"-", ":"}:
                 in_table = True
                 continue
             if not in_table:
@@ -396,9 +439,86 @@ def parse_openspec(text: str) -> list[dict[str, str]]:
             name = strip_md_link(cells[0]).strip("`")
             path = strip_md_link(cells[1]).strip("`") if len(cells) > 1 else ""
             if name and name not in {"—", "-", "（尚无）"}:
-                rows.append({"name": name, "path": path})
+                repo_idx = next(
+                    (i for i, h in enumerate(table_header) if h in {"仓库", "repo"}),
+                    None,
+                )
+                store_idx = next(
+                    (i for i, h in enumerate(table_header) if h == "store"),
+                    None,
+                )
+                repo = (
+                    strip_md_link(cells[repo_idx]).strip("`")
+                    if repo_idx is not None and repo_idx < len(cells)
+                    else ""
+                )
+                store = (
+                    strip_md_link(cells[store_idx]).strip("`")
+                    if store_idx is not None and store_idx < len(cells)
+                    else ""
+                )
+                rows.append(
+                    {
+                        "name": name,
+                        "path": path,
+                        "repo": normalize_repo_path(repo) if repo and repo not in {"—", "-"} else "",
+                        "store": store if store not in {"—", "-"} else "",
+                    }
+                )
         elif in_table and line.strip() == "":
             break
+    return rows
+
+
+def parse_work_context(text: str) -> list[dict[str, Any]]:
+    """Parse README 工作上下文, accepting both legacy and current tables."""
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^##\s*工作上下文\s*$", line):
+            start = i + 1
+            break
+    if start is None:
+        return []
+    rows: list[dict[str, Any]] = []
+    header: list[str] = []
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells or all(set(c) <= {"-", ":"} for c in cells):
+            continue
+        if cells[0] in {"仓库", "repo"}:
+            header = cells
+            continue
+        if cells[0] in _SCOPE_SKIP_NAMES:
+            continue
+        # Current: repo | canonical | checkout | worktree | branch | base.
+        # Legacy:  repo | path      | worktree | branch   | base.
+        if len(cells) >= 6:
+            name, canonical, checkout, wt_raw, branch, base = cells[:6]
+        elif len(cells) >= 5:
+            name, canonical, wt_raw, branch, base = cells[:5]
+            checkout = canonical
+        else:
+            continue
+        canonical = strip_md_link(canonical).strip("`")
+        checkout = strip_md_link(checkout).strip("`")
+        if not canonical:
+            continue
+        rows.append(
+            {
+                "name": name.strip("`"),
+                "repo": normalize_repo_path(canonical),
+                "checkout": checkout or canonical,
+                "is_worktree": wt_raw.strip().lower()
+                in {"是", "yes", "true", "linked", "worktree"},
+                "branch": branch.strip("`"),
+                "base": base.strip("`"),
+            }
+        )
     return rows
 
 
@@ -659,8 +779,7 @@ def render_index(next_id: int, active: list[TaskRow], archived: list[TaskRow]) -
 
 def write_index(root: Path, next_id: int, active: list[TaskRow], archived: list[TaskRow]) -> None:
     path = index_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_index(next_id, active, archived), encoding="utf-8")
+    atomic_write_text(path, render_index(next_id, active, archived))
 
 
 def resolve_task_root(root: Path, row: TaskRow) -> Path:
@@ -698,6 +817,7 @@ def enrich_row(root: Path, row: TaskRow) -> TaskInfo | None:
         readme=rel_posix(root, readme),
         openspec=parse_openspec(text),
         scope=parse_scope(text),
+        checkouts=parse_work_context(text),
         index_path=rel_posix(root, index_path(root)) if index_path(root).exists() else "",
         updated=row.updated,
     )
@@ -1160,15 +1280,23 @@ def scaffold_readme(
 
 ### 关联 OpenSpec
 
-| change | 路径 | 说明 |
-|--------|------|------|
-| — | | （尚无） |
+| change | 路径 | 仓库 | store | 说明 |
+|--------|------|------|-------|------|
+| — | | | | （尚无） |
 
 ### 设计文档
 
 | 文档 | 类型 | 归档落点 |
 |------|------|----------|
 | — | | （无；复杂任务经 task-design 写入 `design/`） |
+
+## 工作上下文
+
+事实一出现或变化就立刻改这里，不要等 archive。涉及面是计划范围；本节是实际执行环境。
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| （待补） | | | 未使用 | | |
 
 ## 验收标准
 
@@ -1198,6 +1326,156 @@ def find_git_root(start: Path) -> Path | None:
         if (p / ".git").exists():
             return p
     return None
+
+
+def inspect_git_checkout(root: Path, repo: Path) -> dict[str, Any]:
+    """Detect a linked git worktree (`.git` file / git-dir ≠ common-dir)."""
+    git_dir_r = run_git(repo, "rev-parse", "--absolute-git-dir")
+    common_r = run_git(repo, "rev-parse", "--git-common-dir")
+    git_dir = None
+    if git_dir_r.returncode == 0 and git_dir_r.stdout.strip():
+        git_dir = Path(git_dir_r.stdout.strip()).resolve()
+    common = None
+    common_raw = common_r.stdout.strip()
+    if common_r.returncode == 0 and common_raw:
+        common = Path(common_raw)
+        if not common.is_absolute():
+            common = (repo / common).resolve()
+        else:
+            common = common.resolve()
+    is_worktree = bool(git_dir and common and git_dir != common)
+    main_rel = None
+    if is_worktree and common is not None:
+        main_abs = common.parent if common.name == ".git" else common
+        try:
+            main_rel = rel_posix(root, main_abs)
+            if main_rel in ("", "."):
+                main_rel = "."
+        except ValueError:
+            main_rel = str(main_abs)
+    return {"is_worktree": is_worktree, "main_worktree": main_rel}
+
+
+def git_common_dir(repo: Path) -> Path | None:
+    r = run_git(repo, "rev-parse", "--git-common-dir")
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    path = Path(r.stdout.strip())
+    return (path if path.is_absolute() else repo / path).resolve()
+
+
+def same_git_repository(left: Path, right: Path) -> bool:
+    left_common = git_common_dir(left)
+    right_common = git_common_dir(right)
+    return bool(left_common and right_common and left_common == right_common)
+
+
+def resolve_checkout_path(root: Path, raw: str) -> Path:
+    """Resolve a recorded checkout path; unlike canonical repos it may be outside root."""
+    value = raw.strip().strip("`")
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    return path.resolve()
+
+
+def display_checkout_path(root: Path, path: Path) -> str:
+    try:
+        rel = rel_posix(root, path)
+        return "." if rel in {"", "."} else rel
+    except ValueError:
+        return str(path.resolve())
+
+
+def list_worktrees(repo: Path) -> list[dict[str, str]]:
+    r = run_git(repo, "worktree", "list", "--porcelain")
+    if r.returncode != 0:
+        return []
+    out: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for line in [*r.stdout.splitlines(), ""]:
+        if not line.strip():
+            if current.get("path"):
+                out.append(current)
+            current = {}
+            continue
+        key, _, value = line.partition(" ")
+        if key == "worktree":
+            current["path"] = value
+        elif key == "branch":
+            current["branch"] = value.removeprefix("refs/heads/")
+        elif key == "HEAD":
+            current["head"] = value
+        elif key == "bare":
+            current["bare"] = "true"
+    return out
+
+
+def find_worktree_for_branch(repo: Path, branch: str) -> Path | None:
+    for item in list_worktrees(repo):
+        if item.get("branch") == branch and item.get("path"):
+            path = Path(item["path"]).resolve()
+            if path.is_dir():
+                return path
+    return None
+
+
+def binding_for_repo(info: TaskInfo | None, repo_path: str) -> dict[str, Any] | None:
+    if info is None:
+        return None
+    key = normalize_repo_path(repo_path)
+    for binding in info.checkouts:
+        if normalize_repo_path(str(binding.get("repo") or "")) == key:
+            return binding
+    return None
+
+
+def format_work_context(rows: list[dict[str, Any]]) -> str:
+    lines = [
+        "事实一出现或变化就立刻改这里，不要等 archive。涉及面是计划范围；本节是实际执行环境。",
+        "",
+        "| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |",
+        "|------|----------|---------------|----------|------|------|",
+    ]
+    if not rows:
+        lines.append("| — | | | 未使用 | | |")
+        return "\n".join(lines)
+    for row in rows:
+        lines.append(
+            "| {name} | `{repo}` | `{checkout}` | {worktree} | `{branch}` | `{base}` |".format(
+                name=row.get("name") or row.get("repo") or "repo",
+                repo=row.get("repo") or "",
+                checkout=row.get("checkout") or row.get("repo") or "",
+                worktree="是" if row.get("is_worktree") else "否",
+                branch=row.get("branch") or "",
+                base=row.get("base") or "",
+            )
+        )
+    return "\n".join(lines)
+
+
+def _persist_work_context_unlocked(
+    root: Path, task_id: str, updates: list[dict[str, Any]]
+) -> None:
+    infos = list_active_infos(root)
+    matches = match_query(infos, task_id)
+    if len(matches) != 1:
+        raise TaskError(f"cannot persist work context: task not unique: {task_id}")
+    info = matches[0]
+    merged = {normalize_repo_path(str(r.get("repo") or "")): dict(r) for r in info.checkouts}
+    for row in updates:
+        key = normalize_repo_path(str(row.get("repo") or ""))
+        if key:
+            merged[key] = {**merged.get(key, {}), **row}
+    readme = root / info.readme
+    text = readme.read_text(encoding="utf-8")
+    updated = upsert_markdown_section(text, "工作上下文", format_work_context(list(merged.values())))
+    atomic_write_text(readme, updated)
+
+
+def persist_work_context(root: Path, task_id: str, updates: list[dict[str, Any]]) -> None:
+    with index_lock(root):
+        _persist_work_context_unlocked(root, task_id, updates)
 
 
 def normalize_repo_path(raw: str) -> str:
@@ -1236,11 +1514,14 @@ def resolve_repo(root: Path, raw: str) -> dict[str, Any]:
     git_rel_out = "./" if git_rel == "." else git_rel.rstrip("/") + "/"
     rel_parts = git_rel_out.strip("./").split("/") if git_rel_out not in {".", "./"} else []
 
+    checkout = inspect_git_checkout(root_res, git_root)
     return {
         "input": logical,
         "git_root": git_rel_out,
         "git_root_abs": str(git_root),
         "excluded_by_default": any(m in rel_parts for m in DEFAULT_EXCLUDE_REPO_MARKERS),
+        "is_worktree": checkout["is_worktree"],
+        "main_worktree": checkout["main_worktree"],
     }
 
 
@@ -1463,6 +1744,12 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
     if prefix not in VALID_BRANCH_PREFIXES:
         raise TaskError(f"invalid prefix: {prefix}; expected one of {', '.join(VALID_BRANCH_PREFIXES)}")
     branch = f"{prefix}-{slug}"
+    explicit_worktrees: dict[str, str] = {}
+    for raw_mapping in getattr(args, "worktrees", None) or []:
+        repo_key, sep, checkout = raw_mapping.partition("=")
+        if not sep or not repo_key.strip() or not checkout.strip():
+            raise TaskError("--worktree expects REPO=CHECKOUT_PATH")
+        explicit_worktrees[normalize_repo_path(repo_key)] = checkout.strip()
 
     raw_repos, extra = collect_prepare_repo_inputs(root, args)
     if extra and extra.get("ok") is False:
@@ -1495,6 +1782,12 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         }
         return emit(payload)
 
+    task_info: TaskInfo | None = None
+    if args.from_task:
+        matches = match_query(list_active_infos(root), args.from_task)
+        if len(matches) == 1:
+            task_info = matches[0]
+
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -1522,25 +1815,63 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         seen.add(key)
         target_abs.add(str(Path(info["git_root_abs"]).resolve()))
 
-        repo = Path(info["git_root_abs"])
+        canonical_repo = Path(info["git_root_abs"])
+        canonical_key = normalize_repo_path(info["git_root"].rstrip("/"))
+        recorded = binding_for_repo(task_info, canonical_key)
+        explicit_checkout = explicit_worktrees.get(normalize_repo_path(raw))
+        if explicit_checkout is None:
+            explicit_checkout = explicit_worktrees.get(canonical_key)
+        create_worktree = False
+        selected_repo = canonical_repo
+        if explicit_checkout:
+            selected_repo = resolve_checkout_path(root, explicit_checkout)
+            create_worktree = not selected_repo.exists()
+        elif recorded and recorded.get("checkout"):
+            candidate = resolve_checkout_path(root, str(recorded["checkout"]))
+            if candidate.is_dir() and same_git_repository(canonical_repo, candidate):
+                selected_repo = candidate
+        else:
+            branch_worktree = find_worktree_for_branch(canonical_repo, branch)
+            if branch_worktree is not None:
+                selected_repo = branch_worktree
+        target_abs.add(str(selected_repo.resolve()))
+
         entry: dict[str, Any] = {
             "input": raw,
             "git_root": info["git_root"],
             "branch": branch,
             "action": "pending",
+            "checkout": display_checkout_path(root, selected_repo),
+            "checkout_abs": str(selected_repo),
         }
         try:
-            cur = current_branch(repo)
+            if selected_repo.exists() and not same_git_repository(canonical_repo, selected_repo):
+                raise TaskError(
+                    f"checkout does not belong to canonical repo {info['git_root']}: {selected_repo}"
+                )
+            checkout_info = (
+                inspect_git_checkout(root, selected_repo)
+                if selected_repo.exists()
+                else {"is_worktree": True, "main_worktree": info["git_root"].rstrip("/")}
+            )
+            entry.update(checkout_info)
+            repo = selected_repo
+            if create_worktree:
+                # Branch and remote preparation happen below against canonical_repo.
+                cur = ""
+            else:
+                cur = current_branch(repo)
             entry["current_branch"] = cur
             if cur == branch:
                 # Continuing on the task branch: dirty WIP is expected.
                 entry["action"] = "already_on_branch"
+                entry["base"] = (recorded or {}).get("base") or args.base or ""
                 if is_dirty(repo):
                     entry["dirty"] = True
                 results.append(entry)
                 continue
 
-            if is_dirty(repo):
+            if not create_worktree and is_dirty(repo):
                 if args.skip_dirty:
                     entry["action"] = "skipped_dirty"
                     entry["dirty"] = True
@@ -1550,71 +1881,93 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
                 errors.append(blocked_dirty_entry(entry, repo))
                 continue
 
-            # Detect default branch before mutating (may be develop/trunk/…).
-            base = detect_base_branch(repo, args.base)
+            # Detect and refresh the canonical repository before mutating a checkout.
+            base = detect_base_branch(canonical_repo, args.base)
             entry["base"] = base
             entry["base_source"] = "explicit" if args.base else "default_branch"
 
             if args.dry_run:
                 entry["action"] = "would_create"
                 entry["plan"] = [
-                    "fetch origin",
-                    f"checkout {base}",
-                    f"pull --ff-only origin {base}",
-                    f"checkout -b {branch}",
+                    "fetch origin (when configured)",
+                    (
+                        f"git worktree add -b {branch} {selected_repo} origin/{base}"
+                        if create_worktree
+                        else f"switch/create {branch} from origin/{base}"
+                    ),
                 ]
                 results.append(entry)
                 continue
 
-            # Always refresh from remote default before creating the feature branch.
-            fetch = run_git(repo, "fetch", "origin")
-            entry["fetch_ok"] = fetch.returncode == 0
-            if fetch.returncode != 0:
-                tail = (fetch.stderr or "").strip().splitlines()
-                if tail:
-                    entry["fetch_stderr"] = tail[-1]
-
-            # Re-detect after fetch so origin/HEAD is current.
-            if not args.base:
-                base = detect_base_branch(repo, None)
-                entry["base"] = base
-
+            remotes = run_git(canonical_repo, "remote").stdout.split()
+            has_origin = "origin" in remotes
+            if has_origin:
+                fetch = run_git(canonical_repo, "fetch", "origin")
+                entry["fetch_ok"] = fetch.returncode == 0
+                if fetch.returncode != 0:
+                    tail = (fetch.stderr or "").strip().splitlines()
+                    entry["action"] = "blocked_fetch"
+                    entry["error"] = (
+                        "failed to refresh configured origin: "
+                        + (tail[-1] if tail else "unknown")
+                    )
+                    entry["needs_user_confirm"] = True
+                    errors.append(entry)
+                    continue
+                if not args.base:
+                    base = detect_base_branch(canonical_repo, None)
+                    entry["base"] = base
             has_origin_base = (
-                run_git(repo, "rev-parse", "--verify", f"origin/{base}").returncode == 0
+                has_origin
+                and run_git(
+                    canonical_repo, "rev-parse", "--verify", f"origin/{base}"
+                ).returncode
+                == 0
             )
-            co = run_git(repo, "checkout", base)
-            if co.returncode != 0 and has_origin_base:
-                co = run_git(repo, "checkout", "-B", base, f"origin/{base}")
-            if co.returncode != 0:
-                raise TaskError((co.stderr or co.stdout or "checkout default branch failed").strip())
+            start_ref = f"origin/{base}" if has_origin_base else base
+            if (
+                run_git(canonical_repo, "rev-parse", "--verify", start_ref).returncode
+                != 0
+            ):
+                raise TaskError(f"base ref not found: {start_ref}")
 
-            if has_origin_base or entry.get("fetch_ok"):
-                pull = run_git(repo, "pull", "--ff-only", "origin", base)
-                entry["pull_ok"] = pull.returncode == 0
-                if pull.returncode != 0:
-                    # Local-only repos often fail pull; only block when origin/base exists.
-                    if has_origin_base:
-                        tail = (pull.stderr or "").strip().splitlines()
-                        err = blocked_pull_entry(entry, tail[-1] if tail else pull.stderr)
-                        errors.append(err)
-                        continue
-                    tail = (pull.stderr or "").strip().splitlines()
-                    if tail:
-                        entry["pull_stderr"] = tail[-1]
-            else:
-                entry["pull_ok"] = False
-                entry["pull_skipped"] = "no origin/<base>"
-
-            exists = run_git(repo, "rev-parse", "--verify", f"refs/heads/{branch}")
-            if exists.returncode == 0:
-                sw = run_git(repo, "checkout", branch)
-                if sw.returncode != 0:
-                    raise TaskError((sw.stderr or "checkout existing branch failed").strip())
-                entry["action"] = "checked_out_existing"
-            else:
-                created = run_git(repo, "checkout", "-b", branch)
+            exists = (
+                run_git(canonical_repo, "rev-parse", "--verify", f"refs/heads/{branch}")
+                .returncode
+                == 0
+            )
+            if create_worktree:
+                selected_repo.parent.mkdir(parents=True, exist_ok=True)
+                wt_args = ["worktree", "add"]
+                if not exists:
+                    wt_args.extend(["-b", branch])
+                wt_args.extend([str(selected_repo), branch if exists else start_ref])
+                created = run_git(canonical_repo, *wt_args)
                 if created.returncode != 0:
-                    raise TaskError((created.stderr or "checkout -b failed").strip())
+                    raise TaskError(
+                        (created.stderr or created.stdout or "git worktree add failed").strip()
+                    )
+                repo = selected_repo
+                entry["action"] = "created_worktree"
+                entry.update(inspect_git_checkout(root, repo))
+            elif exists:
+                occupied = find_worktree_for_branch(canonical_repo, branch)
+                if occupied is not None and occupied.resolve() != repo.resolve():
+                    # Route to the checkout that already owns the branch.
+                    repo = occupied
+                    entry["checkout"] = display_checkout_path(root, repo)
+                    entry["checkout_abs"] = str(repo)
+                    entry.update(inspect_git_checkout(root, repo))
+                    entry["action"] = "routed_existing_worktree"
+                else:
+                    sw = run_git(repo, "switch", branch)
+                    if sw.returncode != 0:
+                        raise TaskError((sw.stderr or "switch existing branch failed").strip())
+                    entry["action"] = "checked_out_existing"
+            else:
+                sw = run_git(repo, "switch", "-c", branch, start_ref)
+                if sw.returncode != 0:
+                    raise TaskError((sw.stderr or "switch -c failed").strip())
                 entry["action"] = "created"
 
             entry["current_branch"] = current_branch(repo)
@@ -1624,6 +1977,23 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
             entry["error"] = str(e)
             entry["needs_user_confirm"] = True
             errors.append(entry)
+
+    if args.from_task and results and not args.dry_run:
+        persist_work_context(
+            root,
+            args.from_task,
+            [
+                {
+                    "name": row.get("git_root", "").rstrip("/") or "workspace",
+                    "repo": normalize_repo_path(row.get("git_root", "").rstrip("/")),
+                    "checkout": row.get("checkout") or row.get("git_root", "").rstrip("/"),
+                    "is_worktree": bool(row.get("is_worktree")),
+                    "branch": row.get("branch") or "",
+                    "base": row.get("base") or "",
+                }
+                for row in results
+            ],
+        )
 
     ok = not errors
     needs_confirm = any(e.get("needs_user_confirm") for e in errors)
@@ -1681,6 +2051,12 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
     errors: list[dict[str, Any]] = []
     seen: set[str] = set()
     md_parts: list[str] = ["## 代码变更摘要（taskctl 生成，请人工核对）", ""]
+    checkout_map: dict[str, str] = {}
+    for raw_mapping in getattr(args, "checkouts", None) or []:
+        repo_key, sep, checkout = raw_mapping.partition("=")
+        if not sep:
+            raise TaskError("--checkout expects REPO=CHECKOUT_PATH")
+        checkout_map[normalize_repo_path(repo_key)] = checkout
 
     for raw in args.repos:
         try:
@@ -1696,7 +2072,23 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
             continue
         seen.add(key)
 
-        repo = Path(info["git_root_abs"])
+        canonical_repo = Path(info["git_root_abs"])
+        canonical_key = normalize_repo_path(key.rstrip("/"))
+        repo = canonical_repo
+        checkout_raw = checkout_map.get(normalize_repo_path(raw)) or checkout_map.get(
+            canonical_key
+        )
+        if checkout_raw:
+            repo = resolve_checkout_path(root, checkout_raw)
+            if not repo.is_dir() or not same_git_repository(canonical_repo, repo):
+                errors.append(
+                    {
+                        "input": raw,
+                        "git_root": key,
+                        "error": f"invalid checkout for canonical repo: {checkout_raw}",
+                    }
+                )
+                continue
         cur = current_branch(repo)
         branch = args.branch or cur
         try:
@@ -1736,6 +2128,7 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
             range_spec,
         )
         files: list[dict[str, str]] = []
+        seen_files: set[tuple[str, str]] = set()
         if name_status.returncode == 0:
             for line in name_status.stdout.splitlines():
                 if not line.strip():
@@ -1748,6 +2141,55 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
                         "status": status,
                         "path": path,
                         "repo_path": repo_display_path(key, path),
+                        "source": "committed",
+                    }
+                )
+                seen_files.add((status, path))
+                if len(files) >= max_files:
+                    break
+
+        for diff_args, source in (
+            (("diff", "--name-status"), "working_tree"),
+            (("diff", "--cached", "--name-status"), "staged"),
+        ):
+            dirty_names = run_git(repo, *diff_args)
+            if dirty_names.returncode != 0:
+                continue
+            for line in dirty_names.stdout.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 2:
+                    continue
+                status, path = parts[0], parts[-1]
+                if (status, path) in seen_files:
+                    continue
+                files.append(
+                    {
+                        "status": status,
+                        "path": path,
+                        "repo_path": repo_display_path(key, path),
+                        "source": source,
+                    }
+                )
+                seen_files.add((status, path))
+                if len(files) >= max_files:
+                    break
+        status_out = run_git(repo, "status", "--porcelain")
+        if status_out.returncode == 0:
+            for line in status_out.stdout.splitlines():
+                if len(line) < 4:
+                    continue
+                status = line[:2].strip() or "M"
+                path = line[3:].strip()
+                if (status, path) in seen_files or any(
+                    existing["path"] == path for existing in files
+                ):
+                    continue
+                files.append(
+                    {
+                        "status": status,
+                        "path": path,
+                        "repo_path": repo_display_path(key, path),
+                        "source": "untracked" if status == "??" else "working_tree",
                     }
                 )
                 if len(files) >= max_files:
@@ -1759,6 +2201,8 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
         entry = {
             "input": raw,
             "git_root": key,
+            "checkout": display_checkout_path(root, repo),
+            "is_worktree": inspect_git_checkout(root, repo)["is_worktree"],
             "branch": branch,
             "base": base,
             "range": range_spec,
@@ -1789,7 +2233,9 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
         md_parts.append("")
         if files:
             for f in files:
-                md_parts.append(f"- `{f['status']}` `{f['repo_path']}`")
+                md_parts.append(
+                    f"- `{f['status']}` `{f['repo_path']}` ({f.get('source', 'committed')})"
+                )
         else:
             md_parts.append("- （无文件变更或无法解析 range — 待核对）")
         md_parts.append("")
@@ -1812,6 +2258,272 @@ def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
         },
         code=0 if ok else 1,
     )
+
+
+def resolve_change_target(
+    root: Path, info: TaskInfo, change: dict[str, str]
+) -> dict[str, Any]:
+    raw_repo = (change.get("repo") or "").strip()
+    repo_key = normalize_repo_path(raw_repo) if raw_repo else ""
+    binding = binding_for_repo(info, repo_key) if repo_key else None
+    if repo_key:
+        canonical_info = resolve_repo(root, repo_key)
+        canonical_repo = Path(canonical_info["git_root_abs"])
+        if binding and binding.get("checkout"):
+            checkout = resolve_checkout_path(root, str(binding["checkout"]))
+            if not checkout.is_dir():
+                raise TaskError(
+                    f"recorded checkout missing for {repo_key}: {checkout}"
+                )
+            if not same_git_repository(canonical_repo, checkout):
+                raise TaskError(
+                    f"recorded checkout is not the canonical repository {repo_key}: "
+                    f"{checkout}"
+                )
+        else:
+            checkout = canonical_repo
+    else:
+        checkout = root
+    raw_path = (change.get("path") or "").strip().strip("`").rstrip("/")
+    if raw_path and Path(raw_path).is_absolute():
+        raise TaskError(
+            f"OpenSpec path must be canonical-repo/workspace relative: {raw_path}"
+        )
+    relative = raw_path
+    if repo_key and relative:
+        normalized = normalize_repo_path(relative)
+        if normalized == repo_key:
+            relative = ""
+        elif normalized.startswith(repo_key.rstrip("/") + "/"):
+            relative = normalized[len(repo_key.rstrip("/")) + 1 :]
+    change_root = (checkout / relative).resolve() if relative else checkout
+    try:
+        change_root.relative_to(checkout.resolve())
+    except ValueError as e:
+        raise TaskError(f"OpenSpec path escapes checkout: {raw_path}") from e
+    planning_root = change_root
+    for candidate in [change_root, *change_root.parents]:
+        if candidate.name == "changes" and candidate.parent.name == "openspec":
+            planning_root = candidate.parent
+            break
+        if candidate.name == "openspec":
+            planning_root = candidate
+            break
+    return {
+        **change,
+        "repo": repo_key,
+        "checkout": display_checkout_path(root, checkout),
+        "checkout_abs": str(checkout),
+        "change_root": str(change_root),
+        "planning_root": str(planning_root),
+    }
+
+
+def openspec_checkbox_progress(target: dict[str, Any]) -> dict[str, int]:
+    change_root = Path(target["change_root"])
+    tasks = change_root / "tasks.md"
+    if not tasks.is_file():
+        return {"total": 0, "complete": 0, "remaining": 0}
+    text = tasks.read_text(encoding="utf-8")
+    complete = len(re.findall(r"^\s*-\s*\[[xX]\]", text, re.MULTILINE))
+    remaining = len(re.findall(r"^\s*-\s*\[\s\]", text, re.MULTILINE))
+    return {"total": complete + remaining, "complete": complete, "remaining": remaining}
+
+
+def archived_change_paths(target: dict[str, Any]) -> list[Path]:
+    archive_root = Path(target["planning_root"]) / "changes" / "archive"
+    if not archive_root.is_dir():
+        return []
+    name = str(target.get("name") or "")
+    return sorted(
+        p for p in archive_root.iterdir() if p.is_dir() and p.name.endswith(f"-{name}")
+    )
+
+
+def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
+    matches = match_query(list_active_infos(root), args.query)
+    if len(matches) != 1:
+        return emit(
+            {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "exit_markdown": exit_markdown(matches, "task-apply"),
+            },
+            code=2,
+        )
+    info = matches[0]
+    targets = [resolve_change_target(root, info, row) for row in info.openspec]
+    for target in targets:
+        target["progress"] = openspec_checkbox_progress(target)
+    progress_path = root / info.task_root.rstrip("/") / "progress.md"
+    return emit(
+        {
+            "ok": True,
+            "result": "execution_context",
+            "task": asdict(info),
+            "targets": targets,
+            "progress_path": rel_posix(root, progress_path),
+            "progress_exists": progress_path.is_file(),
+            "progress_markdown": (
+                progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
+            ),
+        }
+    )
+
+
+def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
+    matches = match_query(list_active_infos(root), args.query)
+    if len(matches) != 1:
+        return emit(
+            {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "exit_markdown": exit_markdown(matches, "task-apply"),
+            },
+            code=2,
+        )
+    info = matches[0]
+    phase = args.phase
+    status = "blocked" if phase == "blocked" else "in_progress"
+    task_readme = root / info.readme
+    original_readme = task_readme.read_text(encoding="utf-8")
+    task_index = index_path(root)
+    original_index = (
+        task_index.read_text(encoding="utf-8") if task_index.is_file() else None
+    )
+    targets = [resolve_change_target(root, info, row) for row in info.openspec]
+    progress_path = root / info.task_root.rstrip("/") / "progress.md"
+    previous_text = (
+        progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
+    )
+    progress_existed = progress_path.is_file()
+
+    def previous_items(heading: str) -> list[str]:
+        body = next(
+            (
+                section["body"]
+                for section in parse_markdown_sections(previous_text)
+                if normalize_heading(section["heading"]) == normalize_heading(heading)
+            ),
+            "",
+        )
+        return [
+            m.group(1).strip()
+            for m in re.finditer(r"^\s*-\s+(.+?)\s*$", body, re.MULTILINE)
+            if m.group(1).strip() not in {"（无）", "（尚无）"}
+        ]
+
+    completed_items = list(
+        dict.fromkeys([*previous_items("本轮完成"), *(args.completed or [])])
+    )
+    verification_items = list(
+        dict.fromkeys([*previous_items("验证证据"), *(args.verification or [])])
+    )
+    snapshots: list[dict[str, Any]] = []
+    for binding in info.checkouts:
+        canonical = Path(
+            resolve_repo(root, str(binding["repo"]))["git_root_abs"]
+        )
+        checkout = resolve_checkout_path(root, str(binding.get("checkout") or binding["repo"]))
+        if not checkout.is_dir() or not same_git_repository(canonical, checkout):
+            raise TaskError(
+                f"missing/invalid recorded checkout for {binding['repo']}: {checkout}"
+            )
+        snapshots.append(
+            {
+                **binding,
+                "current_branch": current_branch(checkout),
+                "dirty": is_dirty(checkout),
+                "dirty_porcelain": dirty_porcelain(checkout),
+            }
+        )
+    lines = [
+        f"# {info.task_id} 实施进度",
+        "",
+        f"- 更新：{args.date or today_str()}",
+        f"- 阶段：`{phase}`",
+        f"- 当前 change：`{args.change or '—'}`",
+        f"- 当前任务：{args.current_task or '—'}",
+        "",
+        "## OpenSpec 进度",
+        "",
+        "| change | 完成 | 总数 | 剩余 | planning root |",
+        "|--------|------|------|------|---------------|",
+    ]
+    for target in targets:
+        progress = openspec_checkbox_progress(target)
+        lines.append(
+            f"| `{target['name']}` | {progress['complete']} | {progress['total']} | "
+            f"{progress['remaining']} | `{target['planning_root']}` |"
+        )
+    lines.extend(["", "## 本轮完成", ""])
+    lines.extend(f"- {item}" for item in completed_items)
+    if not completed_items:
+        lines.append("- （无）")
+    lines.extend(["", "## 验证证据", ""])
+    lines.extend(f"- {item}" for item in verification_items)
+    if not verification_items:
+        lines.append("- （尚无）")
+    lines.extend(
+        [
+            "",
+            "## 阻塞",
+            "",
+            f"- {args.blocker or '无'}",
+            "",
+            "## 下一步",
+            "",
+            f"- {args.next_step or '继续下一个未完成 OpenSpec task'}",
+            "",
+            "## Git 快照",
+            "",
+        ]
+    )
+    for snap in snapshots:
+        lines.append(
+            f"- `{snap.get('repo')}` checkout=`{snap.get('checkout')}` "
+            f"branch=`{snap.get('current_branch', snap.get('branch', ''))}` "
+            f"dirty={'yes' if snap.get('dirty') else 'no'}"
+        )
+        for dirty in snap.get("dirty_porcelain") or []:
+            lines.append(f"  - `{dirty}`")
+    try:
+        atomic_write_text(progress_path, "\n".join(lines).rstrip() + "\n")
+        with contextlib.redirect_stdout(io.StringIO()):
+            status_code = _cmd_set_status_unlocked(
+                root,
+                argparse.Namespace(query=info.task_id, status=status, date=args.date),
+            )
+        if status_code != 0:
+            raise TaskError(f"failed to persist checkpoint status for {info.task_id}")
+    except Exception:
+        with contextlib.suppress(Exception):
+            atomic_write_text(task_readme, original_readme)
+            if original_index is None:
+                task_index.unlink(missing_ok=True)
+            else:
+                atomic_write_text(task_index, original_index)
+            if progress_existed:
+                atomic_write_text(progress_path, previous_text)
+            else:
+                progress_path.unlink(missing_ok=True)
+        raise
+    return emit(
+        {
+            "ok": True,
+            "result": "checkpointed",
+            "task_id": info.task_id,
+            "phase": phase,
+            "status": status,
+            "progress_path": rel_posix(root, progress_path),
+            "targets": targets,
+        }
+    )
+
+
+def cmd_checkpoint(root: Path, args: argparse.Namespace) -> int:
+    with index_lock(root):
+        return _cmd_checkpoint_unlocked(root, args)
 
 
 def cmd_list(root: Path, args: argparse.Namespace) -> int:
@@ -1893,7 +2605,7 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
     return emit(with_workflow_notes(root, inferred), code=2)
 
 
-def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
+def _cmd_set_status_unlocked(root: Path, args: argparse.Namespace) -> int:
     status = args.status.strip().lower()
     if status not in VALID_STATUSES:
         raise TaskError(f"invalid status: {status}; expected one of {', '.join(VALID_STATUSES)}")
@@ -1916,7 +2628,7 @@ def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
     text = readme.read_text(encoding="utf-8")
     new_text = set_readme_status(text, status)
     if new_text != text:
-        readme.write_text(new_text if new_text.endswith("\n") else new_text + "\n", encoding="utf-8")
+        atomic_write_text(readme, new_text if new_text.endswith("\n") else new_text + "\n")
     updated = args.date or today_str()
     try:
         update_active_index_row(root, info.task_id, status=status, updated=updated)
@@ -1940,7 +2652,12 @@ def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
     return emit({"ok": True, "result": "updated", "task": asdict(info)})
 
 
-def cmd_new(root: Path, args: argparse.Namespace) -> int:
+def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
+    with index_lock(root):
+        return _cmd_set_status_unlocked(root, args)
+
+
+def _cmd_new_unlocked(root: Path, args: argparse.Namespace) -> int:
     slug = validate_slug(args.slug)
     title = (args.title or slug).strip()
     created = args.date or today_str()
@@ -1992,26 +2709,30 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
 
     task_root.mkdir(parents=True, exist_ok=False)
     readme = task_root / "README.md"
-    readme.write_text(
-        scaffold_readme(
-            task_id=task_id,
-            slug=slug,
-            title=title,
-            created=created,
-            scope=scope,
-        ),
-        encoding="utf-8",
-    )
-    active.append(
-        TaskRow(
-            task_id=task_id,
-            name=slug,
-            path=rel,
-            status="draft",
-            updated=created,
+    try:
+        atomic_write_text(
+            readme,
+            scaffold_readme(
+                task_id=task_id,
+                slug=slug,
+                title=title,
+                created=created,
+                scope=scope,
+            ),
         )
-    )
-    write_index(root, next_id + 1, active, archived)
+        active.append(
+            TaskRow(
+                task_id=task_id,
+                name=slug,
+                path=rel,
+                status="draft",
+                updated=created,
+            )
+        )
+        write_index(root, next_id + 1, active, archived)
+    except Exception:
+        shutil.rmtree(task_root, ignore_errors=True)
+        raise
     print(f"已创建任务：{task_id} — {rel}", file=sys.stderr)
     info = TaskInfo(
         task_id=task_id,
@@ -2026,7 +2747,12 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     return emit(with_workflow_notes(root, {"ok": True, "result": "created", "task": asdict(info)}))
 
 
-def cmd_archive(root: Path, args: argparse.Namespace) -> int:
+def cmd_new(root: Path, args: argparse.Namespace) -> int:
+    with index_lock(root):
+        return _cmd_new_unlocked(root, args)
+
+
+def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     infos = list_active_infos(root)
     matches = match_query(infos, args.query)
     if len(matches) != 1:
@@ -2046,6 +2772,144 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
     changes = src / "changes.md"
     if not changes.is_file() and not args.allow_missing_changes:
         raise TaskError("missing changes.md; write it first or pass --allow-missing-changes")
+    original_changes_text = (
+        changes.read_text(encoding="utf-8") if changes.is_file() else None
+    )
+
+    override_notes: list[str] = []
+    active_or_incomplete: list[str] = []
+    resolved_targets: list[dict[str, Any]] = []
+    for change in info.openspec:
+        target = resolve_change_target(root, info, change)
+        resolved_targets.append(target)
+        progress = openspec_checkbox_progress(target)
+        if Path(target["change_root"]).exists():
+            active_or_incomplete.append(
+                f"{change['name']} (active path exists: {target['change_root']}, "
+                f"remaining={progress['remaining']})"
+            )
+        else:
+            archived_paths = archived_change_paths(target)
+            if not archived_paths:
+                active_or_incomplete.append(
+                    f"{change['name']} (recorded path missing and no archived change found "
+                    f"under {Path(target['planning_root']) / 'changes' / 'archive'})"
+                )
+            else:
+                for archived_path in archived_paths:
+                    archived_progress = openspec_checkbox_progress(
+                        {**target, "change_root": str(archived_path)}
+                    )
+                    if archived_progress["remaining"]:
+                        active_or_incomplete.append(
+                            f"{change['name']} (archived at {archived_path} with "
+                            f"remaining={archived_progress['remaining']})"
+                        )
+    if active_or_incomplete and not args.allow_active_openspec:
+        raise TaskError(
+            "active/incomplete OpenSpec changes remain: "
+            + "; ".join(active_or_incomplete)
+            + "; archive them first or pass --allow-active-openspec"
+        )
+    if active_or_incomplete:
+        override_notes.append("允许遗留 OpenSpec：" + "; ".join(active_or_incomplete))
+
+    readme = src / "README.md"
+    original_text = readme.read_text(encoding="utf-8")
+    acceptance = next(
+        (
+            s["body"]
+            for s in parse_markdown_sections(original_text)
+            if normalize_heading(s["heading"]) == "验收标准"
+        ),
+        "",
+    )
+    unchecked = len(re.findall(r"^\s*-\s*\[\s\]", acceptance, re.MULTILINE))
+    if unchecked and not args.allow_unchecked_acceptance:
+        raise TaskError(
+            f"{unchecked} acceptance item(s) unchecked; complete them or pass "
+            "--allow-unchecked-acceptance"
+        )
+    if unchecked:
+        override_notes.append(f"允许 {unchecked} 项验收未勾选")
+
+    progress_path = src / "progress.md"
+    verification_ok = False
+    if progress_path.is_file():
+        progress_text = progress_path.read_text(encoding="utf-8")
+        verification = next(
+            (
+                s["body"]
+                for s in parse_markdown_sections(progress_text)
+                if normalize_heading(s["heading"]) == "验证证据"
+            ),
+            "",
+        )
+        verification_ok = bool(
+            verification
+            and "（尚无）" not in verification
+            and re.search(r"^\s*-\s+\S", verification, re.MULTILINE)
+        )
+    if not verification_ok and not args.allow_missing_verification:
+        raise TaskError(
+            "missing verification evidence in progress.md; checkpoint testing evidence "
+            "or pass --allow-missing-verification"
+        )
+    if not verification_ok:
+        override_notes.append("允许缺少验证证据")
+
+    dirty_bindings: list[str] = []
+    missing_bindings: list[str] = []
+    repo_keys = {
+        normalize_repo_path(str(row.get("path") or ""))
+        for row in info.scope.get("must", [])
+        if row.get("path")
+    }
+    repo_keys.update(
+        normalize_repo_path(str(binding.get("repo") or ""))
+        for binding in info.checkouts
+        if binding.get("repo")
+    )
+    repo_keys.update(
+        normalize_repo_path(str(target.get("repo") or ""))
+        for target in resolved_targets
+        if target.get("repo")
+    )
+    if any(not target.get("repo") for target in resolved_targets):
+        workspace_git = find_git_root(root)
+        if workspace_git is not None and workspace_git.resolve() == root.resolve():
+            repo_keys.add(".")
+    for repo_key in sorted(repo_keys):
+        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
+        binding = binding_for_repo(info, repo_key)
+        checkout = (
+            resolve_checkout_path(root, str(binding.get("checkout")))
+            if binding and binding.get("checkout")
+            else canonical
+        )
+        if not checkout.is_dir() or not same_git_repository(canonical, checkout):
+            missing_bindings.append(f"{repo_key} -> {checkout}")
+            continue
+        if is_dirty(checkout):
+            dirty_bindings.append(display_checkout_path(root, checkout))
+    if missing_bindings and not args.allow_dirty:
+        raise TaskError(
+            "missing/invalid task checkout(s): "
+            + ", ".join(missing_bindings)
+            + "; restore bindings or pass --allow-dirty"
+        )
+    if missing_bindings:
+        override_notes.append(
+            "允许缺失 checkout：" + ", ".join(missing_bindings)
+        )
+    if dirty_bindings and not args.allow_dirty:
+        raise TaskError(
+            "dirty task checkout(s): "
+            + ", ".join(dirty_bindings)
+            + "; commit/clean them or pass --allow-dirty"
+        )
+    if dirty_bindings:
+        override_notes.append("允许 dirty checkout：" + ", ".join(dirty_bindings))
 
     create_date = src.parent.name
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", create_date):
@@ -2073,31 +2937,48 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
             }
         )
 
+    if override_notes and changes.is_file():
+        changes_text = changes.read_text(encoding="utf-8").rstrip()
+        changes_text += "\n\n## 归档门禁覆盖\n\n"
+        changes_text += "\n".join(f"- {note}" for note in override_notes) + "\n"
+        atomic_write_text(changes, changes_text)
+
     readme = src / "README.md"
-    text = readme.read_text(encoding="utf-8")
-    readme.write_text(set_readme_status(text, "archived") + ("" if text.endswith("\n") else "\n"), encoding="utf-8")
+    text = original_text
+    archived_text = set_readme_status(text, "archived") + ("" if text.endswith("\n") else "\n")
+    try:
+        atomic_write_text(readme, archived_text)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dest))
+        # prune empty date dir
+        parent = src.parent
+        if parent.is_dir() and parent.name != "tasks" and not any(parent.iterdir()):
+            parent.rmdir()
 
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(src), str(dest))
-    # prune empty date dir
-    parent = src.parent
-    if parent.is_dir() and parent.name != "tasks" and not any(parent.iterdir()):
-        parent.rmdir()
-
-    next_id, active, archived = parse_index(root)
-    active = [r for r in active if r.task_id != info.task_id]
-    archived = [r for r in archived if r.task_id != info.task_id]
-    archived.append(
-        TaskRow(
-            task_id=info.task_id,
-            name=info.name,
-            path=rel_dest,
-            status="archived",
-            archived_on=archived_on,
-            section="archived",
+        next_id, active, archived = parse_index(root)
+        active = [r for r in active if r.task_id != info.task_id]
+        archived = [r for r in archived if r.task_id != info.task_id]
+        archived.append(
+            TaskRow(
+                task_id=info.task_id,
+                name=info.name,
+                path=rel_dest,
+                status="archived",
+                archived_on=archived_on,
+                section="archived",
+            )
         )
-    )
-    write_index(root, next_id, active, archived)
+        write_index(root, next_id, active, archived)
+    except Exception:
+        with contextlib.suppress(Exception):
+            if dest.exists() and not src.exists():
+                src.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(dest), str(src))
+            if src.exists():
+                atomic_write_text(src / "README.md", text)
+                if original_changes_text is not None:
+                    atomic_write_text(src / "changes.md", original_changes_text)
+        raise
     print(f"已归档：{info.task_id} → {rel_dest}", file=sys.stderr)
     return emit(
         {
@@ -2109,6 +2990,11 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
             "archived_on": archived_on,
         }
     )
+
+
+def cmd_archive(root: Path, args: argparse.Namespace) -> int:
+    with index_lock(root):
+        return _cmd_archive_unlocked(root, args)
 
 
 def cmd_notes(root: Path, args: argparse.Namespace) -> int:
@@ -2282,6 +3168,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="allow archive without changes.md",
     )
+    arch_p.add_argument("--allow-active-openspec", action="store_true")
+    arch_p.add_argument("--allow-unchecked-acceptance", action="store_true")
+    arch_p.add_argument("--allow-missing-verification", action="store_true")
+    arch_p.add_argument("--allow-dirty", action="store_true")
     arch_p.set_defaults(func=cmd_archive)
 
     roots_p = sub.add_parser("repo-roots", help="resolve workspace-relative paths to unique git roots")
@@ -2316,6 +3206,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         help="must-modify git root (workspace-relative); repeatable. Do not pass cwd or `.` unless the workspace itself is a target",
+    )
+    prep_p.add_argument(
+        "--worktree",
+        dest="worktrees",
+        action="append",
+        default=None,
+        metavar="REPO=CHECKOUT",
+        help="explicit checkout/worktree for a canonical repo; creates it when missing",
     )
     prep_p.add_argument(
         "--from-task",
@@ -2353,6 +3251,14 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="workspace-relative git path; repeatable (`.` = workspace)",
     )
+    sum_p.add_argument(
+        "--checkout",
+        dest="checkouts",
+        action="append",
+        default=None,
+        metavar="REPO=CHECKOUT",
+        help="actual checkout/worktree to summarize for a canonical repo",
+    )
     sum_p.add_argument("--branch", default=None, help="feature branch (default: current)")
     sum_p.add_argument("--base", default=None, help="base branch name (default: detected)")
     sum_p.add_argument("--max-commits", type=int, default=30)
@@ -2363,6 +3269,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="allow roots matching default exclude markers (none by default)",
     )
     sum_p.set_defaults(func=cmd_git_summary)
+
+    context_p = sub.add_parser(
+        "execution-context",
+        help="resolve persisted checkout/worktree and OpenSpec execution targets",
+    )
+    context_p.add_argument("query", help="TNNNN / slug / path")
+    context_p.set_defaults(func=cmd_execution_context)
+
+    checkpoint_p = sub.add_parser(
+        "checkpoint",
+        help="persist task-apply phase, progress, blockers, next step, and git snapshot",
+    )
+    checkpoint_p.add_argument("query", help="TNNNN / slug / path")
+    checkpoint_p.add_argument(
+        "--phase",
+        required=True,
+        choices=("implementing", "testing", "blocked", "done"),
+    )
+    checkpoint_p.add_argument("--change", default="")
+    checkpoint_p.add_argument("--current-task", default="")
+    checkpoint_p.add_argument("--completed", action="append", default=[])
+    checkpoint_p.add_argument("--verification", action="append", default=[])
+    checkpoint_p.add_argument("--blocker", default="")
+    checkpoint_p.add_argument("--next", dest="next_step", default="")
+    checkpoint_p.add_argument("--date", default=None)
+    checkpoint_p.set_defaults(func=cmd_checkpoint)
 
     notes_p = sub.add_parser(
         "notes",
@@ -2405,6 +3337,15 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(root, args)
     except TaskError as e:
         return emit({"ok": False, "error": str(e)}, code=e.code)
+    except (OSError, UnicodeError, subprocess.SubprocessError) as e:
+        return emit(
+            {
+                "ok": False,
+                "error": f"{type(e).__name__}: {e}",
+                "error_type": "io_or_process_error",
+            },
+            code=1,
+        )
 
 
 if __name__ == "__main__":
