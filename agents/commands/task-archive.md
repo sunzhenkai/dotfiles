@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-按 `execution-context` 在真实 checkout 归档全部 OpenSpec change，把 `design/` 晋升到仓库正式位置（若有），通过完成度/验证/clean 门禁后再原子移动 task 并更新索引。任一 change 或 delta sync 失败必须停止。
+按 `execution-context` 在真实 checkout 归档全部 OpenSpec change，把 `design/` 晋升到仓库正式位置（若有），通过完成度/验证/clean 门禁后再原子移动 task 并更新索引。只剩测试/验证 checkbox 时必须先向用户确认是否继续；用户确认或明确「强行合并」后用 `--force-merge`。仍有实现项则停止（除非用户明确强行合并）。任一 change 或 delta sync 失败必须停止。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

@@ -36,7 +36,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 | `resolve [query] --command <cmd> [--hint ...] [--cwd ...] [--git-branch ...]` | Task Resolution Gate；无 query 时自动推断 | 0 确定性唯一；**2** 零/多命中/需确认 |
 | `set-status <query> <status>` | 同步写 README status + INDEX 行 | 0 / 2 |
 | `new --slug <slug> [--title ...] [--date YYYY-MM-DD]` | 分配 `TNNNN`、建目录与 README 骨架、更新 INDEX | 0 |
-| `archive <query> [--allow-missing-changes]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
+| `archive <query> [--allow-missing-changes] [--force-merge]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
 | `repo-roots <path> [...]` | 解析为去重后的 git 根（工作区相对路径；`.` = 工作区自身，仅当工作区就是目标仓时使用） | 0 / 1 |
 | `scope-repos <query> [--cwd ...]` | 解析 README 涉及面；`checkout` 仅为角色=必须的仓 | 0 / 2 |
 | `prepare-branches --slug <slug> [--from-task <query>] [--repo <path>] [--worktree REPO=CHECKOUT]` | Checkout Gate：解析/创建/续用真实 checkout，刷新基线并自动记账 | 0 / 1 / 2 |
@@ -49,9 +49,9 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 - stderr：一行人读摘要（如「当前任务：T0002 — path」）。
 - `resolve`/`set-status`/`archive` 在零/多命中或 `needs_confirm` 时打印 `exit_markdown`，**中止主流程**，等待用户选择。
 - `new` 只建骨架；概述/现状缺口/涉及面/工作上下文/验收等正文仍由 Agent 填写。
-- `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。
+- `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。只剩测试/验证 checkbox 时 **MUST** `needs_confirm`（退出码 2），列出剩余项并等用户选择；禁止自行当结案停止，也禁止未确认就归档。用户确认「继续归档 / 强行合并」或本条已写该口令后，用 `--force-merge` 覆盖未完成 OpenSpec（原因写入 `changes.md`）。仍有实现项则硬失败，除非用户明确强行合并。
 - `prepare-branches`：身份确定后、**写入目标代码仓之前**跑。优先级为显式 `--worktree` → README 已记录 checkout → 已持有 task 分支的 worktree → canonical 仓。显式 checkout 不存在时创建 linked worktree；工作区外路径仅在 `git-common-dir` 同源时可续用。配置了 `origin` 但 fetch 失败必须阻断，禁止从旧本地基线继续。`--from-task` 会自动回写工作上下文；部分仓成功后也保存成功项。无必须仓则跳过。已在目标分支允许 dirty 续作；其他 dirty 情况停下来确认。支持 `--dry-run`；不 push；禁止擅自 stash/reset/force checkout。
-- `execution-context`：`task-apply` / archive 写操作前 MUST 调用；不得依赖当前 cwd 猜 OpenSpec 根。
+- `execution-context`：`task-apply` / archive 写操作前 MUST 调用；不得依赖当前 cwd 猜 OpenSpec 根。JSON 含 `openspec_remaining.kind`（`none` / `verification_only` / `implementation`）与剩余 checkbox 文本，供 archive 门禁判断。
 - `checkpoint`：`task-apply` 开始、每个 OpenSpec task 完成、暂停/错误、进入测试和全部完成时 MUST 调用；`progress.md` 不再可选。
 - `scope-repos`：只读解析涉及面。`checkout` = 必须仓路径；建议/排除不在内。cwd 出现在 `cwd_*` 报告里，不自动进入 checkout。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区；`--repo` 同样只传必须仓。
@@ -328,10 +328,14 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 ### task-archive
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. `taskctl execution-context <id>`，在各 target 的 planning root/store 依次委托 `openspec-archive-change`；任一 change 归档或 delta sync 失败即停止，不得继续 task 归档
+2. `taskctl execution-context <id>`，读取各 target 的 `remaining_kind` / `openspec_remaining`。**先分类剩余 checkbox，再决定是否委托 `openspec-archive-change`：**
+   - `remaining_kind=none`：在各 target 的 planning root/store 依次委托 `openspec-archive-change`
+   - `remaining_kind=verification_only`：**MUST 向用户确认**是否继续 archive。列出剩余测试/验证项与完成数（如 14/18）。禁止把「未完成」直接当成结案停止，也禁止未确认就归档。用户确认「继续归档」或本条已写「强行合并 / `--force-merge`」后再委托 `openspec-archive-change`，随后 `taskctl archive <id> --force-merge`
+   - `remaining_kind=implementation`：停止并列出未完成实现项。仅当用户明确「强行合并」时才用 `--force-merge` 继续
+   任一 change 归档或 delta sync 失败即停止，不得继续 task 归档
 3. **晋升设计文档**（若 `<taskRoot>/design/` 存在）：按 `design/README.md` 归档落点表，把文档复制到目标仓正式位置（`docs/design/<domain>/`、ADR、knowledge）；更新该仓 INDEX/README 交叉引用并核对链接。落点不明则停下来问，不要发明目录。`design/` **原件保留**，随 task 目录归档作快照。无 `design/` 则跳过
 4. 按 execution-context 对每仓运行 `git-summary --repo <canonical> --checkout <canonical>=<checkout> --branch <记录分支> --base <记录基线>`，同时纳入提交、staged 与 working-tree diff
-5. `taskctl archive <id>` 机械校验：无活跃 OpenSpec、验收全勾选、progress 有验证证据、checkout clean。确需跳过时使用对应显式 `--allow-*`，覆盖原因自动写入 `changes.md`
+5. `taskctl archive <id>` 机械校验：无活跃 OpenSpec、验收全勾选、progress 有验证证据、checkout clean。只剩测试/验证时 CLI 亦会 `needs_confirm`（退出码 2）。确需跳过时使用对应显式 `--allow-*` 或 `--force-merge`（强行合并未完成 OpenSpec），覆盖原因自动写入 `changes.md`
 6. archive 内置 status→archived，并在移动/INDEX 写入失败时回滚
 7. 桥接：列出已晋升文档路径
 

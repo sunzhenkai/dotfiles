@@ -90,6 +90,12 @@ STATUS_LINE_RE = re.compile(
     r"^(\*\*(?:status|状态)[：:]\*\*\s*)([A-Za-z_]+)(\s*)$",
     re.MULTILINE,
 )
+CHECKBOX_ITEM_RE = re.compile(r"^\s*-\s*\[([ xX])\]\s+(.+?)\s*$", re.MULTILINE)
+VERIFICATION_ITEM_RE = re.compile(
+    r"(验证|测试|回归|冒烟|healthcheck|healthy|smoke|e2e|"
+    r"\bqa\b|\btest\b|verify|validation|lint|typecheck)",
+    re.IGNORECASE,
+)
 FM_STATUS_RE = re.compile(r"^(status:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 FM_ID_RE = re.compile(r"^(id:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 META_ID_RE = re.compile(r"^\*\*id[：:]\*\*\s*(T\d{4})\s*$", re.MULTILINE | re.IGNORECASE)
@@ -2319,15 +2325,157 @@ def resolve_change_target(
     }
 
 
-def openspec_checkbox_progress(target: dict[str, Any]) -> dict[str, int]:
+def classify_checkbox_item(text: str) -> str:
+    return "verification" if VERIFICATION_ITEM_RE.search(text) else "implementation"
+
+
+def parse_openspec_checkboxes(text: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for match in CHECKBOX_ITEM_RE.finditer(text):
+        title = match.group(2).strip()
+        items.append(
+            {
+                "text": title,
+                "done": match.group(1).lower() == "x",
+                "kind": classify_checkbox_item(title),
+            }
+        )
+    return items
+
+
+def remaining_kind_of(items: list[dict[str, Any]]) -> str:
+    remaining = [item for item in items if not item["done"]]
+    if not remaining:
+        return "none"
+    if all(item["kind"] == "verification" for item in remaining):
+        return "verification_only"
+    return "implementation"
+
+
+def aggregate_remaining_kind(reports: list[dict[str, Any]]) -> str:
+    kinds = {str(report.get("remaining_kind") or "none") for report in reports}
+    kinds.discard("none")
+    if "implementation" in kinds:
+        return "implementation"
+    if "verification_only" in kinds:
+        return "verification_only"
+    return "none"
+
+
+def empty_openspec_report() -> dict[str, Any]:
+    return {
+        "total": 0,
+        "complete": 0,
+        "remaining": 0,
+        "remaining_kind": "none",
+        "remaining_items": [],
+    }
+
+
+def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
     change_root = Path(target["change_root"])
     tasks = change_root / "tasks.md"
     if not tasks.is_file():
-        return {"total": 0, "complete": 0, "remaining": 0}
-    text = tasks.read_text(encoding="utf-8")
-    complete = len(re.findall(r"^\s*-\s*\[[xX]\]", text, re.MULTILINE))
-    remaining = len(re.findall(r"^\s*-\s*\[\s\]", text, re.MULTILINE))
-    return {"total": complete + remaining, "complete": complete, "remaining": remaining}
+        return empty_openspec_report()
+    items = parse_openspec_checkboxes(tasks.read_text(encoding="utf-8"))
+    remaining_items = [item for item in items if not item["done"]]
+    complete = sum(1 for item in items if item["done"])
+    return {
+        "total": len(items),
+        "complete": complete,
+        "remaining": len(remaining_items),
+        "remaining_kind": remaining_kind_of(items),
+        "remaining_items": remaining_items,
+    }
+
+
+def openspec_checkbox_progress(target: dict[str, Any]) -> dict[str, Any]:
+    return openspec_task_report(target)
+
+
+def inspect_change_remainder(target: dict[str, Any]) -> dict[str, Any]:
+    name = str(target.get("name") or "")
+    change_root = Path(target["change_root"])
+    if change_root.exists():
+        report = openspec_task_report(target)
+        return {
+            "name": name,
+            "state": "active",
+            "path": str(change_root),
+            "message": (
+                f"{name} (active path exists: {change_root}, "
+                f"remaining={report['remaining']})"
+            ),
+            **report,
+        }
+    archived_paths = archived_change_paths(target)
+    archive_root = Path(target["planning_root"]) / "changes" / "archive"
+    if not archived_paths:
+        return {
+            "name": name,
+            "state": "missing",
+            "path": str(archive_root),
+            "message": (
+                f"{name} (recorded path missing and no archived change found "
+                f"under {archive_root})"
+            ),
+            "total": 0,
+            "complete": 0,
+            "remaining": 1,
+            "remaining_kind": "implementation",
+            "remaining_items": [],
+        }
+    last_report = empty_openspec_report()
+    for archived_path in archived_paths:
+        report = openspec_task_report({**target, "change_root": str(archived_path)})
+        last_report = report
+        if report["remaining"]:
+            return {
+                "name": name,
+                "state": "archived_incomplete",
+                "path": str(archived_path),
+                "message": (
+                    f"{name} (archived at {archived_path} with "
+                    f"remaining={report['remaining']})"
+                ),
+                **report,
+            }
+    return {
+        "name": name,
+        "state": "archived",
+        "path": str(archived_paths[-1]),
+        "message": "",
+        **last_report,
+    }
+
+
+def verification_only_confirm_markdown(
+    task_id: str, leftovers: list[dict[str, Any]]
+) -> str:
+    lines = [
+        "## 只剩测试/验证，确认是否继续归档",
+        "",
+        f"{task_id} 的 OpenSpec 仍有未完成 checkbox，但全部判定为测试/验证。",
+        "",
+        "**剩余项：**",
+    ]
+    for row in leftovers:
+        lines.append(f"- `{row['name']}` {row['complete']}/{row['total']}")
+        for item in row.get("remaining_items") or []:
+            lines.append(f"  - {item['text']}")
+    lines.extend(
+        [
+            "",
+            "**请选择：**",
+            f"- 继续归档（强行合并）：`taskctl archive {task_id} --force-merge`",
+            "- 先做完验证再归档",
+            "- 中止",
+            "",
+            "未确认前 **不得** 继续 archive。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def archived_change_paths(target: dict[str, Any]) -> list[Path]:
@@ -2353,15 +2501,30 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
         )
     info = matches[0]
     targets = [resolve_change_target(root, info, row) for row in info.openspec]
+    remaining_items: list[dict[str, Any]] = []
     for target in targets:
-        target["progress"] = openspec_checkbox_progress(target)
+        progress = openspec_checkbox_progress(target)
+        target["progress"] = progress
+        target["remaining_kind"] = progress["remaining_kind"]
+        target["remaining_items"] = progress["remaining_items"]
+        for item in progress["remaining_items"]:
+            remaining_items.append({"change": target.get("name") or "", **item})
     progress_path = root / info.task_root.rstrip("/") / "progress.md"
+    complete = sum(int(t["progress"]["complete"]) for t in targets)
+    total = sum(int(t["progress"]["total"]) for t in targets)
     return emit(
         {
             "ok": True,
             "result": "execution_context",
             "task": asdict(info),
             "targets": targets,
+            "openspec_remaining": {
+                "kind": aggregate_remaining_kind(targets),
+                "complete": complete,
+                "total": total,
+                "remaining": total - complete,
+                "items": remaining_items,
+            },
             "progress_path": rel_posix(root, progress_path),
             "progress_exists": progress_path.is_file(),
             "progress_markdown": (
@@ -2777,42 +2940,74 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     )
 
     override_notes: list[str] = []
-    active_or_incomplete: list[str] = []
+    allow_remaining_openspec = bool(
+        getattr(args, "allow_active_openspec", False)
+        or getattr(args, "force_merge", False)
+    )
     resolved_targets: list[dict[str, Any]] = []
+    remainder_rows: list[dict[str, Any]] = []
     for change in info.openspec:
         target = resolve_change_target(root, info, change)
         resolved_targets.append(target)
-        progress = openspec_checkbox_progress(target)
-        if Path(target["change_root"]).exists():
-            active_or_incomplete.append(
-                f"{change['name']} (active path exists: {target['change_root']}, "
-                f"remaining={progress['remaining']})"
+        remainder_rows.append(inspect_change_remainder(target))
+    blocking_rows = [
+        row
+        for row in remainder_rows
+        if row["state"] in {"active", "missing", "archived_incomplete"}
+    ]
+    active_or_incomplete = [row["message"] for row in blocking_rows if row.get("message")]
+    incomplete_rows = [
+        row
+        for row in blocking_rows
+        if row["state"] == "missing" or row["remaining"] > 0
+    ]
+    verification_only = bool(incomplete_rows) and all(
+        row["state"] != "missing" and row["remaining_kind"] == "verification_only"
+        for row in incomplete_rows
+    )
+    if active_or_incomplete and not allow_remaining_openspec:
+        if verification_only:
+            print(
+                f"只剩测试/验证：{info.task_id} — 确认是否强行合并归档",
+                file=sys.stderr,
             )
-        else:
-            archived_paths = archived_change_paths(target)
-            if not archived_paths:
-                active_or_incomplete.append(
-                    f"{change['name']} (recorded path missing and no archived change found "
-                    f"under {Path(target['planning_root']) / 'changes' / 'archive'})"
-                )
-            else:
-                for archived_path in archived_paths:
-                    archived_progress = openspec_checkbox_progress(
-                        {**target, "change_root": str(archived_path)}
-                    )
-                    if archived_progress["remaining"]:
-                        active_or_incomplete.append(
-                            f"{change['name']} (archived at {archived_path} with "
-                            f"remaining={archived_progress['remaining']})"
-                        )
-    if active_or_incomplete and not args.allow_active_openspec:
+            return emit(
+                {
+                    "ok": False,
+                    "result": "needs_confirm",
+                    "reason": "verification_only_remaining",
+                    "taskId": info.task_id,
+                    "remaining": incomplete_rows,
+                    "exit_markdown": verification_only_confirm_markdown(
+                        info.task_id, incomplete_rows
+                    ),
+                    "user_actions": [
+                        {
+                            "id": "force_merge",
+                            "label": (
+                                f"继续归档（强行合并）："
+                                f"taskctl archive {info.task_id} --force-merge"
+                            ),
+                        },
+                        {
+                            "id": "finish_verification",
+                            "label": "先做完验证再归档",
+                        },
+                        {"id": "abort", "label": "中止"},
+                    ],
+                },
+                code=2,
+            )
         raise TaskError(
             "active/incomplete OpenSpec changes remain: "
             + "; ".join(active_or_incomplete)
-            + "; archive them first or pass --allow-active-openspec"
+            + "; archive them first or pass --allow-active-openspec / --force-merge"
         )
     if active_or_incomplete:
-        override_notes.append("允许遗留 OpenSpec：" + "; ".join(active_or_incomplete))
+        note_prefix = (
+            "强行合并：" if getattr(args, "force_merge", False) else "允许遗留 OpenSpec："
+        )
+        override_notes.append(note_prefix + "; ".join(active_or_incomplete))
 
     readme = src / "README.md"
     original_text = readme.read_text(encoding="utf-8")
@@ -3169,6 +3364,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="allow archive without changes.md",
     )
     arch_p.add_argument("--allow-active-openspec", action="store_true")
+    arch_p.add_argument(
+        "--force-merge",
+        action="store_true",
+        help="force-archive despite remaining OpenSpec tasks (强行合并)",
+    )
     arch_p.add_argument("--allow-unchecked-acceptance", action="store_true")
     arch_p.add_argument("--allow-missing-verification", action="store_true")
     arch_p.add_argument("--allow-dirty", action="store_true")

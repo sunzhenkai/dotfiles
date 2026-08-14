@@ -449,6 +449,119 @@ hello
         code, payload = self._run("archive", "T0001")
         self.assertEqual(code, 1)
         self.assertIn("remaining=1", payload["error"])
+        self.assertIn("--force-merge", payload["error"])
+
+    def test_classify_checkbox_item(self) -> None:
+        self.assertEqual(
+            tc.classify_checkbox_item("5.1 Docker multi-stage build 验证"),
+            "verification",
+        )
+        self.assertEqual(
+            tc.classify_checkbox_item("6.1 完整 Compose smoke"),
+            "verification",
+        )
+        self.assertEqual(
+            tc.classify_checkbox_item("5.3 六服务 healthcheck 与 Compose healthy 验证"),
+            "verification",
+        )
+        self.assertEqual(tc.classify_checkbox_item("运行单元测试"), "verification")
+        self.assertEqual(tc.classify_checkbox_item("实现 Fastify API"), "implementation")
+        self.assertEqual(
+            tc.remaining_kind_of(
+                [
+                    {"done": True, "kind": "implementation"},
+                    {"done": False, "kind": "verification"},
+                    {"done": False, "kind": "verification"},
+                ]
+            ),
+            "verification_only",
+        )
+        self.assertEqual(
+            tc.remaining_kind_of(
+                [
+                    {"done": False, "kind": "implementation"},
+                    {"done": False, "kind": "verification"},
+                ]
+            ),
+            "implementation",
+        )
+
+    def _seed_archive_ready(self, slug: str, tasks_md: str, *, archived: bool = False) -> Path:
+        task = self._seed_task("T0001", slug, openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(tasks_md, encoding="utf-8")
+        if archived:
+            dest = self.tmp / "openspec/changes/archive/2026-08-14-demo-change"
+            dest.parent.mkdir(parents=True)
+            shutil.move(str(change), str(dest))
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace("- [ ] done", "- [x] done"), encoding="utf-8"
+        )
+        (task / "changes.md").write_text("# changes\n", encoding="utf-8")
+        (task / "progress.md").write_text(
+            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+        )
+        self._write_index(next_id=2)
+        return task
+
+    def test_execution_context_reports_verification_only(self) -> None:
+        self._seed_archive_ready(
+            "verify-ctx",
+            "- [x] 实现 API\n"
+            "- [ ] 5.1 Docker multi-stage build 验证\n"
+            "- [ ] 6.1 完整 Compose smoke\n",
+        )
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["openspec_remaining"]["kind"], "verification_only")
+        self.assertEqual(payload["openspec_remaining"]["complete"], 1)
+        self.assertEqual(payload["openspec_remaining"]["total"], 3)
+        self.assertEqual(payload["targets"][0]["remaining_kind"], "verification_only")
+        texts = [item["text"] for item in payload["openspec_remaining"]["items"]]
+        self.assertIn("5.1 Docker multi-stage build 验证", texts)
+
+    def test_archive_confirms_verification_only_remaining(self) -> None:
+        self._seed_archive_ready(
+            "verify-only",
+            "- [x] 实现 API\n- [ ] 最终 runtime/Compose/smoke 验证\n",
+        )
+        code, payload = self._run("archive", "T0001")
+        self.assertEqual(code, 2)
+        self.assertEqual(payload["result"], "needs_confirm")
+        self.assertEqual(payload["reason"], "verification_only_remaining")
+        self.assertIn("只剩测试/验证", payload["exit_markdown"])
+        self.assertIn("--force-merge", payload["exit_markdown"])
+        self.assertTrue(
+            (self.tmp / "tasks/2026-08-01/T0001-verify-only").is_dir()
+        )
+
+    def test_archive_force_merge_allows_verification_remaining(self) -> None:
+        task = self._seed_archive_ready(
+            "force-verify",
+            "- [x] 实现 API\n- [ ] 6.1 完整 Compose smoke\n",
+        )
+        code, payload = self._run("archive", "T0001", "--force-merge")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "archived")
+        dest = self.tmp / "tasks/archive/2026-08-01-T0001-force-verify"
+        self.assertTrue((dest / "README.md").is_file())
+        self.assertFalse(task.exists())
+        self.assertIn("强行合并", (dest / "changes.md").read_text(encoding="utf-8"))
+
+    def test_archive_force_merge_allows_implementation_remaining(self) -> None:
+        self._seed_archive_ready(
+            "force-impl",
+            "- [x] done\n- [ ] 实现 billing 模块\n",
+            archived=True,
+        )
+        code, payload = self._run("archive", "T0001")
+        self.assertEqual(code, 1)
+        self.assertIn("remaining=1", payload["error"])
+        code, payload = self._run("archive", "T0001", "--force-merge")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "archived")
 
     def test_archive_fails_closed_when_recorded_checkout_is_missing(self) -> None:
         self._init_git_repo("svc")
