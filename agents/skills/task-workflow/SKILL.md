@@ -370,7 +370,10 @@ command 渲染后，固定模板与用户正文在**同一个 block**：正文�
 3. 若存在 `design/`，把它当作提案输入（推荐路径、接口契约、未决问题）；不要丢弃已做的设计结论
 4. 根据涉及面决定 change 落点：单仓 → 该仓 `openspec/`；跨仓/工作区级配置 → 工作区 `openspec/`；可多个 change。若会写工作区，`.` 必须作为「必须」仓通过 Checkout Gate
 5. 对每个计划中的 change **委托** `openspec-propose`。能判断时在 proposal / tasks 里标明本轮是修复 / 新增 / 重新设计，供 apply 对照「改码建议」
-6. 将全部 change 的名称、**canonical 仓库**、仓内相对路径和 store 写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`
+6. 将全部 change 的名称、**canonical 仓库**、仓内相对路径和 store 写入 README「关联 OpenSpec」；`taskctl set-status <id> proposed`。更新该表时 MUST 遵守：
+   - 写前先 `Read` 当前「关联 OpenSpec」小节的实际文本；`Grep` 只用于定位，不能把未锚定命中当作精确内容（核对标题时使用类似 `^### 关联 OpenSpec$` 的行级锚定）。
+   - `strReplace` 的 `oldStr` MUST 选取当前文件中**最小且唯一**的稳定锚点（优先精确占位行或目标数据行）；禁止从模板、早先读取结果或记忆重建“标题 + 空行 + 表头 + 分隔线 + 数据行”的整块文本。
+   - 若报 `oldStr was not found`，MUST 停止猜测标题层级、分隔线长度或空白变体；重新 `Read` 目标小节的窄范围，复制当前精确文本并缩小到唯一锚点后再重试。成功后重新 `Read` 该表，确认全部 change 均已写入且无重复行。
 7. 输出 change 列表、分支与 `{{slash:task-apply}} TNNNN` 桥接
 
 ### task-apply
