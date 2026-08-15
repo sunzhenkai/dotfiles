@@ -128,15 +128,31 @@ hello
         )
         (self.tmp / "tasks" / "INDEX.md").write_text(body, encoding="utf-8")
 
+    def _write_fresh_progress(self, task: Path) -> None:
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        snapshots = []
+        for binding in tc.parse_work_context(readme):
+            checkout = tc.resolve_checkout_path(self.tmp, str(binding["checkout"]))
+            if checkout.is_dir() and tc.current_branch(checkout) == binding["branch"]:
+                snapshots.append(
+                    f"- repo=`{binding['repo']}` checkout=`{tc.display_checkout_path(self.tmp, checkout)}` "
+                    f"branch=`{binding['branch']}` head=`{tc.git_head(checkout)}`"
+                )
+        text = (
+            "# progress\n\n## 验证证据\n\n- tests passed\n\n"
+            "## 最终验证快照\n\n- 状态：`fresh`\n"
+            "- 说明：test fixture\n"
+            + ("\n".join(snapshots) + "\n" if snapshots else "")
+        )
+        (task / "progress.md").write_text(text, encoding="utf-8")
+
     def _mark_archive_ready(self, task: Path) -> None:
         readme = (task / "README.md").read_text(encoding="utf-8")
         (task / "README.md").write_text(
             readme.replace("- [ ] done", "- [x] done"), encoding="utf-8"
         )
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
-        (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
-        )
+        self._write_fresh_progress(task)
 
     def test_resolve_by_id(self) -> None:
         self._seed_task("T0001", "alpha")
@@ -417,7 +433,7 @@ hello
         self.assertIn("--slug", payload["error"])
 
     def test_archive(self) -> None:
-        root = self._seed_task("T0001", "alpha", openspec=True)
+        root = self._seed_task("T0001", "alpha")
         (root / "changes.md").write_text("# changes\n", encoding="utf-8")
         self._write_index(next_id=2)
         code, payload = self._run(
@@ -425,7 +441,6 @@ hello
             "T0001",
             "--date",
             "2026-08-20",
-            "--allow-active-openspec",
             "--allow-unchecked-acceptance",
             "--allow-missing-verification",
         )
@@ -450,10 +465,10 @@ hello
         self._write_index(next_id=2)
         code, payload = self._run("archive", "T0001")
         self.assertEqual(code, 1)
-        self.assertIn("changes.md", payload["error"])
+        self.assertEqual(payload["reason"], "missing_changes_summary")
         code, payload = self._run("archive", "T0001", "--dry-run")
         self.assertEqual(code, 0)
-        self.assertEqual(payload["result"], "dry_run")
+        self.assertIn(payload["result"], {"initial_preflight", "final_preflight"})
 
     def test_new_rolls_back_scaffold_when_index_write_fails(self) -> None:
         with mock.patch.object(tc, "write_index", side_effect=OSError("disk full")):
@@ -478,7 +493,7 @@ hello
         task = self._seed_task("T0001", "rollback")
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
         (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+            "# progress\n\n## 验证证据\n\n- tests passed\n\n## 最终验证快照\n\n- 状态：`fresh`\n- 说明：test fixture\n", encoding="utf-8"
         )
         readme = (task / "README.md").read_text(encoding="utf-8")
         (task / "README.md").write_text(
@@ -498,7 +513,7 @@ hello
         task = self._seed_task("T0001", "move-fail")
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
         (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+            "# progress\n\n## 验证证据\n\n- tests passed\n\n## 最终验证快照\n\n- 状态：`fresh`\n- 说明：test fixture\n", encoding="utf-8"
         )
         readme = (task / "README.md").read_text(encoding="utf-8")
         (task / "README.md").write_text(
@@ -527,7 +542,7 @@ hello
             "--allow-missing-verification",
         )
         self.assertEqual(code, 0)
-        self.assertEqual(payload["result"], "dry_run")
+        self.assertIn(payload["result"], {"initial_preflight", "final_preflight"})
         self.assertEqual(changes.read_text(encoding="utf-8"), "# changes\n")
 
     def test_openspec_parse(self) -> None:
@@ -563,7 +578,7 @@ hello
         self.assertEqual(context["targets"][0]["progress"]["remaining"], 1)
         self.assertTrue(context["progress_exists"])
 
-    def test_advance_defers_resumes_and_keeps_runnable_work(self) -> None:
+    def test_advance_defers_resumes_and_keeps_candidate_work(self) -> None:
         self._seed_task("T0002", "deferred", openspec=True)
         change = self.tmp / "openspec/changes/demo-change"
         change.mkdir(parents=True)
@@ -597,13 +612,22 @@ hello
         self.assertEqual(resumed["next"]["text"], "manual verification")
 
         tasks.write_text("- [x] first\n- [x] manual verification\n- [x] implement next\n", encoding="utf-8")
+        code, exhausted = self._run("advance", "T0002", "--phase", "implementing", "--change", "demo-change")
+        self.assertEqual(code, 0)
+        self.assertEqual(exhausted["result"], "validation_required")
+        code, testing = self._run(
+            "advance", "T0002", "--phase", "testing", "--change", "demo-change",
+            "--verification", "unit tests passed",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(testing["result"], "validation_recorded")
         code, done = self._run("advance", "T0002", "--phase", "done", "--change", "demo-change")
         self.assertEqual(code, 0)
         self.assertEqual(done["result"], "done")
         self.assertIsNone(done["next"])
         progress = (self.tmp / "tasks/2026-08-01/T0002-deferred/progress.md").read_text(encoding="utf-8")
         self.assertIn("## 暂缓项", progress)
-        self.assertIn("## 可执行项", progress)
+        self.assertIn("## 候选项", progress)
 
     def test_advance_rejects_defer_that_is_not_an_exact_remaining_item(self) -> None:
         self._seed_task("T0002", "bad-defer", openspec=True)
@@ -722,7 +746,7 @@ hello
         )
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
         (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+            "# progress\n\n## 验证证据\n\n- tests passed\n\n## 最终验证快照\n\n- 状态：`fresh`\n- 说明：test fixture\n", encoding="utf-8"
         )
         self._write_index(next_id=2)
         code, payload = self._run("archive", "T0001")
@@ -761,9 +785,7 @@ hello
             readme.replace("- [ ] done", "- [x] done"), encoding="utf-8"
         )
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
-        (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
-        )
+        self._write_fresh_progress(task)
         self._write_index(next_id=2)
         return task
 
@@ -814,6 +836,7 @@ hello
         task = self._seed_archive_ready(
             "force-verify",
             "- [x] 实现 API\n- [ ] 6.1 完整 Compose smoke\n",
+            archived=True,
         )
         code, payload = self._run("archive", "T0001", "--force-merge")
         self.assertEqual(code, 0)
@@ -821,7 +844,9 @@ hello
         dest = self.tmp / "tasks/archive/2026-08-01-T0001-force-verify"
         self.assertTrue((dest / "README.md").is_file())
         self.assertFalse(task.exists())
-        self.assertIn("强行合并", (dest / "changes.md").read_text(encoding="utf-8"))
+        audit = (dest / "changes.md").read_text(encoding="utf-8")
+        self.assertIn("## Gate Overrides", audit)
+        self.assertIn("authorization=`--force-merge`", audit)
 
     def test_archive_force_merge_allows_implementation_remaining(self) -> None:
         self._seed_archive_ready(
@@ -859,7 +884,7 @@ hello
         )
         (task / "changes.md").write_text("# changes\n", encoding="utf-8")
         (task / "progress.md").write_text(
-            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+            "# progress\n\n## 验证证据\n\n- tests passed\n\n## 最终验证快照\n\n- 状态：`fresh`\n- 说明：test fixture\n", encoding="utf-8"
         )
         self._write_index(next_id=2)
         code, payload = self._run("archive", "T0001")
@@ -870,7 +895,7 @@ hello
         )
         self.assertEqual(code, 1)
         self.assertEqual(
-            payload["reason"], "missing_or_invalid_delivery_checkout"
+            payload["reason"], "checkout_missing"
         )
 
     def test_archive_allows_dirty_planning_and_task_store(self) -> None:
@@ -891,6 +916,7 @@ hello
         task = self._seed_task(
             "T0001", "workspace-change", openspec=True, scope_block=scope_block
         )
+        self._git(self.tmp / "service-a", "checkout", "-b", "feat-example")
         archived_change = (
             self.tmp / "openspec/changes/archive/2026-08-01-demo-change"
         )
@@ -904,7 +930,7 @@ hello
         code, payload = self._run("archive", "T0001", "--dry-run")
 
         self.assertEqual(code, 0)
-        self.assertEqual(payload["result"], "dry_run")
+        self.assertIn(payload["result"], {"initial_preflight", "final_preflight"})
         uses = {
             row["repo"]: row for row in payload["archive_gate"]["repository_uses"]
         }
@@ -954,24 +980,28 @@ hello
 | service-a | `service-a` | `service-a` | 否 | `feat-example` | `main` |
 """
         task = self._seed_task("T0001", "delivery-change", scope_block=scope_block)
+        self._git(repo, "checkout", "-b", "feat-example")
         self._mark_archive_ready(task)
         self._write_index(next_id=2)
         (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
 
         code, payload = self._run("archive", "T0001")
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 2)
         self.assertEqual(payload["reason"], "dirty_delivery_checkout")
         self.assertEqual(
             payload["archive_gate"]["blocking"][0]["repo"], "service-a"
         )
+        self.assertEqual(
+            payload["exact_action"],
+            "taskctl archive T0001 --allow-dirty-checkout service-a",
+        )
 
-        (task / "changes.md").unlink()
         code, payload = self._run(
             "archive",
             "T0001",
-            "--allow-missing-changes",
             "--allow-dirty-checkout",
             "service-a",
+            "--allow-missing-verification",
         )
         self.assertEqual(code, 0)
         self.assertEqual(payload["result"], "archived")
@@ -980,7 +1010,8 @@ hello
         )
         audit = self.tmp / "tasks/archive/2026-08-01-T0001-delivery-change/changes.md"
         self.assertIn(
-            "允许 dirty delivery checkout", audit.read_text(encoding="utf-8")
+            "authorization=`--allow-dirty-checkout service-a`",
+            audit.read_text(encoding="utf-8"),
         )
 
     def test_archive_rolls_back_new_override_audit_file(self) -> None:
@@ -991,10 +1022,15 @@ hello
 | 逻辑库 | 路径 | 角色 |
 |--------|------|------|
 | service-a | `service-a` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| service-a | `service-a` | `service-a` | 否 | `main` | `main` |
 """
         task = self._seed_task("T0001", "audit-rollback", scope_block=scope_block)
         self._mark_archive_ready(task)
-        (task / "changes.md").unlink()
         self._write_index(next_id=2)
         (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
 
@@ -1002,15 +1038,15 @@ hello
             code, payload = self._run(
                 "archive",
                 "T0001",
-                "--allow-missing-changes",
                 "--allow-dirty-checkout",
                 "service-a",
+                "--allow-missing-verification",
             )
 
         self.assertEqual(code, 1)
         self.assertIn("disk full", payload["error"])
         self.assertTrue(task.is_dir())
-        self.assertFalse((task / "changes.md").exists())
+        self.assertEqual((task / "changes.md").read_text(encoding="utf-8"), "# changes\n")
         self.assertIn(
             "**status：** draft", (task / "README.md").read_text(encoding="utf-8")
         )
@@ -1026,6 +1062,12 @@ hello
 | 逻辑库 | 路径 | 角色 |
 |--------|------|------|
 | service-a | `service-a` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| service-a | `service-a` | `service-a` | 否 | `main` | `main` |
 """
         task = self._seed_task("T0001", "status-failure", scope_block=scope_block)
         self._mark_archive_ready(task)
@@ -1099,6 +1141,7 @@ hello
         self.assertEqual(code, 1)
         blocking = payload["archive_gate"]["blocking"][0]
         self.assertEqual(blocking["repo"], "service-a")
+        self.assertEqual(blocking["reason"], "checkout_not_prepared")
         self.assertEqual(blocking["roles"], ["delivery", "reference"])
 
     def test_archive_does_not_special_case_workspace_delivery_repo(self) -> None:
@@ -1116,14 +1159,15 @@ hello
 | workspace | `.` | `.` | 否 | `feat-example` | `main` |
 """
         task = self._seed_task("T0001", "workspace-delivery", scope_block=scope_block)
-        self._mark_archive_ready(task)
         self._write_index(next_id=2)
-        self._init_git_repo(".")
+        workspace = self._init_git_repo(".")
+        self._git(workspace, "checkout", "-b", "feat-example")
+        self._mark_archive_ready(task)
         (self.tmp / "delivery-change.txt").write_text("dirty\n", encoding="utf-8")
 
         code, payload = self._run("archive", "T0001")
 
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 2)
         self.assertEqual(payload["reason"], "dirty_delivery_checkout")
         blocking = payload["archive_gate"]["blocking"][0]
         self.assertEqual(blocking["repo"], ".")
@@ -1142,7 +1186,7 @@ hello
 
 | change | 路径 | 仓库 | store | 说明 |
 |--------|------|------|-------|------|
-| demo-change | `openspec/changes/demo-change/` | `service-a` | `openspec/` | demo |
+| demo-change | `openspec/changes/demo-change/` | `service-a` | | demo |
 
 ## 工作上下文
 
@@ -1151,6 +1195,7 @@ hello
 | service-a | `service-a` | `service-a` | 否 | `feat-example` | `main` |
 """
         task = self._seed_task("T0001", "combined-role", scope_block=scope_block)
+        self._git(repo, "checkout", "-b", "feat-example")
         archived_change = repo / "openspec/changes/archive/2026-08-01-demo-change"
         archived_change.mkdir(parents=True)
         (archived_change / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
@@ -1159,7 +1204,7 @@ hello
 
         code, payload = self._run("archive", "T0001")
 
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 2)
         self.assertEqual(payload["reason"], "dirty_delivery_checkout")
         blocking = payload["archive_gate"]["blocking"][0]
         self.assertEqual(blocking["repo"], "service-a")
@@ -1196,21 +1241,66 @@ hello
         self.assertEqual(advanced["result"], "next")
         self.assertEqual(advanced["targets"][0]["checkout"], "svc-life-wt")
         (change / "tasks.md").write_text("- [x] implement\n", encoding="utf-8")
-        code, testing = self._run(
-            "advance", "T0001", "--phase", "testing", "--change", "life-change", "--verification", "unit tests passed",
+        code, exhausted = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "life-change",
         )
         self.assertEqual(code, 0)
-        self.assertEqual(testing["result"], "done")
+        self.assertEqual(exhausted["result"], "validation_required")
+        code, provisional = self._run(
+            "advance", "T0001", "--phase", "testing", "--change", "life-change",
+            "--verification", "unit tests passed on dirty checkout",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(provisional["result"], "validation_required")
+        self.assertEqual(provisional["verification"]["status"], "provisional")
+
+        self._git(wt, "add", ".")
+        self._git(wt, "commit", "-m", "implement lifecycle")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing", "--change", "life-change",
+            "--verification", "unit tests passed after commit",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(testing["result"], "validation_recorded")
+        code, resumed = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "life-change",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(resumed["result"], "validation_required")
+        code, stale_done = self._run("advance", "T0001", "--phase", "done", "--change", "life-change")
+        self.assertEqual(code, 1)
+        self.assertEqual(stale_done["reason"], "stale_verification")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing", "--change", "life-change",
+            "--verification", "unit tests rerun after implementation resume",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(testing["result"], "validation_recorded")
         code, done = self._run("advance", "T0001", "--phase", "done", "--change", "life-change")
         self.assertEqual(code, 0)
         self.assertEqual(done["result"], "done")
-        self.assertIn("unit tests passed", (task / "progress.md").read_text(encoding="utf-8"))
+
         archived_change = wt / "openspec/changes/archive/2026-08-14-life-change"
         archived_change.parent.mkdir(parents=True)
         shutil.move(str(change), str(archived_change))
         self._git(wt, "add", ".")
-        self._git(wt, "commit", "-m", "implement lifecycle")
+        self._git(wt, "commit", "-m", "archive lifecycle spec")
         (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+        code, stale_archive = self._run("archive", "T0001", "--dry-run", "--date", "2026-08-14")
+        self.assertEqual(code, 2)
+        self.assertEqual(stale_archive["reason"], "stale_verification")
+        self.assertEqual(
+            stale_archive["exact_action"],
+            "taskctl archive T0001 --allow-missing-verification",
+        )
+        code, retested = self._run(
+            "advance", "T0001", "--phase", "testing", "--change", "life-change",
+            "--verification", "unit tests rerun at archived-spec HEAD",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(retested["result"], "validation_recorded")
+        code, done = self._run("advance", "T0001", "--phase", "done", "--change", "life-change")
+        self.assertEqual(code, 0)
         code, dry_run = self._run("archive", "T0001", "--dry-run", "--date", "2026-08-14")
         self.assertEqual(code, 0)
         self.assertEqual(dry_run["archive_gate"]["delivery_summaries"][0]["checkout"], "svc-life-wt")
@@ -1218,6 +1308,199 @@ hello
         self.assertEqual(code, 0)
         self.assertEqual(archived["result"], "archived")
         self.assertTrue((self.tmp / "tasks/archive/2026-08-14-T0001-lifecycle").is_dir())
+
+
+    def test_archive_initial_preflight_lists_active_complete_without_mutation(self) -> None:
+        task = self._seed_archive_ready("initial", "- [x] done\n")
+        active = self.tmp / "openspec/changes/demo-change"
+        before = (active / "tasks.md").read_text(encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001", "--dry-run")
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "initial_preflight")
+        self.assertEqual(payload["target_states"][0]["state"], "active")
+        self.assertEqual(payload["external_actions"][0]["state"], "pending")
+        self.assertTrue(task.is_dir())
+        self.assertEqual((active / "tasks.md").read_text(encoding="utf-8"), before)
+        self.assertFalse((self.tmp / "openspec/changes/archive").exists())
+
+    def test_archive_multi_target_partial_retry_recognizes_completed_target(self) -> None:
+        task = self._seed_task("T0001", "partial", openspec=True)
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        readme = readme.replace(
+            "| `demo-change` | `openspec/changes/demo-change/` | demo |",
+            "| `demo-change` | `openspec/changes/demo-change/` | demo |\n"
+            "| `second-change` | `openspec/changes/second-change/` | second |",
+        ).replace("- [ ] done", "- [x] done")
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        for name in ("demo-change", "second-change"):
+            root = self.tmp / f"openspec/changes/{name}"
+            root.mkdir(parents=True)
+            (root / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        first_archive = self.tmp / "openspec/changes/archive/2026-08-14-demo-change"
+        first_archive.parent.mkdir(parents=True)
+        shutil.move(str(self.tmp / "openspec/changes/demo-change"), str(first_archive))
+        (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+        self._write_fresh_progress(task)
+        self._write_index(next_id=2)
+
+        code, partial = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertEqual(partial["result"], "initial_preflight")
+        self.assertEqual(
+            {row["name"]: row["state"] for row in partial["target_states"]},
+            {"demo-change": "uniquely_archived", "second-change": "active"},
+        )
+        self.assertEqual(
+            {row["change"]: row["state"] for row in partial["external_actions"] if row["action"] == "archive_openspec"},
+            {"demo-change": "completed", "second-change": "pending"},
+        )
+
+        second_archive = self.tmp / "openspec/changes/archive/2026-08-14-second-change"
+        shutil.move(str(self.tmp / "openspec/changes/second-change"), str(second_archive))
+        code, final = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertEqual(final["result"], "final_preflight")
+        self.assertTrue(all(row["state"] == "uniquely_archived" for row in final["target_states"]))
+        self.assertTrue(task.is_dir())
+
+    def test_archive_final_preflight_reports_new_dirty_and_keeps_task_active(self) -> None:
+        repo = self._init_git_repo("svc")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| svc | `svc` | `svc` | 否 | `main` | `main` |
+"""
+        task = self._seed_task("T0001", "final-dirty", openspec=True, scope_block=scope_block)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        code, initial = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertEqual(initial["result"], "initial_preflight")
+
+        archived = self.tmp / "openspec/changes/archive/2026-08-14-demo-change"
+        archived.parent.mkdir(parents=True)
+        shutil.move(str(change), str(archived))
+        (repo / "external-write.txt").write_text("dirty\n", encoding="utf-8")
+        code, final = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertEqual(final["reason"], "dirty_delivery_checkout")
+        self.assertEqual(final["target_states"][0]["state"], "uniquely_archived")
+        self.assertTrue(task.is_dir())
+
+    def test_archive_confirmations_are_code_2_and_gate_overrides_are_audited(self) -> None:
+        repo = self._init_git_repo("svc")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| svc | `svc` | `svc` | 否 | `main` | `main` |
+"""
+        task = self._seed_task("T0001", "confirmations", scope_block=scope_block)
+        (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+        self._write_index(next_id=2)
+
+        code, acceptance = self._run("archive", "T0001")
+        self.assertEqual(code, 2)
+        self.assertEqual(acceptance["reason"], "unchecked_acceptance")
+        self.assertEqual(acceptance["affected"], ["done"])
+        self.assertEqual(
+            acceptance["exact_action"],
+            "taskctl archive T0001 --allow-unchecked-acceptance",
+        )
+
+        code, verification = self._run(
+            "archive", "T0001", "--allow-unchecked-acceptance"
+        )
+        self.assertEqual(code, 2)
+        self.assertEqual(verification["reason"], "stale_verification")
+        self.assertEqual(
+            verification["exact_action"],
+            "taskctl archive T0001 --allow-missing-verification",
+        )
+
+        (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        code, dirty = self._run(
+            "archive",
+            "T0001",
+            "--allow-unchecked-acceptance",
+            "--allow-missing-verification",
+        )
+        self.assertEqual(code, 2)
+        self.assertEqual(dirty["reason"], "dirty_delivery_checkout")
+
+        code, archived = self._run(
+            "archive",
+            "T0001",
+            "--allow-unchecked-acceptance",
+            "--allow-missing-verification",
+            "--allow-dirty-checkout",
+            "svc",
+        )
+        self.assertEqual(code, 0)
+        audit_path = self.tmp / "tasks/archive/2026-08-01-T0001-confirmations/changes.md"
+        audit = audit_path.read_text(encoding="utf-8")
+        self.assertIn("## Gate Overrides", audit)
+        self.assertIn("authorization=`--allow-unchecked-acceptance`", audit)
+        self.assertIn("authorization=`--allow-missing-verification`", audit)
+        self.assertIn("authorization=`--allow-dirty-checkout svc`", audit)
+        self.assertEqual(len(archived["gate_overrides"]), 3)
+
+    def test_archive_structural_failures_are_not_overrideable(self) -> None:
+        task = self._seed_task("T0001", "missing-structural", openspec=True)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        code, missing = self._run(
+            "archive",
+            "T0001",
+            "--dry-run",
+            "--force-merge",
+            "--allow-unchecked-acceptance",
+            "--allow-missing-verification",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(missing["reason"], "openspec_target_missing")
+
+        active = self.tmp / "openspec/changes/demo-change"
+        active.mkdir(parents=True)
+        (active / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        archived = self.tmp / "openspec/changes/archive/2026-08-14-demo-change"
+        archived.mkdir(parents=True)
+        (archived / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        code, ambiguous = self._run(
+            "archive", "T0001", "--dry-run", "--force-merge"
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(ambiguous["reason"], "openspec_target_ambiguous")
+
+    def test_archive_parser_has_no_unsafe_flags(self) -> None:
+        parser = tc.build_parser()
+        removed_flags = [
+            "--allow-" + "active-openspec",
+            "--allow-" + "missing-changes",
+        ]
+        for flag in removed_flags:
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["archive", "T0001", flag])
 
     def _git(self, cwd: Path, *args: str) -> None:
         subprocess.run(
@@ -1390,17 +1673,6 @@ hello
         self.assertEqual(code, 1)
         self.assertEqual(payload["errors"][0]["action"], "blocked_dirty")
 
-        code, payload = self._run(
-            "prepare-branches",
-            "--slug",
-            "x",
-            "--repo",
-            "svc",
-            "--skip-dirty",
-        )
-        self.assertEqual(code, 0)
-        self.assertEqual(payload["repos"][0]["action"], "skipped_dirty")
-
     def test_prepare_branches_already_on_branch_allows_dirty(self) -> None:
         repo = self._init_git_repo("svc")
         self._git(repo, "checkout", "-b", "feat-x")
@@ -1439,7 +1711,10 @@ hello
         task = self._seed_task("T0001", "summary", scope_block=scope_block)
         self._mark_archive_ready(task)
         self._write_index(next_id=2)
-        code, payload = self._run("archive", "T0001", "--dry-run", "--allow-dirty-checkout", "svc")
+        code, payload = self._run(
+            "archive", "T0001", "--dry-run", "--allow-dirty-checkout", "svc",
+            "--allow-missing-verification",
+        )
         self.assertEqual(code, 0)
         summary = payload["archive_gate"]["delivery_summaries"][0]
         self.assertTrue(summary["commits"])
@@ -1617,7 +1892,7 @@ hello
             "main",
         )
 
-    def test_execution_context_reports_scope_with_must_checkout_only(self) -> None:
+    def test_execution_context_requires_binding_for_must_checkout(self) -> None:
         scope_block = """
 ### 涉及面
 
@@ -1630,10 +1905,9 @@ hello
         self._seed_task("T0001", "demo-feature", scope_block=scope_block)
         self._write_index(next_id=2)
         code, payload = self._run("execution-context", "T0001")
-        self.assertEqual(code, 0)
-        self.assertEqual(payload["scope"]["checkout"], ["svc"])
-        self.assertEqual([row["path"] for row in payload["scope"]["suggested"]], ["other"])
-        self.assertEqual([row["path"] for row in payload["scope"]["excluded"]], ["vendor"])
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "checkout_not_prepared")
+        self.assertEqual(payload["checkout_gate"]["blocking"][0]["repo"], "svc")
 
     def test_prepare_branches_dirty_asks_confirm(self) -> None:
         repo = self._init_git_repo("svc")
@@ -1758,11 +2032,14 @@ hello
         (change / "tasks.md").write_text("- [ ] unfinished archived item\n", encoding="utf-8")
         self._mark_archive_ready(task)
         self._write_index(next_id=2)
-        code, _ = self._run("archive", "T0001", "--force-merge")
+        code, preflight = self._run("archive", "T0001", "--dry-run", "--force-merge")
         self.assertEqual(code, 0)
+        self.assertEqual(preflight["result"], "initial_preflight")
         archived_change = self.tmp / "openspec/changes/archive/2026-08-01-demo-change"
         archived_change.parent.mkdir(parents=True)
         shutil.move(str(change), str(archived_change))
+        code, _ = self._run("archive", "T0001", "--force-merge")
+        self.assertEqual(code, 0)
         code, _ = self._run("restore", "T0001")
         self.assertEqual(code, 0)
         code, context = self._run("execution-context", "T0001")
@@ -1774,6 +2051,368 @@ hello
         self.assertEqual(advanced["result"], "deferred_only")
         self.assertIn("restore or create a follow-up", advanced["apply_schedule"]["deferred"][0]["reason"])
 
+
+    def test_execution_context_rejects_wrong_repository_and_detached_head(self) -> None:
+        svc = self._init_git_repo("svc")
+        other = self._init_git_repo("other")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| svc | `svc` | `other` | 否 | `main` | `main` |
+"""
+        task = self._seed_task("T0001", "wrong-repo", scope_block=scope_block)
+        self._write_index(next_id=2)
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "wrong_repository")
+
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace("`other` | 否 | `main`", "`svc` | 否 | `main`"),
+            encoding="utf-8",
+        )
+        self._git(svc, "checkout", "--detach")
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "detached_head")
+        self.assertIsNone(payload["checkout_gate"]["blocking"][0]["actual_branch"])
+
+    def test_archive_rejects_clean_wrong_branch_with_expected_actual(self) -> None:
+        repo = self._init_git_repo("svc")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| svc | `svc` | `svc` | 否 | `feat-expected` | `main` |
+"""
+        task = self._seed_task("T0001", "wrong-branch", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        self.assertFalse(tc.is_dirty(repo))
+        code, payload = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "branch_mismatch")
+        blocking = payload["archive_gate"]["blocking"][0]
+        self.assertEqual(blocking["expected_branch"], "feat-expected")
+        self.assertEqual(blocking["actual_branch"], "main")
+
+    def test_prepare_branches_multi_repo_persists_only_success_and_returns_blocking(self) -> None:
+        good = self._init_git_repo("good")
+        bad = self._init_git_repo("bad")
+        (bad / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| good | `good` | 必须 |
+| bad | `bad` | 必须 |
+"""
+        task = self._seed_task("T0001", "partial", scope_block=scope_block)
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "prepare-branches", "--slug", "partial", "--from-task", "T0001"
+        )
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["errors"][0]["action"], "blocked_dirty")
+        self.assertEqual(tc.current_branch(good), "feat-partial")
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        bindings = tc.parse_work_context(readme)
+        self.assertEqual([row["repo"] for row in bindings], ["good"])
+        self.assertNotIn("skipped_" + "dirty", json.dumps(payload))
+
+    def test_prepare_branches_parser_has_no_skip_dirty(self) -> None:
+        parser = tc.build_parser()
+        removed_flag = "--skip-" + "dirty"
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            parser.parse_args(["prepare-branches", "--slug", "x", "--repo", "svc", removed_flag])
+
+    def test_advance_blocked_precedes_candidates_and_testing_rejects_remaining(self) -> None:
+        self._seed_task("T0001", "blocked", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text("- [ ] still candidate\n", encoding="utf-8")
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "advance", "T0001", "--phase", "blocked", "--blocker", "global outage"
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "blocked")
+        self.assertIsNone(payload["next"])
+        self.assertEqual(payload["apply_schedule"]["candidates"][0]["text"], "still candidate")
+        self.assertNotIn("run" + "nable", payload["apply_schedule"])
+        code, payload = self._run(
+            "advance", "T0001", "--phase", "testing", "--verification", "not ready"
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "checkboxes_remaining")
+
+    def test_deferred_dependency_chain_keeps_independent_candidate(self) -> None:
+        self._seed_task("T0001", "deps", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "- [ ] A manual environment\n- [ ] B depends on A\n- [ ] C independent\n",
+            encoding="utf-8",
+        )
+        self._write_index(next_id=2)
+        code, first = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "A manual environment", "--defer-current", "environment unavailable",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(first["next"]["text"], "B depends on A")
+        code, second = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "B depends on A", "--defer-current", "blocked by demo-change:A manual environment",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(second["next"]["text"], "C independent")
+        reasons = {row["task"]: row["reason"] for row in second["apply_schedule"]["deferred"]}
+        self.assertIn("A manual environment", reasons["B depends on A"])
+
+    def test_catalog_omitted_row_is_repaired_and_id_not_reused(self) -> None:
+        self._seed_task("T0009", "unindexed")
+        (self.tmp / "tasks/INDEX.md").write_text(
+            tc.render_index(2, [], []), encoding="utf-8"
+        )
+        code, listed = self._run("list")
+        self.assertEqual(code, 0)
+        self.assertTrue(listed["catalog"]["repair_needed"])
+        self.assertEqual(listed["catalog"]["max_id"], 9)
+        code, created = self._run("new", "--slug", "after-gap")
+        self.assertEqual(code, 0)
+        self.assertEqual(created["task"]["task_id"], "T0010")
+        index = (self.tmp / "tasks/INDEX.md").read_text(encoding="utf-8")
+        self.assertIn("T0009", index)
+
+    def test_catalog_duplicate_and_active_archive_conflicts_block_mutation(self) -> None:
+        self._seed_task("T0001", "one")
+        self._seed_task("T0001", "two", day="2026-08-02")
+        self._write_index(next_id=2)
+        code, payload = self._run("new", "--slug", "blocked-by-duplicate")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "task_catalog_conflict")
+        self.assertEqual(payload["catalog"]["diagnostics"][0]["reason"], "duplicate_task_id")
+
+        shutil.rmtree(self.tmp / "tasks/2026-08-02")
+        task = self.tmp / "tasks/2026-08-01/T0001-one"
+        archived = self.tmp / "tasks/archive/2026-08-01-T0001-copy"
+        archived.parent.mkdir(parents=True)
+        shutil.copytree(task, archived)
+        archived_readme = (archived / "README.md").read_text(encoding="utf-8")
+        (archived / "README.md").write_text(
+            tc.set_readme_status(archived_readme, "archived"), encoding="utf-8"
+        )
+        code, payload = self._run("set-status", "T0001", "exploring")
+        self.assertEqual(code, 1)
+        reasons = [row["reason"] for row in payload["catalog"]["diagnostics"]]
+        self.assertIn("active_archive_id_conflict", reasons)
+
+    def test_catalog_reports_dir_identity_and_missing_index_path(self) -> None:
+        task = self._seed_task("T0001", "identity")
+        wrong = task.parent / "T0002-identity"
+        task.rename(wrong)
+        self._write_index(next_id=3)
+        code, payload = self._run("new", "--slug", "blocked")
+        self.assertEqual(code, 1)
+        diagnostics = payload["catalog"]["diagnostics"]
+        self.assertTrue(any(row["reason"] == "readme_dir_id_mismatch" for row in diagnostics))
+
+        shutil.rmtree(wrong)
+        missing = tc.TaskRow(
+            task_id="T0003", name="missing", path="tasks/2026-08-01/T0003-missing/"
+        )
+        tc.write_index(self.tmp, 4, [missing], [])
+        code, payload = self._run("new", "--slug", "still-blocked")
+        self.assertEqual(code, 1)
+        self.assertTrue(
+            any(row["reason"] == "missing_indexed_path" for row in payload["catalog"]["diagnostics"])
+        )
+
+    def test_unknown_scope_role_and_malformed_tables_fail_before_git(self) -> None:
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | maybe |
+"""
+        self._seed_task("T0001", "bad-scope", scope_block=scope_block)
+        self._write_index(next_id=2)
+        with mock.patch.object(tc, "run_git") as run_git_mock:
+            code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "task_catalog_conflict")
+        diagnostic = payload["catalog"]["diagnostics"][0]["diagnostic"]
+        self.assertEqual(diagnostic["section"], "涉及面")
+        self.assertGreater(diagnostic["line"], 0)
+        run_git_mock.assert_not_called()
+
+    def test_malformed_work_context_and_openspec_tables_report_lines(self) -> None:
+        task = self._seed_task("T0001", "bad-tables")
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        readme = readme.replace(
+            "## 验收标准",
+            """## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| svc | `svc` |
+
+## 验收标准""",
+        )
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        self._write_index(next_id=2)
+        code, payload = self._run("set-status", "T0001", "exploring")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["catalog"]["diagnostics"][0]["diagnostic"]["section"], "工作上下文")
+
+        shutil.rmtree(task)
+        task = self._seed_task("T0002", "bad-openspec")
+        readme = (task / "README.md").read_text(encoding="utf-8").replace(
+            "## 验收标准",
+            """### 关联 OpenSpec
+
+| change | 路径 |
+|--------|------|
+| only-one-cell |
+
+## 验收标准""",
+        )
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        self._write_index(next_id=3)
+        code, payload = self._run("set-status", "T0002", "exploring")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["catalog"]["diagnostics"][0]["diagnostic"]["section"], "关联 OpenSpec")
+
+    def test_archive_requires_acceptance_structure(self) -> None:
+        task = self._seed_task("T0001", "no-acceptance")
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        readme = readme.split("## 验收标准", 1)[0] + "## Notes\n\nnone\n"
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+        self._write_fresh_progress(task)
+        self._write_index(next_id=2)
+        code, payload = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "invalid_acceptance_structure")
+
+    def test_execution_context_rejects_nonempty_openspec_store(self) -> None:
+        task = self._seed_task("T0001", "store")
+        readme = (task / "README.md").read_text(encoding="utf-8").replace(
+            "## 验收标准",
+            """### 关联 OpenSpec
+
+| change | 路径 | 仓库 | store | 说明 |
+|--------|------|------|-------|------|
+| demo | `openspec/changes/demo` | | `external-store` | unsupported |
+
+## 验收标准""",
+        )
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        self._write_index(next_id=2)
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "unsupported_openspec_store")
+        self.assertEqual(payload["store"], "external-store")
+
+    def test_new_reports_structured_rollback_failure(self) -> None:
+        with mock.patch.object(tc, "write_index", side_effect=OSError("primary index failure")), mock.patch.object(
+            tc.shutil, "rmtree", side_effect=OSError("cleanup failed")
+        ):
+            code, payload = self._run("new", "--slug", "rollback-fails")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "rollback_failed")
+        self.assertIn("primary index failure", payload["primary_error"])
+        self.assertTrue(any("cleanup failed" in error for error in payload["rollback_errors"]))
+        self.assertTrue(payload["affected_paths"])
+        self.assertIn("inspect", payload["recovery_hint"])
+
+    def test_advance_reports_structured_rollback_failure(self) -> None:
+        task = self._seed_task("T0001", "advance-rollback-fails")
+        progress = task / "progress.md"
+        progress.write_text("old progress\n", encoding="utf-8")
+        self._write_index(next_id=2)
+        real_atomic = tc.atomic_write_text
+
+        def fail_progress_restore(path: Path, text: str) -> None:
+            if Path(path) == progress and text == "old progress\n":
+                raise OSError("progress restore failed")
+            real_atomic(path, text)
+
+        with mock.patch.object(tc, "write_index", side_effect=OSError("primary index failure")), mock.patch.object(
+            tc, "atomic_write_text", side_effect=fail_progress_restore
+        ):
+            code, payload = self._run("advance", "T0001", "--phase", "implementing")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "rollback_failed")
+        self.assertIn("primary index failure", payload["primary_error"])
+        self.assertTrue(any("progress restore failed" in error for error in payload["rollback_errors"]))
+
+    def test_archive_reports_structured_rollback_failure(self) -> None:
+        task = self._seed_task("T0001", "archive-rollback-fails")
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        real_move = shutil.move
+        calls = 0
+
+        def fail_move_back(src, dest):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return real_move(src, dest)
+            raise OSError("archive move-back failed")
+
+        with mock.patch.object(tc, "write_index", side_effect=OSError("primary index failure")), mock.patch.object(
+            tc.shutil, "move", side_effect=fail_move_back
+        ):
+            code, payload = self._run("archive", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "rollback_failed")
+        self.assertIn("primary index failure", payload["primary_error"])
+        self.assertTrue(any("archive move-back failed" in error for error in payload["rollback_errors"]))
+        self.assertTrue(any("archive" in path for path in payload["affected_paths"]))
+
+    def test_restore_rollback_failure_is_structured(self) -> None:
+        task = self._seed_task("T0001", "restore-structured")
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        code, _ = self._run("archive", "T0001")
+        self.assertEqual(code, 0)
+        real_move = shutil.move
+        calls = 0
+
+        def fail_move_back(src, dest):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return real_move(src, dest)
+            raise OSError("restore move-back failed")
+
+        with mock.patch.object(tc, "write_index", side_effect=OSError("primary index failure")), mock.patch.object(
+            tc.shutil, "move", side_effect=fail_move_back
+        ):
+            code, payload = self._run("restore", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "rollback_failed")
+        self.assertTrue(any("restore move-back failed" in error for error in payload["rollback_errors"]))
 
 if __name__ == "__main__":
     unittest.main()

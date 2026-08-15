@@ -25,7 +25,7 @@ task-new → task-explore? → task-design? → task-propose → task-apply → 
 | `task-design` | `references/planning.md#task-design` + skill `task-design` | 可选决策级设计 |
 | `task-propose` | `references/planning.md#task-propose` | 生成并关联 OpenSpec changes |
 | `task-apply` | `references/apply.md` | 准备真实 checkout 并持续实施 |
-| `task-archive` | `references/archive.md` | Prepare/Finalize 后原子归档 |
+| `task-archive` | `references/archive.md` | Initial/External/Final 可恢复归档 |
 
 跨阶段硬门禁集中在 `references/safety.md`；阶段 reference 通过规则 ID 引用，不复制算法。
 
@@ -50,8 +50,8 @@ python3 <this-skill>/scripts/taskctl.py <command> ...
 | `restore` | 将 archived task 原子恢复为 active |
 | `prepare-branches` | apply 的 delivery checkout/worktree Gate |
 | `execution-context` | 返回 scope、真实 checkout、OpenSpec targets 与调度 |
-| `advance` | 原子保存 apply 进度并返回 next/done/deferred_only |
-| `archive` | 预检 delivery summaries/gates 并原子归档 |
+| `advance` | 原子保存 apply 进度并返回六种 control outcome |
+| `archive` | initial/final preflight、external action 状态与原子 finalize |
 | `notes` | 读写工作区 `.task-workflow.md` |
 
 完整参数以 `python3 .../taskctl.py <command> --help` 为准。stdout 只输出 JSON；stderr 是一行人读摘要。退出码 2 表示需要确认/选择，不得继续写操作；退出码 1 表示硬失败。

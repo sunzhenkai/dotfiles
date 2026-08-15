@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -81,6 +82,21 @@ class SkillContractTest(unittest.TestCase):
             text = (COMMAND_ROOT / f"task-{name}.md").read_text(encoding="utf-8")
             for forbidden in ("prepare-branches", "git status", "git checkout", "worktree add"):
                 self.assertNotIn(forbidden, text, name)
+
+    def test_safety_references_existing_test_methods(self) -> None:
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
+        referenced = set(re.findall(r"`(test_[A-Za-z0-9_]+)`", safety))
+        existing: set[str] = set()
+        for path in (SKILL_ROOT / "tests").glob("test_*.py"):
+            existing.update(
+                re.findall(
+                    r"^\s*def\s+(test_[A-Za-z0-9_]+)\s*\(",
+                    path.read_text(encoding="utf-8"),
+                    re.MULTILINE,
+                )
+            )
+        self.assertTrue(referenced, "safety.md must reference regression tests")
+        self.assertEqual(referenced - existing, set())
 
     def test_instruction_footprint_is_below_previous_baseline(self) -> None:
         paths = [SKILL_ROOT / "SKILL.md", *(SKILL_ROOT / "references").glob("*.md")]

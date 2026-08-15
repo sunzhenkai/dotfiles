@@ -67,10 +67,6 @@ DIRTY_USER_ACTIONS = (
         "label": "提交或清理该仓改动后重试 prepare-branches",
     },
     {
-        "id": "skip_dirty",
-        "label": "确认跳过该脏仓（其余仓继续）：prepare-branches ... --skip-dirty",
-    },
-    {
         "id": "abort",
         "label": "中止，稍后再执行本命令",
     },
@@ -134,9 +130,47 @@ class TaskInfo:
 
 
 class TaskError(Exception):
-    def __init__(self, message: str, code: int = 1) -> None:
+    def __init__(
+        self,
+        message: str,
+        code: int = 1,
+        *,
+        reason: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.reason = reason
+        self.details = details or {}
+
+
+def rollback_or_raise(
+    primary_error: Exception,
+    actions: list[tuple[str, Any]],
+    *,
+    affected_paths: list[Path | str],
+) -> None:
+    """Run every rollback action and make restoration failures machine-visible."""
+    rollback_errors: list[str] = []
+    for label, action in actions:
+        try:
+            action()
+        except Exception as exc:
+            rollback_errors.append(f"{label}: {type(exc).__name__}: {exc}")
+    if rollback_errors:
+        paths = [str(path) for path in affected_paths]
+        raise TaskError(
+            f"mutation failed: {primary_error}; rollback_failed: "
+            + "; ".join(rollback_errors),
+            reason="rollback_failed",
+            details={
+                "primary_error": f"{type(primary_error).__name__}: {primary_error}",
+                "rollback_errors": rollback_errors,
+                "affected_paths": paths,
+                "recovery_hint": "inspect affected paths and restore them from the pre-call state",
+            },
+        ) from primary_error
+    raise primary_error
 
 
 def emit(payload: dict[str, Any], *, code: int = 0) -> int:
@@ -464,115 +498,122 @@ def parse_id_from_readme(text: str) -> str | None:
     return None
 
 
+def operational_error(section: str, line_no: int, line: str, detail: str) -> TaskError:
+    return TaskError(
+        f"malformed {section} at line {line_no}: {detail}: {line.strip()}",
+        reason="malformed_operational_table",
+        details={
+            "diagnostic": {
+                "section": section,
+                "line": line_no,
+                "source": line.strip()[:240],
+                "detail": detail,
+            }
+        },
+    )
+
+
+def _find_section_start(lines: list[str], pattern: str) -> int | None:
+    for i, line in enumerate(lines):
+        if re.match(pattern, line, re.IGNORECASE):
+            return i + 1
+    return None
+
+
 def parse_openspec(text: str) -> list[dict[str, str]]:
     lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if re.match(r"^#{2,3}\s*关联\s*OpenSpec", line, re.IGNORECASE):
-            start = i + 1
-            break
+    start = _find_section_start(lines, r"^#{2,3}\s*关联\s*OpenSpec")
     if start is None:
         return []
     rows: list[dict[str, str]] = []
     in_table = False
-    table_header: list[str] = []
-    for line in lines[start:]:
+    header: list[str] = []
+    for i in range(start, len(lines)):
+        line = lines[i]
         if re.match(r"^#{2,3}\s+", line):
             break
-        if line.strip().startswith("|"):
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if not cells:
-                continue
-            if cells[0].lower() in {"change", "名称", "name"}:
-                in_table = True
-                table_header = [c.lower() for c in cells]
-                continue
-            if set(cells[0]) <= {"-", ":"}:
-                in_table = True
-                continue
-            if not in_table:
-                continue
-            name = strip_md_link(cells[0]).strip("`")
-            path = strip_md_link(cells[1]).strip("`") if len(cells) > 1 else ""
-            if name and name not in {"—", "-", "（尚无）"}:
-                repo_idx = next(
-                    (i for i, h in enumerate(table_header) if h in {"仓库", "repo"}),
-                    None,
-                )
-                store_idx = next(
-                    (i for i, h in enumerate(table_header) if h == "store"),
-                    None,
-                )
-                repo = (
-                    strip_md_link(cells[repo_idx]).strip("`")
-                    if repo_idx is not None and repo_idx < len(cells)
-                    else ""
-                )
-                store = (
-                    strip_md_link(cells[store_idx]).strip("`")
-                    if store_idx is not None and store_idx < len(cells)
-                    else ""
-                )
-                rows.append(
-                    {
-                        "name": name,
-                        "path": path,
-                        "repo": normalize_repo_path(repo) if repo and repo not in {"—", "-"} else "",
-                        "store": store if store not in {"—", "-"} else "",
-                    }
-                )
-        elif in_table and line.strip() == "":
-            break
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        if cells[0].lower() in {"change", "名称", "name"}:
+            in_table = True
+            header = [c.lower() for c in cells]
+            continue
+        if all(set(c) <= {"-", ":"} for c in cells):
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        if len(cells) < 2:
+            raise operational_error(
+                "关联 OpenSpec", i + 1, line, "expected at least change and path columns"
+            )
+        name = strip_md_link(cells[0]).strip("`")
+        if name in {"", "—", "-", "（尚无）"}:
+            continue
+        path = strip_md_link(cells[1]).strip("`")
+        repo_idx = next((j for j, value in enumerate(header) if value in {"仓库", "repo"}), None)
+        store_idx = next((j for j, value in enumerate(header) if value == "store"), None)
+        repo = strip_md_link(cells[repo_idx]).strip("`") if repo_idx is not None and repo_idx < len(cells) else ""
+        store = strip_md_link(cells[store_idx]).strip("`") if store_idx is not None and store_idx < len(cells) else ""
+        rows.append(
+            {
+                "name": name,
+                "path": path,
+                "repo": normalize_repo_path(repo) if repo and repo not in {"—", "-"} else "",
+                "store": store if store not in {"—", "-"} else "",
+                "line": str(i + 1),
+            }
+        )
     return rows
 
 
 def parse_work_context(text: str) -> list[dict[str, Any]]:
-    """Parse README 工作上下文, accepting both legacy and current tables."""
+    """Parse README 工作上下文 and reject malformed operational rows."""
     lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if re.match(r"^##\s*工作上下文\s*$", line):
-            start = i + 1
-            break
+    start = _find_section_start(lines, r"^##\s*工作上下文\s*$")
     if start is None:
         return []
     rows: list[dict[str, Any]] = []
-    header: list[str] = []
-    for line in lines[start:]:
-        if line.startswith("## "):
+    in_table = False
+    for i in range(start, len(lines)):
+        line = lines[i]
+        if re.match(r"^#{2,3}\s+", line):
             break
         if not line.strip().startswith("|"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if not cells or all(set(c) <= {"-", ":"} for c in cells):
             continue
-        if cells[0] in {"仓库", "repo"}:
-            header = cells
+        if cells[0].lower() in {"仓库", "repo"}:
+            in_table = True
             continue
-        if cells[0] in _SCOPE_SKIP_NAMES:
+        if cells[0] in _SCOPE_SKIP_NAMES or "apply 前" in cells[0]:
             continue
-        # Current: repo | canonical | checkout | worktree | branch | base.
-        # Legacy:  repo | path      | worktree | branch   | base.
         if len(cells) >= 6:
             name, canonical, checkout, wt_raw, branch, base = cells[:6]
         elif len(cells) >= 5:
             name, canonical, wt_raw, branch, base = cells[:5]
             checkout = canonical
         else:
+            if in_table:
+                raise operational_error("工作上下文", i + 1, line, "expected five or six columns")
             continue
         canonical = strip_md_link(canonical).strip("`")
         checkout = strip_md_link(checkout).strip("`")
         if not canonical:
-            continue
+            raise operational_error("工作上下文", i + 1, line, "canonical repository is required")
         rows.append(
             {
                 "name": name.strip("`"),
                 "repo": normalize_repo_path(canonical),
                 "checkout": checkout or canonical,
-                "is_worktree": wt_raw.strip().lower()
-                in {"是", "yes", "true", "linked", "worktree"},
+                "is_worktree": wt_raw.strip().lower() in {"是", "yes", "true", "linked", "worktree"},
                 "branch": branch.strip("`"),
                 "base": base.strip("`"),
+                "line": i + 1,
             }
         )
     return rows
@@ -597,9 +638,7 @@ def normalize_scope_role(raw: str) -> str | None:
 
 
 def _is_placeholder_scope_row(name: str, path: str, role: str) -> bool:
-    if name in _SCOPE_SKIP_NAMES:
-        return True
-    if path in _SCOPE_SKIP_NAMES:
+    if name in _SCOPE_SKIP_NAMES or path in _SCOPE_SKIP_NAMES:
         return True
     if "path/to" in path or "或" in path:
         return True
@@ -609,47 +648,47 @@ def _is_placeholder_scope_row(name: str, path: str, role: str) -> bool:
 
 
 def parse_scope(text: str) -> dict[str, Any]:
-    """Parse README 「涉及面」 or notes 「默认涉及面」 table. checkout = must only."""
+    """Parse scope strictly. Unknown roles never become delivery repositories."""
     scope = empty_scope()
     lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if re.match(r"^#{2,3}\s*(?:默认)?涉及面", line):
-            start = i + 1
-            break
+    start = _find_section_start(lines, r"^#{2,3}\s*(?:默认)?涉及面")
     if start is None:
         return scope
     in_table = False
     seen_checkout: set[str] = set()
-    for line in lines[start:]:
+    for i in range(start, len(lines)):
+        line = lines[i]
         if re.match(r"^#{2,3}\s+", line):
             break
-        if line.strip().startswith("|"):
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if not cells:
-                continue
-            head = cells[0].lower()
-            if set(cells[0]) <= {"-", ":"} or head in {"逻辑库", "仓库", "库", "name", "repo"}:
-                in_table = True
-                continue
-            if not in_table:
-                continue
-            name = strip_md_link(cells[0]).strip("`")
-            path = strip_md_link(cells[1]).strip("`") if len(cells) > 1 else ""
-            role_raw = cells[2] if len(cells) > 2 else "必须"
-            if _is_placeholder_scope_row(name, path, role_raw):
-                continue
-            role = normalize_scope_role(role_raw) or "must"
-            logical = normalize_repo_path(path) if path else ""
-            if not logical:
-                continue
-            row = {"name": name, "path": logical, "role": role}
-            scope[role].append(row)
-            if role == "must" and logical not in seen_checkout:
-                seen_checkout.add(logical)
-                scope["checkout"].append(logical)
-        elif in_table and line.strip() == "":
-            break
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        head = cells[0].lower()
+        if all(set(c) <= {"-", ":"} for c in cells) or head in {"逻辑库", "仓库", "库", "name", "repo"}:
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        if len(cells) < 3:
+            raise operational_error("涉及面", i + 1, line, "expected name, path, and role columns")
+        name = strip_md_link(cells[0]).strip("`")
+        path = strip_md_link(cells[1]).strip("`")
+        role_raw = cells[2]
+        if _is_placeholder_scope_row(name, path, role_raw):
+            continue
+        role = normalize_scope_role(role_raw)
+        if role is None:
+            raise operational_error("涉及面", i + 1, line, f"unknown scope role {role_raw!r}")
+        logical = normalize_repo_path(path) if path else ""
+        if not logical:
+            raise operational_error("涉及面", i + 1, line, "repository path is required")
+        row = {"name": name, "path": logical, "role": role, "line": i + 1}
+        scope[role].append(row)
+        if role == "must" and logical not in seen_checkout:
+            seen_checkout.add(logical)
+            scope["checkout"].append(logical)
     return scope
 
 
@@ -880,9 +919,7 @@ def enrich_row(root: Path, row: TaskRow) -> TaskInfo | None:
 
 
 def list_active_infos(root: Path) -> list[TaskInfo]:
-    _, active, _ = parse_index(root)
-    if not active:
-        active = scan_active_tasks(root)
+    active = list(reconcile_task_catalog(root)["active"])
     infos: list[TaskInfo] = []
     for row in active:
         info = enrich_row(root, row)
@@ -917,6 +954,108 @@ def scan_archived_tasks(root: Path) -> list[TaskRow]:
     return rows
 
 
+def reconcile_task_catalog(root: Path) -> dict[str, Any]:
+    """Merge INDEX and task directories, reporting identity conflicts without mutation."""
+    next_id, indexed_active, indexed_archived = parse_index(root)
+    scanned_active = scan_active_tasks(root)
+    scanned_archived = scan_archived_tasks(root)
+    diagnostics: list[dict[str, Any]] = []
+
+    def add(reason: str, **details: Any) -> None:
+        diagnostics.append({"reason": reason, **details})
+
+    scanned = [*scanned_active, *scanned_archived]
+    by_id: dict[str, list[TaskRow]] = {}
+    for row in scanned:
+        if ID_RE.match(row.task_id):
+            by_id.setdefault(normalize_id(row.task_id), []).append(row)
+        readme = root / row.path.rstrip("/") / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        readme_id = parse_id_from_readme(text)
+        dirname = readme.parent.name
+        archive_match = ARCHIVE_TASK_DIR_RE.match(dirname)
+        identity_name = archive_match.group(2) if archive_match else dirname
+        dirname_id = id_from_dirname(identity_name)
+        if readme_id is None:
+            add("missing_readme_id", path=row.path)
+        if readme_id and dirname_id and readme_id != dirname_id:
+            add("readme_dir_id_mismatch", path=row.path, readme_id=readme_id, dirname_id=dirname_id)
+        parsed_status = parse_status_from_readme(text)
+        if parsed_status not in VALID_STATUSES:
+            add("invalid_readme_status", path=row.path, status=parsed_status)
+        try:
+            parse_scope(text)
+            parse_work_context(text)
+            parse_openspec(text)
+        except TaskError as exc:
+            add(
+                exc.reason or "malformed_operational_table",
+                path=row.path,
+                **exc.details,
+            )
+    for task_id, rows in by_id.items():
+        if len(rows) > 1:
+            sections = {row.section for row in rows}
+            add(
+                "active_archive_id_conflict" if len(sections) > 1 else "duplicate_task_id",
+                task_id=task_id,
+                paths=[row.path for row in rows],
+            )
+
+    indexed = [*indexed_active, *indexed_archived]
+    indexed_paths: set[str] = set()
+    for row in indexed:
+        path = row.path.rstrip("/")
+        if path in indexed_paths:
+            add("duplicate_index_path", path=row.path)
+        indexed_paths.add(path)
+        if not (root / path / "README.md").is_file():
+            add("missing_indexed_path", task_id=row.task_id, path=row.path)
+
+    scan_keys = {(row.task_id, row.path.rstrip("/"), row.section) for row in scanned}
+    index_keys = {(row.task_id, row.path.rstrip("/"), row.section) for row in indexed}
+    missing_rows = [asdict(row) for row in scanned if (row.task_id, row.path.rstrip("/"), row.section) not in index_keys]
+    stale_rows = [asdict(row) for row in indexed if (row.task_id, row.path.rstrip("/"), row.section) not in scan_keys]
+    numbers = [int(row.task_id[1:]) for row in scanned if ID_RE.match(row.task_id)]
+    reconciled_next = max([next_id, *((number + 1) for number in numbers)])
+    return {
+        "next_id": reconciled_next,
+        "active": scanned_active,
+        "archived": scanned_archived,
+        "diagnostics": diagnostics,
+        "blocking": diagnostics,
+        "missing_index_rows": missing_rows,
+        "stale_index_rows": stale_rows,
+        "repair_needed": bool(missing_rows or stale_rows or next_id != reconciled_next),
+        "max_id": max(numbers, default=0),
+    }
+
+
+def catalog_payload(catalog: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "next_id": catalog["next_id"],
+        "max_id": catalog["max_id"],
+        "diagnostics": catalog["diagnostics"],
+        "missing_index_rows": catalog["missing_index_rows"],
+        "stale_index_rows": catalog["stale_index_rows"],
+        "repair_needed": catalog["repair_needed"],
+    }
+
+
+def require_catalog(root: Path, *, repair: bool) -> dict[str, Any]:
+    catalog = reconcile_task_catalog(root)
+    if catalog["blocking"]:
+        raise TaskError(
+            "task catalog has blocking identity/path diagnostics",
+            reason="task_catalog_conflict",
+            details={"catalog": catalog_payload(catalog)},
+        )
+    if repair and catalog["repair_needed"]:
+        write_index(root, catalog["next_id"], list(catalog["active"]), list(catalog["archived"]))
+        catalog = reconcile_task_catalog(root)
+    return catalog
+
+
 def enrich_archived_row(root: Path, row: TaskRow) -> TaskInfo | None:
     task_root = resolve_task_root(root, row)
     readme = task_root / "README.md"
@@ -945,14 +1084,7 @@ def enrich_archived_row(root: Path, row: TaskRow) -> TaskInfo | None:
 
 
 def list_archived_infos(root: Path) -> list[TaskInfo]:
-    _, _, indexed = parse_index(root)
-    rows = list(indexed)
-    known = {(row.task_id, row.path.rstrip("/")) for row in rows}
-    for row in scan_archived_tasks(root):
-        key = (row.task_id, row.path.rstrip("/"))
-        if key not in known:
-            rows.append(row)
-            known.add(key)
+    rows = list(reconcile_task_catalog(root)["archived"])
     infos: list[TaskInfo] = []
     for row in rows:
         info = enrich_archived_row(root, row)
@@ -1577,6 +1709,63 @@ def binding_for_repo(info: TaskInfo | None, repo_path: str) -> dict[str, Any] | 
     return None
 
 
+def delivery_repo_keys(info: TaskInfo) -> list[str]:
+    keys: list[str] = []
+    for row in info.scope.get("must", []):
+        key = normalize_repo_path(str(row.get("path") or ""))
+        if key and key not in keys:
+            keys.append(key)
+    for row in info.checkouts:
+        key = normalize_repo_path(str(row.get("repo") or ""))
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def validate_checkout_binding(root: Path, info: TaskInfo, repo_key: str) -> dict[str, Any]:
+    repo_key = normalize_repo_path(repo_key)
+    base: dict[str, Any] = {"repo": repo_key, "ok": False}
+    binding = binding_for_repo(info, repo_key)
+    if binding is None:
+        return {**base, "reason": "checkout_not_prepared", "checkout": None}
+    expected = str(binding.get("branch") or "").strip()
+    checkout_raw = str(binding.get("checkout") or "").strip()
+    base.update({"binding": binding, "expected_branch": expected, "checkout": checkout_raw or None})
+    if not checkout_raw or not expected:
+        return {**base, "reason": "checkout_not_prepared"}
+    try:
+        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
+    except TaskError as exc:
+        return {**base, "reason": "canonical_repository_unavailable", "detail": str(exc)}
+    checkout = resolve_checkout_path(root, checkout_raw)
+    base["checkout"] = display_checkout_path(root, checkout)
+    if not checkout.is_dir():
+        return {**base, "reason": "checkout_missing"}
+    if not same_git_repository(canonical, checkout):
+        return {**base, "reason": "wrong_repository"}
+    actual = current_branch(checkout)
+    base["actual_branch"] = actual or None
+    if not actual:
+        return {**base, "reason": "detached_head"}
+    if actual != expected:
+        return {**base, "reason": "branch_mismatch"}
+    return {**base, "ok": True, "reason": "ok", "checkout_abs": str(checkout), "actual_branch": actual}
+
+
+def evaluate_delivery_checkout_bindings(root: Path, info: TaskInfo) -> dict[str, Any]:
+    bindings = [validate_checkout_binding(root, info, key) for key in delivery_repo_keys(info)]
+    return {"ok": all(row["ok"] for row in bindings), "bindings": bindings, "blocking": [row for row in bindings if not row["ok"]]}
+
+
+def checkout_gate_failure(gate: dict[str, Any]) -> TaskError:
+    first = gate["blocking"][0]
+    return TaskError(
+        f"delivery checkout binding failed for {first['repo']}: {first['reason']}",
+        reason=str(first["reason"]),
+        details={"checkout_gate": gate},
+    )
+
+
 def format_work_context(rows: list[dict[str, Any]]) -> str:
     lines = [
         "apply 前保持「尚未准备」；task-apply Checkout Gate 后再记录实际执行环境。涉及面是计划范围；本节是实际执行环境。",
@@ -1818,6 +2007,9 @@ def collect_prepare_repo_inputs(
 
 
 def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
+    if args.from_task and not args.dry_run:
+        with index_lock(root):
+            require_catalog(root, repair=True)
     slug = validate_slug(args.slug)
     prefix = (args.prefix or "feat").strip().lower()
     if prefix not in VALID_BRANCH_PREFIXES:
@@ -1951,12 +2143,6 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
                 continue
 
             if not create_worktree and is_dirty(repo):
-                if args.skip_dirty:
-                    entry["action"] = "skipped_dirty"
-                    entry["dirty"] = True
-                    entry["dirty_porcelain"] = dirty_porcelain(repo)
-                    results.append(entry)
-                    continue
                 errors.append(blocked_dirty_entry(entry, repo))
                 continue
 
@@ -2225,32 +2411,30 @@ def summarize_delivery_checkout(
 def resolve_change_target(
     root: Path, info: TaskInfo, change: dict[str, str]
 ) -> dict[str, Any]:
+    store = str(change.get("store") or "").strip()
+    if store:
+        raise TaskError(
+            f"unsupported OpenSpec store for {change.get('name')}: {store}",
+            reason="unsupported_openspec_store",
+            details={"change": change.get("name"), "store": store, "line": change.get("line")},
+        )
     raw_repo = (change.get("repo") or "").strip()
     repo_key = normalize_repo_path(raw_repo) if raw_repo else ""
-    binding = binding_for_repo(info, repo_key) if repo_key else None
-    if repo_key:
-        canonical_info = resolve_repo(root, repo_key)
-        canonical_repo = Path(canonical_info["git_root_abs"])
-        if binding and binding.get("checkout"):
-            checkout = resolve_checkout_path(root, str(binding["checkout"]))
-            if not checkout.is_dir():
-                raise TaskError(
-                    f"recorded checkout missing for {repo_key}: {checkout}"
-                )
-            if not same_git_repository(canonical_repo, checkout):
-                raise TaskError(
-                    f"recorded checkout is not the canonical repository {repo_key}: "
-                    f"{checkout}"
-                )
-        else:
-            checkout = canonical_repo
+    delivery_key = repo_key or ("." if "." in delivery_repo_keys(info) else "")
+    if delivery_key and delivery_key in delivery_repo_keys(info):
+        checked = validate_checkout_binding(root, info, delivery_key)
+        if not checked["ok"]:
+            raise checkout_gate_failure({"ok": False, "bindings": [checked], "blocking": [checked]})
+        checkout = Path(checked["checkout_abs"])
+        if not repo_key:
+            repo_key = delivery_key
+    elif repo_key:
+        checkout = Path(resolve_repo(root, repo_key)["git_root_abs"])
     else:
         checkout = root
     raw_path = (change.get("path") or "").strip().strip("`").rstrip("/")
     if raw_path and Path(raw_path).is_absolute():
-        raise TaskError(
-            f"OpenSpec path must be canonical-repo/workspace relative: {raw_path}"
-        )
+        raise TaskError(f"OpenSpec path must be canonical-repo/workspace relative: {raw_path}")
     relative = raw_path
     if repo_key and relative:
         normalized = normalize_repo_path(relative)
@@ -2261,8 +2445,8 @@ def resolve_change_target(
     change_root = (checkout / relative).resolve() if relative else checkout
     try:
         change_root.relative_to(checkout.resolve())
-    except ValueError as e:
-        raise TaskError(f"OpenSpec path escapes checkout: {raw_path}") from e
+    except ValueError as exc:
+        raise TaskError(f"OpenSpec path escapes checkout: {raw_path}") from exc
     planning_root = change_root
     for candidate in [change_root, *change_root.parents]:
         if candidate.name == "changes" and candidate.parent.name == "openspec":
@@ -2321,7 +2505,7 @@ def empty_openspec_report() -> dict[str, Any]:
 def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
     change_root = Path(target["change_root"])
     tasks = change_root / "tasks.md"
-    availability = "runnable"
+    availability = "active"
     unavailable_reason = ""
     if not tasks.is_file():
         archived_paths = archived_change_paths(target)
@@ -2381,58 +2565,73 @@ def openspec_checkbox_progress(target: dict[str, Any]) -> dict[str, Any]:
 
 
 def inspect_change_remainder(target: dict[str, Any]) -> dict[str, Any]:
+    """Classify the actual OpenSpec target state for resumable archive.
+
+    Active and archived locations are inspected together.  More than one real
+    location is ambiguous rather than silently preferring the recorded active
+    path or the newest archive directory.
+    """
     name = str(target.get("name") or "")
     change_root = Path(target["change_root"])
-    if change_root.exists():
-        report = openspec_task_report(target)
-        return {
-            "name": name,
-            "state": "active",
-            "path": str(change_root),
-            "message": (
-                f"{name} (active path exists: {change_root}, "
-                f"remaining={report['remaining']})"
-            ),
-            **report,
-        }
     archived_paths = archived_change_paths(target)
+    active_paths = [change_root] if change_root.is_dir() else []
+    locations = [*active_paths, *archived_paths]
     archive_root = Path(target["planning_root"]) / "changes" / "archive"
-    if not archived_paths:
+
+    if not locations:
         return {
             "name": name,
             "state": "missing",
-            "path": str(archive_root),
+            "path": str(change_root),
+            "paths": [],
             "message": (
                 f"{name} (recorded path missing and no archived change found "
                 f"under {archive_root})"
             ),
-            "total": 0,
-            "complete": 0,
-            "remaining": 1,
-            "remaining_state": "remaining",
-            "remaining_items": [],
+            **empty_openspec_report(),
+            "status_available": False,
         }
-    last_report = empty_openspec_report()
-    for archived_path in archived_paths:
-        report = openspec_task_report({**target, "change_root": str(archived_path)})
-        last_report = report
-        if report["remaining"]:
-            return {
-                "name": name,
-                "state": "archived_incomplete",
-                "path": str(archived_path),
-                "message": (
-                    f"{name} (archived at {archived_path} with "
-                    f"remaining={report['remaining']})"
-                ),
-                **report,
-            }
+    if len(locations) > 1:
+        return {
+            "name": name,
+            "state": "ambiguous",
+            "path": "",
+            "paths": [str(path) for path in locations],
+            "message": (
+                f"{name} has multiple active/archive matches: "
+                + ", ".join(str(path) for path in locations)
+            ),
+            **empty_openspec_report(),
+            "status_available": False,
+        }
+
+    actual_path = locations[0]
+    report = openspec_task_report({**target, "change_root": str(actual_path)})
+    status_available = str(report.get("availability") or "") not in {
+        "missing",
+        "ambiguous_archived",
+    }
+    if active_paths:
+        state = "active"
+        message = (
+            f"{name} (active at {actual_path}, remaining={report['remaining']})"
+        )
+    elif report["remaining"]:
+        state = "archived_incomplete"
+        message = (
+            f"{name} (archived at {actual_path} with remaining={report['remaining']})"
+        )
+    else:
+        state = "uniquely_archived"
+        message = f"{name} (uniquely archived at {actual_path})"
     return {
         "name": name,
-        "state": "archived",
-        "path": str(archived_paths[-1]),
-        "message": "",
-        **last_report,
+        "state": state,
+        "path": str(actual_path),
+        "paths": [str(actual_path)],
+        "message": message,
+        **report,
+        "status_available": status_available,
     }
 
 
@@ -2481,6 +2680,98 @@ def apply_state_path(root: Path, info: TaskInfo) -> Path:
     return root / info.task_root.rstrip("/") / APPLY_STATE_FILENAME
 
 
+FINAL_VERIFICATION_HEADING = "最终验证快照"
+FINAL_SNAPSHOT_RE = re.compile(
+    r"^- repo=`(?P<repo>[^`]*)` checkout=`(?P<checkout>[^`]*)` "
+    r"branch=`(?P<branch>[^`]*)` head=`(?P<head>[^`]*)`$",
+    re.MULTILINE,
+)
+
+
+def git_head(repo: Path) -> str:
+    result = run_git(repo, "rev-parse", "HEAD")
+    if result.returncode != 0 or not result.stdout.strip():
+        raise TaskError(f"cannot read HEAD for checkout: {repo}")
+    return result.stdout.strip()
+
+
+def collect_delivery_snapshots(root: Path, info: TaskInfo) -> list[dict[str, Any]]:
+    gate = evaluate_delivery_checkout_bindings(root, info)
+    if not gate["ok"]:
+        raise checkout_gate_failure(gate)
+    snapshots: list[dict[str, Any]] = []
+    for checked in gate["bindings"]:
+        checkout = Path(checked["checkout_abs"])
+        snapshots.append(
+            {
+                "repo": checked["repo"],
+                "checkout": checked["checkout"],
+                "branch": checked["actual_branch"],
+                "head": git_head(checkout),
+                "dirty": is_dirty(checkout),
+                "dirty_porcelain": dirty_porcelain(checkout),
+            }
+        )
+    return snapshots
+
+
+def parse_final_verification(text: str) -> dict[str, Any]:
+    body = next(
+        (
+            section["body"]
+            for section in parse_markdown_sections(text)
+            if normalize_heading(section["heading"])
+            == normalize_heading(FINAL_VERIFICATION_HEADING)
+        ),
+        "",
+    )
+    status_match = re.search(r"^- 状态：`([^`]+)`\s*$", body, re.MULTILINE)
+    reason_match = re.search(r"^- 说明：(.+?)\s*$", body, re.MULTILINE)
+    return {
+        "status": status_match.group(1) if status_match else "missing",
+        "reason": reason_match.group(1).strip() if reason_match else "",
+        "snapshots": [match.groupdict() for match in FINAL_SNAPSHOT_RE.finditer(body)],
+    }
+
+
+def render_final_verification(final: dict[str, Any]) -> list[str]:
+    lines = ["", f"## {FINAL_VERIFICATION_HEADING}", "", f"- 状态：`{final['status']}`"]
+    if final.get("reason"):
+        lines.append(f"- 说明：{final['reason']}")
+    for snap in final.get("snapshots") or []:
+        lines.append(
+            f"- repo=`{snap['repo']}` checkout=`{snap['checkout']}` "
+            f"branch=`{snap['branch']}` head=`{snap['head']}`"
+        )
+    return lines
+
+
+def validate_final_verification(root: Path, info: TaskInfo, text: str) -> dict[str, Any]:
+    recorded = parse_final_verification(text)
+    if recorded["status"] != "fresh":
+        return {"ok": False, "reason": "stale_verification", "recorded": recorded, "current": []}
+    current = collect_delivery_snapshots(root, info)
+
+    def comparable(rows: list[dict[str, Any]]) -> list[tuple[str, str, str, str]]:
+        return sorted(
+            (
+                str(row.get("repo") or ""),
+                str(row.get("checkout") or ""),
+                str(row.get("branch") or ""),
+                str(row.get("head") or ""),
+            )
+            for row in rows
+        )
+
+    ok = not any(row["dirty"] for row in current) and comparable(recorded["snapshots"]) == comparable(current)
+    return {
+        "ok": ok,
+        "reason": "ok" if ok else "stale_verification",
+        "recorded": recorded,
+        "current": current,
+    }
+
+
 def load_deferred_items(path: Path) -> list[dict[str, str]]:
     if not path.is_file():
         return []
@@ -2524,14 +2815,14 @@ def build_apply_schedule(
         target["remaining_state"] = progress["remaining_state"]
         target["remaining_items"] = progress["remaining_items"]
         change = str(target.get("name") or "")
-        availability = str(progress.get("availability") or "runnable")
+        availability = str(progress.get("availability") or "active")
         unavailable_reason = str(progress.get("unavailable_reason") or "")
         for item in progress["remaining_items"]:
             remaining.append(
                 {
                     "change": change,
                     **item,
-                    "available": availability == "runnable",
+                    "available": availability == "active",
                     "availability": availability,
                     "unavailable_reason": unavailable_reason,
                 }
@@ -2561,7 +2852,7 @@ def build_apply_schedule(
             "change": row["change"],
             "task": row["text"],
             "reason": row["unavailable_reason"]
-            or f"OpenSpec change is not runnable ({row['availability']})",
+            or f"OpenSpec change is unavailable ({row['availability']})",
             "updated": "",
             "automatic": True,
         }
@@ -2570,25 +2861,26 @@ def build_apply_schedule(
     ]
     unavailable_keys = {(row["change"], row["task"]) for row in unavailable}
     deferred_keys = explicit_keys | unavailable_keys
-    runnable = [
+    candidates = [
         row
         for row in remaining
         if row["available"]
         and (row["change"], row["text"]) not in deferred_keys
     ]
-    state = "done" if not remaining else ("runnable" if runnable else "deferred_only")
+    state = "done" if not remaining else ("candidates" if candidates else "deferred_only")
     return {
         "state": state,
         "remaining": remaining,
         "persisted_deferred": reconciled,
         "unavailable": unavailable,
         "deferred": [*reconciled, *unavailable],
-        "runnable": runnable,
-        "next": runnable[0] if runnable else None,
+        "candidates": candidates,
+        "next": candidates[0] if candidates else None,
     }
 
 
 def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
+    catalog = require_catalog(root, repair=False)
     matches = match_query(list_active_infos(root), args.query)
     if len(matches) != 1:
         return emit(
@@ -2600,6 +2892,9 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             code=2,
         )
     info = matches[0]
+    checkout_gate = evaluate_delivery_checkout_bindings(root, info)
+    if not checkout_gate["ok"]:
+        raise checkout_gate_failure(checkout_gate)
     targets = [resolve_change_target(root, info, row) for row in info.openspec]
     schedule = build_apply_schedule(
         targets, load_deferred_items(apply_state_path(root, info))
@@ -2612,6 +2907,8 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             "ok": True,
             "result": "execution_context",
             "task": asdict(info),
+            "catalog": catalog_payload(catalog),
+            "checkout_gate": checkout_gate,
             "scope": info.scope,
             "targets": targets,
             "openspec_remaining": {
@@ -2643,19 +2940,18 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             code=2,
         )
     info = matches[0]
+    checkout_gate = evaluate_delivery_checkout_bindings(root, info)
+    if not checkout_gate["ok"]:
+        raise checkout_gate_failure(checkout_gate)
     phase = args.phase
     status = "blocked" if phase == "blocked" else "in_progress"
     task_readme = root / info.readme
     original_readme = task_readme.read_text(encoding="utf-8")
     task_index = index_path(root)
-    original_index = (
-        task_index.read_text(encoding="utf-8") if task_index.is_file() else None
-    )
+    original_index = task_index.read_text(encoding="utf-8") if task_index.is_file() else None
     targets = [resolve_change_target(root, info, row) for row in info.openspec]
     progress_path = root / info.task_root.rstrip("/") / "progress.md"
-    previous_text = (
-        progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
-    )
+    previous_text = progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
     progress_existed = progress_path.is_file()
     state_path = apply_state_path(root, info)
     state_existed = state_path.is_file()
@@ -2668,15 +2964,9 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         if not args.change or not args.current_task:
             raise TaskError("--resume-current requires --change and --current-task")
         current_key = (args.change, args.current_task)
-        if not any(
-            (row["change"], row["task"]) == current_key for row in deferred
-        ):
+        if not any((row["change"], row["task"]) == current_key for row in deferred):
             raise TaskError("current task is not deferred: " + args.current_task)
-        deferred = [
-            row
-            for row in deferred
-            if (row["change"], row["task"]) != current_key
-        ]
+        deferred = [row for row in deferred if (row["change"], row["task"]) != current_key]
     if args.defer_current is not None:
         if not args.change or not args.current_task:
             raise TaskError("--defer-current requires --change and --current-task")
@@ -2684,11 +2974,7 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         if not defer_reason:
             raise TaskError("--defer-current reason must not be blank")
         current_key = (args.change, args.current_task)
-        deferred = [
-            row
-            for row in deferred
-            if (row["change"], row["task"]) != current_key
-        ]
+        deferred = [row for row in deferred if (row["change"], row["task"]) != current_key]
         deferred.append(
             {
                 "change": args.change,
@@ -2703,12 +2989,29 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         for row in schedule["persisted_deferred"]
     ):
         raise TaskError(
-            "deferred current task is not an exact remaining OpenSpec checkbox: "
-            + args.current_task
+            "deferred current task is not an exact remaining OpenSpec checkbox: " + args.current_task
         )
     deferred = schedule["persisted_deferred"]
+    if phase == "testing" and schedule["state"] != "done":
+        raise TaskError(
+            "--phase testing requires all OpenSpec checkboxes complete",
+            reason="checkboxes_remaining",
+        )
+    if phase == "testing" and not (args.verification or []):
+        raise TaskError(
+            "--phase testing requires new --verification evidence",
+            reason="verification_evidence_required",
+        )
     if phase == "done" and schedule["state"] != "done":
         raise TaskError("--phase done requires all OpenSpec checkboxes complete")
+    if phase == "done":
+        verification_gate = validate_final_verification(root, info, previous_text)
+        if not verification_gate["ok"]:
+            raise TaskError(
+                "--phase done requires fresh final verification for current delivery HEADs",
+                reason="stale_verification",
+                details={"verification_gate": verification_gate},
+            )
 
     def previous_items(heading: str) -> list[str]:
         body = next(
@@ -2720,35 +3023,38 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             "",
         )
         return [
-            m.group(1).strip()
-            for m in re.finditer(r"^\s*-\s+(.+?)\s*$", body, re.MULTILINE)
-            if m.group(1).strip() not in {"（无）", "（尚无）"}
+            match.group(1).strip()
+            for match in re.finditer(r"^\s*-\s+(.+?)\s*$", body, re.MULTILINE)
+            if match.group(1).strip() not in {"（无）", "（尚无）"}
         ]
 
-    completed_items = list(
-        dict.fromkeys([*previous_items("本轮完成"), *(args.completed or [])])
-    )
-    verification_items = list(
-        dict.fromkeys([*previous_items("验证证据"), *(args.verification or [])])
-    )
-    snapshots: list[dict[str, Any]] = []
-    for binding in info.checkouts:
-        canonical = Path(
-            resolve_repo(root, str(binding["repo"]))["git_root_abs"]
-        )
-        checkout = resolve_checkout_path(root, str(binding.get("checkout") or binding["repo"]))
-        if not checkout.is_dir() or not same_git_repository(canonical, checkout):
-            raise TaskError(
-                f"missing/invalid recorded checkout for {binding['repo']}: {checkout}"
-            )
-        snapshots.append(
-            {
-                **binding,
-                "current_branch": current_branch(checkout),
-                "dirty": is_dirty(checkout),
-                "dirty_porcelain": dirty_porcelain(checkout),
-            }
-        )
+    completed_items = list(dict.fromkeys([*previous_items("本轮完成"), *(args.completed or [])]))
+    verification_items = list(dict.fromkeys([*previous_items("验证证据"), *(args.verification or [])]))
+    snapshots = collect_delivery_snapshots(root, info)
+    previous_final = parse_final_verification(previous_text)
+    final_verification = previous_final
+    if phase == "implementing":
+        final_verification = {
+            **previous_final,
+            "status": "stale" if previous_final["status"] == "fresh" else previous_final["status"],
+            "reason": (
+                "implementation resumed after final verification; re-run testing"
+                if previous_final["status"] == "fresh"
+                else previous_final.get("reason", "")
+            ),
+        }
+    elif phase == "testing":
+        dirty = [snapshot for snapshot in snapshots if snapshot["dirty"]]
+        final_verification = {
+            "status": "provisional" if dirty else "fresh",
+            "reason": (
+                "delivery checkout is dirty; evidence is provisional"
+                if dirty
+                else "final verification matches clean delivery branch/HEAD snapshots"
+            ),
+            "snapshots": snapshots,
+        }
+
     lines = [
         f"# {info.task_id} 实施进度",
         "",
@@ -2779,14 +3085,12 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
     lines.extend(["", "## 暂缓项", ""])
     if schedule["deferred"]:
         for row in schedule["deferred"]:
-            lines.append(
-                f"- `{row['change']}` — {row['task']}（{row['reason']}）"
-            )
+            lines.append(f"- `{row['change']}` — {row['task']}（{row['reason']}）")
     else:
         lines.append("- （无）")
-    lines.extend(["", "## 可执行项", ""])
-    if schedule["runnable"]:
-        for row in schedule["runnable"]:
+    lines.extend(["", "## 候选项", ""])
+    if schedule["candidates"]:
+        for row in schedule["candidates"]:
             lines.append(f"- `{row['change']}` — {row['text']}")
     else:
         lines.append("- （无）")
@@ -2805,55 +3109,74 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             "",
         ]
     )
-    for snap in snapshots:
+    for snapshot in snapshots:
         lines.append(
-            f"- `{snap.get('repo')}` checkout=`{snap.get('checkout')}` "
-            f"branch=`{snap.get('current_branch', snap.get('branch', ''))}` "
-            f"dirty={'yes' if snap.get('dirty') else 'no'}"
+            f"- `{snapshot['repo']}` checkout=`{snapshot['checkout']}` "
+            f"branch=`{snapshot['branch']}` head=`{snapshot['head']}` "
+            f"dirty={'yes' if snapshot['dirty'] else 'no'}"
         )
-        for dirty in snap.get("dirty_porcelain") or []:
-            lines.append(f"  - `{dirty}`")
+        for dirty_line in snapshot["dirty_porcelain"]:
+            lines.append(f"  - `{dirty_line}`")
+    lines.extend(render_final_verification(final_verification))
+
     try:
         atomic_write_text(
             state_path,
-            json.dumps(
-                {"version": APPLY_STATE_VERSION, "deferred": deferred},
-                ensure_ascii=False,
-                indent=2,
-            )
-            + "\n",
+            json.dumps({"version": APPLY_STATE_VERSION, "deferred": deferred}, ensure_ascii=False, indent=2) + "\n",
         )
         atomic_write_text(progress_path, "\n".join(lines).rstrip() + "\n")
         with contextlib.redirect_stdout(io.StringIO()):
             status_code = _cmd_set_status_unlocked(
-                root,
-                argparse.Namespace(query=info.task_id, status=status, date=args.date),
+                root, argparse.Namespace(query=info.task_id, status=status, date=args.date)
             )
         if status_code != 0:
             raise TaskError(f"failed to persist checkpoint status for {info.task_id}")
-    except Exception:
-        with contextlib.suppress(Exception):
-            atomic_write_text(task_readme, original_readme)
+    except Exception as primary_error:
+        def restore_index() -> None:
             if original_index is None:
                 task_index.unlink(missing_ok=True)
             else:
                 atomic_write_text(task_index, original_index)
+
+        def restore_progress() -> None:
             if progress_existed:
                 atomic_write_text(progress_path, previous_text)
             else:
                 progress_path.unlink(missing_ok=True)
+
+        def restore_state() -> None:
             if state_existed:
                 atomic_write_text(state_path, original_state)
             else:
                 state_path.unlink(missing_ok=True)
-        raise
-    result = (
-        "done"
-        if schedule["state"] == "done"
-        else "deferred_only"
-        if schedule["state"] == "deferred_only"
-        else "next"
-    )
+
+        rollback_or_raise(
+            primary_error,
+            [
+                ("README restore", lambda: atomic_write_text(task_readme, original_readme)),
+                ("INDEX restore", restore_index),
+                ("progress restore", restore_progress),
+                ("apply state restore", restore_state),
+            ],
+            affected_paths=[task_readme, task_index, progress_path, state_path],
+        )
+
+    if phase == "blocked":
+        result, next_item = "blocked", None
+    elif phase == "implementing":
+        result = (
+            "validation_required"
+            if schedule["state"] == "done"
+            else "deferred_only"
+            if schedule["state"] == "deferred_only"
+            else "next"
+        )
+        next_item = schedule["next"] if result == "next" else None
+    elif phase == "testing":
+        result = "validation_recorded" if final_verification["status"] == "fresh" else "validation_required"
+        next_item = None
+    else:
+        result, next_item = "done", None
     checkpoint = {
         "phase": phase,
         "status": status,
@@ -2868,36 +3191,43 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             "checkpoint": checkpoint,
             **checkpoint,
             "apply_schedule": schedule,
-            "next": schedule["next"],
+            "next": next_item,
             "targets": targets,
+            "verification": final_verification,
+            "checkout_gate": checkout_gate,
         }
     )
 
 
 def cmd_advance(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
+        require_catalog(root, repair=True)
         return _cmd_advance_unlocked(root, args)
 
 
 def cmd_list(root: Path, args: argparse.Namespace) -> int:
+    catalog = require_catalog(root, repair=False)
     infos = list_active_infos(root)
     if args.archived:
-        _, _, archived = parse_index(root)
+        archived = catalog["archived"]
         payload = {
             "ok": True,
             "result": "archived",
             "tasks": [asdict(r) for r in archived],
+            "catalog": catalog_payload(catalog),
         }
         return emit(payload)
     payload = {
         "ok": True,
         "result": "active",
         "tasks": [asdict(i) for i in infos],
+        "catalog": catalog_payload(catalog),
     }
     return emit(payload)
 
 
 def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
+    catalog = require_catalog(root, repair=False)
     infos = list_active_infos(root)
     command = args.command
     query = (args.query or "").strip()
@@ -2917,6 +3247,7 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
                         "confidence": "deterministic",
                         "reason": "explicit_query",
                         "task": asdict(info),
+                        "catalog": catalog_payload(catalog),
                     },
                 )
             )
@@ -3038,6 +3369,7 @@ def _cmd_set_status_unlocked(root: Path, args: argparse.Namespace) -> int:
 
 def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
+        require_catalog(root, repair=True)
         return _cmd_set_status_unlocked(root, args)
 
 
@@ -3145,33 +3477,28 @@ def _cmd_restore_unlocked(root: Path, args: argparse.Namespace) -> int:
         )
         write_index(root, next_id, active, archived)
     except Exception as primary_error:
-        rollback_errors: list[str] = []
-        if dest.exists() and not src.exists():
-            try:
+        def move_back() -> None:
+            if dest.exists() and not src.exists():
                 src.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(dest), str(src))
-            except Exception as exc:  # best-effort recovery must be visible
-                rollback_errors.append(f"move-back: {exc}")
-        readme_location = src / "README.md" if src.exists() else dest / "README.md"
-        if readme_location.exists():
-            try:
-                atomic_write_text(readme_location, original_readme)
-            except Exception as exc:
-                rollback_errors.append(f"README restore: {exc}")
-        try:
+
+        def restore_readme() -> None:
+            location = src / "README.md" if src.exists() else dest / "README.md"
+            if location.exists():
+                atomic_write_text(location, original_readme)
+
+        def restore_index() -> None:
             if original_index is None:
                 task_index.unlink(missing_ok=True)
             else:
                 atomic_write_text(task_index, original_index)
-        except Exception as exc:
-            rollback_errors.append(f"INDEX restore: {exc}")
-        if rollback_errors:
-            raise TaskError(
-                f"restore failed: {primary_error}; rollback_failed: "
-                + "; ".join(rollback_errors)
-                + f"; inspect {src} and {dest}"
-            ) from primary_error
-        raise
+
+        rollback_or_raise(
+            primary_error,
+            [("move-back", move_back), ("README restore", restore_readme), ("INDEX restore", restore_index)],
+            affected_paths=[src, dest, task_index],
+        )
+
     print(f"已恢复：{info.task_id} → {rel_dest} ({status})", file=sys.stderr)
     return emit(
         {
@@ -3187,6 +3514,7 @@ def _cmd_restore_unlocked(root: Path, args: argparse.Namespace) -> int:
 
 def cmd_restore(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
+        require_catalog(root, repair=True)
         return _cmd_restore_unlocked(root, args)
 
 
@@ -3271,9 +3599,12 @@ def _cmd_new_unlocked(root: Path, args: argparse.Namespace) -> int:
             )
         )
         write_index(root, next_id + 1, active, archived)
-    except Exception:
-        shutil.rmtree(task_root, ignore_errors=True)
-        raise
+    except Exception as primary_error:
+        rollback_or_raise(
+            primary_error,
+            [("task directory cleanup", lambda: shutil.rmtree(task_root) if task_root.exists() else None)],
+            affected_paths=[task_root, index_path(root)],
+        )
     print(f"已创建任务：{task_id} — {rel}", file=sys.stderr)
     info = TaskInfo(
         task_id=task_id,
@@ -3290,6 +3621,7 @@ def _cmd_new_unlocked(root: Path, args: argparse.Namespace) -> int:
 
 def cmd_new(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
+        require_catalog(root, repair=True)
         return _cmd_new_unlocked(root, args)
 
 
@@ -3372,20 +3704,21 @@ def evaluate_archive_repository_gate(
             continue
         canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
         if "delivery" in roles:
-            binding = binding_for_repo(info, repo_key)
+            checked = validate_checkout_binding(root, info, repo_key)
+            binding = checked.get("binding")
             checkout = (
-                resolve_checkout_path(root, str(binding.get("checkout")))
-                if binding and binding.get("checkout")
-                else canonical
+                Path(checked["checkout_abs"])
+                if checked.get("ok")
+                else resolve_checkout_path(root, str(checked.get("checkout") or repo_key))
             )
             base = {
                 **use,
                 "checkout": display_checkout_path(root, checkout),
+                "expected_branch": checked.get("expected_branch"),
+                "actual_branch": checked.get("actual_branch"),
             }
-            if not checkout.is_dir() or not same_git_repository(canonical, checkout):
-                missing_delivery.append(
-                    {**base, "reason": "missing_or_invalid_delivery_checkout"}
-                )
+            if not checked.get("ok"):
+                missing_delivery.append({**base, "reason": checked["reason"]})
                 continue
             porcelain, status_error = archive_status_porcelain(checkout)
             if status_error:
@@ -3444,6 +3777,48 @@ def evaluate_archive_repository_gate(
     }
 
 
+def parse_acceptance_section(text: str) -> list[dict[str, Any]]:
+    lines = text.splitlines()
+    headings = [i for i, line in enumerate(lines) if re.match(r"^#{2,3}\s*验收标准\s*$", line)]
+    if len(headings) != 1:
+        line_no = headings[0] + 1 if headings else 0
+        source = lines[headings[0]] if headings else "<missing 验收标准>"
+        raise TaskError(
+            "final archive requires exactly one 验收标准 section",
+            reason="invalid_acceptance_structure",
+            details={
+                "diagnostic": {
+                    "section": "验收标准",
+                    "line": line_no,
+                    "source": source,
+                    "detail": f"expected one section, found {len(headings)}",
+                }
+            },
+        )
+    start = headings[0]
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if re.match(r"^#{2,3}\s+", lines[i]):
+            end = i
+            break
+    body = "\n".join(lines[start + 1 : end])
+    items = parse_openspec_checkboxes(body)
+    if not items:
+        raise TaskError(
+            "final archive requires at least one acceptance checkbox",
+            reason="invalid_acceptance_structure",
+            details={
+                "diagnostic": {
+                    "section": "验收标准",
+                    "line": start + 1,
+                    "source": lines[start],
+                    "detail": "no acceptance checkbox found",
+                }
+            },
+        )
+    return items
+
+
 def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     infos = list_active_infos(root)
     matches = match_query(infos, args.query)
@@ -3461,125 +3836,45 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     if not src.is_dir():
         raise TaskError(f"task directory missing: {info.task_root}")
 
+    readme = src / "README.md"
+    original_text = readme.read_text(encoding="utf-8")
+    acceptance_items = parse_acceptance_section(original_text)
     changes = src / "changes.md"
-    if not changes.is_file() and not args.allow_missing_changes and not args.dry_run:
-        raise TaskError("missing changes.md; write it first or pass --allow-missing-changes")
-    original_changes_text = (
-        changes.read_text(encoding="utf-8") if changes.is_file() else None
-    )
+    original_changes_text = changes.read_text(encoding="utf-8") if changes.is_file() else None
+    task_index = index_path(root)
+    original_index = task_index.read_text(encoding="utf-8") if task_index.is_file() else None
 
-    override_notes: list[str] = []
-    allow_remaining_openspec = bool(
-        getattr(args, "allow_active_openspec", False)
-        or getattr(args, "force_merge", False)
-    )
     resolved_targets: list[dict[str, Any]] = []
-    remainder_rows: list[dict[str, Any]] = []
+    target_states: list[dict[str, Any]] = []
     for change in info.openspec:
         target = resolve_change_target(root, info, change)
         resolved_targets.append(target)
-        remainder_rows.append(inspect_change_remainder(target))
-    blocking_rows = [
-        row
-        for row in remainder_rows
-        if row["state"] in {"active", "missing", "archived_incomplete"}
-    ]
-    active_or_incomplete = [row["message"] for row in blocking_rows if row.get("message")]
-    incomplete_rows = [
-        row
-        for row in blocking_rows
-        if row["state"] == "missing" or row["remaining"] > 0
-    ]
-    missing_rows = [row for row in incomplete_rows if row["state"] == "missing"]
-    if active_or_incomplete and not allow_remaining_openspec:
-        # A recorded change whose path is gone is a bookkeeping error, not a
-        # judgement call — keep it a hard failure.
-        if missing_rows:
-            raise TaskError(
-                "recorded OpenSpec change(s) not found: "
-                + "; ".join(row["message"] for row in missing_rows if row.get("message"))
-                + "; fix the task README or pass --allow-active-openspec / --force-merge"
-            )
-        print(
-            f"OpenSpec 未完成：{info.task_id} — 列出剩余项，等用户裁决",
-            file=sys.stderr,
-        )
-        return emit(
-            {
-                "ok": False,
-                "result": "needs_confirm",
-                "reason": "openspec_remaining",
-                "taskId": info.task_id,
-                "remaining": incomplete_rows or blocking_rows,
-                "exit_markdown": remaining_confirm_markdown(
-                    info.task_id, incomplete_rows or blocking_rows
-                ),
-                "user_actions": [
-                    {
-                        "id": "force_merge",
-                        "label": (
-                            f"继续归档（强行合并）："
-                            f"taskctl archive {info.task_id} --force-merge"
-                        ),
-                    },
-                    {
-                        "id": "finish_remaining",
-                        "label": "先做完剩余项再归档",
-                    },
-                    {"id": "abort", "label": "中止"},
-                ],
-            },
-            code=2,
-        )
-    if active_or_incomplete:
-        note_prefix = (
-            "强行合并：" if getattr(args, "force_merge", False) else "允许遗留 OpenSpec："
-        )
-        override_notes.append(note_prefix + "; ".join(active_or_incomplete))
+        target_states.append(inspect_change_remainder(target))
 
-    readme = src / "README.md"
-    original_text = readme.read_text(encoding="utf-8")
-    acceptance = next(
-        (
-            s["body"]
-            for s in parse_markdown_sections(original_text)
-            if normalize_heading(s["heading"]) == "验收标准"
-        ),
-        "",
-    )
-    unchecked = len(re.findall(r"^\s*-\s*\[\s\]", acceptance, re.MULTILINE))
-    if unchecked and not args.allow_unchecked_acceptance:
+    missing_or_ambiguous = [
+        row for row in target_states if row["state"] in {"missing", "ambiguous"}
+    ]
+    if missing_or_ambiguous:
+        reason = (
+            "openspec_target_ambiguous"
+            if any(row["state"] == "ambiguous" for row in missing_or_ambiguous)
+            else "openspec_target_missing"
+        )
         raise TaskError(
-            f"{unchecked} acceptance item(s) unchecked; complete them or pass "
-            "--allow-unchecked-acceptance"
+            "; ".join(row["message"] for row in missing_or_ambiguous),
+            reason=reason,
+            details={"target_states": target_states},
         )
-    if unchecked:
-        override_notes.append(f"允许 {unchecked} 项验收未勾选")
-
-    progress_path = src / "progress.md"
-    verification_ok = False
-    if progress_path.is_file():
-        progress_text = progress_path.read_text(encoding="utf-8")
-        verification = next(
-            (
-                s["body"]
-                for s in parse_markdown_sections(progress_text)
-                if normalize_heading(s["heading"]) == "验证证据"
-            ),
-            "",
-        )
-        verification_ok = bool(
-            verification
-            and "（尚无）" not in verification
-            and re.search(r"^\s*-\s+\S", verification, re.MULTILINE)
-        )
-    if not verification_ok and not args.allow_missing_verification:
+    unavailable_status = [
+        row for row in target_states if not row.get("status_available", False)
+    ]
+    if unavailable_status:
         raise TaskError(
-            "missing verification evidence in progress.md; checkpoint testing evidence "
-            "or pass --allow-missing-verification"
+            "OpenSpec target status unavailable: "
+            + "; ".join(row["message"] for row in unavailable_status),
+            reason="openspec_status_unavailable",
+            details={"target_states": target_states},
         )
-    if not verification_ok:
-        override_notes.append("允许缺少验证证据")
 
     archive_gate = evaluate_archive_repository_gate(root, info, resolved_targets)
     missing_delivery = archive_gate["missing_delivery_checkouts"]
@@ -3596,8 +3891,9 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
                     + rendered
                     + "; restore the recorded delivery checkout"
                 ),
-                "reason": "missing_or_invalid_delivery_checkout",
+                "reason": missing_delivery[0]["reason"],
                 "archive_gate": archive_gate,
+                "target_states": target_states,
             },
             code=1,
         )
@@ -3615,99 +3911,317 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
                 "error": "cannot inspect delivery checkout status: " + rendered,
                 "reason": "delivery_status_unavailable",
                 "archive_gate": archive_gate,
+                "target_states": target_states,
             },
             code=1,
+        )
+
+    external_actions: list[dict[str, Any]] = []
+    for row in target_states:
+        external_actions.append(
+            {
+                "action": "archive_openspec",
+                "change": row["name"],
+                "state": "pending" if row["state"] == "active" else "completed",
+                "target_state": row["state"],
+                "path": row["path"],
+                "planning_root": next(
+                    target["planning_root"]
+                    for target in resolved_targets
+                    if str(target.get("name") or "") == row["name"]
+                ),
+            }
+        )
+    design_root = src / "design"
+    if design_root.is_dir():
+        external_actions.append(
+            {
+                "action": "promote_design",
+                "state": "pending",
+                "source": rel_posix(root, design_root),
+                "files": [
+                    rel_posix(root, path)
+                    for path in sorted(design_root.rglob("*"))
+                    if path.is_file()
+                ],
+            }
+        )
+    if not changes.is_file():
+        external_actions.append(
+            {
+                "action": "write_changes",
+                "state": "pending",
+                "path": rel_posix(root, changes),
+            }
+        )
+
+    if not args.dry_run and not changes.is_file():
+        raise TaskError(
+            "final preflight requires changes.md",
+            reason="missing_changes_summary",
+            details={"external_actions": external_actions},
+        )
+
+    override_audit: list[dict[str, Any]] = []
+    remaining_rows = [row for row in target_states if int(row.get("remaining") or 0) > 0]
+    if remaining_rows and not args.force_merge:
+        print(
+            f"OpenSpec 未完成：{info.task_id} — 列出剩余项，等用户裁决",
+            file=sys.stderr,
+        )
+        return emit(
+            {
+                "ok": False,
+                "result": "needs_confirm",
+                "reason": "openspec_remaining",
+                "condition": "remaining_openspec_checkboxes",
+                "taskId": info.task_id,
+                "affected": remaining_rows,
+                "remaining": remaining_rows,
+                "exact_action": f"taskctl archive {info.task_id} --force-merge",
+                "exit_markdown": remaining_confirm_markdown(info.task_id, remaining_rows),
+                "user_actions": [
+                    {
+                        "id": "force_merge",
+                        "label": (
+                            f"继续归档（强行合并）："
+                            f"taskctl archive {info.task_id} --force-merge"
+                        ),
+                    },
+                    {"id": "finish_remaining", "label": "先做完剩余项再归档"},
+                    {"id": "abort", "label": "中止"},
+                ],
+                "archive_gate": archive_gate,
+                "target_states": target_states,
+                "external_actions": external_actions,
+            },
+            code=2,
+        )
+    if remaining_rows:
+        override_audit.append(
+            {
+                "condition": "remaining_openspec_checkboxes",
+                "authorization": "--force-merge",
+                "affected": [
+                    {
+                        "change": row["name"],
+                        "items": [item["text"] for item in row.get("remaining_items") or []],
+                    }
+                    for row in remaining_rows
+                ],
+            }
+        )
+
+    if not args.dry_run and any(row["state"] == "active" for row in target_states):
+        raise TaskError(
+            "OpenSpec external archive actions are still pending; run initial preflight, "
+            "perform the listed external actions, then rerun final preflight",
+            reason="openspec_external_actions_pending",
+            details={
+                "target_states": target_states,
+                "external_actions": external_actions,
+            },
+        )
+
+    unchecked_items = [item["text"] for item in acceptance_items if not item["done"]]
+    if unchecked_items and not args.allow_unchecked_acceptance:
+        action = f"taskctl archive {info.task_id} --allow-unchecked-acceptance"
+        return emit(
+            {
+                "ok": False,
+                "result": "needs_confirm",
+                "reason": "unchecked_acceptance",
+                "condition": "unchecked_acceptance",
+                "affected": unchecked_items,
+                "exact_action": action,
+                "user_actions": [
+                    {"id": "allow_unchecked_acceptance", "label": action},
+                    {"id": "abort", "label": "中止"},
+                ],
+                "archive_gate": archive_gate,
+                "target_states": target_states,
+                "external_actions": external_actions,
+            },
+            code=2,
+        )
+    if unchecked_items:
+        override_audit.append(
+            {
+                "condition": "unchecked_acceptance",
+                "authorization": "--allow-unchecked-acceptance",
+                "affected": unchecked_items,
+            }
         )
 
     allowed_repos = {
         normalize_repo_path(str(repo))
         for repo in (getattr(args, "allow_dirty_checkouts", None) or [])
     }
-    blocked_dirty: list[dict[str, Any]] = []
-    overridden_dirty: list[dict[str, Any]] = []
-    for row in archive_gate["dirty_delivery_checkouts"]:
-        if row["repo"] in allowed_repos:
-            overridden_dirty.append(row)
-        else:
-            blocked_dirty.append(row)
+    dirty_by_repo = {
+        str(row["repo"]): row for row in archive_gate["dirty_delivery_checkouts"]
+    }
+    unknown_dirty_overrides = sorted(allowed_repos - set(dirty_by_repo))
+    if unknown_dirty_overrides:
+        raise TaskError(
+            "dirty override does not match a currently dirty delivery repository: "
+            + ", ".join(unknown_dirty_overrides),
+            reason="invalid_dirty_override_target",
+            details={
+                "authorized_repositories": sorted(allowed_repos),
+                "dirty_repositories": sorted(dirty_by_repo),
+                "archive_gate": archive_gate,
+            },
+        )
+    blocked_dirty = [
+        row for repo, row in dirty_by_repo.items() if repo not in allowed_repos
+    ]
+    overridden_dirty = [
+        row for repo, row in dirty_by_repo.items() if repo in allowed_repos
+    ]
     archive_gate["blocking"] = blocked_dirty
     archive_gate["overridden"] = overridden_dirty
-
     if blocked_dirty:
-        rendered = ", ".join(
-            f"{row['repo']} ({row['checkout']})" for row in blocked_dirty
-        )
+        exact_actions = [
+            f"taskctl archive {info.task_id} --allow-dirty-checkout {row['repo']}"
+            for row in blocked_dirty
+        ]
         return emit(
             {
                 "ok": False,
-                "error": (
-                    "dirty delivery checkout(s): "
-                    + rendered
-                    + "; commit/clean them or pass "
-                    "--allow-dirty-checkout <repo>"
-                ),
+                "result": "needs_confirm",
                 "reason": "dirty_delivery_checkout",
+                "condition": "dirty_delivery_checkout",
+                "affected": blocked_dirty,
+                "exact_action": exact_actions[0] if len(exact_actions) == 1 else exact_actions,
+                "user_actions": [
+                    {"id": "allow_dirty_checkout", "label": action}
+                    for action in exact_actions
+                ]
+                + [{"id": "abort", "label": "中止"}],
                 "archive_gate": archive_gate,
+                "target_states": target_states,
+                "external_actions": external_actions,
             },
-            code=1,
+            code=2,
         )
     for row in overridden_dirty:
-        override_notes.append(
-            f"允许 dirty delivery checkout：{row['repo']} ({row['checkout']})"
+        override_audit.append(
+            {
+                "condition": "dirty_delivery_checkout",
+                "authorization": f"--allow-dirty-checkout {row['repo']}",
+                "affected": {
+                    "repo": row["repo"],
+                    "checkout": row["checkout"],
+                    "dirty_porcelain": row["dirty_porcelain"],
+                },
+            }
+        )
+
+
+    progress_path = src / "progress.md"
+    verification_ok = False
+    verification_gate: dict[str, Any] = {"ok": False, "reason": "stale_verification"}
+    if progress_path.is_file():
+        progress_text = progress_path.read_text(encoding="utf-8")
+        verification = next(
+            (
+                section["body"]
+                for section in parse_markdown_sections(progress_text)
+                if normalize_heading(section["heading"]) == "验证证据"
+            ),
+            "",
+        )
+        has_evidence = bool(
+            verification
+            and "（尚无）" not in verification
+            and re.search(r"^\s*-\s+\S", verification, re.MULTILINE)
+        )
+        verification_gate = validate_final_verification(root, info, progress_text)
+        verification_ok = has_evidence and verification_gate["ok"]
+    if not verification_ok and not args.allow_missing_verification:
+        action = f"taskctl archive {info.task_id} --allow-missing-verification"
+        return emit(
+            {
+                "ok": False,
+                "result": "needs_confirm",
+                "reason": "stale_verification",
+                "condition": "missing_or_stale_final_verification",
+                "affected": verification_gate,
+                "exact_action": action,
+                "user_actions": [
+                    {"id": "allow_missing_verification", "label": action},
+                    {"id": "rerun_verification", "label": "重新执行并记录最终验证"},
+                    {"id": "abort", "label": "中止"},
+                ],
+                "archive_gate": archive_gate,
+                "target_states": target_states,
+                "external_actions": external_actions,
+            },
+            code=2,
+        )
+    if not verification_ok:
+        override_audit.append(
+            {
+                "condition": "missing_or_stale_final_verification",
+                "authorization": "--allow-missing-verification",
+                "affected": verification_gate,
+            }
         )
 
     create_date = src.parent.name
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", create_date):
         create_date = args.date or today_str()
     dirname = src.name
-    # ensure archive name has id prefix when possible
     if not DIR_ID_SLUG_RE.match(dirname) and ID_RE.match(info.task_id):
         dirname = f"{info.task_id}-{info.slug}"
     dest = root / "tasks" / "archive" / f"{create_date}-{dirname}"
     rel_dest = rel_posix(root, dest) + "/"
-
     if dest.exists():
         raise TaskError(f"archive destination exists: {rel_dest}")
-
     archived_on = args.date or today_str()
 
+    initial = any(row["state"] == "active" for row in target_states) or not changes.is_file()
     if args.dry_run:
         return emit(
             {
                 "ok": True,
-                "result": "dry_run",
+                "result": "initial_preflight" if initial else "final_preflight",
+                "preflight": "initial" if initial else "final",
                 "from": info.task_root,
                 "to": rel_dest,
                 "archived_on": archived_on,
                 "archive_gate": archive_gate,
+                "target_states": target_states,
+                "external_actions": external_actions,
+                "gate_overrides": override_audit,
             }
         )
 
-    if override_notes:
-        changes_text = (
-            changes.read_text(encoding="utf-8").rstrip()
-            if changes.is_file()
-            else "# Changes"
-        )
-        changes_text += "\n\n## 归档门禁覆盖\n\n"
-        changes_text += "\n".join(f"- {note}" for note in override_notes) + "\n"
+    if override_audit:
+        changes_text = changes.read_text(encoding="utf-8").rstrip()
+        changes_text += "\n\n## Gate Overrides\n\n"
+        for entry in override_audit:
+            affected = json.dumps(entry["affected"], ensure_ascii=False, sort_keys=True)
+            changes_text += (
+                f"- condition=`{entry['condition']}`; "
+                f"authorization=`{entry['authorization']}`; affected={affected}\n"
+            )
         atomic_write_text(changes, changes_text)
 
-    readme = src / "README.md"
-    text = original_text
-    archived_text = set_readme_status(text, "archived") + ("" if text.endswith("\n") else "\n")
+    archived_text = set_readme_status(original_text, "archived") + (
+        "" if original_text.endswith("\n") else "\n"
+    )
     try:
         atomic_write_text(readme, archived_text)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dest))
-        # prune empty date dir
         parent = src.parent
         if parent.is_dir() and parent.name != "tasks" and not any(parent.iterdir()):
             parent.rmdir()
 
         next_id, active, archived = parse_index(root)
-        active = [r for r in active if r.task_id != info.task_id]
-        archived = [r for r in archived if r.task_id != info.task_id]
+        active = [row for row in active if row.task_id != info.task_id]
+        archived = [row for row in archived if row.task_id != info.task_id]
         archived.append(
             TaskRow(
                 task_id=info.task_id,
@@ -3719,18 +4233,36 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
             )
         )
         write_index(root, next_id, active, archived)
-    except Exception:
-        with contextlib.suppress(Exception):
+    except Exception as primary_error:
+        def move_back() -> None:
             if dest.exists() and not src.exists():
                 src.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(dest), str(src))
+
+        def restore_files() -> None:
             if src.exists():
-                atomic_write_text(src / "README.md", text)
+                atomic_write_text(src / "README.md", original_text)
                 if original_changes_text is not None:
                     atomic_write_text(src / "changes.md", original_changes_text)
                 elif (src / "changes.md").exists():
                     (src / "changes.md").unlink()
-        raise
+
+        def restore_index() -> None:
+            if original_index is None:
+                task_index.unlink(missing_ok=True)
+            else:
+                atomic_write_text(task_index, original_index)
+
+        rollback_or_raise(
+            primary_error,
+            [
+                ("move-back", move_back),
+                ("task files restore", restore_files),
+                ("INDEX restore", restore_index),
+            ],
+            affected_paths=[src, dest, task_index, changes],
+        )
+
     print(f"已归档：{info.task_id} → {rel_dest}", file=sys.stderr)
     return emit(
         {
@@ -3741,12 +4273,16 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
             "to": rel_dest,
             "archived_on": archived_on,
             "archive_gate": archive_gate,
+            "target_states": target_states,
+            "external_actions": external_actions,
+            "gate_overrides": override_audit,
         }
     )
 
 
 def cmd_archive(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
+        require_catalog(root, repair=True)
         return _cmd_archive_unlocked(root, args)
 
 
@@ -3924,15 +4460,9 @@ def build_parser() -> argparse.ArgumentParser:
     arch_p.add_argument("--date", help="archived_on date YYYY-MM-DD (default: today)")
     arch_p.add_argument("--dry-run", action="store_true")
     arch_p.add_argument(
-        "--allow-missing-changes",
-        action="store_true",
-        help="allow archive without changes.md",
-    )
-    arch_p.add_argument("--allow-active-openspec", action="store_true")
-    arch_p.add_argument(
         "--force-merge",
         action="store_true",
-        help="force-archive despite remaining OpenSpec tasks (强行合并)",
+        help="authorize the exact remaining OpenSpec checkbox set reported by preflight",
     )
     arch_p.add_argument("--allow-unchecked-acceptance", action="store_true")
     arch_p.add_argument("--allow-missing-verification", action="store_true")
@@ -3993,11 +4523,6 @@ def build_parser() -> argparse.ArgumentParser:
     prep_p.add_argument("--base", default=None, help="base branch (default: origin/HEAD or main)")
     prep_p.add_argument("--dry-run", action="store_true")
     prep_p.add_argument(
-        "--skip-dirty",
-        action="store_true",
-        help="skip dirty repos instead of failing them",
-    )
-    prep_p.add_argument(
         "--include-excluded",
         action="store_true",
         help="allow roots matching default exclude markers (none by default)",
@@ -4013,7 +4538,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     advance_p = sub.add_parser(
         "advance",
-        help="atomically persist apply progress and return the next runnable item",
+        help="atomically persist apply progress and return the next candidate item",
     )
     advance_p.add_argument("query", help="TNNNN / slug / path")
     advance_p.add_argument(
@@ -4031,7 +4556,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--defer-current",
         default=None,
         metavar="REASON",
-        help="defer the exact --change/--current-task while other runnable items continue",
+        help="defer the exact --change/--current-task while other candidate items continue",
     )
     defer_group.add_argument(
         "--resume-current",
@@ -4082,7 +4607,10 @@ def main(argv: list[str] | None = None) -> int:
             raise TaskError(f"tasks/ not found under {root}")
         return args.func(root, args)
     except TaskError as e:
-        return emit({"ok": False, "error": str(e)}, code=e.code)
+        payload = {"ok": False, "error": str(e), **e.details}
+        if e.reason:
+            payload["reason"] = e.reason
+        return emit(payload, code=e.code)
     except (OSError, UnicodeError, subprocess.SubprocessError) as e:
         return emit(
             {

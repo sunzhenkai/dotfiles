@@ -1,4 +1,4 @@
 interface:
   display_name: "任务工作流"
   short_description: "按 new → explore → design? → propose → apply → archive 跟踪一次交付"
-  default_prompt: "用 $task-workflow 跟踪需求；只加载当前 phase reference。apply 通过 prepare-branches 绑定真实 checkout，以 execution-context 定位 OpenSpec，并用一次 advance 原子保存进度和返回 next/done/deferred_only；archive 直接读取 delivery summaries 与角色门禁。"
+  default_prompt: "用 $task-workflow 跟踪需求；只加载当前 phase reference。apply 通过 prepare-branches 绑定真实 checkout，以 execution-context 定位 OpenSpec，并由 advance 的 candidates 与 blocked/next/deferred_only/validation_required/validation_recorded/done 控制推进；archive 执行 Initial preflight → External actions → Final preflight → finalize。"

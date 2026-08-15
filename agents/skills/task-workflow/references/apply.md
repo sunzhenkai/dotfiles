@@ -1,8 +1,8 @@
 # Apply 阶段
 
-执行前读根 `SKILL.md`，并遵守 `safety.md` 的 RES-1/3、CHECKOUT-1/2/3、APPLY-1/2/3、MUT-1。
+执行前读根 `SKILL.md`，并遵守 `safety.md` 的 RES-1/3、CHECKOUT-1/2/3/4、APPLY-1/2/3/4、MUT-1。
 
-## 流程
+## Checkout 与 execution context
 
 1. 运行 `resolve <id> --command task-apply`。显式命中 archived task 时，报告后运行 `restore <id> --status in_progress`，再 resolve；不得对其他命令静默恢复。
 2. 首次实现写入前运行：
@@ -10,37 +10,47 @@
    python3 <skill>/scripts/taskctl.py prepare-branches \
      --slug <slug> --from-task <id>
    ```
-   只处理必须仓；`needs_user_confirm` 时停止，禁止自行 stash/reset/force checkout。命令会持久化真实 checkout/worktree/branch/base。
-3. 运行 `execution-context <id>`，以 JSON 的 `targets`、`scope`、`apply_schedule`、`progress_markdown` 为准，不从 cwd 猜 planning root 或 checkout。无 OpenSpec target 时停止并建议 propose。
-4. 开始或续作时调用一次：
-   ```bash
-   python3 <skill>/scripts/taskctl.py advance <id> \
-     --phase implementing --change <change> --current-task "<checkbox 原文>"
-   ```
-5. 实施 `apply_schedule.next`。每完成一个 OpenSpec checkbox，先在对应 `tasks.md` 勾选，再调用一次 `advance --phase implementing --completed "..."`。
-6. 读取同一响应：
-   - `result=next`：同一轮继续 `next`，不得只做阶段总结。
-   - `result=deferred_only`：确无 runnable 项，汇总 deferred 后才可暂停。
-   - `result=done`：进入验证并最终记录 done。
+   只处理必须仓。任一仓 blocked 时整次准备不是成功；已成功仓的 binding 可保留以便重试，但不得为失败仓写 binding。禁止自行 stash/reset/force checkout，也不存在跳过 dirty 必须仓的选项。
+3. 运行 `execution-context <id>`。每个 delivery 仓必须有已持久化 binding，且 checkout 必须存在、同源、非 detached HEAD、当前分支等于记录分支；失败时停止，绝不回退 canonical checkout。
+4. 以 JSON 的 `targets`、`scope`、`checkout_gate`、`apply_schedule.candidates`、`progress_markdown` 为准。无 OpenSpec target 时停止并建议 propose；非空 OpenSpec `store` 当前不受支持，必须按错误处理。
 
-## Deferred
+## 实施与 candidate 依赖检查
 
-当前项因手工验证、环境暂缺或局部依赖不可执行，但其他项可继续时：
+开始或续作时调用：
 
 ```bash
 python3 <skill>/scripts/taskctl.py advance <id> \
-  --phase implementing --change <change> --current-task "<原文>" \
-  --defer-current "<具体原因>"
+  --phase implementing --change <change> --current-task "<checkbox 原文>"
 ```
 
-保持 checkbox 未勾选。恢复时对同一 change/task 使用 `--resume-current`。只有全局故障或需要用户决策时才用 `--phase blocked --blocker ...`。
+`candidates` 只表示“未显式 defer 且 artifact 可读取”，**不表示依赖已经满足**。执行每个 candidate 前，Agent 必须读取 task/design 上下文，检查它是否直接或传递依赖任何 deferred 项：
+
+- 独立 candidate：实施；完成后先勾选对应 `tasks.md`，再 `advance --phase implementing --completed "..."`。
+- 依赖 deferred 项：不得实施；先对该 candidate 使用 exact `--change` + `--current-task` 调用 `--defer-current`，reason 必须包含 blocker identity（change 与 checkbox 原文/稳定 ID），然后读取下一个 candidate。
+- 当前项因环境/手工验证局部不可执行：保持 checkbox 未勾选并 exact defer；恢复时对同一 change/task 用 `--resume-current`。
+- 只有全局故障或需要用户决策时才用 `--phase blocked --blocker ...`。
+
+## Outcome 控制
+
+调用方只依据顶层 `result` 控制流程；候选事实不能覆盖 phase outcome：
+
+| result | 行为 |
+|--------|------|
+| `blocked` | 全局停止，`next=null`；即使 candidates 非空也不得继续 |
+| `next` | 同一轮检查并处理 `next` candidate |
+| `deferred_only` | 无独立候选，汇总 deferred 后暂停 |
+| `validation_required` | checkbox 已耗尽但尚无 fresh final verification，或本轮验证仅 provisional |
+| `validation_recorded` | clean delivery branch/HEAD 的最终验证已记录 |
+| `done` | final done transition 已完成；checkbox 与 fresh verification 均满足 |
 
 ## 验证与完成
 
-```bash
-python3 <skill>/scripts/taskctl.py advance <id> \
-  --phase testing --verification "<命令与结果>"
-python3 <skill>/scripts/taskctl.py advance <id> --phase done
-```
-
-`--phase done` 仅在所有 OpenSpec checkbox 完成时成功。输出真实 checkout/分支、各 change 进度、runnable/deferred、`progress.md` 路径；全部完成后桥接 `task-archive`。
+1. 所有 checkbox 完成后，`advance --phase implementing` 返回 `validation_required`，不会返回 done。
+2. 先提交/清理全部 delivery checkout，再运行：
+   ```bash
+   python3 <skill>/scripts/taskctl.py advance <id> \
+     --phase testing --verification "<命令与结果>"
+   ```
+   dirty checkout 上证据仅记为 `provisional`，结果仍是 `validation_required`；全部 clean 时在 `progress.md` 记录每个 delivery checkout、branch、HEAD 的 final snapshot，并返回 `validation_recorded`。
+3. 再运行 `advance <id> --phase done`。它会重读当前 branch/HEAD；snapshot 缺失、实现恢复、checkout 变 dirty、切分支或 HEAD 变化均返回 `stale_verification`，必须重新测试。
+4. `done` 后桥接 `task-archive`；archive 会再次执行相同 checkout 与 final snapshot 校验。
