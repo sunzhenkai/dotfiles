@@ -16,6 +16,7 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py notes
   python3 scripts/taskctl.py notes --init
   python3 scripts/taskctl.py notes --set-section 特殊要求 --body "验收必须带回归清单"
+  python3 scripts/taskctl.py extract-new --message-file /tmp/msg.txt
 
 `--root` defaults to the nearest ancestor that contains `tasks/`.
 `--repo` is a workspace-relative path to a git root that this task will modify.
@@ -100,6 +101,15 @@ VERIFICATION_ITEM_RE = re.compile(
 FM_STATUS_RE = re.compile(r"^(status:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 FM_ID_RE = re.compile(r"^(id:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 META_ID_RE = re.compile(r"^\*\*id[：:]\*\*\s*(T\d{4})\s*$", re.MULTILINE | re.IGNORECASE)
+TASK_NEW_INPUT_MARKER = "[TASK_NEW_INPUT_START]"
+TASK_NEW_HOST_CUT_RE = re.compile(
+    r"(?m)^(?:---\s*End Command\s*---|</cursor_commands>|<timestamp>|<user_query>)"
+)
+TASK_NEW_INVOKE_RE = re.compile(r"^[ \t]*/task-new\b(?:[ \t]+(\S.*))?$", re.IGNORECASE)
+TASK_NEW_CHROME_RE = re.compile(
+    r"^[ \t]*(?:▸ |● |要做什么？|Credits:|---\s*End Command|</|<[a-zA-Z])"
+)
+TASK_NEW_TEMPLATE_TAIL_RE = re.compile(r"(?m)^下一步：")
 
 
 @dataclass
@@ -141,6 +151,90 @@ class TaskError(Exception):
 def emit(payload: dict[str, Any], *, code: int = 0) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return code
+
+
+def _strip_task_new_host_tail(text: str) -> str:
+    m = TASK_NEW_HOST_CUT_RE.search(text)
+    if m:
+        text = text[: m.start()]
+    return text.strip()
+
+
+def _task_new_after_marker(message: str) -> str:
+    if TASK_NEW_INPUT_MARKER not in message:
+        return ""
+    after = message.rsplit(TASK_NEW_INPUT_MARKER, 1)[1]
+    after = after.split("\n", 1)[1] if "\n" in after else ""
+    return _strip_task_new_host_tail(after)
+
+
+def _task_new_after_template_tail(message: str) -> str:
+    matches = list(TASK_NEW_TEMPLATE_TAIL_RE.finditer(message))
+    if not matches:
+        return ""
+    after = message[matches[-1].start() :]
+    after = after.split("\n", 1)[1] if "\n" in after else ""
+    if TASK_NEW_INPUT_MARKER in after:
+        after = after.split(TASK_NEW_INPUT_MARKER, 1)[0]
+    return _strip_task_new_host_tail(after)
+
+
+def _task_new_from_invocations(text: str) -> str:
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = TASK_NEW_INVOKE_RE.match(line)
+        if not m:
+            continue
+        chunks: list[str] = []
+        first = (m.group(1) or "").strip()
+        if first:
+            chunks.append(first)
+        for extra in lines[i + 1 :]:
+            if TASK_NEW_CHROME_RE.match(extra) or TASK_NEW_INVOKE_RE.match(extra):
+                break
+            chunks.append(extra)
+        body = "\n".join(chunks).strip()
+        if body:
+            return body
+    return ""
+
+
+def _task_new_user_query(message: str) -> str:
+    m = re.search(
+        r"<user_query>\s*(.*?)\s*</user_query>",
+        message,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    return m.group(1).strip() if m else ""
+
+
+def extract_task_new_input(message: str) -> dict[str, Any]:
+    """Pull /task-new requirement out of a rendered host message.
+
+    Do not subtract against the rendered block: hosts append user text into
+    the same command block, so "appears in this template" is circular.
+    """
+    raw = message or ""
+    query = _task_new_user_query(raw)
+    candidates = (
+        ("marker", _task_new_after_marker(raw)),
+        ("user_query_invoke", _task_new_from_invocations(query) if query else ""),
+        ("slash", _task_new_from_invocations(raw)),
+        ("template_tail", _task_new_after_template_tail(raw)),
+    )
+    source = "empty"
+    requirement = ""
+    for name, body in candidates:
+        if len(body) > len(requirement):
+            source = name
+            requirement = body
+    empty = not bool(requirement)
+    return {
+        "requirement": requirement,
+        "source": "empty" if empty else source,
+        "empty": empty,
+        "candidates": {name: body for name, body in candidates},
+    }
 
 
 def today_str() -> str:
@@ -3582,13 +3676,58 @@ def build_parser() -> argparse.ArgumentParser:
     notes_p.add_argument("--dry-run", action="store_true")
     notes_p.set_defaults(func=cmd_notes)
 
+    extract_p = sub.add_parser(
+        "extract-new",
+        help="extract /task-new requirement from a rendered host message",
+    )
+    extract_p.add_argument(
+        "--message-file",
+        default="",
+        help="path to the full rendered message, or - for stdin",
+    )
+    extract_p.add_argument(
+        "--message",
+        default="",
+        help="inline message (tests / short); ignored if --message-file is set",
+    )
+    extract_p.set_defaults(func=cmd_extract_new)
+
     return p
+
+
+def cmd_extract_new(_root: Path | None, args: argparse.Namespace) -> int:
+    if args.message_file:
+        if args.message_file == "-":
+            raw = sys.stdin.read()
+        else:
+            raw = Path(args.message_file).read_text(encoding="utf-8")
+    else:
+        raw = args.message
+    extracted = extract_task_new_input(raw)
+    empty = bool(extracted["empty"])
+    print(
+        f"需求抽取：{'空' if empty else '非空'} — {extracted['source']}",
+        file=sys.stderr,
+    )
+    payload = {
+        "ok": True,
+        "result": "empty" if empty else "extracted",
+        "empty": empty,
+        "requirement": extracted["requirement"],
+        "source": extracted["source"],
+    }
+    if empty:
+        payload["exit_markdown"] = "要做什么？"
+        return emit(payload, code=2)
+    return emit(payload)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.cmd == "extract-new":
+            return cmd_extract_new(None, args)
         root = (args.root or find_repo_root()).resolve()
         if not (root / "tasks").exists():
             raise TaskError(f"tasks/ not found under {root}")

@@ -1272,6 +1272,92 @@ hello
         self.assertTrue(payload["workflow_notes"]["exists"])
         self.assertIn("分支前缀用 feat", payload["workflow_notes"]["markdown"])
 
+    def test_extract_new_marker_and_user_query(self) -> None:
+        msg = """<cursor_commands>
+
+--- Cursor Command: task-new ---
+在 `tasks/` 创建需求任务。
+
+**MUST 先读取并执行** skill `task-workflow`。
+
+下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
+
+[TASK_NEW_INPUT_START]
+
+在本地起一套完整的 fai 测试平台，镜像不需要上传，打包到本地直接用即可，数据库使用 docker compose 部署即可，所以服务基于 docker compose 部署；docker compose
+--- End Command ---
+</cursor_commands>
+<user_query>
+  /task-new 在本地起一套完整的 fai 测试平台，镜像不需要上传，打包到本地直接用即可，数据库使用 docker compose 部署即可，所以服务基于 docker compose 部署；docker compose
+    按类型把容器分组部署；使用一个 fai network
+
+  要做什么？
+</user_query>
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 0)
+        self.assertFalse(payload["empty"])
+        self.assertIn("fai 测试平台", payload["requirement"])
+        self.assertIn("fai network", payload["requirement"])
+        self.assertNotIn("要做什么", payload["requirement"])
+        self.assertNotIn("End Command", payload["requirement"])
+        self.assertNotIn("MUST 先读取", payload["requirement"])
+
+    def test_extract_new_empty_template_only(self) -> None:
+        msg = """--- Cursor Command: task-new ---
+创建带编号任务。
+
+下一步：缺口偏方案 → `/task-explore`。
+
+[TASK_NEW_INPUT_START]
+--- End Command ---
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 2)
+        self.assertTrue(payload["empty"])
+        self.assertEqual(payload["requirement"], "")
+        self.assertEqual(payload["exit_markdown"], "要做什么？")
+
+    def test_extract_new_legacy_no_marker(self) -> None:
+        msg = """--- Cursor Command: task-new ---
+**MUST 先读取并执行** skill `task-workflow`。
+
+**输入**：需求描述；可选 kebab-case slug。
+
+下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
+
+给 docs/README 加一节本地安装说明
+--- End Command ---
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
+        self.assertEqual(payload["source"], "template_tail")
+
+    def test_extract_new_no_tasks_dir(self) -> None:
+        empty = Path(tempfile.mkdtemp(prefix="taskctl-empty-"))
+        try:
+            from io import StringIO
+            from contextlib import redirect_stdout, redirect_stderr
+
+            out = StringIO()
+            err = StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = tc.main(
+                    [
+                        "--root",
+                        str(empty),
+                        "extract-new",
+                        "--message",
+                        "/task-new 给 docs/README 加一节本地安装说明\n",
+                    ]
+                )
+            payload = json.loads(out.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
+        finally:
+            shutil.rmtree(empty, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

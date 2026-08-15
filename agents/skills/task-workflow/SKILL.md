@@ -34,6 +34,7 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 
 | 子命令 | 用途 | 退出码 |
 |--------|------|--------|
+| `extract-new` | 从渲染后的完整消息机械抽出 `/task-new` 需求 | 0 非空；**2** 空 |
 | `list` | 列出活跃任务（JSON） | 0 |
 | `resolve [query] --command <cmd> [--hint ...] [--cwd ...] [--git-branch ...]` | Task Resolution Gate；无 query 时自动推断 | 0 确定性唯一；**2** 零/多命中/需确认 |
 | `set-status <query> <status>` | 同步写 README status + INDEX 行 | 0 / 2 |
@@ -58,7 +59,8 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 - `scope-repos`：只读解析涉及面。`checkout` = 必须仓路径；建议/排除不在内。cwd 出现在 `cwd_*` 报告里，不自动进入 checkout。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区；`--repo` 同样只传必须仓。
 - `notes`：读/建/改工作区根 `.task-workflow.md`。`--init` 仅在文件不存在时建骨架；`--set-section` 在缺失时先建骨架再写入一节；`--from-file` 整文件替换。`resolve` / `new` JSON 亦含 `workflow_notes`。
-- 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。
+- `extract-new`：只读解析渲染后的 `/task-new` 消息；**不需要** `tasks/`。`--message-file`（`-` = stdin）或 `--message`。stdout 含 `empty` / `requirement` / `source`。
+- 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。`extract-new` 忽略 `--root`。
 
 ## 任务编号与索引
 
@@ -314,20 +316,22 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-new
 
-**抽取本条需求（先做，再决定是否追问）**
+**抽取本条需求（第一条工具调用，再决定是否追问）**
 
-command 渲染后，固定模板与用户正文出现在**同一个 command block**。判定只用一条机械规则：**凡是没有逐字出现在 `task-new` command 模板里的自然语言，都是用户需求**；模板末尾 `[TASK_NEW_INPUT_START]` 之后的文本必然是需求。不得因为文本位于 command block 内、或读起来像流程说明就整块丢弃。
+command 渲染后，固定模板与用户正文出现在**同一个 command block**。**禁止**用「没有逐字出现在本模板」做减法：用户原文被追加进 block 后，它已经「出现在本模板」里，抄出必空，会误问「要做什么」。
 
-MUST 按序执行：
+MUST 先把本条完整消息交给 CLI（不需要 `tasks/`）：
 
-1. 抄出非模板文本，在首条回复输出一行 `需求：<原文>`。
-2. 抄出非空 → **立刻创建**。自行推导 title 与 kebab-case slug（英文语义、短、稳定）；用户给了 slug 才使用用户值。
-3. 服务清单、目标文件、实现方式、验收细节不完整 ≠ 没有需求；写入「现状缺口」，**禁止**停下来要求用户重述需求或确认 slug。
-4. 只有抄出为空（本条逐字等于模板全文，如光秃 `{{slash:task-new}}`、只有「帮我建个任务」）才追问一句「要做什么」，且不要给填写模板。
+```bash
+python3 <this-skill>/scripts/taskctl.py extract-new --message-file <本条消息临时文件>
+```
 
-**禁止**以「本条消息未提供改动主题」为由停下，除非已逐字比对确认整条消息都是模板。
+- 退出码 **0**（`empty=false`）：首条回复写 `需求：<requirement>`，**立刻创建**。自行推导 title 与 kebab-case slug；用户给了 slug 才用用户值。服务清单/目标文件/实现方式/验收细节不全写入「现状缺口」，**禁止**追问「要做什么」或要 slug。
+- 退出码 **2**（`empty=true`）：才问一句「要做什么」，不要给填写模板。例如光秃 `{{slash:task-new}}`、只有「帮我建个任务」。
 
-正例（MUST 创建）：`{{slash:task-new}} 在本地起一套完整的 fai 测试平台，镜像本地构建不上传，数据库与服务都用 docker compose，按类型分组、共用一个 fai network`。摘要为「搭建基于 Docker Compose 的 FAI 本地测试平台」；未给出的服务清单记入现状缺口，不能追问「要做什么」。
+`extract-new` 按长度取最长候选：`[TASK_NEW_INPUT_START]` 之后、`<user_query>` 里的 `/task-new` 正文、全文 `/task-new` 调用、模板「下一步」之后（无标记时的旧宿主）。不要覆盖其结果。
+
+正例（MUST 创建）：`{{slash:task-new}} 给 docs/README 加一节本地安装说明`。未写清安装步骤记入现状缺口，不能追问「要做什么」。
 
 然后：
 
