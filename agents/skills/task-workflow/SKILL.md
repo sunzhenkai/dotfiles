@@ -320,7 +320,7 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 command 渲染后，固定模板与用户正文出现在**同一个 command block**。**禁止**用「没有逐字出现在本模板」做减法：用户原文被追加进 block 后，它已经「出现在本模板」里，抄出必空，会误问「要做什么」。
 
-MUST 先把本条完整消息交给 CLI（不需要 `tasks/`）：
+MUST 先把宿主渲染的完整原文交给 CLI（含标记后正文与 `/task-new` 调用；禁止只重写 command 模板；不需要 `tasks/`）：
 
 ```bash
 python3 <this-skill>/scripts/taskctl.py extract-new --message-file <本条消息临时文件>
@@ -329,7 +329,7 @@ python3 <this-skill>/scripts/taskctl.py extract-new --message-file <本条消息
 - 退出码 **0**（`empty=false`）：首条回复写 `需求：<requirement>`，**立刻创建**。自行推导 title 与 kebab-case slug；用户给了 slug 才用用户值。服务清单/目标文件/实现方式/验收细节不全写入「现状缺口」，**禁止**追问「要做什么」或要 slug。
 - 退出码 **2**（`empty=true`）：才问一句「要做什么」，不要给填写模板。例如光秃 `{{slash:task-new}}`、只有「帮我建个任务」。
 
-`extract-new` 按长度取最长候选：`[TASK_NEW_INPUT_START]` 之后、`<user_query>` 里的 `/task-new` 正文、全文 `/task-new` 调用、模板「下一步」之后（无标记时的旧宿主）。不要覆盖其结果。
+`extract-new` 只从用户通道取正文（标记之后、`/task-new` 调用、`--- NAME START ---`…`END` 节、用户向标签），并在下一道**结构围栏行**处截断：`--- … ---`、孤行 `---`、仅 markup 标签的行。围栏行本身不是需求，不要按宿主名字列举。取最长非空候选，不要覆盖其结果。
 
 正例（MUST 创建）：`{{slash:task-new}} 给 docs/README 加一节本地安装说明`。未写清安装步骤记入现状缺口，不能追问「要做什么」。
 

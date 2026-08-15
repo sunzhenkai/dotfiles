@@ -102,14 +102,18 @@ FM_STATUS_RE = re.compile(r"^(status:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECAS
 FM_ID_RE = re.compile(r"^(id:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 META_ID_RE = re.compile(r"^\*\*id[：:]\*\*\s*(T\d{4})\s*$", re.MULTILINE | re.IGNORECASE)
 TASK_NEW_INPUT_MARKER = "[TASK_NEW_INPUT_START]"
-TASK_NEW_HOST_CUT_RE = re.compile(
-    r"(?m)^(?:---\s*End Command\s*---|</cursor_commands>|<timestamp>|<user_query>)"
-)
 TASK_NEW_INVOKE_RE = re.compile(r"^[ \t]*/task-new\b(?:[ \t]+(\S.*))?$", re.IGNORECASE)
-TASK_NEW_CHROME_RE = re.compile(
-    r"^[ \t]*(?:▸ |● |要做什么？|Credits:|---\s*End Command|</|<[a-zA-Z])"
-)
+TASK_NEW_FENCE_LINE_RE = re.compile(r"^(?:---(?:\s+.+?\s+---)?)$")
+TASK_NEW_TAG_LINE_RE = re.compile(r"^</?[A-Za-z][\w:-]*(?:\s[^>]*)?>.*$")
 TASK_NEW_TEMPLATE_TAIL_RE = re.compile(r"(?m)^下一步：")
+TASK_NEW_SECTION_RE = re.compile(
+    r"---\s*(.+?)\s+START\s*---\s*(.*?)\s*---\s*\1\s+END\s*---",
+    re.DOTALL | re.IGNORECASE,
+)
+TASK_NEW_USER_TAG_RE = re.compile(
+    r"<(user_query|user-query|user_message|user)>\s*(.*?)\s*</\1>",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 @dataclass
@@ -153,11 +157,40 @@ def emit(payload: dict[str, Any], *, code: int = 0) -> int:
     return code
 
 
-def _strip_task_new_host_tail(text: str) -> str:
-    m = TASK_NEW_HOST_CUT_RE.search(text)
-    if m:
-        text = text[: m.start()]
-    return text.strip()
+def _is_task_new_boundary_line(line: str) -> bool:
+    """Protocol / document delimiters are never requirement text.
+
+    A labeled `--- … ---` line, a lone `---`, or a markup-tag line is a
+    boundary regardless of the host-specific label inside it.
+    """
+    s = line.strip()
+    if not s:
+        return False
+    if TASK_NEW_FENCE_LINE_RE.match(s):
+        return True
+    if s.startswith("<") and TASK_NEW_TAG_LINE_RE.match(s):
+        return True
+    return False
+
+
+def _task_new_structure_only(text: str) -> bool:
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return True
+    return all(
+        _is_task_new_boundary_line(ln) or ln in {"EOF", "```"} or ln.startswith("```")
+        for ln in lines
+    )
+
+
+def _take_until_boundary(text: str) -> str:
+    kept: list[str] = []
+    for line in text.splitlines():
+        if _is_task_new_boundary_line(line):
+            break
+        kept.append(line)
+    body = "\n".join(kept).strip()
+    return "" if _task_new_structure_only(body) else body
 
 
 def _task_new_after_marker(message: str) -> str:
@@ -165,7 +198,7 @@ def _task_new_after_marker(message: str) -> str:
         return ""
     after = message.rsplit(TASK_NEW_INPUT_MARKER, 1)[1]
     after = after.split("\n", 1)[1] if "\n" in after else ""
-    return _strip_task_new_host_tail(after)
+    return _take_until_boundary(after)
 
 
 def _task_new_after_template_tail(message: str) -> str:
@@ -176,7 +209,7 @@ def _task_new_after_template_tail(message: str) -> str:
     after = after.split("\n", 1)[1] if "\n" in after else ""
     if TASK_NEW_INPUT_MARKER in after:
         after = after.split(TASK_NEW_INPUT_MARKER, 1)[0]
-    return _strip_task_new_host_tail(after)
+    return _take_until_boundary(after)
 
 
 def _task_new_from_invocations(text: str) -> str:
@@ -190,22 +223,36 @@ def _task_new_from_invocations(text: str) -> str:
         if first:
             chunks.append(first)
         for extra in lines[i + 1 :]:
-            if TASK_NEW_CHROME_RE.match(extra) or TASK_NEW_INVOKE_RE.match(extra):
+            if _is_task_new_boundary_line(extra) or TASK_NEW_INVOKE_RE.match(extra):
                 break
             chunks.append(extra)
-        body = "\n".join(chunks).strip()
+        body = _take_until_boundary("\n".join(chunks))
         if body:
             return body
     return ""
 
 
-def _task_new_user_query(message: str) -> str:
-    m = re.search(
-        r"<user_query>\s*(.*?)\s*</user_query>",
-        message,
-        flags=re.DOTALL | re.IGNORECASE,
+def _task_new_tagged_user_blocks(message: str) -> list[str]:
+    return [m.group(2).strip() for m in TASK_NEW_USER_TAG_RE.finditer(message or "")]
+
+
+def _looks_like_task_new_template(text: str) -> bool:
+    return TASK_NEW_INPUT_MARKER in text or (
+        "extract-new" in text and "task-workflow" in text
     )
-    return m.group(1).strip() if m else ""
+
+
+def _task_new_from_start_end_sections(message: str) -> str:
+    best = ""
+    for m in TASK_NEW_SECTION_RE.finditer(message or ""):
+        body = m.group(2).strip()
+        if _looks_like_task_new_template(body):
+            picked = _task_new_after_marker(body) or _task_new_from_invocations(body)
+        else:
+            picked = _task_new_from_invocations(body) or _take_until_boundary(body)
+        if len(picked) > len(best):
+            best = picked
+    return best
 
 
 def extract_task_new_input(message: str) -> dict[str, Any]:
@@ -213,18 +260,31 @@ def extract_task_new_input(message: str) -> dict[str, Any]:
 
     Do not subtract against the rendered block: hosts append user text into
     the same command block, so "appears in this template" is circular.
+
+    After a known user channel (marker / slash invoke / tagged block),
+    stop at the next structural boundary line. Boundary lines themselves
+    are never a requirement.
     """
     raw = message or ""
-    query = _task_new_user_query(raw)
+    tagged = _task_new_tagged_user_blocks(raw)
+    tagged_invoke = ""
+    for block in tagged:
+        body = _task_new_from_invocations(block)
+        if len(body) > len(tagged_invoke):
+            tagged_invoke = body
     candidates = (
         ("marker", _task_new_after_marker(raw)),
-        ("user_query_invoke", _task_new_from_invocations(query) if query else ""),
+        ("section", _task_new_from_start_end_sections(raw)),
+        ("user_tag_invoke", tagged_invoke),
         ("slash", _task_new_from_invocations(raw)),
         ("template_tail", _task_new_after_template_tail(raw)),
     )
     source = "empty"
     requirement = ""
     for name, body in candidates:
+        body = body.strip()
+        if _task_new_structure_only(body):
+            continue
         if len(body) > len(requirement):
             source = name
             requirement = body

@@ -10,7 +10,7 @@ tags: [task, workflow, openspec]
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
-**第 0 步（第一条工具调用）**：把本条完整消息写入临时文件，执行
+**第 0 步（第一条工具调用）**：把宿主渲染的**完整原文**写入临时文件（含标记后追加的正文与 `/task-new` 调用；禁止只重写 command 模板），执行
 
 `python3 <task-workflow skill>/scripts/taskctl.py extract-new --message-file <该文件>`
 

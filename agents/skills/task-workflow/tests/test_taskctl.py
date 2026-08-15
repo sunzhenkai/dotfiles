@@ -1284,22 +1284,19 @@ hello
 
 [TASK_NEW_INPUT_START]
 
-在本地起一套完整的 fai 测试平台，镜像不需要上传，打包到本地直接用即可，数据库使用 docker compose 部署即可，所以服务基于 docker compose 部署；docker compose
+给 docs/README 加一节本地安装说明，并补上示例命令
 --- End Command ---
 </cursor_commands>
 <user_query>
-  /task-new 在本地起一套完整的 fai 测试平台，镜像不需要上传，打包到本地直接用即可，数据库使用 docker compose 部署即可，所以服务基于 docker compose 部署；docker compose
-    按类型把容器分组部署；使用一个 fai network
-
-  要做什么？
+  /task-new 给 docs/README 加一节本地安装说明，并补上示例命令
+    按环境把配置拆成两组，共用一个 demo network
 </user_query>
 """
         code, payload = self._run("extract-new", "--message", msg)
         self.assertEqual(code, 0)
         self.assertFalse(payload["empty"])
-        self.assertIn("fai 测试平台", payload["requirement"])
-        self.assertIn("fai network", payload["requirement"])
-        self.assertNotIn("要做什么", payload["requirement"])
+        self.assertIn("本地安装说明", payload["requirement"])
+        self.assertIn("demo network", payload["requirement"])
         self.assertNotIn("End Command", payload["requirement"])
         self.assertNotIn("MUST 先读取", payload["requirement"])
 
@@ -1333,6 +1330,46 @@ hello
         self.assertEqual(code, 0)
         self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
         self.assertEqual(payload["source"], "template_tail")
+
+    def test_extract_new_fence_line_is_not_requirement(self) -> None:
+        msg = """下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
+
+[TASK_NEW_INPUT_START]
+
+--- NOT-A-HOST-I-KNOW END ---
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 2)
+        self.assertTrue(payload["empty"])
+        self.assertEqual(payload["requirement"], "")
+
+    def test_extract_new_cuts_at_any_labeled_fence(self) -> None:
+        msg = """下一步：缺口偏方案 → `/task-explore`。
+
+[TASK_NEW_INPUT_START]
+
+给 docs/README 加一节本地安装说明
+--- FOO QUUX ---
+这段是围栏之后的宿主尾巴
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            payload["requirement"],
+            "给 docs/README 加一节本地安装说明",
+        )
+        self.assertNotIn("FOO QUUX", payload["requirement"])
+        self.assertNotIn("宿主尾巴", payload["requirement"])
+
+    def test_extract_new_start_end_section_invocation(self) -> None:
+        msg = """--- ARBITRARY BLOCK START ---
+/task-new 给 docs/README 加一节本地安装说明
+--- ARBITRARY BLOCK END ---
+"""
+        code, payload = self._run("extract-new", "--message", msg)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
+        self.assertEqual(payload["source"], "section")
 
     def test_extract_new_no_tasks_dir(self) -> None:
         empty = Path(tempfile.mkdtemp(prefix="taskctl-empty-"))
