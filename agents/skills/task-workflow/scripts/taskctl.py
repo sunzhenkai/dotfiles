@@ -12,7 +12,8 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py archive T0002
   python3 scripts/taskctl.py prepare-branches --slug my-feature --from-task T0002
   python3 scripts/taskctl.py prepare-branches --slug my-feature --repo path/to/target
-  python3 scripts/taskctl.py git-summary --repo path/to/target --branch feat-my-feature
+  python3 scripts/taskctl.py execution-context T0002
+  python3 scripts/taskctl.py advance T0002 --phase implementing
   python3 scripts/taskctl.py notes
   python3 scripts/taskctl.py notes --init
   python3 scripts/taskctl.py notes --set-section 特殊要求 --body "验收必须带回归清单"
@@ -86,6 +87,11 @@ ID_RE = re.compile(r"^T(\d{1,4})$", re.IGNORECASE)
 ID_SLUG_RE = re.compile(r"^T(\d{1,4})-(.+)$", re.IGNORECASE)
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DIR_ID_SLUG_RE = re.compile(r"^(T\d{4})-(.+)$", re.IGNORECASE)
+ARCHIVE_TASK_DIR_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2})-(T\d{4}-.+)$", re.IGNORECASE
+)
+APPLY_STATE_FILENAME = ".task-apply-state.json"
+APPLY_STATE_VERSION = 1
 MD_LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 STATUS_LINE_RE = re.compile(
     r"^(\*\*(?:status|状态)[：:]\*\*\s*)([A-Za-z_]+)(\s*)$",
@@ -885,6 +891,76 @@ def list_active_infos(root: Path) -> list[TaskInfo]:
     return infos
 
 
+def scan_archived_tasks(root: Path) -> list[TaskRow]:
+    archive_dir = root / "tasks" / "archive"
+    rows: list[TaskRow] = []
+    if not archive_dir.is_dir():
+        return rows
+    for readme in sorted(archive_dir.glob("*/README.md")):
+        task_root = readme.parent
+        text = readme.read_text(encoding="utf-8")
+        tid = parse_id_from_readme(text)
+        if not tid or not ID_RE.match(tid):
+            continue
+        archive_match = ARCHIVE_TASK_DIR_RE.match(task_root.name)
+        original_name = archive_match.group(2) if archive_match else task_root.name
+        rows.append(
+            TaskRow(
+                task_id=normalize_id(tid),
+                name=slug_from_dirname(original_name),
+                path=rel_posix(root, task_root) + "/",
+                status="archived",
+                archived_on=archive_match.group(1) if archive_match else "",
+                section="archived",
+            )
+        )
+    return rows
+
+
+def enrich_archived_row(root: Path, row: TaskRow) -> TaskInfo | None:
+    task_root = resolve_task_root(root, row)
+    readme = task_root / "README.md"
+    if not task_root.is_dir() or not readme.is_file():
+        return None
+    text = readme.read_text(encoding="utf-8")
+    tid = parse_id_from_readme(text) or row.task_id
+    if ID_RE.match(tid):
+        tid = normalize_id(tid)
+    archive_match = ARCHIVE_TASK_DIR_RE.match(task_root.name)
+    original_name = archive_match.group(2) if archive_match else task_root.name
+    slug = slug_from_dirname(original_name)
+    return TaskInfo(
+        task_id=tid,
+        task_root=rel_posix(root, task_root) + "/",
+        slug=slug,
+        name=row.name or slug,
+        status="archived",
+        readme=rel_posix(root, readme),
+        openspec=parse_openspec(text),
+        scope=parse_scope(text),
+        checkouts=parse_work_context(text),
+        index_path=rel_posix(root, index_path(root)) if index_path(root).exists() else "",
+        updated=row.archived_on,
+    )
+
+
+def list_archived_infos(root: Path) -> list[TaskInfo]:
+    _, _, indexed = parse_index(root)
+    rows = list(indexed)
+    known = {(row.task_id, row.path.rstrip("/")) for row in rows}
+    for row in scan_archived_tasks(root):
+        key = (row.task_id, row.path.rstrip("/"))
+        if key not in known:
+            rows.append(row)
+            known.add(key)
+    infos: list[TaskInfo] = []
+    for row in rows:
+        info = enrich_archived_row(root, row)
+        if info:
+            infos.append(info)
+    return infos
+
+
 def match_query(infos: list[TaskInfo], query: str) -> list[TaskInfo]:
     q = query.strip().rstrip("/")
     if not q:
@@ -984,6 +1060,27 @@ def confirm_markdown(
             f"- `/{command} <TNNNN>`",
             "",
             "或回复任务编号（如 `T0002`）。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def archived_match_markdown(matches: list[TaskInfo]) -> str:
+    lines = [
+        "## 任务已归档",
+        "",
+        "指定任务不在活跃任务集合中，不能直接执行 apply。",
+        "",
+        "**归档匹配：**",
+    ]
+    for info in matches:
+        lines.append(f"- {info.task_id} — {info.task_root}")
+    lines.extend(
+        [
+            "",
+            "如需继续实施，请先恢复：",
+            f"- `taskctl restore {matches[0].task_id}`" if len(matches) == 1 else "- `taskctl restore <TNNNN>`",
             "",
         ]
     )
@@ -1720,74 +1817,6 @@ def collect_prepare_repo_inputs(
     return out, extras if extras else None
 
 
-def cmd_scope_repos(root: Path, args: argparse.Namespace) -> int:
-    infos = list_active_infos(root)
-    matches = match_query(infos, args.query)
-    if len(matches) != 1:
-        return emit(
-            {
-                "ok": False,
-                "result": "zero" if not matches else "multi",
-                "exit_markdown": exit_markdown(
-                    infos if not matches else matches, "scope-repos"
-                ),
-            },
-            code=2,
-        )
-    info = matches[0]
-    checkout = list(info.scope.get("checkout") or [])
-    target_abs: set[str] = set()
-    resolved = []
-    errors = []
-    for raw in checkout:
-        try:
-            repo_info = resolve_repo(root, raw)
-            target_abs.add(str(Path(repo_info["git_root_abs"]).resolve()))
-            resolved.append(repo_info)
-        except TaskError as e:
-            errors.append({"input": raw, "error": str(e)})
-    cwd = Path(args.cwd) if args.cwd else Path.cwd()
-    report = cwd_checkout_report(root, cwd, target_abs)
-    print(
-        f"scope-repos: {info.task_id} checkout={len(checkout)} cwd_untouched={report['cwd_untouched']}",
-        file=sys.stderr,
-    )
-    return emit(
-        {
-            "ok": not errors,
-            "result": "scope_repos",
-            "task": asdict(info),
-            "scope": info.scope,
-            "checkout": checkout,
-            "repos": resolved,
-            "errors": errors,
-            **report,
-        },
-        code=0 if not errors else 1,
-    )
-
-
-def cmd_repo_roots(root: Path, args: argparse.Namespace) -> int:
-    repos = []
-    errors = []
-    seen: set[str] = set()
-    for raw in args.repos:
-        try:
-            info = resolve_repo(root, raw)
-            key = info["git_root"]
-            if key in seen:
-                continue
-            seen.add(key)
-            if info["excluded_by_default"] and not args.include_excluded:
-                errors.append({"input": raw, "error": f"excluded by default ({key}); pass --include-excluded"})
-                continue
-            repos.append(info)
-        except TaskError as e:
-            errors.append({"input": raw, "error": str(e)})
-    ok = not errors
-    return emit({"ok": ok, "result": "repo_roots", "repos": repos, "errors": errors}, code=0 if ok else 1)
-
-
 def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
     slug = validate_slug(args.slug)
     prefix = (args.prefix or "feat").strip().lower()
@@ -2094,220 +2123,103 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
     return emit(payload, code=0 if ok else 1)
 
 
-def cmd_git_summary(root: Path, args: argparse.Namespace) -> int:
-    max_commits = max(1, int(args.max_commits))
-    max_files = max(1, int(args.max_files))
-    repos_out: list[dict[str, Any]] = []
-    errors: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    md_parts: list[str] = ["## 代码变更摘要（taskctl 生成，请人工核对）", ""]
-    checkout_map: dict[str, str] = {}
-    for raw_mapping in getattr(args, "checkouts", None) or []:
-        repo_key, sep, checkout = raw_mapping.partition("=")
-        if not sep:
-            raise TaskError("--checkout expects REPO=CHECKOUT_PATH")
-        checkout_map[normalize_repo_path(repo_key)] = checkout
-
-    for raw in args.repos:
-        try:
-            info = resolve_repo(root, raw)
-        except TaskError as e:
-            errors.append({"input": raw, "error": str(e)})
-            continue
-        if info["excluded_by_default"] and not args.include_excluded:
-            errors.append({"input": raw, "error": f"excluded by default ({info['git_root']})"})
-            continue
-        key = info["git_root"]
-        if key in seen:
-            continue
-        seen.add(key)
-
-        canonical_repo = Path(info["git_root_abs"])
-        canonical_key = normalize_repo_path(key.rstrip("/"))
-        repo = canonical_repo
-        checkout_raw = checkout_map.get(normalize_repo_path(raw)) or checkout_map.get(
-            canonical_key
+def summarize_delivery_checkout(
+    root: Path,
+    repo_key: str,
+    checkout: Path,
+    binding: dict[str, Any] | None,
+    *,
+    max_commits: int = 30,
+    max_files: int = 100,
+) -> dict[str, Any]:
+    """Collect committed, staged, working-tree and untracked delivery changes."""
+    branch = str((binding or {}).get("branch") or current_branch(checkout))
+    summary: dict[str, Any] = {
+        "repo": repo_key,
+        "checkout": display_checkout_path(root, checkout),
+        "is_worktree": inspect_git_checkout(root, checkout)["is_worktree"],
+        "branch": branch,
+        "current_branch": current_branch(checkout),
+        "dirty": is_dirty(checkout),
+        "commits": [],
+        "files": [],
+        "stat": "",
+    }
+    try:
+        base = detect_base_branch(
+            checkout, str((binding or {}).get("base") or "") or None
         )
-        if checkout_raw:
-            repo = resolve_checkout_path(root, checkout_raw)
-            if not repo.is_dir() or not same_git_repository(canonical_repo, repo):
-                errors.append(
-                    {
-                        "input": raw,
-                        "git_root": key,
-                        "error": f"invalid checkout for canonical repo: {checkout_raw}",
-                    }
-                )
-                continue
-        cur = current_branch(repo)
-        branch = args.branch or cur
-        try:
-            base = detect_base_branch(repo, args.base)
-        except TaskError as e:
-            errors.append({"input": raw, "git_root": key, "error": str(e)})
-            continue
+    except TaskError as exc:
+        summary["error"] = str(exc)
+        return summary
+    range_spec = f"{base}...{branch}"
+    if run_git(checkout, "rev-parse", "--verify", f"origin/{base}").returncode == 0:
+        range_spec = f"origin/{base}...{branch}"
+    summary["base"] = base
+    summary["range"] = range_spec
 
-        range_spec = f"{base}...{branch}"
-        # Prefer origin/base for range when available
-        if run_git(repo, "rev-parse", "--verify", f"origin/{base}").returncode == 0:
-            range_spec = f"origin/{base}...{branch}"
-
-        log = run_git(
-            repo,
-            "log",
-            "--oneline",
-            f"--max-count={max_commits}",
-            range_spec,
-        )
-        commits: list[dict[str, str]] = []
-        if log.returncode == 0:
-            for line in log.stdout.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                sha, _, subject = line.partition(" ")
-                commits.append({"sha": sha, "subject": subject})
-        else:
-            # branch may not exist yet — fall back empty
-            commits = []
-
-        name_status = run_git(
-            repo,
-            "diff",
-            "--name-status",
-            range_spec,
-        )
-        files: list[dict[str, str]] = []
-        seen_files: set[tuple[str, str]] = set()
-        if name_status.returncode == 0:
-            for line in name_status.stdout.splitlines():
-                if not line.strip():
-                    continue
-                parts = line.split("\t")
-                status = parts[0]
-                path = parts[-1]
-                files.append(
-                    {
-                        "status": status,
-                        "path": path,
-                        "repo_path": repo_display_path(key, path),
-                        "source": "committed",
-                    }
-                )
-                seen_files.add((status, path))
-                if len(files) >= max_files:
-                    break
-
-        for diff_args, source in (
-            (("diff", "--name-status"), "working_tree"),
-            (("diff", "--cached", "--name-status"), "staged"),
-        ):
-            dirty_names = run_git(repo, *diff_args)
-            if dirty_names.returncode != 0:
-                continue
-            for line in dirty_names.stdout.splitlines():
-                parts = line.split("\t")
-                if len(parts) < 2:
-                    continue
-                status, path = parts[0], parts[-1]
-                if (status, path) in seen_files:
-                    continue
-                files.append(
-                    {
-                        "status": status,
-                        "path": path,
-                        "repo_path": repo_display_path(key, path),
-                        "source": source,
-                    }
-                )
-                seen_files.add((status, path))
-                if len(files) >= max_files:
-                    break
-        status_out = run_git(repo, "status", "--porcelain")
-        if status_out.returncode == 0:
-            for line in status_out.stdout.splitlines():
-                if len(line) < 4:
-                    continue
-                status = line[:2].strip() or "M"
-                path = line[3:].strip()
-                if (status, path) in seen_files or any(
-                    existing["path"] == path for existing in files
-                ):
-                    continue
-                files.append(
-                    {
-                        "status": status,
-                        "path": path,
-                        "repo_path": repo_display_path(key, path),
-                        "source": "untracked" if status == "??" else "working_tree",
-                    }
-                )
-                if len(files) >= max_files:
-                    break
-
-        stat = run_git(repo, "diff", "--stat", range_spec)
-        stat_text = stat.stdout.strip() if stat.returncode == 0 else ""
-
-        entry = {
-            "input": raw,
-            "git_root": key,
-            "checkout": display_checkout_path(root, repo),
-            "is_worktree": inspect_git_checkout(root, repo)["is_worktree"],
-            "branch": branch,
-            "base": base,
-            "range": range_spec,
-            "current_branch": cur,
-            "dirty": is_dirty(repo),
-            "commits": commits,
-            "files": files,
-            "stat": stat_text,
-        }
-        repos_out.append(entry)
-
-        md_parts.append(f"### `{key.rstrip('/')}`")
-        md_parts.append("")
-        md_parts.append(f"- branch: `{branch}`")
-        md_parts.append(f"- base range: `{range_spec}`")
-        if entry["dirty"]:
-            md_parts.append("- dirty: yes（只读摘要，未 stash/reset）")
-        md_parts.append("")
-        md_parts.append("#### Commits")
-        md_parts.append("")
-        if commits:
-            for c in commits:
-                md_parts.append(f"- `{c['sha']}` {c['subject']}")
-        else:
-            md_parts.append("- （无提交或无法解析 range — 待核对）")
-        md_parts.append("")
-        md_parts.append("#### Files")
-        md_parts.append("")
-        if files:
-            for f in files:
-                md_parts.append(
-                    f"- `{f['status']}` `{f['repo_path']}` ({f.get('source', 'committed')})"
-                )
-        else:
-            md_parts.append("- （无文件变更或无法解析 range — 待核对）")
-        md_parts.append("")
-        if stat_text:
-            md_parts.append("```")
-            md_parts.append(stat_text)
-            md_parts.append("```")
-            md_parts.append("")
-
-    ok = not errors and bool(repos_out)
-    if not repos_out and not errors:
-        raise TaskError("no --repo provided")
-    return emit(
-        {
-            "ok": ok,
-            "result": "git_summary",
-            "repos": repos_out,
-            "errors": errors,
-            "markdown": "\n".join(md_parts).rstrip() + "\n",
-        },
-        code=0 if ok else 1,
+    log = run_git(
+        checkout, "log", "--oneline", f"--max-count={max_commits}", range_spec
     )
+    if log.returncode == 0:
+        for line in log.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            sha, _, subject = line.partition(" ")
+            summary["commits"].append({"sha": sha, "subject": subject})
+
+    seen_paths: set[str] = set()
+
+    def add_name_status(output: str, source: str) -> None:
+        for line in output.splitlines():
+            parts = line.split("	")
+            if len(parts) < 2:
+                continue
+            status, path = parts[0], parts[-1]
+            if path in seen_paths or len(summary["files"]) >= max_files:
+                continue
+            seen_paths.add(path)
+            summary["files"].append(
+                {
+                    "status": status,
+                    "path": path,
+                    "repo_path": repo_display_path(repo_key, path),
+                    "source": source,
+                }
+            )
+
+    committed = run_git(checkout, "diff", "--name-status", range_spec)
+    if committed.returncode == 0:
+        add_name_status(committed.stdout, "committed")
+    working = run_git(checkout, "diff", "--name-status")
+    if working.returncode == 0:
+        add_name_status(working.stdout, "working_tree")
+    staged = run_git(checkout, "diff", "--cached", "--name-status")
+    if staged.returncode == 0:
+        add_name_status(staged.stdout, "staged")
+    porcelain = run_git(checkout, "status", "--porcelain")
+    if porcelain.returncode == 0:
+        for line in porcelain.stdout.splitlines():
+            if len(line) < 4 or len(summary["files"]) >= max_files:
+                continue
+            status = line[:2].strip() or "M"
+            path = line[3:].strip()
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            summary["files"].append(
+                {
+                    "status": status,
+                    "path": path,
+                    "repo_path": repo_display_path(repo_key, path),
+                    "source": "untracked" if status == "??" else "working_tree",
+                }
+            )
+    stat = run_git(checkout, "diff", "--stat", range_spec)
+    if stat.returncode == 0:
+        summary["stat"] = stat.stdout.strip()
+    return summary
 
 
 def resolve_change_target(
@@ -2409,8 +2321,46 @@ def empty_openspec_report() -> dict[str, Any]:
 def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
     change_root = Path(target["change_root"])
     tasks = change_root / "tasks.md"
+    availability = "runnable"
+    unavailable_reason = ""
     if not tasks.is_file():
-        return empty_openspec_report()
+        archived_paths = archived_change_paths(target)
+        if len(archived_paths) == 1 and (archived_paths[0] / "tasks.md").is_file():
+            tasks = archived_paths[0] / "tasks.md"
+            availability = "archived"
+            unavailable_reason = (
+                f"OpenSpec change is archived at {archived_paths[0]}; "
+                "restore or create a follow-up change before apply"
+            )
+        elif len(archived_paths) > 1:
+            unavailable_reason = (
+                "multiple archived OpenSpec changes match; select and restore one: "
+                + ", ".join(str(path) for path in archived_paths)
+            )
+            return {
+                "total": 1,
+                "complete": 0,
+                "remaining": 1,
+                "remaining_state": "remaining",
+                "remaining_items": [
+                    {"text": "OpenSpec change archive match is ambiguous", "done": False}
+                ],
+                "availability": "ambiguous_archived",
+                "unavailable_reason": unavailable_reason,
+            }
+        else:
+            unavailable_reason = f"OpenSpec tasks.md not found: {change_root / 'tasks.md'}"
+            return {
+                "total": 1,
+                "complete": 0,
+                "remaining": 1,
+                "remaining_state": "remaining",
+                "remaining_items": [
+                    {"text": "OpenSpec tasks.md is missing", "done": False}
+                ],
+                "availability": "missing",
+                "unavailable_reason": unavailable_reason,
+            }
     items = parse_openspec_checkboxes(tasks.read_text(encoding="utf-8"))
     remaining_items = [item for item in items if not item["done"]]
     complete = sum(1 for item in items if item["done"])
@@ -2420,6 +2370,9 @@ def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
         "remaining": len(remaining_items),
         "remaining_state": remaining_state_of(items),
         "remaining_items": remaining_items,
+        "availability": availability,
+        "unavailable_reason": unavailable_reason,
+        "tasks_path": str(tasks),
     }
 
 
@@ -2524,6 +2477,117 @@ def archived_change_paths(target: dict[str, Any]) -> list[Path]:
     )
 
 
+def apply_state_path(root: Path, info: TaskInfo) -> Path:
+    return root / info.task_root.rstrip("/") / APPLY_STATE_FILENAME
+
+
+def load_deferred_items(path: Path) -> list[dict[str, str]]:
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TaskError(f"invalid apply state {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise TaskError(f"invalid apply state schema: {path}")
+    if payload.get("version") != APPLY_STATE_VERSION or not isinstance(
+        payload.get("deferred"), list
+    ):
+        raise TaskError(f"invalid apply state schema: {path}")
+    deferred: list[dict[str, str]] = []
+    for row in payload["deferred"]:
+        if not isinstance(row, dict):
+            raise TaskError(f"invalid deferred item in apply state: {path}")
+        change = str(row.get("change") or "").strip()
+        task = str(row.get("task") or "").strip()
+        reason = str(row.get("reason") or "").strip()
+        if not change or not task or not reason:
+            raise TaskError(f"incomplete deferred item in apply state: {path}")
+        deferred.append(
+            {
+                "change": change,
+                "task": task,
+                "reason": reason,
+                "updated": str(row.get("updated") or ""),
+            }
+        )
+    return deferred
+
+
+def build_apply_schedule(
+    targets: list[dict[str, Any]], deferred: list[dict[str, str]]
+) -> dict[str, Any]:
+    remaining: list[dict[str, Any]] = []
+    for target in targets:
+        progress = openspec_checkbox_progress(target)
+        target["progress"] = progress
+        target["remaining_state"] = progress["remaining_state"]
+        target["remaining_items"] = progress["remaining_items"]
+        change = str(target.get("name") or "")
+        availability = str(progress.get("availability") or "runnable")
+        unavailable_reason = str(progress.get("unavailable_reason") or "")
+        for item in progress["remaining_items"]:
+            remaining.append(
+                {
+                    "change": change,
+                    **item,
+                    "available": availability == "runnable",
+                    "availability": availability,
+                    "unavailable_reason": unavailable_reason,
+                }
+            )
+    seen: set[tuple[str, str]] = set()
+    duplicates: set[tuple[str, str]] = set()
+    for row in remaining:
+        key = (row["change"], row["text"])
+        if key in seen:
+            duplicates.add(key)
+        seen.add(key)
+    if duplicates:
+        rendered = "; ".join(
+            f"{change}: {text}" for change, text in sorted(duplicates)
+        )
+        raise TaskError(
+            "duplicate remaining OpenSpec checkbox text cannot be scheduled safely; "
+            "add unique task ids/text: " + rendered
+        )
+    valid = seen
+    reconciled = [
+        row for row in deferred if (row["change"], row["task"]) in valid
+    ]
+    explicit_keys = {(row["change"], row["task"]) for row in reconciled}
+    unavailable = [
+        {
+            "change": row["change"],
+            "task": row["text"],
+            "reason": row["unavailable_reason"]
+            or f"OpenSpec change is not runnable ({row['availability']})",
+            "updated": "",
+            "automatic": True,
+        }
+        for row in remaining
+        if not row["available"]
+    ]
+    unavailable_keys = {(row["change"], row["task"]) for row in unavailable}
+    deferred_keys = explicit_keys | unavailable_keys
+    runnable = [
+        row
+        for row in remaining
+        if row["available"]
+        and (row["change"], row["text"]) not in deferred_keys
+    ]
+    state = "done" if not remaining else ("runnable" if runnable else "deferred_only")
+    return {
+        "state": state,
+        "remaining": remaining,
+        "persisted_deferred": reconciled,
+        "unavailable": unavailable,
+        "deferred": [*reconciled, *unavailable],
+        "runnable": runnable,
+        "next": runnable[0] if runnable else None,
+    }
+
+
 def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
     matches = match_query(list_active_infos(root), args.query)
     if len(matches) != 1:
@@ -2537,14 +2601,9 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
         )
     info = matches[0]
     targets = [resolve_change_target(root, info, row) for row in info.openspec]
-    remaining_items: list[dict[str, Any]] = []
-    for target in targets:
-        progress = openspec_checkbox_progress(target)
-        target["progress"] = progress
-        target["remaining_state"] = progress["remaining_state"]
-        target["remaining_items"] = progress["remaining_items"]
-        for item in progress["remaining_items"]:
-            remaining_items.append({"change": target.get("name") or "", **item})
+    schedule = build_apply_schedule(
+        targets, load_deferred_items(apply_state_path(root, info))
+    )
     progress_path = root / info.task_root.rstrip("/") / "progress.md"
     complete = sum(int(t["progress"]["complete"]) for t in targets)
     total = sum(int(t["progress"]["total"]) for t in targets)
@@ -2553,14 +2612,16 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             "ok": True,
             "result": "execution_context",
             "task": asdict(info),
+            "scope": info.scope,
             "targets": targets,
             "openspec_remaining": {
                 "state": aggregate_remaining_state(targets),
                 "complete": complete,
                 "total": total,
                 "remaining": total - complete,
-                "items": remaining_items,
+                "items": schedule["remaining"],
             },
+            "apply_schedule": schedule,
             "progress_path": rel_posix(root, progress_path),
             "progress_exists": progress_path.is_file(),
             "progress_markdown": (
@@ -2570,7 +2631,7 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
     )
 
 
-def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
+def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
     matches = match_query(list_active_infos(root), args.query)
     if len(matches) != 1:
         return emit(
@@ -2596,6 +2657,58 @@ def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
         progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
     )
     progress_existed = progress_path.is_file()
+    state_path = apply_state_path(root, info)
+    state_existed = state_path.is_file()
+    original_state = state_path.read_text(encoding="utf-8") if state_existed else ""
+    deferred = load_deferred_items(state_path)
+
+    if (args.resume_current or args.defer_current is not None) and phase != "implementing":
+        raise TaskError("--defer-current/--resume-current require --phase implementing")
+    if args.resume_current:
+        if not args.change or not args.current_task:
+            raise TaskError("--resume-current requires --change and --current-task")
+        current_key = (args.change, args.current_task)
+        if not any(
+            (row["change"], row["task"]) == current_key for row in deferred
+        ):
+            raise TaskError("current task is not deferred: " + args.current_task)
+        deferred = [
+            row
+            for row in deferred
+            if (row["change"], row["task"]) != current_key
+        ]
+    if args.defer_current is not None:
+        if not args.change or not args.current_task:
+            raise TaskError("--defer-current requires --change and --current-task")
+        defer_reason = args.defer_current.strip()
+        if not defer_reason:
+            raise TaskError("--defer-current reason must not be blank")
+        current_key = (args.change, args.current_task)
+        deferred = [
+            row
+            for row in deferred
+            if (row["change"], row["task"]) != current_key
+        ]
+        deferred.append(
+            {
+                "change": args.change,
+                "task": args.current_task,
+                "reason": defer_reason,
+                "updated": args.date or today_str(),
+            }
+        )
+    schedule = build_apply_schedule(targets, deferred)
+    if args.defer_current is not None and not any(
+        row["change"] == args.change and row["task"] == args.current_task
+        for row in schedule["persisted_deferred"]
+    ):
+        raise TaskError(
+            "deferred current task is not an exact remaining OpenSpec checkbox: "
+            + args.current_task
+        )
+    deferred = schedule["persisted_deferred"]
+    if phase == "done" and schedule["state"] != "done":
+        raise TaskError("--phase done requires all OpenSpec checkboxes complete")
 
     def previous_items(heading: str) -> list[str]:
         body = next(
@@ -2663,6 +2776,20 @@ def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
     lines.extend(f"- {item}" for item in verification_items)
     if not verification_items:
         lines.append("- （尚无）")
+    lines.extend(["", "## 暂缓项", ""])
+    if schedule["deferred"]:
+        for row in schedule["deferred"]:
+            lines.append(
+                f"- `{row['change']}` — {row['task']}（{row['reason']}）"
+            )
+    else:
+        lines.append("- （无）")
+    lines.extend(["", "## 可执行项", ""])
+    if schedule["runnable"]:
+        for row in schedule["runnable"]:
+            lines.append(f"- `{row['change']}` — {row['text']}")
+    else:
+        lines.append("- （无）")
     lines.extend(
         [
             "",
@@ -2687,6 +2814,15 @@ def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
         for dirty in snap.get("dirty_porcelain") or []:
             lines.append(f"  - `{dirty}`")
     try:
+        atomic_write_text(
+            state_path,
+            json.dumps(
+                {"version": APPLY_STATE_VERSION, "deferred": deferred},
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+        )
         atomic_write_text(progress_path, "\n".join(lines).rstrip() + "\n")
         with contextlib.redirect_stdout(io.StringIO()):
             status_code = _cmd_set_status_unlocked(
@@ -2706,23 +2842,41 @@ def _cmd_checkpoint_unlocked(root: Path, args: argparse.Namespace) -> int:
                 atomic_write_text(progress_path, previous_text)
             else:
                 progress_path.unlink(missing_ok=True)
+            if state_existed:
+                atomic_write_text(state_path, original_state)
+            else:
+                state_path.unlink(missing_ok=True)
         raise
+    result = (
+        "done"
+        if schedule["state"] == "done"
+        else "deferred_only"
+        if schedule["state"] == "deferred_only"
+        else "next"
+    )
+    checkpoint = {
+        "phase": phase,
+        "status": status,
+        "progress_path": rel_posix(root, progress_path),
+        "apply_state_path": rel_posix(root, state_path),
+    }
     return emit(
         {
             "ok": True,
-            "result": "checkpointed",
+            "result": result,
             "task_id": info.task_id,
-            "phase": phase,
-            "status": status,
-            "progress_path": rel_posix(root, progress_path),
+            "checkpoint": checkpoint,
+            **checkpoint,
+            "apply_schedule": schedule,
+            "next": schedule["next"],
             "targets": targets,
         }
     )
 
 
-def cmd_checkpoint(root: Path, args: argparse.Namespace) -> int:
+def cmd_advance(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
-        return _cmd_checkpoint_unlocked(root, args)
+        return _cmd_advance_unlocked(root, args)
 
 
 def cmd_list(root: Path, args: argparse.Namespace) -> int:
@@ -2767,6 +2921,37 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
                 )
             )
         result = "zero" if not matches else "multi"
+        archived_matches = (
+            match_query(list_archived_infos(root), query) if result == "zero" else []
+        )
+        if archived_matches:
+            payload = with_workflow_notes(
+                root,
+                {
+                    "ok": False,
+                    "result": (
+                        "archived_match"
+                        if len(archived_matches) == 1
+                        else "archived_multi"
+                    ),
+                    "reason": "task_archived",
+                    "confidence": "deterministic",
+                    "matches": [asdict(m) for m in archived_matches],
+                    "archived_match": (
+                        asdict(archived_matches[0])
+                        if len(archived_matches) == 1
+                        else None
+                    ),
+                    "active": [asdict(i) for i in infos],
+                    "restore_command": (
+                        f"taskctl restore {archived_matches[0].task_id}"
+                        if len(archived_matches) == 1
+                        else ""
+                    ),
+                    "exit_markdown": archived_match_markdown(archived_matches),
+                },
+            )
+            return emit(payload, code=2)
         payload = with_workflow_notes(
             root,
             {
@@ -2854,6 +3039,155 @@ def _cmd_set_status_unlocked(root: Path, args: argparse.Namespace) -> int:
 def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
     with index_lock(root):
         return _cmd_set_status_unlocked(root, args)
+
+
+def _cmd_restore_unlocked(root: Path, args: argparse.Namespace) -> int:
+    status = args.status.strip().lower()
+    if status not in VALID_STATUSES or status == "archived":
+        raise TaskError(
+            "invalid restore status: "
+            + status
+            + "; expected draft|exploring|designed|proposed|in_progress|blocked"
+        )
+    matches = match_query(list_archived_infos(root), args.query)
+    if len(matches) != 1:
+        return emit(
+            {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "matches": [asdict(m) for m in matches],
+                "exit_markdown": (
+                    archived_match_markdown(matches)
+                    if matches
+                    else "## 未找到归档任务\n\n请指定归档任务编号或路径。"
+                ),
+            },
+            code=2,
+        )
+    info = matches[0]
+    src = root / info.task_root.rstrip("/")
+    archive_match = ARCHIVE_TASK_DIR_RE.match(src.name)
+    if not archive_match:
+        raise TaskError(
+            f"cannot derive original task location from archive path: {info.task_root}"
+        )
+    created, original_name = archive_match.groups()
+    if not DIR_ID_SLUG_RE.match(original_name):
+        original_name = f"{info.task_id}-{info.slug}"
+    dest = root / "tasks" / created / original_name
+    rel_dest = rel_posix(root, dest) + "/"
+    if dest.exists():
+        raise TaskError(f"restore destination exists: {rel_dest}")
+    active_infos = list_active_infos(root)
+    active_conflicts = [i for i in active_infos if i.task_id == info.task_id]
+    if active_conflicts:
+        raise TaskError(f"active task id already exists: {info.task_id}")
+    slug_conflicts = [i for i in active_infos if i.slug == info.slug]
+    if slug_conflicts:
+        raise TaskError(
+            f"active task slug already exists: {info.slug} ({slug_conflicts[0].task_id})"
+        )
+    if args.dry_run:
+        return emit(
+            {
+                "ok": True,
+                "result": "dry_run",
+                "taskId": info.task_id,
+                "from": info.task_root,
+                "to": rel_dest,
+                "status": status,
+            }
+        )
+
+    readme = src / "README.md"
+    original_readme = readme.read_text(encoding="utf-8")
+    task_index = index_path(root)
+    original_index = (
+        task_index.read_text(encoding="utf-8") if task_index.is_file() else None
+    )
+    updated = args.date or today_str()
+    next_id, active, archived = parse_index(root)
+    known_archived_rows = {
+        (row.task_id, row.path.rstrip("/")) for row in archived
+    }
+    for row in scan_archived_tasks(root):
+        key = (row.task_id, row.path.rstrip("/"))
+        if key not in known_archived_rows:
+            archived.append(row)
+            known_archived_rows.add(key)
+    known_ids = [
+        row.task_id for row in [*active, *archived]
+    ] + [archived_info.task_id for archived_info in list_archived_infos(root)]
+    known_numbers = [
+        int(task_id[1:]) for task_id in known_ids if ID_RE.match(task_id)
+    ]
+    if known_numbers:
+        next_id = max(next_id, max(known_numbers) + 1)
+    try:
+        restored_readme = set_readme_status(original_readme, status)
+        atomic_write_text(
+            readme, restored_readme if restored_readme.endswith("\n") else restored_readme + "\n"
+        )
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dest))
+        if any(row.task_id == info.task_id for row in active):
+            raise TaskError(f"active task id already exists in INDEX: {info.task_id}")
+        archived = [row for row in archived if row.task_id != info.task_id]
+        active.append(
+            TaskRow(
+                task_id=info.task_id,
+                name=info.name or info.slug,
+                path=rel_dest,
+                status=status,
+                updated=updated,
+                section="active",
+            )
+        )
+        write_index(root, next_id, active, archived)
+    except Exception as primary_error:
+        rollback_errors: list[str] = []
+        if dest.exists() and not src.exists():
+            try:
+                src.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(dest), str(src))
+            except Exception as exc:  # best-effort recovery must be visible
+                rollback_errors.append(f"move-back: {exc}")
+        readme_location = src / "README.md" if src.exists() else dest / "README.md"
+        if readme_location.exists():
+            try:
+                atomic_write_text(readme_location, original_readme)
+            except Exception as exc:
+                rollback_errors.append(f"README restore: {exc}")
+        try:
+            if original_index is None:
+                task_index.unlink(missing_ok=True)
+            else:
+                atomic_write_text(task_index, original_index)
+        except Exception as exc:
+            rollback_errors.append(f"INDEX restore: {exc}")
+        if rollback_errors:
+            raise TaskError(
+                f"restore failed: {primary_error}; rollback_failed: "
+                + "; ".join(rollback_errors)
+                + f"; inspect {src} and {dest}"
+            ) from primary_error
+        raise
+    print(f"已恢复：{info.task_id} → {rel_dest} ({status})", file=sys.stderr)
+    return emit(
+        {
+            "ok": True,
+            "result": "restored",
+            "taskId": info.task_id,
+            "from": info.task_root,
+            "to": rel_dest,
+            "status": status,
+        }
+    )
+
+
+def cmd_restore(root: Path, args: argparse.Namespace) -> int:
+    with index_lock(root):
+        return _cmd_restore_unlocked(root, args)
 
 
 def _cmd_new_unlocked(root: Path, args: argparse.Namespace) -> int:
@@ -3029,6 +3363,7 @@ def evaluate_archive_repository_gate(
     dirty_delivery: list[dict[str, Any]] = []
     non_blocking_dirty: list[dict[str, Any]] = []
     non_blocking_diagnostics: list[dict[str, Any]] = []
+    delivery_summaries: list[dict[str, Any]] = []
 
     for use in repository_uses:
         repo_key = str(use["repo"])
@@ -3061,14 +3396,18 @@ def evaluate_archive_repository_gate(
                         "detail": status_error,
                     }
                 )
-            elif porcelain:
-                dirty_delivery.append(
-                    {
-                        **base,
-                        "reason": "dirty_delivery_checkout",
-                        "dirty_porcelain": porcelain,
-                    }
+            else:
+                delivery_summaries.append(
+                    summarize_delivery_checkout(root, repo_key, checkout, binding)
                 )
+                if porcelain:
+                    dirty_delivery.append(
+                        {
+                            **base,
+                            "reason": "dirty_delivery_checkout",
+                            "dirty_porcelain": porcelain,
+                        }
+                    )
             continue
 
         if roles.intersection({"planning", "task_store"}):
@@ -3094,6 +3433,7 @@ def evaluate_archive_repository_gate(
 
     return {
         "repository_uses": repository_uses,
+        "delivery_summaries": delivery_summaries,
         "blocking": [],
         "missing_delivery_checkouts": missing_delivery,
         "unavailable_delivery_status": unavailable_delivery_status,
@@ -3122,7 +3462,7 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
         raise TaskError(f"task directory missing: {info.task_root}")
 
     changes = src / "changes.md"
-    if not changes.is_file() and not args.allow_missing_changes:
+    if not changes.is_file() and not args.allow_missing_changes and not args.dry_run:
         raise TaskError("missing changes.md; write it first or pass --allow-missing-changes")
     original_changes_text = (
         changes.read_text(encoding="utf-8") if changes.is_file() else None
@@ -3286,7 +3626,7 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     blocked_dirty: list[dict[str, Any]] = []
     overridden_dirty: list[dict[str, Any]] = []
     for row in archive_gate["dirty_delivery_checkouts"]:
-        if args.allow_dirty or row["repo"] in allowed_repos:
+        if row["repo"] in allowed_repos:
             overridden_dirty.append(row)
         else:
             blocked_dirty.append(row)
@@ -3604,33 +3944,20 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="REPO",
         help="allow one dirty delivery checkout; repeatable",
     )
-    arch_p.add_argument(
-        "--allow-dirty",
-        action="store_true",
-        help="deprecated: allow all dirty delivery checkouts (never missing checkouts)",
-    )
     arch_p.set_defaults(func=cmd_archive)
 
-    roots_p = sub.add_parser("repo-roots", help="resolve workspace-relative paths to unique git roots")
-    roots_p.add_argument("repos", nargs="+", help="workspace-relative git path (`.` = workspace itself, only if it is a target)")
-    roots_p.add_argument(
-        "--include-excluded",
-        action="store_true",
-        help="allow roots matching default exclude markers (none by default)",
+    restore_p = sub.add_parser(
+        "restore", help="restore an archived task to its original active date directory"
     )
-    roots_p.set_defaults(func=cmd_repo_roots)
-
-    scope_p = sub.add_parser(
-        "scope-repos",
-        help="list 涉及面 repos; checkout = 必须 only (never cwd)",
+    restore_p.add_argument("query", help="archived TNNNN / slug / path")
+    restore_p.add_argument(
+        "--status",
+        default="in_progress",
+        help="active status after restore (default: in_progress)",
     )
-    scope_p.add_argument("query", help="TNNNN / slug / path")
-    scope_p.add_argument(
-        "--cwd",
-        default=None,
-        help="path whose git root is reported; not added to checkout",
-    )
-    scope_p.set_defaults(func=cmd_scope_repos)
+    restore_p.add_argument("--date", help="updated date YYYY-MM-DD (default: today)")
+    restore_p.add_argument("--dry-run", action="store_true")
+    restore_p.set_defaults(func=cmd_restore)
 
     prep_p = sub.add_parser(
         "prepare-branches",
@@ -3677,36 +4004,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prep_p.set_defaults(func=cmd_prepare_branches)
 
-    sum_p = sub.add_parser(
-        "git-summary",
-        help="read-only git log/diff summary for changes.md scaffolding",
-    )
-    sum_p.add_argument(
-        "--repo",
-        dest="repos",
-        action="append",
-        required=True,
-        help="workspace-relative git path; repeatable (`.` = workspace)",
-    )
-    sum_p.add_argument(
-        "--checkout",
-        dest="checkouts",
-        action="append",
-        default=None,
-        metavar="REPO=CHECKOUT",
-        help="actual checkout/worktree to summarize for a canonical repo",
-    )
-    sum_p.add_argument("--branch", default=None, help="feature branch (default: current)")
-    sum_p.add_argument("--base", default=None, help="base branch name (default: detected)")
-    sum_p.add_argument("--max-commits", type=int, default=30)
-    sum_p.add_argument("--max-files", type=int, default=100)
-    sum_p.add_argument(
-        "--include-excluded",
-        action="store_true",
-        help="allow roots matching default exclude markers (none by default)",
-    )
-    sum_p.set_defaults(func=cmd_git_summary)
-
     context_p = sub.add_parser(
         "execution-context",
         help="resolve persisted checkout/worktree and OpenSpec execution targets",
@@ -3714,24 +4011,36 @@ def build_parser() -> argparse.ArgumentParser:
     context_p.add_argument("query", help="TNNNN / slug / path")
     context_p.set_defaults(func=cmd_execution_context)
 
-    checkpoint_p = sub.add_parser(
-        "checkpoint",
-        help="persist task-apply phase, progress, blockers, next step, and git snapshot",
+    advance_p = sub.add_parser(
+        "advance",
+        help="atomically persist apply progress and return the next runnable item",
     )
-    checkpoint_p.add_argument("query", help="TNNNN / slug / path")
-    checkpoint_p.add_argument(
+    advance_p.add_argument("query", help="TNNNN / slug / path")
+    advance_p.add_argument(
         "--phase",
         required=True,
         choices=("implementing", "testing", "blocked", "done"),
     )
-    checkpoint_p.add_argument("--change", default="")
-    checkpoint_p.add_argument("--current-task", default="")
-    checkpoint_p.add_argument("--completed", action="append", default=[])
-    checkpoint_p.add_argument("--verification", action="append", default=[])
-    checkpoint_p.add_argument("--blocker", default="")
-    checkpoint_p.add_argument("--next", dest="next_step", default="")
-    checkpoint_p.add_argument("--date", default=None)
-    checkpoint_p.set_defaults(func=cmd_checkpoint)
+    advance_p.add_argument("--change", default="")
+    advance_p.add_argument("--current-task", default="")
+    advance_p.add_argument("--completed", action="append", default=[])
+    advance_p.add_argument("--verification", action="append", default=[])
+    advance_p.add_argument("--blocker", default="")
+    defer_group = advance_p.add_mutually_exclusive_group()
+    defer_group.add_argument(
+        "--defer-current",
+        default=None,
+        metavar="REASON",
+        help="defer the exact --change/--current-task while other runnable items continue",
+    )
+    defer_group.add_argument(
+        "--resume-current",
+        action="store_true",
+        help="remove the exact --change/--current-task from deferred state",
+    )
+    advance_p.add_argument("--next", dest="next_step", default="")
+    advance_p.add_argument("--date", default=None)
+    advance_p.set_defaults(func=cmd_advance)
 
     notes_p = sub.add_parser(
         "notes",
