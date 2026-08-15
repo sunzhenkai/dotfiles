@@ -1342,11 +1342,11 @@ def scaffold_readme(
 
 ## 工作上下文
 
-事实一出现或变化就立刻改这里，不要等 archive。涉及面是计划范围；本节是实际执行环境。
+apply 前保持「尚未准备」；task-apply Checkout Gate 后再记录实际执行环境。涉及面是计划范围；本节是实际执行环境。
 
 | 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
 |------|----------|---------------|----------|------|------|
-| （待补） | | | 未使用 | | |
+| （apply 前尚未准备） | | | 未使用 | | |
 
 ## 验收标准
 
@@ -1482,7 +1482,7 @@ def binding_for_repo(info: TaskInfo | None, repo_path: str) -> dict[str, Any] | 
 
 def format_work_context(rows: list[dict[str, Any]]) -> str:
     lines = [
-        "事实一出现或变化就立刻改这里，不要等 archive。涉及面是计划范围；本节是实际执行环境。",
+        "apply 前保持「尚未准备」；task-apply Checkout Gate 后再记录实际执行环境。涉及面是计划范围；本节是实际执行环境。",
         "",
         "| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |",
         "|------|----------|---------------|----------|------|------|",
@@ -2959,6 +2959,151 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         return _cmd_new_unlocked(root, args)
 
 
+def collect_archive_repository_uses(
+    root: Path, info: TaskInfo, resolved_targets: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Derive per-task repository roles without treating planning stores as delivery repos."""
+    uses: dict[str, dict[str, Any]] = {}
+
+    def add(raw_repo: str, role: str, source: str) -> None:
+        repo_key = normalize_repo_path(raw_repo)
+        row = uses.setdefault(
+            repo_key,
+            {"repo": repo_key, "roles": set(), "sources": set()},
+        )
+        row["roles"].add(role)
+        row["sources"].add(source)
+
+    for row in info.scope.get("must", []):
+        if row.get("path"):
+            add(str(row["path"]), "delivery", "scope.must")
+    for scope_role in ("suggested", "excluded"):
+        for row in info.scope.get(scope_role, []):
+            if row.get("path"):
+                add(str(row["path"]), "reference", f"scope.{scope_role}")
+    for binding in info.checkouts:
+        if binding.get("repo"):
+            add(str(binding["repo"]), "delivery", "work_context")
+    for target in resolved_targets:
+        repo_key = str(target.get("repo") or "")
+        if repo_key:
+            add(repo_key, "planning", "openspec")
+        else:
+            workspace_git = find_git_root(root)
+            if workspace_git is not None and workspace_git.resolve() == root.resolve():
+                add(".", "planning", "openspec")
+
+    workspace_git = find_git_root(root)
+    if workspace_git is not None and workspace_git.resolve() == root.resolve():
+        add(".", "task_store", "workspace_root")
+
+    return [
+        {
+            "repo": row["repo"],
+            "roles": sorted(row["roles"]),
+            "sources": sorted(row["sources"]),
+        }
+        for row in sorted(uses.values(), key=lambda item: str(item["repo"]))
+    ]
+
+
+def archive_status_porcelain(
+    repo: Path, *, limit: int = 20
+) -> tuple[list[str], str | None]:
+    try:
+        result = run_git(repo, "status", "--porcelain")
+    except (OSError, UnicodeError, subprocess.SubprocessError) as error:
+        return [], f"{type(error).__name__}: {error}"
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        return [], detail or f"git status exited with {result.returncode}"
+    return [line for line in result.stdout.splitlines() if line.strip()][:limit], None
+
+
+def evaluate_archive_repository_gate(
+    root: Path, info: TaskInfo, resolved_targets: list[dict[str, Any]]
+) -> dict[str, Any]:
+    repository_uses = collect_archive_repository_uses(root, info, resolved_targets)
+    missing_delivery: list[dict[str, Any]] = []
+    unavailable_delivery_status: list[dict[str, Any]] = []
+    dirty_delivery: list[dict[str, Any]] = []
+    non_blocking_dirty: list[dict[str, Any]] = []
+    non_blocking_diagnostics: list[dict[str, Any]] = []
+
+    for use in repository_uses:
+        repo_key = str(use["repo"])
+        roles = set(use["roles"])
+        if roles == {"reference"}:
+            continue
+        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
+        if "delivery" in roles:
+            binding = binding_for_repo(info, repo_key)
+            checkout = (
+                resolve_checkout_path(root, str(binding.get("checkout")))
+                if binding and binding.get("checkout")
+                else canonical
+            )
+            base = {
+                **use,
+                "checkout": display_checkout_path(root, checkout),
+            }
+            if not checkout.is_dir() or not same_git_repository(canonical, checkout):
+                missing_delivery.append(
+                    {**base, "reason": "missing_or_invalid_delivery_checkout"}
+                )
+                continue
+            porcelain, status_error = archive_status_porcelain(checkout)
+            if status_error:
+                unavailable_delivery_status.append(
+                    {
+                        **base,
+                        "reason": "delivery_status_unavailable",
+                        "detail": status_error,
+                    }
+                )
+            elif porcelain:
+                dirty_delivery.append(
+                    {
+                        **base,
+                        "reason": "dirty_delivery_checkout",
+                        "dirty_porcelain": porcelain,
+                    }
+                )
+            continue
+
+        if roles.intersection({"planning", "task_store"}):
+            porcelain, status_error = archive_status_porcelain(canonical)
+            if status_error:
+                non_blocking_diagnostics.append(
+                    {
+                        **use,
+                        "checkout": display_checkout_path(root, canonical),
+                        "reason": "non_delivery_status_unavailable",
+                        "detail": status_error,
+                    }
+                )
+            elif porcelain:
+                non_blocking_dirty.append(
+                    {
+                        **use,
+                        "checkout": display_checkout_path(root, canonical),
+                        "reason": "not_a_delivery_checkout",
+                        "dirty_porcelain": porcelain,
+                    }
+                )
+
+    return {
+        "repository_uses": repository_uses,
+        "blocking": [],
+        "missing_delivery_checkouts": missing_delivery,
+        "unavailable_delivery_status": unavailable_delivery_status,
+        "dirty_delivery_checkouts": dirty_delivery,
+        "non_blocking_dirty": non_blocking_dirty,
+        "non_blocking_diagnostics": non_blocking_diagnostics,
+        "overridden": [],
+    }
+
+
 def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     infos = list_active_infos(root)
     matches = match_query(infos, args.query)
@@ -3096,58 +3241,80 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     if not verification_ok:
         override_notes.append("允许缺少验证证据")
 
-    dirty_bindings: list[str] = []
-    missing_bindings: list[str] = []
-    repo_keys = {
-        normalize_repo_path(str(row.get("path") or ""))
-        for row in info.scope.get("must", [])
-        if row.get("path")
+    archive_gate = evaluate_archive_repository_gate(root, info, resolved_targets)
+    missing_delivery = archive_gate["missing_delivery_checkouts"]
+    if missing_delivery:
+        archive_gate["blocking"] = missing_delivery
+        rendered = ", ".join(
+            f"{row['repo']} -> {row['checkout']}" for row in missing_delivery
+        )
+        return emit(
+            {
+                "ok": False,
+                "error": (
+                    "missing/invalid task checkout(s) (delivery): "
+                    + rendered
+                    + "; restore the recorded delivery checkout"
+                ),
+                "reason": "missing_or_invalid_delivery_checkout",
+                "archive_gate": archive_gate,
+            },
+            code=1,
+        )
+
+    unavailable_delivery_status = archive_gate["unavailable_delivery_status"]
+    if unavailable_delivery_status:
+        archive_gate["blocking"] = unavailable_delivery_status
+        rendered = ", ".join(
+            f"{row['repo']} ({row['checkout']}): {row['detail']}"
+            for row in unavailable_delivery_status
+        )
+        return emit(
+            {
+                "ok": False,
+                "error": "cannot inspect delivery checkout status: " + rendered,
+                "reason": "delivery_status_unavailable",
+                "archive_gate": archive_gate,
+            },
+            code=1,
+        )
+
+    allowed_repos = {
+        normalize_repo_path(str(repo))
+        for repo in (getattr(args, "allow_dirty_checkouts", None) or [])
     }
-    repo_keys.update(
-        normalize_repo_path(str(binding.get("repo") or ""))
-        for binding in info.checkouts
-        if binding.get("repo")
-    )
-    repo_keys.update(
-        normalize_repo_path(str(target.get("repo") or ""))
-        for target in resolved_targets
-        if target.get("repo")
-    )
-    if any(not target.get("repo") for target in resolved_targets):
-        workspace_git = find_git_root(root)
-        if workspace_git is not None and workspace_git.resolve() == root.resolve():
-            repo_keys.add(".")
-    for repo_key in sorted(repo_keys):
-        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
-        binding = binding_for_repo(info, repo_key)
-        checkout = (
-            resolve_checkout_path(root, str(binding.get("checkout")))
-            if binding and binding.get("checkout")
-            else canonical
+    blocked_dirty: list[dict[str, Any]] = []
+    overridden_dirty: list[dict[str, Any]] = []
+    for row in archive_gate["dirty_delivery_checkouts"]:
+        if args.allow_dirty or row["repo"] in allowed_repos:
+            overridden_dirty.append(row)
+        else:
+            blocked_dirty.append(row)
+    archive_gate["blocking"] = blocked_dirty
+    archive_gate["overridden"] = overridden_dirty
+
+    if blocked_dirty:
+        rendered = ", ".join(
+            f"{row['repo']} ({row['checkout']})" for row in blocked_dirty
         )
-        if not checkout.is_dir() or not same_git_repository(canonical, checkout):
-            missing_bindings.append(f"{repo_key} -> {checkout}")
-            continue
-        if is_dirty(checkout):
-            dirty_bindings.append(display_checkout_path(root, checkout))
-    if missing_bindings and not args.allow_dirty:
-        raise TaskError(
-            "missing/invalid task checkout(s): "
-            + ", ".join(missing_bindings)
-            + "; restore bindings or pass --allow-dirty"
+        return emit(
+            {
+                "ok": False,
+                "error": (
+                    "dirty delivery checkout(s): "
+                    + rendered
+                    + "; commit/clean them or pass "
+                    "--allow-dirty-checkout <repo>"
+                ),
+                "reason": "dirty_delivery_checkout",
+                "archive_gate": archive_gate,
+            },
+            code=1,
         )
-    if missing_bindings:
+    for row in overridden_dirty:
         override_notes.append(
-            "允许缺失 checkout：" + ", ".join(missing_bindings)
+            f"允许 dirty delivery checkout：{row['repo']} ({row['checkout']})"
         )
-    if dirty_bindings and not args.allow_dirty:
-        raise TaskError(
-            "dirty task checkout(s): "
-            + ", ".join(dirty_bindings)
-            + "; commit/clean them or pass --allow-dirty"
-        )
-    if dirty_bindings:
-        override_notes.append("允许 dirty checkout：" + ", ".join(dirty_bindings))
 
     create_date = src.parent.name
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", create_date):
@@ -3172,11 +3339,16 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
                 "from": info.task_root,
                 "to": rel_dest,
                 "archived_on": archived_on,
+                "archive_gate": archive_gate,
             }
         )
 
-    if override_notes and changes.is_file():
-        changes_text = changes.read_text(encoding="utf-8").rstrip()
+    if override_notes:
+        changes_text = (
+            changes.read_text(encoding="utf-8").rstrip()
+            if changes.is_file()
+            else "# Changes"
+        )
         changes_text += "\n\n## 归档门禁覆盖\n\n"
         changes_text += "\n".join(f"- {note}" for note in override_notes) + "\n"
         atomic_write_text(changes, changes_text)
@@ -3216,6 +3388,8 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
                 atomic_write_text(src / "README.md", text)
                 if original_changes_text is not None:
                     atomic_write_text(src / "changes.md", original_changes_text)
+                elif (src / "changes.md").exists():
+                    (src / "changes.md").unlink()
         raise
     print(f"已归档：{info.task_id} → {rel_dest}", file=sys.stderr)
     return emit(
@@ -3226,6 +3400,7 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
             "from": info.task_root,
             "to": rel_dest,
             "archived_on": archived_on,
+            "archive_gate": archive_gate,
         }
     )
 
@@ -3421,7 +3596,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     arch_p.add_argument("--allow-unchecked-acceptance", action="store_true")
     arch_p.add_argument("--allow-missing-verification", action="store_true")
-    arch_p.add_argument("--allow-dirty", action="store_true")
+    arch_p.add_argument(
+        "--allow-dirty-checkout",
+        dest="allow_dirty_checkouts",
+        action="append",
+        default=None,
+        metavar="REPO",
+        help="allow one dirty delivery checkout; repeatable",
+    )
+    arch_p.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="deprecated: allow all dirty delivery checkouts (never missing checkouts)",
+    )
     arch_p.set_defaults(func=cmd_archive)
 
     roots_p = sub.add_parser("repo-roots", help="resolve workspace-relative paths to unique git roots")

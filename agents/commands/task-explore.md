@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-在已解析的 task 上下文中探索方案（不写业务代码）：resolve 后对必须目标仓跑 Checkout Gate，再委托 `openspec-explore`。
+在已解析的 task 上下文中探索方案（不写业务代码）：resolve 后直接委托 `openspec-explore`；不得检查目标仓 Git 状态、创建或切换 task 分支，Checkout Gate 延后到 `task-apply`。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

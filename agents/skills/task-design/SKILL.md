@@ -35,7 +35,7 @@ task-new → task-explore? → task-design? → task-propose → task-apply → 
 
 ## MUST 先做
 
-1. 读并执行 skill `task-workflow` 的 **task-design 职责**（resolve、Checkout Gate 仅必须目标仓、路径、status）
+1. 读并执行 skill `task-workflow` 的 **task-design 职责**（resolve、路径、status；本阶段不得运行 Checkout Gate 或检查/切换目标仓分支）
 2. 再按下面三阶段写设计
 
 ## 三阶段：探索 → 设计 → 暂存

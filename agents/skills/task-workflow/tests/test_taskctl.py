@@ -126,6 +126,16 @@ hello
         )
         (self.tmp / "tasks" / "INDEX.md").write_text(body, encoding="utf-8")
 
+    def _mark_archive_ready(self, task: Path) -> None:
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace("- [ ] done", "- [x] done"), encoding="utf-8"
+        )
+        (task / "changes.md").write_text("# changes\n", encoding="utf-8")
+        (task / "progress.md").write_text(
+            "# progress\n\n## 验证证据\n\n- tests passed\n", encoding="utf-8"
+        )
+
     def test_resolve_by_id(self) -> None:
         self._seed_task("T0001", "alpha")
         self._seed_task("T0002", "beta", day="2026-08-02")
@@ -216,6 +226,7 @@ hello
         self.assertIn("### 设计文档", readme)
         self.assertIn("## 工作上下文", readme)
         self.assertIn("worktree", readme)
+        self.assertIn("apply 前尚未准备", readme)
         index = (self.tmp / "tasks/INDEX.md").read_text()
         self.assertIn("next_id: 2", index)
         code, payload = self._run("list")
@@ -624,6 +635,325 @@ hello
         code, payload = self._run("archive", "T0001")
         self.assertEqual(code, 1)
         self.assertIn("missing/invalid task checkout", payload["error"])
+        code, payload = self._run("archive", "T0001", "--allow-dirty")
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            payload["reason"], "missing_or_invalid_delivery_checkout"
+        )
+
+    def test_archive_allows_dirty_planning_and_task_store(self) -> None:
+        self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| service-a | `service-a` | `service-a` | 否 | `feat-example` | `main` |
+"""
+        task = self._seed_task(
+            "T0001", "workspace-change", openspec=True, scope_block=scope_block
+        )
+        archived_change = (
+            self.tmp / "openspec/changes/archive/2026-08-01-demo-change"
+        )
+        archived_change.mkdir(parents=True)
+        (archived_change / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        self._init_git_repo(".")
+        (self.tmp / "other-task-note.md").write_text("in progress\n", encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001", "--dry-run")
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "dry_run")
+        uses = {
+            row["repo"]: row for row in payload["archive_gate"]["repository_uses"]
+        }
+        self.assertEqual(uses["service-a"]["roles"], ["delivery"])
+        self.assertEqual(uses["."]["roles"], ["planning", "task_store"])
+        self.assertEqual(payload["archive_gate"]["blocking"], [])
+        self.assertEqual(
+            payload["archive_gate"]["non_blocking_dirty"][0]["repo"], "."
+        )
+
+        original_run_git = tc.run_git
+
+        def run_git_with_unavailable_workspace(
+            repo: Path, *git_args: str, check: bool = False
+        ):
+            if (
+                repo.resolve() == self.tmp.resolve()
+                and git_args == ("status", "--porcelain")
+            ):
+                raise OSError("simulated status failure")
+            return original_run_git(repo, *git_args, check=check)
+
+        with mock.patch.object(
+            tc,
+            "run_git",
+            side_effect=run_git_with_unavailable_workspace,
+        ):
+            code, payload = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 0)
+        diagnostic = payload["archive_gate"]["non_blocking_diagnostics"][0]
+        self.assertEqual(diagnostic["repo"], ".")
+        self.assertEqual(diagnostic["reason"], "non_delivery_status_unavailable")
+
+    def test_archive_blocks_dirty_delivery_and_supports_exact_override(self) -> None:
+        repo = self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| service-a | `service-a` | `service-a` | 否 | `feat-example` | `main` |
+"""
+        task = self._seed_task("T0001", "delivery-change", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "dirty_delivery_checkout")
+        self.assertEqual(
+            payload["archive_gate"]["blocking"][0]["repo"], "service-a"
+        )
+
+        (task / "changes.md").unlink()
+        code, payload = self._run(
+            "archive",
+            "T0001",
+            "--allow-missing-changes",
+            "--allow-dirty-checkout",
+            "service-a",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "archived")
+        self.assertEqual(
+            payload["archive_gate"]["overridden"][0]["repo"], "service-a"
+        )
+        audit = self.tmp / "tasks/archive/2026-08-01-T0001-delivery-change/changes.md"
+        self.assertIn(
+            "允许 dirty delivery checkout", audit.read_text(encoding="utf-8")
+        )
+
+    def test_archive_rolls_back_new_override_audit_file(self) -> None:
+        repo = self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+"""
+        task = self._seed_task("T0001", "audit-rollback", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        (task / "changes.md").unlink()
+        self._write_index(next_id=2)
+        (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
+
+        with mock.patch.object(tc, "write_index", side_effect=OSError("disk full")):
+            code, payload = self._run(
+                "archive",
+                "T0001",
+                "--allow-missing-changes",
+                "--allow-dirty-checkout",
+                "service-a",
+            )
+
+        self.assertEqual(code, 1)
+        self.assertIn("disk full", payload["error"])
+        self.assertTrue(task.is_dir())
+        self.assertFalse((task / "changes.md").exists())
+        self.assertIn(
+            "**status：** draft", (task / "README.md").read_text(encoding="utf-8")
+        )
+        self.assertFalse(
+            (self.tmp / "tasks/archive/2026-08-01-T0001-audit-rollback").exists()
+        )
+
+    def test_archive_fails_closed_when_delivery_status_is_unavailable(self) -> None:
+        self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+"""
+        task = self._seed_task("T0001", "status-failure", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+
+        original_run_git = tc.run_git
+
+        def run_git_with_status_failure(
+            repo: Path, *git_args: str, check: bool = False
+        ):
+            if git_args == ("status", "--porcelain"):
+                raise OSError("simulated status failure")
+            return original_run_git(repo, *git_args, check=check)
+
+        with mock.patch.object(
+            tc,
+            "run_git",
+            side_effect=run_git_with_status_failure,
+        ):
+            code, payload = self._run("archive", "T0001", "--dry-run")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "delivery_status_unavailable")
+        blocking = payload["archive_gate"]["blocking"][0]
+        self.assertEqual(blocking["repo"], "service-a")
+        self.assertEqual(blocking["reason"], "delivery_status_unavailable")
+
+    def test_archive_legacy_allow_dirty_still_overrides_delivery(self) -> None:
+        repo = self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+"""
+        task = self._seed_task("T0001", "legacy-override", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001", "--allow-dirty")
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "archived")
+        self.assertEqual(
+            payload["archive_gate"]["overridden"][0]["repo"], "service-a"
+        )
+
+    def test_archive_reports_reference_without_inspecting_git(self) -> None:
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| docs-only | `missing-reference` | 建议 |
+| excluded-only | `another-missing-reference` | 排除 |
+"""
+        task = self._seed_task("T0001", "reference-only", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+
+        with mock.patch.object(tc, "run_git") as run_git_mock:
+            code, payload = self._run("archive", "T0001", "--dry-run")
+
+        self.assertEqual(code, 0)
+        run_git_mock.assert_not_called()
+        uses = {
+            row["repo"]: row for row in payload["archive_gate"]["repository_uses"]
+        }
+        self.assertEqual(uses["missing-reference"]["roles"], ["reference"])
+        self.assertEqual(
+            uses["another-missing-reference"]["roles"], ["reference"]
+        )
+
+    def test_archive_delivery_role_takes_priority_over_reference(self) -> None:
+        repo = self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+| service-a-docs | `service-a` | 建议 |
+"""
+        task = self._seed_task("T0001", "mixed-reference", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        (repo / "local-change.txt").write_text("dirty\n", encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001")
+
+        self.assertEqual(code, 1)
+        blocking = payload["archive_gate"]["blocking"][0]
+        self.assertEqual(blocking["repo"], "service-a")
+        self.assertEqual(blocking["roles"], ["delivery", "reference"])
+
+    def test_archive_does_not_special_case_workspace_delivery_repo(self) -> None:
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| workspace | `.` | 必须 |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| workspace | `.` | `.` | 否 | `feat-example` | `main` |
+"""
+        task = self._seed_task("T0001", "workspace-delivery", scope_block=scope_block)
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+        self._init_git_repo(".")
+        (self.tmp / "delivery-change.txt").write_text("dirty\n", encoding="utf-8")
+
+        code, payload = self._run("archive", "T0001")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "dirty_delivery_checkout")
+        blocking = payload["archive_gate"]["blocking"][0]
+        self.assertEqual(blocking["repo"], ".")
+        self.assertEqual(blocking["roles"], ["delivery", "task_store"])
+
+    def test_archive_blocks_dirty_repo_with_delivery_and_planning_roles(self) -> None:
+        repo = self._init_git_repo("service-a")
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| service-a | `service-a` | 必须 |
+
+### 关联 OpenSpec
+
+| change | 路径 | 仓库 | store | 说明 |
+|--------|------|------|-------|------|
+| demo-change | `openspec/changes/demo-change/` | `service-a` | `openspec/` | demo |
+
+## 工作上下文
+
+| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |
+|------|----------|---------------|----------|------|------|
+| service-a | `service-a` | `service-a` | 否 | `feat-example` | `main` |
+"""
+        task = self._seed_task("T0001", "combined-role", scope_block=scope_block)
+        archived_change = repo / "openspec/changes/archive/2026-08-01-demo-change"
+        archived_change.mkdir(parents=True)
+        (archived_change / "tasks.md").write_text("- [x] done\n", encoding="utf-8")
+        self._mark_archive_ready(task)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("archive", "T0001")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "dirty_delivery_checkout")
+        blocking = payload["archive_gate"]["blocking"][0]
+        self.assertEqual(blocking["repo"], "service-a")
+        self.assertEqual(blocking["roles"], ["delivery", "planning"])
 
     def test_worktree_apply_checkpoint_archive_lifecycle(self) -> None:
         repo = self._init_git_repo("svc")

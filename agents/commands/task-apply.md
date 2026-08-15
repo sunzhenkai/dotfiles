@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-对 task 已关联的 OpenSpec change 执行可恢复实施：Checkout Gate 续用已绑定 worktree/checkout，`execution-context` 定位每个 change，并在开始、每项完成、暂停和测试时强制 checkpoint。
+对 task 已关联的 OpenSpec change 执行可恢复实施：在此节点首次运行 Checkout Gate，检查目标仓状态并创建/续用 task 分支与 worktree/checkout；再用 `execution-context` 定位每个 change，并在开始、每项完成、暂停和测试时强制 checkpoint。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 

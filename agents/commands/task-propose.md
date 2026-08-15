@@ -6,7 +6,7 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-为 task 制定 OpenSpec 提案：resolve 后对实际写入仓跑 Checkout Gate，再按真实 checkout 委托 `openspec-propose`，并在 README 记录每个 change 的 canonical 仓、相对路径与 store。
+为 task 制定 OpenSpec 提案：resolve 后直接委托 `openspec-propose`，并在 README 记录每个 change 的 canonical 仓、相对路径与 store；不检查目标仓 Git 状态或准备分支，Checkout Gate 延后到 `task-apply`。
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
