@@ -260,6 +260,11 @@ hello
         self.assertEqual(code, 1)
         self.assertIn("requires --slug or --title", payload["error"])
 
+    def test_new_cjk_title_asks_for_explicit_slug(self) -> None:
+        code, payload = self._run("new", "--title", "在本地起一套完整的测试服务")
+        self.assertEqual(code, 1)
+        self.assertIn("--slug", payload["error"])
+
     def test_archive(self) -> None:
         root = self._seed_task("T0001", "alpha", openspec=True)
         (root / "changes.md").write_text("# changes\n", encoding="utf-8")
@@ -480,43 +485,25 @@ hello
         )
         self._write_index(next_id=2)
         code, payload = self._run("archive", "T0001")
-        self.assertEqual(code, 1)
-        self.assertIn("remaining=1", payload["error"])
-        self.assertIn("--force-merge", payload["error"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload["reason"], "openspec_remaining")
+        self.assertIn("pending", payload["exit_markdown"])
 
-    def test_classify_checkbox_item(self) -> None:
-        self.assertEqual(
-            tc.classify_checkbox_item("5.1 Docker multi-stage build 验证"),
-            "verification",
+    def test_checkbox_parsing_reports_facts_without_classifying(self) -> None:
+        items = tc.parse_openspec_checkboxes(
+            "- [x] 实现 API\n- [ ] 实现 /healthz healthcheck 接口\n"
         )
         self.assertEqual(
-            tc.classify_checkbox_item("6.1 完整 Compose smoke"),
-            "verification",
+            items,
+            [
+                {"text": "实现 API", "done": True},
+                {"text": "实现 /healthz healthcheck 接口", "done": False},
+            ],
         )
+        self.assertEqual(tc.remaining_state_of(items), "remaining")
         self.assertEqual(
-            tc.classify_checkbox_item("5.3 六服务 healthcheck 与 Compose healthy 验证"),
-            "verification",
-        )
-        self.assertEqual(tc.classify_checkbox_item("运行单元测试"), "verification")
-        self.assertEqual(tc.classify_checkbox_item("实现 Fastify API"), "implementation")
-        self.assertEqual(
-            tc.remaining_kind_of(
-                [
-                    {"done": True, "kind": "implementation"},
-                    {"done": False, "kind": "verification"},
-                    {"done": False, "kind": "verification"},
-                ]
-            ),
-            "verification_only",
-        )
-        self.assertEqual(
-            tc.remaining_kind_of(
-                [
-                    {"done": False, "kind": "implementation"},
-                    {"done": False, "kind": "verification"},
-                ]
-            ),
-            "implementation",
+            tc.remaining_state_of([{"text": "实现 API", "done": True}]),
+            "none",
         )
 
     def _seed_archive_ready(self, slug: str, tasks_md: str, *, archived: bool = False) -> Path:
@@ -539,7 +526,7 @@ hello
         self._write_index(next_id=2)
         return task
 
-    def test_execution_context_reports_verification_only(self) -> None:
+    def test_execution_context_reports_remaining_items_verbatim(self) -> None:
         self._seed_archive_ready(
             "verify-ctx",
             "- [x] 实现 API\n"
@@ -548,14 +535,14 @@ hello
         )
         code, payload = self._run("execution-context", "T0001")
         self.assertEqual(code, 0)
-        self.assertEqual(payload["openspec_remaining"]["kind"], "verification_only")
+        self.assertEqual(payload["openspec_remaining"]["state"], "remaining")
         self.assertEqual(payload["openspec_remaining"]["complete"], 1)
         self.assertEqual(payload["openspec_remaining"]["total"], 3)
-        self.assertEqual(payload["targets"][0]["remaining_kind"], "verification_only")
+        self.assertEqual(payload["targets"][0]["remaining_state"], "remaining")
         texts = [item["text"] for item in payload["openspec_remaining"]["items"]]
         self.assertIn("5.1 Docker multi-stage build 验证", texts)
 
-    def test_archive_confirms_verification_only_remaining(self) -> None:
+    def test_archive_confirms_any_remaining_with_verbatim_items(self) -> None:
         self._seed_archive_ready(
             "verify-only",
             "- [x] 实现 API\n- [ ] 最终 runtime/Compose/smoke 验证\n",
@@ -563,14 +550,26 @@ hello
         code, payload = self._run("archive", "T0001")
         self.assertEqual(code, 2)
         self.assertEqual(payload["result"], "needs_confirm")
-        self.assertEqual(payload["reason"], "verification_only_remaining")
-        self.assertIn("只剩测试/验证", payload["exit_markdown"])
+        self.assertEqual(payload["reason"], "openspec_remaining")
+        self.assertIn("最终 runtime/Compose/smoke 验证", payload["exit_markdown"])
         self.assertIn("--force-merge", payload["exit_markdown"])
+        self.assertNotIn("全部判定", payload["exit_markdown"])
         self.assertTrue(
             (self.tmp / "tasks/2026-08-01/T0001-verify-only").is_dir()
         )
 
-    def test_archive_force_merge_allows_verification_remaining(self) -> None:
+    def test_archive_does_not_downgrade_gate_for_implementation_wording(self) -> None:
+        """A leftover that merely mentions healthcheck is still user's call."""
+        self._seed_archive_ready(
+            "impl-wording",
+            "- [x] done\n- [ ] 实现 /healthz healthcheck 接口\n",
+        )
+        code, payload = self._run("archive", "T0001")
+        self.assertEqual(code, 2)
+        self.assertEqual(payload["reason"], "openspec_remaining")
+        self.assertIn("实现 /healthz healthcheck 接口", payload["exit_markdown"])
+
+    def test_archive_force_merge_allows_remaining(self) -> None:
         task = self._seed_archive_ready(
             "force-verify",
             "- [x] 实现 API\n- [ ] 6.1 完整 Compose smoke\n",
@@ -590,8 +589,9 @@ hello
             archived=True,
         )
         code, payload = self._run("archive", "T0001")
-        self.assertEqual(code, 1)
-        self.assertIn("remaining=1", payload["error"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload["reason"], "openspec_remaining")
+        self.assertIn("实现 billing 模块", payload["exit_markdown"])
         code, payload = self._run("archive", "T0001", "--force-merge")
         self.assertEqual(code, 0)
         self.assertEqual(payload["result"], "archived")
@@ -1271,129 +1271,6 @@ hello
         self.assertEqual(code, 0)
         self.assertTrue(payload["workflow_notes"]["exists"])
         self.assertIn("分支前缀用 feat", payload["workflow_notes"]["markdown"])
-
-    def test_extract_new_marker_and_user_query(self) -> None:
-        msg = """<cursor_commands>
-
---- Cursor Command: task-new ---
-在 `tasks/` 创建需求任务。
-
-**MUST 先读取并执行** skill `task-workflow`。
-
-下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
-
-[TASK_NEW_INPUT_START]
-
-给 docs/README 加一节本地安装说明，并补上示例命令
---- End Command ---
-</cursor_commands>
-<user_query>
-  /task-new 给 docs/README 加一节本地安装说明，并补上示例命令
-    按环境把配置拆成两组，共用一个 demo network
-</user_query>
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 0)
-        self.assertFalse(payload["empty"])
-        self.assertIn("本地安装说明", payload["requirement"])
-        self.assertIn("demo network", payload["requirement"])
-        self.assertNotIn("End Command", payload["requirement"])
-        self.assertNotIn("MUST 先读取", payload["requirement"])
-
-    def test_extract_new_empty_template_only(self) -> None:
-        msg = """--- Cursor Command: task-new ---
-创建带编号任务。
-
-下一步：缺口偏方案 → `/task-explore`。
-
-[TASK_NEW_INPUT_START]
---- End Command ---
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 2)
-        self.assertTrue(payload["empty"])
-        self.assertEqual(payload["requirement"], "")
-        self.assertEqual(payload["exit_markdown"], "要做什么？")
-
-    def test_extract_new_legacy_no_marker(self) -> None:
-        msg = """--- Cursor Command: task-new ---
-**MUST 先读取并执行** skill `task-workflow`。
-
-**输入**：需求描述；可选 kebab-case slug。
-
-下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
-
-给 docs/README 加一节本地安装说明
---- End Command ---
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 0)
-        self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
-        self.assertEqual(payload["source"], "template_tail")
-
-    def test_extract_new_fence_line_is_not_requirement(self) -> None:
-        msg = """下一步：缺口偏方案 → `/task-explore`；范围已清 → `/task-propose`。
-
-[TASK_NEW_INPUT_START]
-
---- NOT-A-HOST-I-KNOW END ---
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 2)
-        self.assertTrue(payload["empty"])
-        self.assertEqual(payload["requirement"], "")
-
-    def test_extract_new_cuts_at_any_labeled_fence(self) -> None:
-        msg = """下一步：缺口偏方案 → `/task-explore`。
-
-[TASK_NEW_INPUT_START]
-
-给 docs/README 加一节本地安装说明
---- FOO QUUX ---
-这段是围栏之后的宿主尾巴
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 0)
-        self.assertEqual(
-            payload["requirement"],
-            "给 docs/README 加一节本地安装说明",
-        )
-        self.assertNotIn("FOO QUUX", payload["requirement"])
-        self.assertNotIn("宿主尾巴", payload["requirement"])
-
-    def test_extract_new_start_end_section_invocation(self) -> None:
-        msg = """--- ARBITRARY BLOCK START ---
-/task-new 给 docs/README 加一节本地安装说明
---- ARBITRARY BLOCK END ---
-"""
-        code, payload = self._run("extract-new", "--message", msg)
-        self.assertEqual(code, 0)
-        self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
-        self.assertEqual(payload["source"], "section")
-
-    def test_extract_new_no_tasks_dir(self) -> None:
-        empty = Path(tempfile.mkdtemp(prefix="taskctl-empty-"))
-        try:
-            from io import StringIO
-            from contextlib import redirect_stdout, redirect_stderr
-
-            out = StringIO()
-            err = StringIO()
-            with redirect_stdout(out), redirect_stderr(err):
-                code = tc.main(
-                    [
-                        "--root",
-                        str(empty),
-                        "extract-new",
-                        "--message",
-                        "/task-new 给 docs/README 加一节本地安装说明\n",
-                    ]
-                )
-            payload = json.loads(out.getvalue())
-            self.assertEqual(code, 0)
-            self.assertEqual(payload["requirement"], "给 docs/README 加一节本地安装说明")
-        finally:
-            shutil.rmtree(empty, ignore_errors=True)
 
 
 if __name__ == "__main__":

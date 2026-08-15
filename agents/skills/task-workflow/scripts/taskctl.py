@@ -16,7 +16,6 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py notes
   python3 scripts/taskctl.py notes --init
   python3 scripts/taskctl.py notes --set-section 特殊要求 --body "验收必须带回归清单"
-  python3 scripts/taskctl.py extract-new --message-file /tmp/msg.txt
 
 `--root` defaults to the nearest ancestor that contains `tasks/`.
 `--repo` is a workspace-relative path to a git root that this task will modify.
@@ -93,27 +92,9 @@ STATUS_LINE_RE = re.compile(
     re.MULTILINE,
 )
 CHECKBOX_ITEM_RE = re.compile(r"^\s*-\s*\[([ xX])\]\s+(.+?)\s*$", re.MULTILINE)
-VERIFICATION_ITEM_RE = re.compile(
-    r"(验证|测试|回归|冒烟|healthcheck|healthy|smoke|e2e|"
-    r"\bqa\b|\btest\b|verify|validation|lint|typecheck)",
-    re.IGNORECASE,
-)
 FM_STATUS_RE = re.compile(r"^(status:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 FM_ID_RE = re.compile(r"^(id:\s*)(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 META_ID_RE = re.compile(r"^\*\*id[：:]\*\*\s*(T\d{4})\s*$", re.MULTILINE | re.IGNORECASE)
-TASK_NEW_INPUT_MARKER = "[TASK_NEW_INPUT_START]"
-TASK_NEW_INVOKE_RE = re.compile(r"^[ \t]*/task-new\b(?:[ \t]+(\S.*))?$", re.IGNORECASE)
-TASK_NEW_FENCE_LINE_RE = re.compile(r"^(?:---(?:\s+.+?\s+---)?)$")
-TASK_NEW_TAG_LINE_RE = re.compile(r"^</?[A-Za-z][\w:-]*(?:\s[^>]*)?>.*$")
-TASK_NEW_TEMPLATE_TAIL_RE = re.compile(r"(?m)^下一步：")
-TASK_NEW_SECTION_RE = re.compile(
-    r"---\s*(.+?)\s+START\s*---\s*(.*?)\s*---\s*\1\s+END\s*---",
-    re.DOTALL | re.IGNORECASE,
-)
-TASK_NEW_USER_TAG_RE = re.compile(
-    r"<(user_query|user-query|user_message|user)>\s*(.*?)\s*</\1>",
-    re.DOTALL | re.IGNORECASE,
-)
 
 
 @dataclass
@@ -155,146 +136,6 @@ class TaskError(Exception):
 def emit(payload: dict[str, Any], *, code: int = 0) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return code
-
-
-def _is_task_new_boundary_line(line: str) -> bool:
-    """Protocol / document delimiters are never requirement text.
-
-    A labeled `--- … ---` line, a lone `---`, or a markup-tag line is a
-    boundary regardless of the host-specific label inside it.
-    """
-    s = line.strip()
-    if not s:
-        return False
-    if TASK_NEW_FENCE_LINE_RE.match(s):
-        return True
-    if s.startswith("<") and TASK_NEW_TAG_LINE_RE.match(s):
-        return True
-    return False
-
-
-def _task_new_structure_only(text: str) -> bool:
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    if not lines:
-        return True
-    return all(
-        _is_task_new_boundary_line(ln) or ln in {"EOF", "```"} or ln.startswith("```")
-        for ln in lines
-    )
-
-
-def _take_until_boundary(text: str) -> str:
-    kept: list[str] = []
-    for line in text.splitlines():
-        if _is_task_new_boundary_line(line):
-            break
-        kept.append(line)
-    body = "\n".join(kept).strip()
-    return "" if _task_new_structure_only(body) else body
-
-
-def _task_new_after_marker(message: str) -> str:
-    if TASK_NEW_INPUT_MARKER not in message:
-        return ""
-    after = message.rsplit(TASK_NEW_INPUT_MARKER, 1)[1]
-    after = after.split("\n", 1)[1] if "\n" in after else ""
-    return _take_until_boundary(after)
-
-
-def _task_new_after_template_tail(message: str) -> str:
-    matches = list(TASK_NEW_TEMPLATE_TAIL_RE.finditer(message))
-    if not matches:
-        return ""
-    after = message[matches[-1].start() :]
-    after = after.split("\n", 1)[1] if "\n" in after else ""
-    if TASK_NEW_INPUT_MARKER in after:
-        after = after.split(TASK_NEW_INPUT_MARKER, 1)[0]
-    return _take_until_boundary(after)
-
-
-def _task_new_from_invocations(text: str) -> str:
-    lines = text.splitlines()
-    for i, line in enumerate(lines):
-        m = TASK_NEW_INVOKE_RE.match(line)
-        if not m:
-            continue
-        chunks: list[str] = []
-        first = (m.group(1) or "").strip()
-        if first:
-            chunks.append(first)
-        for extra in lines[i + 1 :]:
-            if _is_task_new_boundary_line(extra) or TASK_NEW_INVOKE_RE.match(extra):
-                break
-            chunks.append(extra)
-        body = _take_until_boundary("\n".join(chunks))
-        if body:
-            return body
-    return ""
-
-
-def _task_new_tagged_user_blocks(message: str) -> list[str]:
-    return [m.group(2).strip() for m in TASK_NEW_USER_TAG_RE.finditer(message or "")]
-
-
-def _looks_like_task_new_template(text: str) -> bool:
-    return TASK_NEW_INPUT_MARKER in text or (
-        "extract-new" in text and "task-workflow" in text
-    )
-
-
-def _task_new_from_start_end_sections(message: str) -> str:
-    best = ""
-    for m in TASK_NEW_SECTION_RE.finditer(message or ""):
-        body = m.group(2).strip()
-        if _looks_like_task_new_template(body):
-            picked = _task_new_after_marker(body) or _task_new_from_invocations(body)
-        else:
-            picked = _task_new_from_invocations(body) or _take_until_boundary(body)
-        if len(picked) > len(best):
-            best = picked
-    return best
-
-
-def extract_task_new_input(message: str) -> dict[str, Any]:
-    """Pull /task-new requirement out of a rendered host message.
-
-    Do not subtract against the rendered block: hosts append user text into
-    the same command block, so "appears in this template" is circular.
-
-    After a known user channel (marker / slash invoke / tagged block),
-    stop at the next structural boundary line. Boundary lines themselves
-    are never a requirement.
-    """
-    raw = message or ""
-    tagged = _task_new_tagged_user_blocks(raw)
-    tagged_invoke = ""
-    for block in tagged:
-        body = _task_new_from_invocations(block)
-        if len(body) > len(tagged_invoke):
-            tagged_invoke = body
-    candidates = (
-        ("marker", _task_new_after_marker(raw)),
-        ("section", _task_new_from_start_end_sections(raw)),
-        ("user_tag_invoke", tagged_invoke),
-        ("slash", _task_new_from_invocations(raw)),
-        ("template_tail", _task_new_after_template_tail(raw)),
-    )
-    source = "empty"
-    requirement = ""
-    for name, body in candidates:
-        body = body.strip()
-        if _task_new_structure_only(body):
-            continue
-        if len(body) > len(requirement):
-            source = name
-            requirement = body
-    empty = not bool(requirement)
-    return {
-        "requirement": requirement,
-        "source": "empty" if empty else source,
-        "empty": empty,
-        "candidates": {name: body for name, body in candidates},
-    }
 
 
 def today_str() -> str:
@@ -356,7 +197,10 @@ def slugify_from_text(text: str, *, max_parts: int = 6) -> str:
             break
     slug = "-".join(parts)
     if not SLUG_RE.match(slug):
-        raise TaskError("cannot infer slug from text; pass --slug")
+        raise TaskError(
+            "cannot infer slug from title (non-ASCII title?); "
+            "pass --slug with a short English kebab-case name"
+        )
     return slug
 
 
@@ -2525,41 +2369,31 @@ def resolve_change_target(
     }
 
 
-def classify_checkbox_item(text: str) -> str:
-    return "verification" if VERIFICATION_ITEM_RE.search(text) else "implementation"
-
-
 def parse_openspec_checkboxes(text: str) -> list[dict[str, Any]]:
+    """Report checkbox facts only.
+
+    Whether a leftover item is "just verification" or real implementation is a
+    semantic call: it belongs to the Agent (who reads the item and explains it)
+    and the user (who decides), never to a keyword table here.
+    """
     items: list[dict[str, Any]] = []
     for match in CHECKBOX_ITEM_RE.finditer(text):
-        title = match.group(2).strip()
         items.append(
             {
-                "text": title,
+                "text": match.group(2).strip(),
                 "done": match.group(1).lower() == "x",
-                "kind": classify_checkbox_item(title),
             }
         )
     return items
 
 
-def remaining_kind_of(items: list[dict[str, Any]]) -> str:
-    remaining = [item for item in items if not item["done"]]
-    if not remaining:
-        return "none"
-    if all(item["kind"] == "verification" for item in remaining):
-        return "verification_only"
-    return "implementation"
+def remaining_state_of(items: list[dict[str, Any]]) -> str:
+    return "remaining" if any(not item["done"] for item in items) else "none"
 
 
-def aggregate_remaining_kind(reports: list[dict[str, Any]]) -> str:
-    kinds = {str(report.get("remaining_kind") or "none") for report in reports}
-    kinds.discard("none")
-    if "implementation" in kinds:
-        return "implementation"
-    if "verification_only" in kinds:
-        return "verification_only"
-    return "none"
+def aggregate_remaining_state(reports: list[dict[str, Any]]) -> str:
+    states = {str(report.get("remaining_state") or "none") for report in reports}
+    return "remaining" if "remaining" in states else "none"
 
 
 def empty_openspec_report() -> dict[str, Any]:
@@ -2567,7 +2401,7 @@ def empty_openspec_report() -> dict[str, Any]:
         "total": 0,
         "complete": 0,
         "remaining": 0,
-        "remaining_kind": "none",
+        "remaining_state": "none",
         "remaining_items": [],
     }
 
@@ -2584,7 +2418,7 @@ def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
         "total": len(items),
         "complete": complete,
         "remaining": len(remaining_items),
-        "remaining_kind": remaining_kind_of(items),
+        "remaining_state": remaining_state_of(items),
         "remaining_items": remaining_items,
     }
 
@@ -2622,7 +2456,7 @@ def inspect_change_remainder(target: dict[str, Any]) -> dict[str, Any]:
             "total": 0,
             "complete": 0,
             "remaining": 1,
-            "remaining_kind": "implementation",
+            "remaining_state": "remaining",
             "remaining_items": [],
         }
     last_report = empty_openspec_report()
@@ -2649,26 +2483,28 @@ def inspect_change_remainder(target: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def verification_only_confirm_markdown(
-    task_id: str, leftovers: list[dict[str, Any]]
-) -> str:
+def remaining_confirm_markdown(task_id: str, leftovers: list[dict[str, Any]]) -> str:
     lines = [
-        "## 只剩测试/验证，确认是否继续归档",
+        "## OpenSpec 仍有未完成项，确认是否继续归档",
         "",
-        f"{task_id} 的 OpenSpec 仍有未完成 checkbox，但全部判定为测试/验证。",
+        f"{task_id} 的 OpenSpec 尚未全部完成。剩余项原文如下：",
         "",
-        "**剩余项：**",
     ]
     for row in leftovers:
         lines.append(f"- `{row['name']}` {row['complete']}/{row['total']}")
         for item in row.get("remaining_items") or []:
             lines.append(f"  - {item['text']}")
+        if not (row.get("remaining_items") or []):
+            lines.append(f"  - {row.get('message') or '无法读取 tasks.md 明细'}")
     lines.extend(
         [
             "",
+            "**Agent**：逐条说明剩余项是什么性质（只差验证，还是功能未完成），"
+            "给出判断依据，交用户裁决；**不得**自行认定「只剩测试」并归档。",
+            "",
             "**请选择：**",
             f"- 继续归档（强行合并）：`taskctl archive {task_id} --force-merge`",
-            "- 先做完验证再归档",
+            "- 先做完剩余项再归档",
             "- 中止",
             "",
             "未确认前 **不得** 继续 archive。",
@@ -2705,7 +2541,7 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
     for target in targets:
         progress = openspec_checkbox_progress(target)
         target["progress"] = progress
-        target["remaining_kind"] = progress["remaining_kind"]
+        target["remaining_state"] = progress["remaining_state"]
         target["remaining_items"] = progress["remaining_items"]
         for item in progress["remaining_items"]:
             remaining_items.append({"change": target.get("name") or "", **item})
@@ -2719,7 +2555,7 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             "task": asdict(info),
             "targets": targets,
             "openspec_remaining": {
-                "kind": aggregate_remaining_kind(targets),
+                "state": aggregate_remaining_state(targets),
                 "complete": complete,
                 "total": total,
                 "remaining": total - complete,
@@ -3169,47 +3005,46 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
         for row in blocking_rows
         if row["state"] == "missing" or row["remaining"] > 0
     ]
-    verification_only = bool(incomplete_rows) and all(
-        row["state"] != "missing" and row["remaining_kind"] == "verification_only"
-        for row in incomplete_rows
-    )
+    missing_rows = [row for row in incomplete_rows if row["state"] == "missing"]
     if active_or_incomplete and not allow_remaining_openspec:
-        if verification_only:
-            print(
-                f"只剩测试/验证：{info.task_id} — 确认是否强行合并归档",
-                file=sys.stderr,
+        # A recorded change whose path is gone is a bookkeeping error, not a
+        # judgement call — keep it a hard failure.
+        if missing_rows:
+            raise TaskError(
+                "recorded OpenSpec change(s) not found: "
+                + "; ".join(row["message"] for row in missing_rows if row.get("message"))
+                + "; fix the task README or pass --allow-active-openspec / --force-merge"
             )
-            return emit(
-                {
-                    "ok": False,
-                    "result": "needs_confirm",
-                    "reason": "verification_only_remaining",
-                    "taskId": info.task_id,
-                    "remaining": incomplete_rows,
-                    "exit_markdown": verification_only_confirm_markdown(
-                        info.task_id, incomplete_rows
-                    ),
-                    "user_actions": [
-                        {
-                            "id": "force_merge",
-                            "label": (
-                                f"继续归档（强行合并）："
-                                f"taskctl archive {info.task_id} --force-merge"
-                            ),
-                        },
-                        {
-                            "id": "finish_verification",
-                            "label": "先做完验证再归档",
-                        },
-                        {"id": "abort", "label": "中止"},
-                    ],
-                },
-                code=2,
-            )
-        raise TaskError(
-            "active/incomplete OpenSpec changes remain: "
-            + "; ".join(active_or_incomplete)
-            + "; archive them first or pass --allow-active-openspec / --force-merge"
+        print(
+            f"OpenSpec 未完成：{info.task_id} — 列出剩余项，等用户裁决",
+            file=sys.stderr,
+        )
+        return emit(
+            {
+                "ok": False,
+                "result": "needs_confirm",
+                "reason": "openspec_remaining",
+                "taskId": info.task_id,
+                "remaining": incomplete_rows or blocking_rows,
+                "exit_markdown": remaining_confirm_markdown(
+                    info.task_id, incomplete_rows or blocking_rows
+                ),
+                "user_actions": [
+                    {
+                        "id": "force_merge",
+                        "label": (
+                            f"继续归档（强行合并）："
+                            f"taskctl archive {info.task_id} --force-merge"
+                        ),
+                    },
+                    {
+                        "id": "finish_remaining",
+                        "label": "先做完剩余项再归档",
+                    },
+                    {"id": "abort", "label": "中止"},
+                ],
+            },
+            code=2,
         )
     if active_or_incomplete:
         note_prefix = (
@@ -3528,7 +3363,10 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_p.add_argument(
         "--hint",
         default="",
-        help="user message / context text for deterministic hint extract",
+        help=(
+            "task identifiers in play (TNNNN / tasks path / slug) plus a short "
+            "intent summary; only identifiers are read, no NLU, no verbatim dump"
+        ),
     )
     resolve_p.add_argument(
         "--cwd",
@@ -3736,58 +3574,13 @@ def build_parser() -> argparse.ArgumentParser:
     notes_p.add_argument("--dry-run", action="store_true")
     notes_p.set_defaults(func=cmd_notes)
 
-    extract_p = sub.add_parser(
-        "extract-new",
-        help="extract /task-new requirement from a rendered host message",
-    )
-    extract_p.add_argument(
-        "--message-file",
-        default="",
-        help="path to the full rendered message, or - for stdin",
-    )
-    extract_p.add_argument(
-        "--message",
-        default="",
-        help="inline message (tests / short); ignored if --message-file is set",
-    )
-    extract_p.set_defaults(func=cmd_extract_new)
-
     return p
-
-
-def cmd_extract_new(_root: Path | None, args: argparse.Namespace) -> int:
-    if args.message_file:
-        if args.message_file == "-":
-            raw = sys.stdin.read()
-        else:
-            raw = Path(args.message_file).read_text(encoding="utf-8")
-    else:
-        raw = args.message
-    extracted = extract_task_new_input(raw)
-    empty = bool(extracted["empty"])
-    print(
-        f"需求抽取：{'空' if empty else '非空'} — {extracted['source']}",
-        file=sys.stderr,
-    )
-    payload = {
-        "ok": True,
-        "result": "empty" if empty else "extracted",
-        "empty": empty,
-        "requirement": extracted["requirement"],
-        "source": extracted["source"],
-    }
-    if empty:
-        payload["exit_markdown"] = "要做什么？"
-        return emit(payload, code=2)
-    return emit(payload)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.cmd == "extract-new":
-            return cmd_extract_new(None, args)
         root = (args.root or find_repo_root()).resolve()
         if not (root / "tasks").exists():
             raise TaskError(f"tasks/ not found under {root}")

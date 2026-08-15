@@ -34,11 +34,10 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 
 | 子命令 | 用途 | 退出码 |
 |--------|------|--------|
-| `extract-new` | 从渲染后的完整消息机械抽出 `/task-new` 需求 | 0 非空；**2** 空 |
 | `list` | 列出活跃任务（JSON） | 0 |
 | `resolve [query] --command <cmd> [--hint ...] [--cwd ...] [--git-branch ...]` | Task Resolution Gate；无 query 时自动推断 | 0 确定性唯一；**2** 零/多命中/需确认 |
 | `set-status <query> <status>` | 同步写 README status + INDEX 行 | 0 / 2 |
-| `new [--slug <slug>] [--title ...] [--date YYYY-MM-DD]` | 分配 `TNNNN`、建目录与 README 骨架、更新 INDEX。`--slug` / `--title` 至少其一；无 slug 时从 title 推导 | 0 |
+| `new [--slug <slug>] [--title ...] [--date YYYY-MM-DD]` | 分配 `TNNNN`、建目录与 README 骨架、更新 INDEX。`--slug` / `--title` 至少其一；无 slug 时从 title 推导（中文 title 推不出，须显式给） | 0 |
 | `archive <query> [--allow-missing-changes] [--force-merge]` | status→archived、移至 `tasks/archive/`、更新 INDEX | 0 / 2 |
 | `repo-roots <path> [...]` | 解析为去重后的 git 根（工作区相对路径；`.` = 工作区自身，仅当工作区就是目标仓时使用） | 0 / 1 |
 | `scope-repos <query> [--cwd ...]` | 解析 README 涉及面；`checkout` 仅为角色=必须的仓 | 0 / 2 |
@@ -51,16 +50,16 @@ python3 <this-skill>/scripts/taskctl.py <cmd> ...
 - stdout：**仅 JSON**（`ok` / `result` / `task` 或 `exit_markdown`）。
 - stderr：一行人读摘要（如「当前任务：T0002 — path」）。
 - `resolve`/`set-status`/`archive` 在零/多命中或 `needs_confirm` 时打印 `exit_markdown`，**中止主流程**，等待用户选择。
-- `new` 只建骨架；概述/现状缺口/涉及面/工作上下文/验收等正文仍由 Agent 填写。`--slug` 可省略：有 `--title` 且含足够 ASCII 词时 CLI 会推导 slug；中文为主的标题由 Agent 按语义自推 kebab-case，**不要为此问用户**。
-- `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。只剩测试/验证 checkbox 时 **MUST** `needs_confirm`（退出码 2），列出剩余项并等用户选择；禁止自行当结案停止，也禁止未确认就归档。用户确认「继续归档 / 强行合并」或本条已写该口令后，用 `--force-merge` 覆盖未完成 OpenSpec（原因写入 `changes.md`）。仍有实现项则硬失败，除非用户明确强行合并。
+- `new` 只建骨架；概述/现状缺口/涉及面/工作上下文/验收等正文仍由 Agent 填写。`--slug` 仅在 `--title` 含足够 ASCII 词时可省略；中文为主的标题 CLI 推不出，Agent **MUST** 按语义自译一个 kebab-case 传入，**不要为此问用户**。
+- `archive` 默认要求已有 `changes.md`（OpenSpec 归档与正文结论先做完）。**只要**还有未完成 checkbox 就 `needs_confirm`（退出码 2），原样列出剩余项等用户裁决；CLI **不判断**剩余项是「只差验证」还是「功能没写完」——那是 Agent 读原文后说明、用户拍板的事。禁止自行当结案停止，也禁止未确认就归档。用户确认「继续归档 / 强行合并」或本条已写该口令后，用 `--force-merge` 覆盖未完成 OpenSpec（原因写入 `changes.md`）。README 记录的 change 路径找不到属账目错误，硬失败。
 - `prepare-branches`：身份确定后、**写入目标代码仓之前**跑。优先级为显式 `--worktree` → README 已记录 checkout → 已持有 task 分支的 worktree → canonical 仓。显式 checkout 不存在时创建 linked worktree；工作区外路径仅在 `git-common-dir` 同源时可续用。配置了 `origin` 但 fetch 失败必须阻断，禁止从旧本地基线继续。`--from-task` 会自动回写工作上下文；部分仓成功后也保存成功项。无必须仓则跳过。已在目标分支允许 dirty 续作；其他 dirty 情况停下来确认。支持 `--dry-run`；不 push；禁止擅自 stash/reset/force checkout。
-- `execution-context`：`task-apply` / archive 写操作前 MUST 调用；不得依赖当前 cwd 猜 OpenSpec 根。JSON 含 `openspec_remaining.kind`（`none` / `verification_only` / `implementation`）与剩余 checkbox 文本，供 archive 门禁判断。
+- `execution-context`：`task-apply` / archive 写操作前 MUST 调用；不得依赖当前 cwd 猜 OpenSpec 根。JSON 含 `openspec_remaining.state`（`none` / `remaining`）与剩余 checkbox **原文**，性质由 Agent 判断。
 - `checkpoint`：`task-apply` 开始、每个 OpenSpec task 完成、暂停/错误、进入测试和全部完成时 MUST 调用；`progress.md` 不再可选。
 - `scope-repos`：只读解析涉及面。`checkout` = 必须仓路径；建议/排除不在内。cwd 出现在 `cwd_*` 报告里，不自动进入 checkout。
 - `git-summary`：只读；路径以仓库相对前缀输出；禁止为采摘要而改工作区；`--repo` 同样只传必须仓。
 - `notes`：读/建/改工作区根 `.task-workflow.md`。`--init` 仅在文件不存在时建骨架；`--set-section` 在缺失时先建骨架再写入一节；`--from-file` 整文件替换。`resolve` / `new` JSON 亦含 `workflow_notes`。
-- `extract-new`：只读解析渲染后的 `/task-new` 消息；**不需要** `tasks/`。`--message-file`（`-` = stdin）或 `--message`。stdout 含 `empty` / `requirement` / `source`。
-- 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。`extract-new` 忽略 `--root`。
+- 可选 `--root <工作区根>`；默认从 cwd 向上探测含 `tasks/` 的目录。
+- `taskctl` **不做**自然语言理解：需求归纳、title / slug 命名由 Agent 完成后作为参数传入。不要新增「从消息里挖需求」这类解析子命令。
 
 ## 任务编号与索引
 
@@ -107,7 +106,7 @@ next_id: 3
    - 用户刚对该任务打 tag / push，或说「归档当前任务」且上文编号唯一
    - 上一条用户或助手已点名唯一 `TNNNN`
 3. 上文出现多个不同 `TNNNN` 且无法判断焦点 → `--infer`，**把这些编号都放进 `--hint`**；`needs_confirm` 时再问
-4. `--hint` MUST 包含：用户本条原文 + 本会话已点名的 `TNNNN`（若有）。**禁止**只传命令名（如 `/task-archive`）丢掉上文编号，再拿多个 `in_progress` 去问用户
+4. `--hint` MUST 带上本条与本会话里的**任务线索**：已点名的 `TNNNN`、`tasks/...` 路径、slug，外加一句你对本次意图的概括。`taskctl` 只从 hint 里取这些标识符，不做语义理解，所以**不必逐字转录**整条消息——但**禁止**只传命令名（如 `/task-archive`）丢掉上文编号，再拿多个 `in_progress` 去问用户
 
 ```bash
 # 显式（本条或上文已有唯一编号时 MUST 走这条）
@@ -115,7 +114,8 @@ python3 <this-skill>/scripts/taskctl.py resolve <TNNNN|slug|path> --command <当
 
 # 未指定且上文也无唯一焦点：自动推断
 python3 <this-skill>/scripts/taskctl.py resolve --infer --command <当前命令名> \
-  --hint "<用户消息原文> <本会话已点名的 TNNNN，若有>" [--cwd "$PWD"] [--git-branch "<当前分支>"]
+  --hint "<本次意图概括> <已点名的 TNNNN / tasks 路径 / slug，若有>" \
+  [--cwd "$PWD"] [--git-branch "<当前分支>"]
 ```
 
 - 退出码 **0**（`result=unique`，`confidence=deterministic`）：继续主流程。
@@ -316,22 +316,19 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 ### task-new
 
-**抽取本条需求（第一条工具调用，再决定是否追问）**
+**归纳本次需求（你自己做，不要交给脚本）**
 
-command 渲染后，固定模板与用户正文出现在**同一个 command block**。**禁止**用「没有逐字出现在本模板」做减法：用户原文被追加进 block 后，它已经「出现在本模板」里，抄出必空，会误问「要做什么」。
+理解自然语言是 Agent 的职责，`taskctl` 只做确定性记账。**禁止**把「哪段是需求」外包给文本解析：既不要逐字比对模板做减法，也不要把渲染原文转存成文件让脚本去挖——转录有损且不可校验，漏抄会静默变成「空需求」，反过来误问用户。
 
-MUST 先把宿主渲染的完整原文交给 CLI（含标记后正文与 `/task-new` 调用；禁止只重写 command 模板；不需要 `tasks/`）：
+command 渲染后，固定模板与用户正文在**同一个 block**：正文一般追加在 `[TASK_NEW_INPUT_START]` 之后，或跟在 `{{slash:task-new}}` 同一行/其后。按语义读出来即可，不要按宿主围栏名字（`--- X START ---`、`<user_query>` 等）列规则。
 
-```bash
-python3 <this-skill>/scripts/taskctl.py extract-new --message-file <本条消息临时文件>
-```
+1. 一句话概括需求 → 首条回复写 `需求：<概括>`
+2. 由概括定 `--title`（简体中文标题）与 `--slug`（短英文 kebab-case；中文 title 推不出 slug，**MUST 自己给** `--slug`，否则 `taskctl new` 会报错）
+3. 立刻创建，**禁止**追问 slug
 
-- 退出码 **0**（`empty=false`）：首条回复写 `需求：<requirement>`，**立刻创建**。自行推导 title 与 kebab-case slug；用户给了 slug 才用用户值。服务清单/目标文件/实现方式/验收细节不全写入「现状缺口」，**禁止**追问「要做什么」或要 slug。
-- 退出码 **2**（`empty=true`）：才问一句「要做什么」，不要给填写模板。例如光秃 `{{slash:task-new}}`、只有「帮我建个任务」。
+只有除模板外确实**没有任何需求信息**（光秃 `{{slash:task-new}}`、「帮我建个任务」）才问一句「要做什么？」，不要给填写模板。服务清单 / 目标文件 / 实现方式 / 验收细节不全 **不是**追问理由 —— 记入「现状缺口」。
 
-`extract-new` 只从用户通道取正文（标记之后、`/task-new` 调用、`--- NAME START ---`…`END` 节、用户向标签），并在下一道**结构围栏行**处截断：`--- … ---`、孤行 `---`、仅 markup 标签的行。围栏行本身不是需求，不要按宿主名字列举。取最长非空候选，不要覆盖其结果。
-
-正例（MUST 创建）：`{{slash:task-new}} 给 docs/README 加一节本地安装说明`。未写清安装步骤记入现状缺口，不能追问「要做什么」。
+正例（MUST 创建）：`{{slash:task-new}} 给 docs/README 加一节本地安装说明` → `需求：给 docs/README 补本地安装说明` → `--title "补充 README 本地安装说明" --slug readme-local-install`。未写清安装步骤记入现状缺口。
 
 然后：
 
@@ -389,14 +386,13 @@ python3 <this-skill>/scripts/taskctl.py extract-new --message-file <本条消息
 ### task-archive
 
 1. `taskctl resolve` Gate（本条或本会话上文有明确 `TNNNN` 则显式传；否则 `--infer` 且 `--hint` 带上文编号；`needs_confirm` 则停）
-2. `taskctl execution-context <id>`，读取各 target 的 `remaining_kind` / `openspec_remaining`。**先分类剩余 checkbox，再决定是否委托 `openspec-archive-change`：**
-   - `remaining_kind=none`：在各 target 的 planning root/store 依次委托 `openspec-archive-change`
-   - `remaining_kind=verification_only`：**MUST 向用户确认**是否继续 archive。列出剩余测试/验证项与完成数（如 14/18）。禁止把「未完成」直接当成结案停止，也禁止未确认就归档。用户确认「继续归档」或本条已写「强行合并 / `--force-merge`」后再委托 `openspec-archive-change`，随后 `taskctl archive <id> --force-merge`
-   - `remaining_kind=implementation`：停止并列出未完成实现项。仅当用户明确「强行合并」时才用 `--force-merge` 继续
+2. `taskctl execution-context <id>`，读取 `openspec_remaining`（`state` + 剩余项原文）。**判断性质是你的活，不是 CLI 的：**
+   - `state=none`：在各 target 的 planning root/store 依次委托 `openspec-archive-change`
+   - `state=remaining`：**MUST 向用户确认**。逐条读剩余项原文，说明它是「只差验证」还是「功能未完成」并给出依据（别只看到「测试 / healthcheck / lint」字样就当验证项——「实现 healthcheck 接口」是实现），连同完成数（如 14/18）一起给用户。禁止把「未完成」直接当结案停止，也禁止未确认就归档。用户确认「继续归档」或本条已写「强行合并 / `--force-merge`」后再委托 `openspec-archive-change`，随后 `taskctl archive <id> --force-merge`
    任一 change 归档或 delta sync 失败即停止，不得继续 task 归档
 3. **晋升设计文档**（若 `<taskRoot>/design/` 存在）：按 `design/README.md` 归档落点表，把文档复制到目标仓正式位置（`docs/design/<domain>/`、ADR、knowledge）；更新该仓 INDEX/README 交叉引用并核对链接。落点不明则停下来问，不要发明目录。`design/` **原件保留**，随 task 目录归档作快照。无 `design/` 则跳过
 4. 按 execution-context 对每仓运行 `git-summary --repo <canonical> --checkout <canonical>=<checkout> --branch <记录分支> --base <记录基线>`，同时纳入提交、staged 与 working-tree diff
-5. `taskctl archive <id>` 机械校验：无活跃 OpenSpec、验收全勾选、progress 有验证证据、checkout clean。只剩测试/验证时 CLI 亦会 `needs_confirm`（退出码 2）。确需跳过时使用对应显式 `--allow-*` 或 `--force-merge`（强行合并未完成 OpenSpec），覆盖原因自动写入 `changes.md`
+5. `taskctl archive <id>` 机械校验：无活跃 OpenSpec、验收全勾选、progress 有验证证据、checkout clean。仍有未完成 checkbox 时 CLI 会 `needs_confirm`（退出码 2）并列出原文。确需跳过时使用对应显式 `--allow-*` 或 `--force-merge`（强行合并未完成 OpenSpec），覆盖原因自动写入 `changes.md`
 6. archive 内置 status→archived，并在移动/INDEX 写入失败时回滚
 7. 桥接：列出已晋升文档路径
 
