@@ -28,7 +28,9 @@ task-new → task-explore? → task-design? → task-propose → task-apply → 
 python3 <this-skill>/scripts/taskctl.py <cmd> ...
 ```
 
-`<this-skill>` 是包含本 `SKILL.md` 的目录（安装后常见于 `~/.cursor/skills/task-workflow/` 或项目 `.cursor/skills/task-workflow/`）。**不要**假设脚本在当前仓库根下。
+`<this-skill>` 是包含本 `SKILL.md` 的目录（= 本次读取 `SKILL.md` 的路径去掉文件名；安装后常见于 `~/.cursor/skills/task-workflow/`、`~/.claude/skills/task-workflow/`、`~/.kiro/skills/task-workflow/` 或项目 `.cursor/skills/task-workflow/`）。**不要**假设脚本在当前仓库根下。
+
+本文与各 command 中出现的 `taskctl` **一律是上面这条 `python3` 调用的简写**。**PATH 上不存在名为 `taskctl` 的可执行文件，MUST NOT 直接执行 `taskctl ...`**（会稳定报 command not found，属于可避免的失败调用）。首次调用前先确定 `<this-skill>` 绝对路径，之后所有子命令都用完整 `python3 <this-skill>/scripts/taskctl.py ...` 形式。
 
 | 子命令 | 用途 | 退出码 |
 |--------|------|--------|
@@ -314,20 +316,18 @@ python3 <this-skill>/scripts/taskctl.py prepare-branches \
 
 **抽取本条需求（先做，再决定是否追问）**
 
-command 渲染后，固定模板与用户参数可能出现在**同一个 command block**。不得把整个 command block 一概视为流程说明。`task-new` command 中的 `[TASK_NEW_INPUT_START]` 是固定模板结束边界；命令系统追加在该标记后的所有非空文本都是用户需求。即使宿主没有保留此标记，下列内容仍是需求候选：
+command 渲染后，固定模板与用户正文出现在**同一个 command block**。判定只用一条机械规则：**凡是没有逐字出现在 `task-new` command 模板里的自然语言，都是用户需求**；模板末尾 `[TASK_NEW_INPUT_START]` 之后的文本必然是需求。不得因为文本位于 command block 内、或读起来像流程说明就整块丢弃。
 
-- 用户原始消息中 `{{slash:task-new}}` 调用后追加的正文；
-- 固定模板末尾之后新增的自然语言；
-- 冒号、引号后的描述，以及任何能回答「要改什么 / 建什么」的句子。
+MUST 按序执行：
 
-MUST 按以下顺序判定：
+1. 抄出非模板文本，在首条回复输出一行 `需求：<原文>`。
+2. 抄出非空 → **立刻创建**。自行推导 title 与 kebab-case slug（英文语义、短、稳定）；用户给了 slug 才使用用户值。
+3. 服务清单、目标文件、实现方式、验收细节不完整 ≠ 没有需求；写入「现状缺口」，**禁止**停下来要求用户重述需求或确认 slug。
+4. 只有抄出为空（本条逐字等于模板全文，如光秃 `{{slash:task-new}}`、只有「帮我建个任务」）才追问一句「要做什么」，且不要给填写模板。
 
-1. 先排除可逐字识别的固定模板段（frontmatter、MUST 先读、输入规则、下一步桥接等），保留追加文本；**只排除已知模板，不得因文本位于 command block 内就排除整块**。
-2. 用保留文本尝试写出一句「要做什么」的需求摘要。能写出摘要 → **输入非空，立刻创建**。自行推导 title 与 kebab-case slug（英文语义、短、稳定）；用户给了 slug 才使用用户值。
-3. 服务清单、目标文件、实现方式、验收细节等不完整，不等于没有需求；写入「现状缺口」，**禁止**停下来要求用户重述需求或确认 slug。
-4. 只有排除固定模板后没有任何追加文本，且用户原始消息也完全没有改动主题，才追问一句「要做什么」。例如：光秃 `{{slash:task-new}}`、只有「帮我建个任务」、或确实只有固定流程说明。不要给填写模板。
+**禁止**以「本条消息未提供改动主题」为由停下，除非已逐字比对确认整条消息都是模板。
 
-正例（MUST 创建）：`{{slash:task-new}} 在本地起一套完整的 fai 测试平台，服务和数据库使用 docker compose，镜像仅在本地构建`。可摘要为「搭建基于 Docker Compose 的 FAI 本地完整测试平台」；尚未给出服务清单应记为现状缺口，不能追问「要做什么」。
+正例（MUST 创建）：`{{slash:task-new}} 在本地起一套完整的 fai 测试平台，镜像本地构建不上传，数据库与服务都用 docker compose，按类型分组、共用一个 fai network`。摘要为「搭建基于 Docker Compose 的 FAI 本地测试平台」；未给出的服务清单记入现状缺口，不能追问「要做什么」。
 
 然后：
 

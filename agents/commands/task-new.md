@@ -10,12 +10,12 @@ tags: [task, workflow, openspec]
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
-**MUST 先读取并执行** skill `task-workflow`（`task-new` 职责）。机械步骤用 `taskctl`。开始时加载工作区 `.task-workflow.md`（`taskctl notes`）。
+**第 0 步（先于读 skill、先于任何工具调用）**：本条消息里凡是**没有逐字出现在本模板**的自然语言，都是本次需求。把它原样抄出，并在首条回复输出一行 `需求：<原文>`。抄出非空 → 立刻进入创建流程；**禁止**追问「要做什么」、禁止要 slug、禁止给填写模板。服务清单、目标文件、实现方式、验收细节不全写入「现状缺口」，不是追问理由。
 
-**输入**：slug 可省略（自动推导）。命令系统会把用户在 `{{slash:task-new}}` 后输入的正文追加到本模板末尾；即使追加内容仍显示在同一个 command block 内，也属于本次需求，不能因为它位于 command block 内而当作流程说明丢弃。
+**MUST 先读取并执行** skill `task-workflow`（`task-new` 职责）。机械步骤用 `taskctl`（= `python3 <task-workflow skill>/scripts/taskctl.py`；PATH 无此命令，勿直接执行）。开始时加载工作区 `.task-workflow.md`（`taskctl notes`）。
 
-执行前 MUST 先从追加内容或用户原始消息中写出一句「要做什么」的需求摘要。只要能写出摘要就立即创建，不要要求用户重述或确认 slug；细节不足写入「现状缺口」。只有追加内容为空，并且用户原始消息也完全没有改动主题时，才问一句「要做什么」。
+**输入**：需求正文——命令系统把它追加到本模板末尾，仍显示在同一个 command block 内，不能因此当作流程说明丢弃；slug 可省略，自行推导。只有抄出为空（本条逐字等于本模板全文）才问一句「要做什么」。
 
 下一步：缺口偏方案 → `{{slash:task-explore}}`；范围已清 → `{{slash:task-propose}}`。
 
-`[TASK_NEW_INPUT_START]`——此标记是固定模板的结束边界；命令系统追加在其后的所有非空文本均为本次需求。
+`[TASK_NEW_INPUT_START]` 是固定模板的结束边界；其后所有非空文本均为本次需求。
