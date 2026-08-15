@@ -51,3 +51,34 @@ def test_sync_copies_skill_scripts(tmp_path: Path) -> None:
     dest = tmp_path / ".kimi-code" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
     assert dest.is_file(), f"scripts 未分发: {dest}\n{r.stdout}"
     assert dest.read_bytes() == src.read_bytes()
+
+
+def test_sync_kiro_commands_as_argument_aware_skills(tmp_path: Path) -> None:
+    r = _run_sync(tmp_path, "kiro")
+    assert r.returncode == 0, r.stderr + r.stdout
+
+    task_new = tmp_path / ".kiro" / "skills" / "task-new" / "SKILL.md"
+    assert task_new.is_file(), f"Kiro command 未生成 skill: {task_new}\n{r.stdout}"
+    content = task_new.read_text()
+    assert "name: task-new" in content
+    assert "[TASK_NEW_INPUT_START]\n\n$ARGUMENTS" in content
+    assert not (tmp_path / ".kiro" / "prompts" / "task-new.md").exists()
+
+    # 同名 source skill 保持唯一 owner，也必须能够接收 slash 后的正文。
+    commit_push = tmp_path / ".kiro" / "skills" / "commit-push" / "SKILL.md"
+    assert commit_push.is_file()
+    assert commit_push.read_text().rstrip().endswith("$ARGUMENTS")
+    assert "skip command commit-push for kiro" in r.stdout
+
+
+def test_sync_kiro_retires_legacy_command_prompts(tmp_path: Path) -> None:
+    legacy = tmp_path / ".kiro" / "prompts" / "task-new.md"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("legacy managed prompt\n")
+
+    r = _run_sync(tmp_path, "kiro")
+    assert r.returncode == 0, r.stderr + r.stdout
+    assert not legacy.exists()
+    backups = list((tmp_path / ".config" / "backups").glob("task-new.md-*"))
+    assert len(backups) == 1
+    assert backups[0].read_text() == "legacy managed prompt\n"

@@ -8,7 +8,7 @@
 │   ├── mcp.json          ← 全局 MCP（托管写入处）
 │   └── cli.json          ← CLI 设置
 ├── skills/               ← 用户级 skills（亦作 /skill-name slash）
-├── prompts/              ← 用户级 prompts（@name / /prompts）
+├── prompts/              ← 用户级无参 prompts（@name / /prompts）
 ├── agents/               ← 自定义 agents
 └── steering/             ← steering 上下文
 ```
@@ -58,7 +58,7 @@ scripts/agents/sync.sh kiro
 | 目标 | 写入位置 | 说明 |
 |------|----------|------|
 | Skills | `~/.kiro/skills/` | 用户级；workspace `.kiro/` 不写 |
-| Commands | `~/.kiro/prompts/` | 映射为 prompts（与 Codex/Pi 类似） |
+| Commands | `~/.kiro/skills/<command>/SKILL.md` | 映射为可接收 `$ARGUMENTS` 的 slash skill；同名共享 skill 直接复用 |
 | MCP | merge → `~/.kiro/settings/mcp.json` 的 `mcpServers` | 保留非托管 server |
 
 `agents/vendors/kiro/mcp.json` 是 **agents/env 生成物**。请改 `agents/env/mcp/` 后运行：

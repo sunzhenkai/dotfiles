@@ -143,7 +143,7 @@ scripts/config.sh agents
 |------|--------|----------|
 | claude | `~/.claude/skills/` + 仓库 `.claude/skills/`（生成） | `~/.claude/commands/` + `.claude/commands/` |
 | cursor | `~/.cursor/skills/` + `.cursor/skills/` | `~/.cursor/commands/` + `.cursor/commands/` |
-| kiro | `~/.kiro/skills/` | `~/.kiro/prompts/`（prompts 映射） |
+| kiro | `~/.kiro/skills/` | `~/.kiro/skills/<command>/SKILL.md`（slash 参数通过 `$ARGUMENTS` 注入；同名 skill 直接复用） |
 | opencode | `~/.config/opencode/skills/` | `~/.config/opencode/commands/` |
 | codex | `~/.codex/skills/` | `~/.codex/prompts/`（降级映射） |
 | kimi-code | `~/.kimi-code/skills/` | skip（无稳定 commands 布局） |

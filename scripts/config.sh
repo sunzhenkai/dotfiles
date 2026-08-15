@@ -251,7 +251,7 @@ install_cursor() {
 }
 
 # 特殊配置：kiro
-# MCP → ~/.kiro/settings/mcp.json；skills → ~/.kiro/skills；commands → ~/.kiro/prompts
+# MCP → ~/.kiro/settings/mcp.json；skills/commands → ~/.kiro/skills
 install_kiro_config() {
   if [ -z "$ZHIPU_API_KEY" ]; then
     echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"

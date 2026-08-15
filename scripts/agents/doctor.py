@@ -64,7 +64,7 @@ def check_skills_drift(
         ),
         "kiro": (
             Path.home() / ".kiro" / "skills",
-            Path.home() / ".kiro" / "prompts",
+            Path.home() / ".kiro" / "skills",
             "dir",
         ),
         "opencode": (

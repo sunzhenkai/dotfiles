@@ -128,6 +128,13 @@ def replace_slashes(body: str, tool: str) -> str:
     return SLASH_RE.sub(repl, body)
 
 
+def inject_kiro_arguments(body: str, tool: str) -> str:
+    """Kiro skills only receive slash arguments through explicit placeholders."""
+    if tool != "kiro" or "$ARGUMENTS" in body or re.search(r"\$\{\d+\}", body):
+        return body
+    return body.rstrip() + "\n\n$ARGUMENTS\n"
+
+
 def read_exclude(path: Path) -> set:
     if not path.is_file():
         return set()
@@ -184,6 +191,13 @@ def render_command_frontmatter(tool: str, meta: Dict[str, str], cmd_id: str) -> 
     category = unquote(fm_get(meta, "category", "Workflow"))
     tags = fm_get(meta, "tags", "[workflow]")
 
+    if tool == "kiro":
+        return (
+            "---\n"
+            f"name: {cmd_id}\n"
+            f"description: {yaml_quote(unquote(desc))}\n"
+            "---\n"
+        )
     if tool == "claude":
         return (
             "---\n"
@@ -232,7 +246,9 @@ def command_relpath(tool: str, cmd_id: str) -> str:
             action = cmd_id[len("opsx-") :]
             return f"commands/opsx/{action}.md"
         return f"commands/{cmd_id}.md"
-    if tool in ("codex", "pi", "kiro"):
+    if tool == "kiro":
+        return f"skills/{cmd_id}/SKILL.md"
+    if tool in ("codex", "pi"):
         return f"prompts/{cmd_id}.md"
     return f"commands/{cmd_id}.md"
 
@@ -278,6 +294,24 @@ def install_skill_sidecars(
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(data)
     return written, skipped
+
+
+def retire_legacy_file(path: Path, dry_run: bool = False) -> bool:
+    """Move a formerly managed file out of its active location."""
+    path = path.expanduser()
+    if not path.exists() and not path.is_symlink():
+        return False
+    bdir = backup_dir()
+    backup_path = bdir / f"{path.name}-{timestamp()}"
+    n = 0
+    while backup_path.exists():
+        n += 1
+        backup_path = bdir / f"{path.name}-{timestamp()}-{n}"
+    print(f"  retire {path} → {backup_path}")
+    if not dry_run:
+        bdir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(path), str(backup_path))
+    return True
 
 
 def install_file(content: str, dest: Path, dry_run: bool = False) -> str:
@@ -366,7 +400,7 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
                 print(f"  skip skill {skill_id} (excluded for {tool})")
                 continue
             meta, body = parse_frontmatter(src.read_text())
-            body = replace_slashes(body, tool)
+            body = inject_kiro_arguments(replace_slashes(body, tool), tool)
             content = render_skill_frontmatter(tool, meta, skill_id) + "\n" + body.lstrip("\n")
             if not content.endswith("\n"):
                 content += "\n"
@@ -395,7 +429,15 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
                 print(f"  skip command {cmd_id} (excluded for {tool})")
                 continue
             meta, body = parse_frontmatter(cmd_file.read_text())
-            body = replace_slashes(body, tool)
+            body = inject_kiro_arguments(replace_slashes(body, tool), tool)
+            if tool == "kiro":
+                for base in bases:
+                    if retire_legacy_file(base / "prompts" / f"{cmd_id}.md", dry_run=dry_run):
+                        written += 1
+                # A same-named source skill already owns Kiro's slash command.
+                if (skills_root / cmd_id / "SKILL.md").is_file():
+                    print(f"  skip command {cmd_id} for kiro (same-name skill owns slash command)")
+                    continue
             content = render_command_frontmatter(tool, meta, cmd_id) + "\n" + body.lstrip("\n")
             if not content.endswith("\n"):
                 content += "\n"
