@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import difflib
 import fcntl
 import hashlib
 import io
@@ -37,6 +38,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -53,6 +55,23 @@ VALID_STATUSES = (
 )
 
 VALID_BRANCH_PREFIXES = ("feat", "fix", "chore", "refactor")
+LOCK_DIR_ENV = "TASKCTL_LOCK_DIR"
+LOCK_TIMEOUT_ENV = "TASKCTL_LOCK_TIMEOUT"
+DEFAULT_LOCK_TIMEOUT = 30.0
+LOCK_POLL_SECONDS = 0.2
+LOCK_STALE_SECONDS = 7 * 24 * 3600
+GIT_TIMEOUT_ENV = "TASKCTL_GIT_TIMEOUT"
+DEFAULT_GIT_TIMEOUT = 15.0
+DEFAULT_GIT_NETWORK_TIMEOUT = 60.0
+GIT_TIMEOUT_RETURNCODE = 124
+NON_INTERACTIVE_GIT_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "true",
+    "SSH_ASKPASS": "true",
+    "SSH_ASKPASS_REQUIRE": "never",
+    "GIT_SSH_COMMAND": "ssh -o BatchMode=yes",
+    "GCM_INTERACTIVE": "never",
+}
 DEFAULT_EXCLUDE_REPO_MARKERS: tuple[str, ...] = ()
 BRANCH_SLUG_RE = re.compile(r"^(?:feat|fix|chore|refactor)-(.+)$")
 HINT_ID_RE = re.compile(r"\b[Tt](\d{1,4})\b")
@@ -299,17 +318,106 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+def positive_float_env(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise TaskError(f"invalid {name}: {raw}; expected a positive number") from None
+    if value <= 0:
+        raise TaskError(f"{name} must be > 0: {raw}")
+    return value
+
+
+def lock_dir() -> Path:
+    override = os.environ.get(LOCK_DIR_ENV, "").strip()
+    if override:
+        return Path(override).expanduser()
+    cache_home = os.environ.get("XDG_CACHE_HOME", "").strip()
+    base = Path(cache_home).expanduser() if cache_home else Path.home() / ".cache"
+    return base / "taskctl" / "locks"
+
+
+def prune_stale_locks(directory: Path, keep: Path) -> None:
+    """Best-effort cleanup so long-lived machines stop accumulating lock files."""
+    cutoff = time.time() - LOCK_STALE_SECONDS
+    try:
+        entries = list(directory.glob("taskctl-*.lock"))
+    except OSError:
+        return
+    for entry in entries:
+        if entry == keep:
+            continue
+        try:
+            if entry.stat().st_mtime < cutoff:
+                entry.unlink()
+        except OSError:
+            continue
+
+
 @contextlib.contextmanager
 def index_lock(root: Path):
-    """Serialize task id allocation and archive index transitions."""
+    """Serialize task id allocation and archive index transitions.
+
+    Acquisition polls a non-blocking lock under a bounded wall clock so a stuck
+    holder surfaces a structured error with the holder pid instead of hanging
+    the caller forever.
+    """
     digest = hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:20]
-    lock_path = Path(tempfile.gettempdir()) / f"taskctl-{digest}.lock"
+    directory = lock_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    lock_path = directory / f"taskctl-{digest}.lock"
+    prune_stale_locks(directory, lock_path)
+    timeout = positive_float_env(LOCK_TIMEOUT_ENV, DEFAULT_LOCK_TIMEOUT)
     with lock_path.open("a+", encoding="utf-8") as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        started = time.monotonic()
+        while True:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                waited = time.monotonic() - started
+                if waited >= timeout:
+                    raise TaskError(
+                        f"could not acquire taskctl workspace lock within {timeout:g}s",
+                        reason="lock_timeout",
+                        details={
+                            "lock_path": str(lock_path),
+                            "waited_seconds": round(waited, 2),
+                            "holder": read_lock_holder(lock),
+                            "recovery_hint": (
+                                "another taskctl process holds this workspace lock; "
+                                "inspect the holder pid and retry, or raise "
+                                f"{LOCK_TIMEOUT_ENV}"
+                            ),
+                        },
+                    ) from None
+                time.sleep(min(LOCK_POLL_SECONDS, timeout - waited))
+        write_lock_holder(lock)
         try:
             yield
         finally:
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def read_lock_holder(lock: io.TextIOWrapper) -> str:
+    try:
+        lock.seek(0)
+        return lock.read().strip()
+    except OSError:
+        return ""
+
+
+def write_lock_holder(lock: io.TextIOWrapper) -> None:
+    try:
+        lock.seek(0)
+        lock.truncate()
+        lock.write(f"pid={os.getpid()} acquired={today_str()}\n")
+        lock.flush()
+    except OSError:
+        pass
 
 
 def parse_markdown_sections(text: str) -> list[dict[str, Any]]:
@@ -1639,14 +1747,54 @@ apply 前保持「尚未准备」；task-apply Checkout Gate 后再记录实际�
 """
 
 
-def run_git(repo: Path, *git_args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(repo), *git_args],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=check,
+def run_git(
+    repo: Path,
+    *git_args: str,
+    check: bool = False,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run git non-interactively under a bounded wall clock.
+
+    Credential and host-key prompts are disabled so an unreachable remote fails
+    fast instead of blocking on stdin, and a timeout degrades to a non-zero
+    result the existing callers already treat as a blocked step.
+    """
+    limit = positive_float_env(
+        GIT_TIMEOUT_ENV, DEFAULT_GIT_TIMEOUT if timeout is None else timeout
     )
+    argv = ["git", "-C", str(repo), *git_args]
+    try:
+        return subprocess.run(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=check,
+            env={**os.environ, **NON_INTERACTIVE_GIT_ENV},
+            timeout=limit,
+        )
+    except subprocess.TimeoutExpired as exc:
+        message = f"git {' '.join(git_args)} timed out after {limit:g}s in {repo}"
+        if check:
+            raise TaskError(
+                message,
+                reason="git_timeout",
+                details={
+                    "repo": str(repo),
+                    "git_args": list(git_args),
+                    "timeout_seconds": limit,
+                    "recovery_hint": (
+                        "check remote reachability and credentials, or raise "
+                        f"{GIT_TIMEOUT_ENV}"
+                    ),
+                },
+            ) from exc
+        return subprocess.CompletedProcess(
+            args=argv,
+            returncode=GIT_TIMEOUT_RETURNCODE,
+            stdout="",
+            stderr=message,
+        )
 
 
 def find_git_root(start: Path) -> Path | None:
@@ -2290,7 +2438,12 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
             remotes = run_git(canonical_repo, "remote").stdout.split()
             has_origin = "origin" in remotes
             if has_origin:
-                fetch = run_git(canonical_repo, "fetch", "origin")
+                fetch = run_git(
+                    canonical_repo,
+                    "fetch",
+                    "origin",
+                    timeout=DEFAULT_GIT_NETWORK_TIMEOUT,
+                )
                 entry["fetch_ok"] = fetch.returncode == 0
                 if fetch.returncode != 0:
                     tail = (fetch.stderr or "").strip().splitlines()
@@ -3017,6 +3170,14 @@ def change_order_value(target: dict[str, Any], row_index: int) -> int:
         return row_index
 
 
+def closest_texts(pool: list[str], text: str, *, limit: int = 3) -> list[str]:
+    """Return verbatim candidates so an exact-match miss costs one retry, not many."""
+    if not pool:
+        return []
+    hits = difflib.get_close_matches(text, pool, n=limit, cutoff=0.4)
+    return hits or pool[:limit]
+
+
 def build_apply_schedule(
     targets: list[dict[str, Any]], deferred: list[dict[str, str]]
 ) -> dict[str, Any]:
@@ -3350,13 +3511,41 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
     deferred = load_deferred_items(state_path)
 
     if (args.resume_current or args.defer_current is not None) and phase != "implementing":
-        raise TaskError("--defer-current/--resume-current require --phase implementing")
+        raise TaskError(
+            "--defer-current/--resume-current require --phase implementing",
+            reason="defer_requires_implementing",
+            details={
+                "exact_action": (
+                    'advance <id> --phase implementing --change "<change>" '
+                    '--current-task "<checkbox 原文>" --defer-current "<原因>" '
+                    '[--blocker "<阻塞事实>"]'
+                ),
+                "recovery_hint": (
+                    "--blocker 可与 implementing + --defer-current 同时使用；"
+                    "--phase blocked 只用于全局故障或需要用户决策"
+                ),
+            },
+        )
     if args.resume_current:
         if not args.change or not args.current_task:
             raise TaskError("--resume-current requires --change and --current-task")
         current_key = (args.change, args.current_task)
         if not any((row["change"], row["task"]) == current_key for row in deferred):
-            raise TaskError("current task is not deferred: " + args.current_task)
+            raise TaskError(
+                "current task is not deferred: " + args.current_task,
+                reason="resume_target_not_deferred",
+                details={
+                    "change": args.change,
+                    "closest": closest_texts(
+                        [row["task"] for row in deferred if row["change"] == args.change],
+                        args.current_task,
+                    ),
+                    "recovery_hint": (
+                        "copy closest[0] verbatim (backticks and punctuation included) "
+                        "into --current-task"
+                    ),
+                },
+            )
         deferred = [row for row in deferred if (row["change"], row["task"]) != current_key]
     if args.defer_current is not None:
         if not args.change or not args.current_task:
@@ -3380,7 +3569,23 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         for row in schedule["persisted_deferred"]
     ):
         raise TaskError(
-            "deferred current task is not an exact remaining OpenSpec checkbox: " + args.current_task
+            "deferred current task is not an exact remaining OpenSpec checkbox: " + args.current_task,
+            reason="defer_target_not_exact",
+            details={
+                "change": args.change,
+                "closest": closest_texts(
+                    [
+                        row["text"]
+                        for row in schedule["remaining"]
+                        if row["change"] == args.change
+                    ],
+                    args.current_task,
+                ),
+                "recovery_hint": (
+                    "copy closest[0] verbatim (backticks and punctuation included) "
+                    "into --current-task"
+                ),
+            },
         )
     deferred = schedule["persisted_deferred"]
     if phase == "testing" and schedule["state"] != "done":

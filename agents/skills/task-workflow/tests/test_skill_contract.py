@@ -192,11 +192,32 @@ class SkillContractTest(unittest.TestCase):
         self.assertIn("`--root` 是全局参数", skill_text)
         self.assertIn("子命令之前", skill_text)
 
+    def test_delegation_budget_rules_are_pinned(self) -> None:
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        self.assertIn("DELEG-1", safety)
+        self.assertIn("DELEG-1", apply_text)
+        for token in ("墙钟上限", "连续失败上限", "降级"):
+            self.assertIn(token, safety, token)
+        self.assertIn("必经路径", apply_text)
+        self.assertIn("15 分钟", apply_text)
+
+    def test_apply_rhythm_rules_are_pinned(self) -> None:
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        self.assertIn("APPLY-7", safety)
+        self.assertIn("APPLY-1/2/3/4/5/6/7", apply_text)
+        for token in ("首轮", "targeted 验证", "5 个 candidate", "60 分钟"):
+            self.assertIn(token, apply_text, token)
+        self.assertIn("openspec-apply-change", apply_text)
+
     def test_instruction_footprint_is_below_previous_baseline(self) -> None:
+        # Baseline raised from 30_000 once APPLY-7 and DELEG-1 landed; these rules
+        # bound scheduling and delegation, so they are worth their instruction cost.
         paths = [SKILL_ROOT / "SKILL.md", *(SKILL_ROOT / "references").glob("*.md")]
         paths.extend(COMMAND_ROOT.glob("task-*.md"))
         total = sum(path.stat().st_size for path in paths)
-        self.assertLess(total, 30_000)
+        self.assertLess(total, 32_000)
 
 
 if __name__ == "__main__":

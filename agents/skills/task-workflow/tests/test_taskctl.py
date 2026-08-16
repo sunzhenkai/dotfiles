@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import ast
+import fcntl
+import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
@@ -36,9 +40,18 @@ class TaskctlTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="taskctl-"))
         (self.tmp / "tasks").mkdir()
+        self.lock_home = Path(tempfile.mkdtemp(prefix="taskctl-locks-"))
+        env = mock.patch.dict(os.environ, {tc.LOCK_DIR_ENV: str(self.lock_home)})
+        env.start()
+        self.addCleanup(env.stop)
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
+        shutil.rmtree(self.lock_home, ignore_errors=True)
+
+    def _lock_path_for_root(self) -> Path:
+        digest = hashlib.sha256(str(self.tmp.resolve()).encode()).hexdigest()[:20]
+        return tc.lock_dir() / f"taskctl-{digest}.lock"
 
     def _run(self, *argv: str) -> tuple[int, dict]:
         from io import StringIO
@@ -645,6 +658,115 @@ hello
         )
         self.assertEqual(code, 1)
         self.assertIn("not an exact remaining", payload["error"])
+
+    def test_defer_miss_reports_closest_verbatim_checkbox(self) -> None:
+        exact = "7.6 在 `scripts/agent-core/sign-artifact.sh` 接入签名"
+        self._seed_task("T0002", "closest", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            f"- [ ] {exact}\n- [ ] 9.1 unrelated documentation\n", encoding="utf-8"
+        )
+        self._write_index()
+        code, payload = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "7.6 在 scripts/agent-core/sign-artifact.sh 接入签名",
+            "--defer-current", "no approved signer identity",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "defer_target_not_exact")
+        self.assertEqual(payload["closest"][0], exact)
+        self.assertIn("verbatim", payload["recovery_hint"])
+
+    def test_defer_outside_implementing_reports_exact_action(self) -> None:
+        self._seed_task("T0002", "defer-phase", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text("- [ ] item\n", encoding="utf-8")
+        self._write_index()
+        code, payload = self._run(
+            "advance", "T0002", "--phase", "blocked", "--change", "demo-change",
+            "--current-task", "item", "--defer-current", "manual",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "defer_requires_implementing")
+        self.assertIn("--phase implementing", payload["exact_action"])
+        self.assertIn("--blocker", payload["exact_action"])
+
+    def test_resume_miss_reports_closest_deferred_item(self) -> None:
+        self._seed_task("T0002", "resume-closest", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "- [ ] 2.4 schedule domain\n- [ ] 2.5 admission domain\n", encoding="utf-8"
+        )
+        self._write_index()
+        code, _ = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "2.4 schedule domain", "--defer-current", "waiting on owner",
+        )
+        self.assertEqual(code, 0)
+        code, payload = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "2.4 schedule", "--resume-current",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "resume_target_not_deferred")
+        self.assertEqual(payload["closest"], ["2.4 schedule domain"])
+
+    def test_index_lock_times_out_with_holder_diagnostics(self) -> None:
+        lock_path = self._lock_path_for_root()
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        holder = lock_path.open("a+", encoding="utf-8")
+        fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+        holder.write("pid=999999 acquired=2026-08-16\n")
+        holder.flush()
+        try:
+            with mock.patch.dict(os.environ, {tc.LOCK_TIMEOUT_ENV: "0.3"}):
+                with self.assertRaises(tc.TaskError) as ctx:
+                    with tc.index_lock(self.tmp):
+                        pass
+        finally:
+            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+            holder.close()
+        self.assertEqual(ctx.exception.reason, "lock_timeout")
+        self.assertIn("pid=999999", ctx.exception.details["holder"])
+        self.assertIn(tc.LOCK_TIMEOUT_ENV, ctx.exception.details["recovery_hint"])
+
+    def test_lock_files_live_outside_tmp_and_stale_ones_are_pruned(self) -> None:
+        directory = tc.lock_dir()
+        directory.mkdir(parents=True, exist_ok=True)
+        stale = directory / "taskctl-0000000000000000stale.lock"
+        stale.write_text("", encoding="utf-8")
+        expired = time.time() - tc.LOCK_STALE_SECONDS - 60
+        os.utime(stale, (expired, expired))
+        fresh = directory / "taskctl-1111111111111111fresh.lock"
+        fresh.write_text("", encoding="utf-8")
+        with tc.index_lock(self.tmp):
+            pass
+        self.assertFalse(stale.exists())
+        self.assertTrue(fresh.exists())
+        self.assertIn(f"pid={os.getpid()}", self._lock_path_for_root().read_text(encoding="utf-8"))
+
+    def test_run_git_is_non_interactive_and_time_bounded(self) -> None:
+        bin_dir = self.tmp / "fakebin"
+        bin_dir.mkdir()
+        fake = bin_dir / "git"
+        fake.write_text(
+            '#!/bin/sh\nif [ "$1" = "-C" ]; then shift 2; fi\n'
+            'if [ "$1" = "sleep" ]; then sleep 5; exit 0; fi\n'
+            'echo "$GIT_TERMINAL_PROMPT $GIT_ASKPASS"\n',
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        patched = {"PATH": f"{bin_dir}:{os.environ.get('PATH', '')}"}
+        with mock.patch.dict(os.environ, patched):
+            probe = tc.run_git(self.tmp, "status")
+        self.assertEqual(probe.stdout.strip(), "0 true")
+        with mock.patch.dict(os.environ, {**patched, tc.GIT_TIMEOUT_ENV: "0.4"}):
+            timed_out = tc.run_git(self.tmp, "sleep")
+        self.assertEqual(timed_out.returncode, tc.GIT_TIMEOUT_RETURNCODE)
+        self.assertIn("timed out", timed_out.stderr)
 
     def test_advance_rejects_blank_defer_reason_without_writing_state(self) -> None:
         task = self._seed_task("T0002", "blank-defer", openspec=True)

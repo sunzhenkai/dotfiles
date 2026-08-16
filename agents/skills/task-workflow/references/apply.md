@@ -1,6 +1,6 @@
 # Apply 阶段
 
-执行前读根 `SKILL.md`，并遵守 `safety.md` 的 RES-1/3、CHECKOUT-1/2/3/4、APPLY-1/2/3/4/5/6、MUT-1。本文件是 apply outcome 契约的唯一来源。命令一律写作 `python3 <skill>/scripts/taskctl.py <command> ...`。
+执行前读根 `SKILL.md`，并遵守 `safety.md` 的 RES-1/3、CHECKOUT-1/2/3/4、APPLY-1/2/3/4/5/6/7、DELEG-1、MUT-1。本文件是 apply outcome 契约的唯一来源。命令一律写作 `python3 <skill>/scripts/taskctl.py <command> ...`。
 
 ## 入口：首次实现与续作
 
@@ -30,7 +30,7 @@
 
 开始或续作时调用 `advance <id> --phase implementing --change <change> --current-task "<checkbox 原文>"`。
 
-`candidates` 只表示“未显式 defer 且 artifact 可读取”，**不表示依赖已经满足**。执行每个 candidate 前，Agent 必须读 task/design 上下文，检查它是否直接或传递依赖任何 deferred 项：
+首轮先通读整张 `candidates` 表，一次性 exact defer 掉注定不可执行的项（缺环境依赖、缺凭据/签名基础设施、需人工或线上验证），不要逐个撞上去再 defer。`candidates` 只表示“未显式 defer 且 artifact 可读取”，**不表示依赖已经满足**；执行每个 candidate 前必须读 task/design 上下文，检查它是否直接或传递依赖任何 deferred 项：
 
 - 独立 candidate：实施；完成后先勾选 canonical planning root 下对应 `tasks.md`，再 `advance --phase implementing --completed "..."`。仓级测试只写入 `--completed` / `--verification` 文本。
 - 依赖 deferred 项：不得实施；对该 checkbox 用 exact `--change` + `--current-task` 调 `--defer-current`，reason 必须含 blocker identity（change 与 checkbox 原文/稳定 ID），然后取下一个 candidate。
@@ -50,6 +50,13 @@
 | `validation_required` | `in_progress` | checkbox 已耗尽但无 fresh final verification，或本轮验证仅 provisional；停本轮调度，不宣称完成 |
 | `validation_recorded` | `in_progress` | clean delivery branch/HEAD 的最终验证已记录；只进入 done transition，不宣称完成 |
 | `done` | `in_progress` | final done transition 完成，checkbox 与 fresh verification 均满足；只有 `done` 才允许对外宣称完成并桥接 archive |
+
+## 节奏：预算、委托与验证分层
+
+- **单轮预算**：连续处理 5 个 candidate 或累计 60 分钟后先汇报进度与剩余量并等确认；这是汇报点，不是暂停类 outcome。
+- **委托上限**：子 agent／并发评审必须设墙钟上限（默认 15 分钟）与连续失败上限（2 次）；超时或超次降级为主会话自审并把结论写进 `--verification` 后继续调度，不得因委托失败判 blocked，也不得让委托成为 candidate 必经路径。
+- **验证分层**：implementing 只跑受影响范围的 targeted 验证，全仓回归、race 与静态检查留到 testing 一次性执行。
+- **不重复劳动**：checkbox 已 `[x]` 且已记账的项不得重新审阅或重跑验证；续作只从 `resume` 取事实，不得改用第二套 apply 流程（如直接走 `openspec-apply-change`）。
 
 ## 验证与完成
 

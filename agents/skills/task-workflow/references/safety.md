@@ -18,6 +18,8 @@
 | APPLY-4 | testing/done/archive 使用验证证据 | remaining 非空禁止 testing；仓级回归不是 final verification；dirty 证据仅 provisional；实现恢复或 branch/HEAD 变化使 final snapshot stale | `test_worktree_apply_advance_archive_lifecycle` |
 | APPLY-5 | apply 暂停类 outcome、`next` 或对外完成声明 | 只有 `done` 可宣称完成并桥接 archive；`next` 继续独立项且已 defer 项并行挂起；暂停类 outcome 停本轮调度并保持 `in_progress` | `test_apply_pause_outcomes_are_not_completion` |
 | APPLY-6 | apply 中断后续作 | 只从 `execution-context` 的 `resume` 取事实；`in_flight` 不得当作未开始重做，`unknown` 必须报告并等确认；binding 齐全时不得重跑 `prepare-branches` | `test_execution_context_resume_reports_in_flight_item` |
+| APPLY-7 | implementing 期间的调度节奏 | 首轮批量 exact defer 不可执行项；只跑 targeted 验证，全仓回归留到 testing；已记账 checkbox 不重复审阅；连续 5 项或 60 分钟先汇报 | `test_apply_rhythm_rules_are_pinned` |
+| DELEG-1 | apply 委托子 agent 或并发评审 | 必须设墙钟上限与连续失败上限，超时/超次降级为主会话自审并继续调度；不得无限等待、不得因委托失败判 blocked、不得让委托成为 candidate 必经路径 | `test_delegation_budget_rules_are_pinned` |
 | PROXY-1 | 关联 OpenSpec 的仓不是 `spec-driven` schema，或 change 位于独立 store | 以 `unsupported_openspec_schema` / `unsupported_openspec_store` 具名失败并停止；不猜测 artifact 结构，不把失败推迟到 apply | `test_unsupported_openspec_schema_is_named_explicitly` |
 | PROXY-2 | 委托任何 `openspec-*` skill | 必须在该 target 的 canonical `planning_root` 下执行且显式传 change name，二者缺一不得委托；propose 收尾与 archive 外部动作前先跑 `openspec validate --strict --change <name>` | `test_openspec_delegation_contract_is_pinned_in_references` |
 | DATA-1 | INDEX 与 task 目录漂移或 identity 冲突 | 合并扫描分配 ID；可修复漏行，有冲突/缺路径时 mutation fail closed | `test_catalog_omitted_row_is_repaired_and_id_not_reused` |

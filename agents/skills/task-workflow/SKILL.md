@@ -39,7 +39,7 @@ python3 <this-skill>/scripts/taskctl.py <command> ...
 
 公共命令固定为：`list`（列 active/archive）、`resolve`（唯一任务 Resolution Gate）、`set-status`、`new`、`restore`、`prepare-branches`（apply 的 checkout/worktree Gate）、`execution-context`（scope、真实 checkout、OpenSpec targets 与调度）、`advance`（原子保存进度并返回 control outcome）、`archive`（preflight 与原子 finalize）、`notes`。
 
-完整参数以 `<command> --help` 为准。stdout 只输出 JSON，stderr 是一行摘要。退出码 2 表示需要确认/选择，不得继续写操作；1 表示硬失败。
+没有 `status` 子命令；查状态用 `execution-context` 或 `list`。完整参数以 `<command> --help` 为准。stdout 只输出 JSON，stderr 是一行摘要。退出码 2 表示需要确认/选择，不得继续写操作；1 表示硬失败。CLI 对锁与 git 都设了上限，`lock_timeout`／`git_timeout` 是有界失败，按 `recovery_hint` 处理后重试，不要当成 task 阻塞。
 
 ## 公共执行契约
 
