@@ -173,6 +173,19 @@ def rollback_or_raise(
     raise primary_error
 
 
+def taskctl_script_path() -> Path:
+    return Path(__file__).resolve()
+
+
+def taskctl_command(*args: str) -> str:
+    """Render a hint the caller can paste and run.
+
+    There is no `taskctl` executable on PATH, so every emitted command must use
+    the script invocation form.
+    """
+    return " ".join(["python3", str(taskctl_script_path()), *args])
+
+
 def emit(payload: dict[str, Any], *, code: int = 0) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return code
@@ -556,14 +569,41 @@ def parse_openspec(text: str) -> list[dict[str, str]]:
         path = strip_md_link(cells[1]).strip("`")
         repo_idx = next((j for j, value in enumerate(header) if value in {"仓库", "repo"}), None)
         store_idx = next((j for j, value in enumerate(header) if value == "store"), None)
+        order_idx = next(
+            (j for j, value in enumerate(header) if value in {"顺序", "order"}), None
+        )
         repo = strip_md_link(cells[repo_idx]).strip("`") if repo_idx is not None and repo_idx < len(cells) else ""
         store = strip_md_link(cells[store_idx]).strip("`") if store_idx is not None and store_idx < len(cells) else ""
+        store = "" if store in {"—", "-"} else store
+        if store:
+            # Rejected where the association is recorded, not later during apply.
+            raise TaskError(
+                f"unsupported OpenSpec store for {name}: {store}",
+                reason="unsupported_openspec_store",
+                details={
+                    "change": name,
+                    "store": store,
+                    "line": str(i + 1),
+                    "diagnostic": {
+                        "section": "关联 OpenSpec",
+                        "line": i + 1,
+                        "source": line.strip()[:240],
+                        "detail": "standalone OpenSpec stores are not supported",
+                    },
+                },
+            )
+        order_raw = (
+            strip_md_link(cells[order_idx]).strip("`")
+            if order_idx is not None and order_idx < len(cells)
+            else ""
+        )
         rows.append(
             {
                 "name": name,
                 "path": path,
                 "repo": normalize_repo_path(repo) if repo and repo not in {"—", "-"} else "",
-                "store": store if store not in {"—", "-"} else "",
+                "store": store,
+                "order": order_raw if order_raw not in {"—", "-"} else "",
                 "line": str(i + 1),
             }
         )
@@ -1212,7 +1252,11 @@ def archived_match_markdown(matches: list[TaskInfo]) -> str:
         [
             "",
             "如需继续实施，请先恢复：",
-            f"- `taskctl restore {matches[0].task_id}`" if len(matches) == 1 else "- `taskctl restore <TNNNN>`",
+            (
+                f"- `{taskctl_command('restore', matches[0].task_id)}`"
+                if len(matches) == 1
+                else f"- `{taskctl_command('restore', '<TNNNN>')}`"
+            ),
             "",
         ]
     )
@@ -1559,8 +1603,8 @@ def scaffold_readme(
 
 ### 关联 OpenSpec
 
-| change | 路径 | 仓库 | store | 说明 |
-|--------|------|------|-------|------|
+| change | 路径 | 仓库 | 顺序 | 说明 |
+|--------|------|------|------|------|
 | — | | | | （尚无） |
 
 ### 设计文档
@@ -1568,6 +1612,12 @@ def scaffold_readme(
 | 文档 | 类型 | 归档落点 |
 |------|------|----------|
 | — | | （无；复杂任务经 task-design 写入 `design/`） |
+
+## 方案笔记
+
+由 task-explore 写入：备选方案、取舍、否决理由与未决问题；无探索时保持「（暂无）」。
+
+（暂无）
 
 ## 工作上下文
 
@@ -1905,9 +1955,69 @@ def is_dirty(repo: Path) -> bool:
     return bool(dirty_porcelain(repo, limit=1))
 
 
+PORCELAIN_RENAME_RE = re.compile(r"^(?P<orig>.+?) -> (?P<dest>.+)$")
+
+
+def porcelain_entry_paths(entry: str) -> list[str]:
+    """Repo-relative paths named by one `git status --porcelain` line."""
+    body = entry[3:] if len(entry) > 3 else ""
+    if not body.strip():
+        return []
+    match = PORCELAIN_RENAME_RE.match(body)
+    parts = [match.group("orig"), match.group("dest")] if match else [body]
+    return [part.strip().strip('"') for part in parts if part.strip()]
+
+
+def classify_dirty_paths(
+    repo: Path, planning_roots: list[Path], *, limit: int = 20
+) -> dict[str, Any]:
+    """Attribute uncommitted changes to the planning or the delivery role.
+
+    Only changes fully contained in a planning root are planning-role; anything
+    else, including an entry whose ownership cannot be decided, is delivery-role
+    and keeps failing closed.
+    """
+    porcelain = dirty_porcelain(repo, limit=limit)
+    roots = [Path(os.path.normpath(str(item))) for item in planning_roots]
+    planning: list[str] = []
+    delivery: list[str] = []
+    for entry in porcelain:
+        paths = porcelain_entry_paths(entry)
+        owned_by_planning = bool(paths) and bool(roots)
+        for raw in paths:
+            absolute = Path(os.path.normpath(str(repo / raw)))
+            if not any(absolute.is_relative_to(item) for item in roots):
+                owned_by_planning = False
+                break
+        (planning if owned_by_planning else delivery).append(entry)
+    if not porcelain:
+        role = "clean"
+    elif delivery:
+        role = "delivery"
+    else:
+        role = "planning"
+    return {
+        "role": role,
+        "porcelain": porcelain,
+        "planning": planning,
+        "delivery": delivery,
+        "planning_roots": [str(item) for item in roots],
+    }
+
+
+def planning_dirty_action(ownership: dict[str, Any]) -> str:
+    roots = ", ".join(ownership["planning_roots"]) or "the canonical planning root"
+    return (
+        f"uncommitted planning artifacts under {roots} stay at the canonical planning "
+        "root and do not travel with the delivery branch; commit them there when "
+        "convenient — delivery preparation continues"
+    )
+
+
 def blocked_dirty_entry(entry: dict[str, Any], repo: Path) -> dict[str, Any]:
     entry["action"] = "blocked_dirty"
     entry["dirty"] = True
+    entry["dirty_role"] = "delivery"
     entry["needs_user_confirm"] = True
     entry["dirty_porcelain"] = dirty_porcelain(repo)
     entry["error"] = "working tree has uncommitted changes; stop for user confirmation"
@@ -2058,6 +2168,7 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
         matches = match_query(list_active_infos(root), args.from_task)
         if len(matches) == 1:
             task_info = matches[0]
+    planning_roots = task_planning_roots(root, task_info)
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
@@ -2137,14 +2248,26 @@ def cmd_prepare_branches(root: Path, args: argparse.Namespace) -> int:
                 # Continuing on the task branch: dirty WIP is expected.
                 entry["action"] = "already_on_branch"
                 entry["base"] = (recorded or {}).get("base") or args.base or ""
-                if is_dirty(repo):
+                ownership = classify_dirty_paths(repo, planning_roots)
+                if ownership["role"] != "clean":
                     entry["dirty"] = True
+                    entry["dirty_role"] = ownership["role"]
+                    entry["planning_dirty"] = ownership["planning"]
                 results.append(entry)
                 continue
 
-            if not create_worktree and is_dirty(repo):
-                errors.append(blocked_dirty_entry(entry, repo))
-                continue
+            if not create_worktree:
+                ownership = classify_dirty_paths(repo, planning_roots)
+                if ownership["role"] == "delivery":
+                    errors.append(blocked_dirty_entry(entry, repo))
+                    continue
+                if ownership["role"] == "planning":
+                    # Planning artifacts are not delivery WIP; they stay at the
+                    # canonical planning root while the branch is prepared.
+                    entry["dirty"] = True
+                    entry["dirty_role"] = "planning"
+                    entry["planning_dirty"] = ownership["planning"]
+                    entry["planning_action"] = planning_dirty_action(ownership)
 
             # Detect and refresh the canonical repository before mutating a checkout.
             base = detect_base_branch(canonical_repo, args.base)
@@ -2408,9 +2531,13 @@ def summarize_delivery_checkout(
     return summary
 
 
-def resolve_change_target(
-    root: Path, info: TaskInfo, change: dict[str, str]
-) -> dict[str, Any]:
+def resolve_change_target(root: Path, change: dict[str, str]) -> dict[str, Any]:
+    """Locate an OpenSpec change at its canonical planning root.
+
+    Planning artifacts belong to the canonical repository and are archived by
+    `openspec archive`; they never travel with a delivery branch or worktree, so
+    no delivery checkout binding participates in this resolution.
+    """
     store = str(change.get("store") or "").strip()
     if store:
         raise TaskError(
@@ -2420,18 +2547,9 @@ def resolve_change_target(
         )
     raw_repo = (change.get("repo") or "").strip()
     repo_key = normalize_repo_path(raw_repo) if raw_repo else ""
-    delivery_key = repo_key or ("." if "." in delivery_repo_keys(info) else "")
-    if delivery_key and delivery_key in delivery_repo_keys(info):
-        checked = validate_checkout_binding(root, info, delivery_key)
-        if not checked["ok"]:
-            raise checkout_gate_failure({"ok": False, "bindings": [checked], "blocking": [checked]})
-        checkout = Path(checked["checkout_abs"])
-        if not repo_key:
-            repo_key = delivery_key
-    elif repo_key:
-        checkout = Path(resolve_repo(root, repo_key)["git_root_abs"])
-    else:
-        checkout = root
+    canonical = (
+        Path(resolve_repo(root, repo_key)["git_root_abs"]) if repo_key else root.resolve()
+    )
     raw_path = (change.get("path") or "").strip().strip("`").rstrip("/")
     if raw_path and Path(raw_path).is_absolute():
         raise TaskError(f"OpenSpec path must be canonical-repo/workspace relative: {raw_path}")
@@ -2442,11 +2560,13 @@ def resolve_change_target(
             relative = ""
         elif normalized.startswith(repo_key.rstrip("/") + "/"):
             relative = normalized[len(repo_key.rstrip("/")) + 1 :]
-    change_root = (checkout / relative).resolve() if relative else checkout
+    change_root = (canonical / relative).resolve() if relative else canonical
     try:
-        change_root.relative_to(checkout.resolve())
+        change_root.relative_to(canonical)
     except ValueError as exc:
-        raise TaskError(f"OpenSpec path escapes checkout: {raw_path}") from exc
+        raise TaskError(
+            f"OpenSpec path escapes the canonical repository: {raw_path}"
+        ) from exc
     planning_root = change_root
     for candidate in [change_root, *change_root.parents]:
         if candidate.name == "changes" and candidate.parent.name == "openspec":
@@ -2455,14 +2575,73 @@ def resolve_change_target(
         if candidate.name == "openspec":
             planning_root = candidate
             break
-    return {
+    target = {
         **change,
         "repo": repo_key,
-        "checkout": display_checkout_path(root, checkout),
-        "checkout_abs": str(checkout),
+        "canonical_repo": display_checkout_path(root, canonical),
+        "canonical_repo_abs": str(canonical),
         "change_root": str(change_root),
         "planning_root": str(planning_root),
     }
+    target["openspec_schema"] = assert_openspec_schema(target)
+    return target
+
+
+SUPPORTED_OPENSPEC_SCHEMA = "spec-driven"
+OPENSPEC_SCHEMA_RE = re.compile(r"^\s*schema\s*:\s*(?P<schema>[^#\s]+)", re.MULTILINE)
+
+
+def read_openspec_schema(planning_root: Path) -> str:
+    """Read the declared schema without depending on a YAML parser."""
+    config = planning_root / "config.yaml"
+    if not config.is_file():
+        return SUPPORTED_OPENSPEC_SCHEMA
+    try:
+        text = config.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return SUPPORTED_OPENSPEC_SCHEMA
+    match = OPENSPEC_SCHEMA_RE.search(text)
+    if not match:
+        return SUPPORTED_OPENSPEC_SCHEMA
+    return match.group("schema").strip().strip("\"'")
+
+
+def assert_openspec_schema(target: dict[str, Any]) -> str:
+    """Fail with a named schema instead of letting artifact names silently miss."""
+    planning_root = Path(target["planning_root"])
+    schema = read_openspec_schema(planning_root)
+    if schema != SUPPORTED_OPENSPEC_SCHEMA:
+        raise TaskError(
+            f"unsupported OpenSpec schema {schema!r} at {planning_root}; "
+            f"only {SUPPORTED_OPENSPEC_SCHEMA} is supported",
+            reason="unsupported_openspec_schema",
+            details={
+                "change": target.get("name"),
+                "schema": schema,
+                "planning_root": str(planning_root),
+            },
+        )
+    return schema
+
+
+def resolve_change_targets(root: Path, info: TaskInfo) -> list[dict[str, Any]]:
+    return [resolve_change_target(root, row) for row in info.openspec]
+
+
+def task_planning_roots(root: Path, info: TaskInfo | None) -> list[Path]:
+    """Canonical planning roots of a task, used for dirty-path ownership."""
+    if info is None:
+        return []
+    roots: list[Path] = []
+    for row in info.openspec:
+        try:
+            target = resolve_change_target(root, row)
+        except TaskError:
+            continue
+        planning_root = Path(target["planning_root"])
+        if planning_root not in roots:
+            roots.append(planning_root)
+    return roots
 
 
 def parse_openspec_checkboxes(text: str) -> list[dict[str, Any]]:
@@ -2499,6 +2678,7 @@ def empty_openspec_report() -> dict[str, Any]:
         "remaining": 0,
         "remaining_state": "none",
         "remaining_items": [],
+        "items": [],
     }
 
 
@@ -2529,11 +2709,17 @@ def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
                 "remaining_items": [
                     {"text": "OpenSpec change archive match is ambiguous", "done": False}
                 ],
+                "items": [],
                 "availability": "ambiguous_archived",
                 "unavailable_reason": unavailable_reason,
             }
         else:
-            unavailable_reason = f"OpenSpec tasks.md not found: {change_root / 'tasks.md'}"
+            planning_root = target.get("planning_root") or str(change_root)
+            unavailable_reason = (
+                f"OpenSpec change is unreadable at canonical planning root {planning_root} "
+                f"(expected {change_root / 'tasks.md'}); re-run task-propose for "
+                f"{target.get('name') or 'this change'} or correct the 关联 OpenSpec row"
+            )
             return {
                 "total": 1,
                 "complete": 0,
@@ -2542,8 +2728,10 @@ def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
                 "remaining_items": [
                     {"text": "OpenSpec tasks.md is missing", "done": False}
                 ],
+                "items": [],
                 "availability": "missing",
                 "unavailable_reason": unavailable_reason,
+                "planning_root": planning_root,
             }
     items = parse_openspec_checkboxes(tasks.read_text(encoding="utf-8"))
     remaining_items = [item for item in items if not item["done"]]
@@ -2554,9 +2742,11 @@ def openspec_task_report(target: dict[str, Any]) -> dict[str, Any]:
         "remaining": len(remaining_items),
         "remaining_state": remaining_state_of(items),
         "remaining_items": remaining_items,
+        "items": items,
         "availability": availability,
         "unavailable_reason": unavailable_reason,
         "tasks_path": str(tasks),
+        "planning_root": target.get("planning_root") or str(change_root),
     }
 
 
@@ -2655,7 +2845,8 @@ def remaining_confirm_markdown(task_id: str, leftovers: list[dict[str, Any]]) ->
             "给出判断依据，交用户裁决；**不得**自行认定「只剩测试」并归档。",
             "",
             "**请选择：**",
-            f"- 继续归档（强行合并）：`taskctl archive {task_id} --force-merge`",
+            "- 继续归档（强行合并）："
+            f"`{taskctl_command('archive', task_id, '--force-merge')}`",
             "- 先做完剩余项再归档",
             "- 中止",
             "",
@@ -2667,12 +2858,18 @@ def remaining_confirm_markdown(task_id: str, leftovers: list[dict[str, Any]]) ->
 
 
 def archived_change_paths(target: dict[str, Any]) -> list[Path]:
+    """Match `YYYY-MM-DD-<name>` exactly.
+
+    A suffix match would classify another change's archive as this change's own
+    and silently skip the real archive action.
+    """
     archive_root = Path(target["planning_root"]) / "changes" / "archive"
-    if not archive_root.is_dir():
-        return []
     name = str(target.get("name") or "")
+    if not name or not archive_root.is_dir():
+        return []
+    dated = re.compile(r"\d{4}-\d{2}-\d{2}-" + re.escape(name) + r"$")
     return sorted(
-        p for p in archive_root.iterdir() if p.is_dir() and p.name.endswith(f"-{name}")
+        p for p in archive_root.iterdir() if p.is_dir() and dated.fullmatch(p.name)
     )
 
 
@@ -2699,17 +2896,21 @@ def collect_delivery_snapshots(root: Path, info: TaskInfo) -> list[dict[str, Any
     gate = evaluate_delivery_checkout_bindings(root, info)
     if not gate["ok"]:
         raise checkout_gate_failure(gate)
+    planning_roots = task_planning_roots(root, info)
     snapshots: list[dict[str, Any]] = []
     for checked in gate["bindings"]:
         checkout = Path(checked["checkout_abs"])
+        ownership = classify_dirty_paths(checkout, planning_roots)
         snapshots.append(
             {
                 "repo": checked["repo"],
                 "checkout": checked["checkout"],
                 "branch": checked["actual_branch"],
                 "head": git_head(checkout),
-                "dirty": is_dirty(checkout),
-                "dirty_porcelain": dirty_porcelain(checkout),
+                "dirty": ownership["role"] != "clean",
+                "dirty_role": ownership["role"],
+                "delivery_dirty": ownership["role"] == "delivery",
+                "dirty_porcelain": ownership["porcelain"],
             }
         )
     return snapshots
@@ -2763,7 +2964,9 @@ def validate_final_verification(root: Path, info: TaskInfo, text: str) -> dict[s
             for row in rows
         )
 
-    ok = not any(row["dirty"] for row in current) and comparable(recorded["snapshots"]) == comparable(current)
+    ok = not any(row["delivery_dirty"] for row in current) and comparable(
+        recorded["snapshots"]
+    ) == comparable(current)
     return {
         "ok": ok,
         "reason": "ok" if ok else "stale_verification",
@@ -2805,15 +3008,33 @@ def load_deferred_items(path: Path) -> list[dict[str, str]]:
     return deferred
 
 
+def change_order_value(target: dict[str, Any], row_index: int) -> int:
+    """Explicit order column wins; otherwise the recorded row order applies."""
+    raw = str(target.get("order") or "").strip()
+    try:
+        return int(raw)
+    except ValueError:
+        return row_index
+
+
 def build_apply_schedule(
     targets: list[dict[str, Any]], deferred: list[dict[str, str]]
 ) -> dict[str, Any]:
-    remaining: list[dict[str, Any]] = []
     for target in targets:
         progress = openspec_checkbox_progress(target)
         target["progress"] = progress
         target["remaining_state"] = progress["remaining_state"]
         target["remaining_items"] = progress["remaining_items"]
+    scheduled = sorted(
+        enumerate(targets),
+        key=lambda pair: (change_order_value(pair[1], pair[0]), pair[0]),
+    )
+    for position, (row_index, target) in enumerate(scheduled):
+        target["order_key"] = change_order_value(target, row_index)
+        target["order_position"] = position
+    remaining: list[dict[str, Any]] = []
+    for _, target in scheduled:
+        progress = target["progress"]
         change = str(target.get("name") or "")
         availability = str(progress.get("availability") or "active")
         unavailable_reason = str(progress.get("unavailable_reason") or "")
@@ -2868,15 +3089,174 @@ def build_apply_schedule(
         and (row["change"], row["text"]) not in deferred_keys
     ]
     state = "done" if not remaining else ("candidates" if candidates else "deferred_only")
+    all_deferred = [*reconciled, *unavailable]
+    groups = [
+        {
+            "change": str(target.get("name") or ""),
+            "order_key": target["order_key"],
+            "planning_root": target.get("planning_root"),
+            "progress": {
+                key: target["progress"][key]
+                for key in ("complete", "total", "remaining")
+            },
+            "candidates": [
+                row for row in candidates if row["change"] == str(target.get("name") or "")
+            ],
+            "deferred": [
+                row
+                for row in all_deferred
+                if row["change"] == str(target.get("name") or "")
+            ],
+        }
+        for _, target in scheduled
+    ]
     return {
         "state": state,
         "remaining": remaining,
         "persisted_deferred": reconciled,
         "unavailable": unavailable,
-        "deferred": [*reconciled, *unavailable],
+        "deferred": all_deferred,
         "candidates": candidates,
+        "groups": groups,
         "next": candidates[0] if candidates else None,
     }
+
+
+PROGRESS_PHASE_RE = re.compile(r"^- 阶段：`(?P<value>[^`]*)`\s*$", re.MULTILINE)
+PROGRESS_CHANGE_RE = re.compile(r"^- 当前 change：`(?P<value>[^`]*)`\s*$", re.MULTILINE)
+PROGRESS_TASK_RE = re.compile(r"^- 当前任务：(?P<value>.+?)\s*$", re.MULTILINE)
+PROGRESS_PLACEHOLDERS = {"", "—", "-", "（无）", "（尚无）"}
+
+
+def parse_progress_resume_facts(text: str) -> dict[str, Any]:
+    """Read the last recorded round back out of the rendered progress artifact.
+
+    Only fields the renderer already writes are parsed, and an unparsable or
+    older artifact degrades to `unknown` instead of blocking the resume path.
+    """
+    if not text.strip():
+        return {"phase": "unknown", "change": "", "task": "", "parsed": False}
+
+    def value_of(pattern: re.Pattern[str]) -> str:
+        match = pattern.search(text)
+        if not match:
+            return ""
+        raw = match.group("value").strip()
+        return "" if raw in PROGRESS_PLACEHOLDERS else raw
+
+    phase = value_of(PROGRESS_PHASE_RE)
+    return {
+        "phase": phase or "unknown",
+        "change": value_of(PROGRESS_CHANGE_RE),
+        "task": value_of(PROGRESS_TASK_RE),
+        "parsed": bool(phase),
+    }
+
+
+def classify_last_item_state(
+    last_item: dict[str, str], targets: list[dict[str, Any]], uncommitted: list[dict[str, Any]]
+) -> tuple[str, str]:
+    """Never default an unresolvable item to `not_started`; re-doing it would
+    duplicate or overwrite half-finished work."""
+    change = last_item.get("change") or ""
+    task = last_item.get("task") or ""
+    if not change or not task:
+        return "unknown", "progress artifact does not name a previously handled item"
+    matched = [
+        item
+        for target in targets
+        if str(target.get("name") or "") == change
+        for item in (target.get("progress") or {}).get("items", [])
+        if item["text"] == task
+    ]
+    if len(matched) != 1:
+        return (
+            "unknown",
+            f"{change}: {task} does not match exactly one current checkbox",
+        )
+    if matched[0]["done"]:
+        return "completed", "OpenSpec checkbox is checked"
+    dirty = [row for row in uncommitted if row["delivery_dirty"]]
+    if dirty:
+        repos = ", ".join(str(row["repo"]) for row in dirty)
+        return "in_flight", f"checkbox is unchecked and {repos} has uncommitted changes"
+    return "not_started", "checkbox is unchecked and every delivery checkout is clean"
+
+
+def build_resume_facts(
+    root: Path,
+    info: TaskInfo,
+    targets: list[dict[str, Any]],
+    schedule: dict[str, Any],
+    progress_text: str,
+    checkout_gate: dict[str, Any],
+) -> dict[str, Any]:
+    """Aggregate every fact a resumed apply needs into one call."""
+    recorded = parse_progress_resume_facts(progress_text)
+    prepare_required = not checkout_gate["ok"]
+    uncommitted: list[dict[str, Any]] = []
+    verification = "unknown"
+    if not prepare_required:
+        for snapshot in collect_delivery_snapshots(root, info):
+            uncommitted.append(
+                {
+                    "repo": snapshot["repo"],
+                    "checkout": snapshot["checkout"],
+                    "branch": snapshot["branch"],
+                    "dirty_role": snapshot["dirty_role"],
+                    "delivery_dirty": snapshot["delivery_dirty"],
+                    "porcelain": snapshot["dirty_porcelain"],
+                }
+            )
+        status = parse_final_verification(progress_text)["status"]
+        if status == "missing":
+            verification = "absent"
+        elif status == "fresh":
+            verification = (
+                "fresh"
+                if validate_final_verification(root, info, progress_text)["ok"]
+                else "stale"
+            )
+        else:
+            verification = status
+    last_item = {"change": recorded["change"], "task": recorded["task"]}
+    if prepare_required:
+        state, reason = "unknown", "delivery checkout preparation is still required"
+    else:
+        state, reason = classify_last_item_state(last_item, targets, uncommitted)
+    return {
+        "phase": recorded["phase"],
+        "progress_parsed": recorded["parsed"],
+        "last_item": last_item,
+        "last_item_state": state,
+        "last_item_reason": reason,
+        "prepare_required": prepare_required,
+        "uncommitted": uncommitted,
+        "verification": verification,
+        "deferred": schedule["deferred"],
+        "next": schedule["next"],
+        "candidates": schedule["candidates"],
+    }
+
+
+def describe_openspec_locations(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Report where each change actually lives and whether it can be read there."""
+    rows: list[dict[str, Any]] = []
+    for target in targets:
+        progress = target.get("progress") or openspec_checkbox_progress(target)
+        availability = str(progress.get("availability") or "active")
+        rows.append(
+            {
+                "change": target.get("name"),
+                "canonical_repo": target.get("canonical_repo"),
+                "planning_root": target.get("planning_root"),
+                "change_root": target.get("change_root"),
+                "availability": availability,
+                "readable": availability in {"active", "archived"},
+                "action": str(progress.get("unavailable_reason") or ""),
+            }
+        )
+    return rows
 
 
 def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
@@ -2893,13 +3273,22 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
         )
     info = matches[0]
     checkout_gate = evaluate_delivery_checkout_bindings(root, info)
+    progress_path = root / info.task_root.rstrip("/") / "progress.md"
+    progress_text = (
+        progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
+    )
     if not checkout_gate["ok"]:
-        raise checkout_gate_failure(checkout_gate)
-    targets = [resolve_change_target(root, info, row) for row in info.openspec]
+        failure = checkout_gate_failure(checkout_gate)
+        failure.details["resume"] = {
+            **parse_progress_resume_facts(progress_text),
+            "prepare_required": True,
+            "last_item_state": "unknown",
+        }
+        raise failure
+    targets = resolve_change_targets(root, info)
     schedule = build_apply_schedule(
         targets, load_deferred_items(apply_state_path(root, info))
     )
-    progress_path = root / info.task_root.rstrip("/") / "progress.md"
     complete = sum(int(t["progress"]["complete"]) for t in targets)
     total = sum(int(t["progress"]["total"]) for t in targets)
     return emit(
@@ -2911,6 +3300,7 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             "checkout_gate": checkout_gate,
             "scope": info.scope,
             "targets": targets,
+            "openspec_locations": describe_openspec_locations(targets),
             "openspec_remaining": {
                 "state": aggregate_remaining_state(targets),
                 "complete": complete,
@@ -2919,11 +3309,12 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
                 "items": schedule["remaining"],
             },
             "apply_schedule": schedule,
+            "resume": build_resume_facts(
+                root, info, targets, schedule, progress_text, checkout_gate
+            ),
             "progress_path": rel_posix(root, progress_path),
             "progress_exists": progress_path.is_file(),
-            "progress_markdown": (
-                progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
-            ),
+            "progress_markdown": progress_text,
         }
     )
 
@@ -2949,7 +3340,7 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
     original_readme = task_readme.read_text(encoding="utf-8")
     task_index = index_path(root)
     original_index = task_index.read_text(encoding="utf-8") if task_index.is_file() else None
-    targets = [resolve_change_target(root, info, row) for row in info.openspec]
+    targets = resolve_change_targets(root, info)
     progress_path = root / info.task_root.rstrip("/") / "progress.md"
     previous_text = progress_path.read_text(encoding="utf-8") if progress_path.is_file() else ""
     progress_existed = progress_path.is_file()
@@ -3044,11 +3435,11 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             ),
         }
     elif phase == "testing":
-        dirty = [snapshot for snapshot in snapshots if snapshot["dirty"]]
+        dirty = [snapshot for snapshot in snapshots if snapshot["delivery_dirty"]]
         final_verification = {
             "status": "provisional" if dirty else "fresh",
             "reason": (
-                "delivery checkout is dirty; evidence is provisional"
+                "delivery checkout has uncommitted code changes; evidence is provisional"
                 if dirty
                 else "final verification matches clean delivery branch/HEAD snapshots"
             ),
@@ -3065,15 +3456,22 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         "",
         "## OpenSpec 进度",
         "",
-        "| change | 完成 | 总数 | 剩余 | planning root |",
-        "|--------|------|------|------|---------------|",
+        "| 顺序 | change | 完成 | 总数 | 剩余 | planning root |",
+        "|------|--------|------|------|------|---------------|",
     ]
-    for target in targets:
-        progress = openspec_checkbox_progress(target)
+    schedule_groups = schedule["groups"]
+    for group in schedule_groups:
+        progress = group["progress"]
         lines.append(
-            f"| `{target['name']}` | {progress['complete']} | {progress['total']} | "
-            f"{progress['remaining']} | `{target['planning_root']}` |"
+            f"| {group['order_key']} | `{group['change']}` | {progress['complete']} | "
+            f"{progress['total']} | {progress['remaining']} | `{group['planning_root']}` |"
         )
+    total_complete = sum(int(g["progress"]["complete"]) for g in schedule_groups)
+    total_all = sum(int(g["progress"]["total"]) for g in schedule_groups)
+    lines.append(
+        f"| — | **合计** | {total_complete} | {total_all} | "
+        f"{total_all - total_complete} | |"
+    )
     lines.extend(["", "## 本轮完成", ""])
     lines.extend(f"- {item}" for item in completed_items)
     if not completed_items:
@@ -3084,14 +3482,22 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         lines.append("- （尚无）")
     lines.extend(["", "## 暂缓项", ""])
     if schedule["deferred"]:
-        for row in schedule["deferred"]:
-            lines.append(f"- `{row['change']}` — {row['task']}（{row['reason']}）")
+        for group in schedule_groups:
+            if not group["deferred"]:
+                continue
+            lines.append(f"- `{group['change']}`（{len(group['deferred'])}）")
+            for row in group["deferred"]:
+                lines.append(f"  - {row['task']}（{row['reason']}）")
     else:
         lines.append("- （无）")
     lines.extend(["", "## 候选项", ""])
     if schedule["candidates"]:
-        for row in schedule["candidates"]:
-            lines.append(f"- `{row['change']}` — {row['text']}")
+        for group in schedule_groups:
+            if not group["candidates"]:
+                continue
+            lines.append(f"- `{group['change']}`（{len(group['candidates'])}）")
+            for row in group["candidates"]:
+                lines.append(f"  - {row['text']}")
     else:
         lines.append("- （无）")
     lines.extend(
@@ -3275,7 +3681,7 @@ def cmd_resolve(root: Path, args: argparse.Namespace) -> int:
                     ),
                     "active": [asdict(i) for i in infos],
                     "restore_command": (
-                        f"taskctl restore {archived_matches[0].task_id}"
+                        taskctl_command("restore", archived_matches[0].task_id)
                         if len(archived_matches) == 1
                         else ""
                     ),
@@ -3690,6 +4096,11 @@ def evaluate_archive_repository_gate(
     root: Path, info: TaskInfo, resolved_targets: list[dict[str, Any]]
 ) -> dict[str, Any]:
     repository_uses = collect_archive_repository_uses(root, info, resolved_targets)
+    planning_roots = [
+        Path(str(target["planning_root"]))
+        for target in resolved_targets
+        if target.get("planning_root")
+    ]
     missing_delivery: list[dict[str, Any]] = []
     unavailable_delivery_status: list[dict[str, Any]] = []
     dirty_delivery: list[dict[str, Any]] = []
@@ -3734,13 +4145,23 @@ def evaluate_archive_repository_gate(
                     summarize_delivery_checkout(root, repo_key, checkout, binding)
                 )
                 if porcelain:
-                    dirty_delivery.append(
-                        {
-                            **base,
-                            "reason": "dirty_delivery_checkout",
-                            "dirty_porcelain": porcelain,
-                        }
-                    )
+                    ownership = classify_dirty_paths(checkout, planning_roots)
+                    if ownership["role"] == "planning":
+                        non_blocking_dirty.append(
+                            {
+                                **base,
+                                "reason": "planning_artifacts_only",
+                                "dirty_porcelain": ownership["planning"],
+                            }
+                        )
+                    else:
+                        dirty_delivery.append(
+                            {
+                                **base,
+                                "reason": "dirty_delivery_checkout",
+                                "dirty_porcelain": porcelain,
+                            }
+                        )
             continue
 
         if roles.intersection({"planning", "task_store"}):
@@ -3847,7 +4268,7 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     resolved_targets: list[dict[str, Any]] = []
     target_states: list[dict[str, Any]] = []
     for change in info.openspec:
-        target = resolve_change_target(root, info, change)
+        target = resolve_change_target(root, change)
         resolved_targets.append(target)
         target_states.append(inspect_change_remainder(target))
 
@@ -3978,15 +4399,13 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
                 "taskId": info.task_id,
                 "affected": remaining_rows,
                 "remaining": remaining_rows,
-                "exact_action": f"taskctl archive {info.task_id} --force-merge",
+                "exact_action": taskctl_command("archive", info.task_id, "--force-merge"),
                 "exit_markdown": remaining_confirm_markdown(info.task_id, remaining_rows),
                 "user_actions": [
                     {
                         "id": "force_merge",
-                        "label": (
-                            f"继续归档（强行合并）："
-                            f"taskctl archive {info.task_id} --force-merge"
-                        ),
+                        "label": "继续归档（强行合并）："
+                        + taskctl_command("archive", info.task_id, "--force-merge"),
                     },
                     {"id": "finish_remaining", "label": "先做完剩余项再归档"},
                     {"id": "abort", "label": "中止"},
@@ -4025,7 +4444,9 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
 
     unchecked_items = [item["text"] for item in acceptance_items if not item["done"]]
     if unchecked_items and not args.allow_unchecked_acceptance:
-        action = f"taskctl archive {info.task_id} --allow-unchecked-acceptance"
+        action = taskctl_command(
+            "archive", info.task_id, "--allow-unchecked-acceptance"
+        )
         return emit(
             {
                 "ok": False,
@@ -4082,7 +4503,9 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
     archive_gate["overridden"] = overridden_dirty
     if blocked_dirty:
         exact_actions = [
-            f"taskctl archive {info.task_id} --allow-dirty-checkout {row['repo']}"
+            taskctl_command(
+                "archive", info.task_id, "--allow-dirty-checkout", str(row["repo"])
+            )
             for row in blocked_dirty
         ]
         return emit(
@@ -4139,7 +4562,9 @@ def _cmd_archive_unlocked(root: Path, args: argparse.Namespace) -> int:
         verification_gate = validate_final_verification(root, info, progress_text)
         verification_ok = has_evidence and verification_gate["ok"]
     if not verification_ok and not args.allow_missing_verification:
-        action = f"taskctl archive {info.task_id} --allow-missing-verification"
+        action = taskctl_command(
+            "archive", info.task_id, "--allow-missing-verification"
+        )
         return emit(
             {
                 "ok": False,

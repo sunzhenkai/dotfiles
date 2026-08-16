@@ -113,9 +113,84 @@ class SkillContractTest(unittest.TestCase):
         self.assertIn("后续 change", apply_text)
         self.assertIn("并行挂起", apply_text)
         self.assertIn("仓级测试不是 final verification", apply_text)
-        self.assertIn("停本轮调度", command_text)
         self.assertIn("并行挂起", command_text)
         self.assertNotIn("停止并执行对应阶段动作", command_text)
+
+    def test_apply_outcome_contract_has_one_complete_source(self) -> None:
+        outcomes = (
+            "blocked",
+            "next",
+            "deferred_only",
+            "validation_required",
+            "validation_recorded",
+            "done",
+        )
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        rows = [
+            line
+            for line in apply_text.splitlines()
+            if line.startswith("| `") and line.count("|") >= 4
+        ]
+        for outcome in outcomes:
+            self.assertTrue(
+                any(f"`{outcome}`" in row for row in rows),
+                f"apply.md must define outcome {outcome} in the contract table",
+            )
+        followers = {
+            "SKILL.md": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "task-apply.md": (COMMAND_ROOT / "task-apply.md").read_text(encoding="utf-8"),
+            "openai.yaml": (SKILL_ROOT / "agents/openai.yaml").read_text(encoding="utf-8"),
+        }
+        contract_only = ("deferred_only", "validation_required", "validation_recorded")
+        for name, text in followers.items():
+            for outcome in contract_only:
+                self.assertNotIn(
+                    outcome,
+                    text,
+                    f"{name} must point at references/apply.md instead of re-listing outcomes",
+                )
+
+    def test_state_ownership_lives_only_in_safety(self) -> None:
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
+        self.assertIn("## 仓库角色", safety)
+        self.assertIn("## 状态所有权", safety)
+        for token in ("task_store", ".task-apply-state.json", "reference | 建议/排除仓"):
+            self.assertIn(token, safety)
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("safety.md", skill_text)
+        for token in ("task_store", ".task-apply-state.json"):
+            self.assertNotIn(token, skill_text)
+
+    def test_openspec_delegation_contract_is_pinned_in_references(self) -> None:
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
+        self.assertIn("PROXY-1", safety)
+        self.assertIn("PROXY-2", safety)
+        self.assertIn("unsupported_openspec_schema", safety)
+        self.assertIn("unsupported_openspec_store", safety)
+        for name in ("planning.md", "archive.md"):
+            text = (SKILL_ROOT / f"references/{name}").read_text(encoding="utf-8")
+            self.assertIn("planning_root", text, name)
+            self.assertIn("openspec validate --strict --change", text, name)
+        planning = (SKILL_ROOT / "references/planning.md").read_text(encoding="utf-8")
+        self.assertIn("canonical planning root", planning)
+
+    def test_schema_assertion_is_implemented_in_taskctl(self) -> None:
+        source = TASKCTL_PATH.read_text(encoding="utf-8")
+        self.assertIn("unsupported_openspec_schema", source)
+        self.assertIn("spec-driven", source)
+        self.assertIn("config.yaml", source)
+
+    def test_root_option_is_global_and_documented(self) -> None:
+        parser = load_taskctl().build_parser()
+        self.assertTrue(
+            any(
+                "--root" in (action.option_strings or [])
+                for action in parser._actions
+            )
+        )
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`--root` 是全局参数", skill_text)
+        self.assertIn("子命令之前", skill_text)
 
     def test_instruction_footprint_is_below_previous_baseline(self) -> None:
         paths = [SKILL_ROOT / "SKILL.md", *(SKILL_ROOT / "references").glob("*.md")]

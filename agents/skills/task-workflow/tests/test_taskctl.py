@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -197,7 +199,9 @@ hello
         self.assertEqual(payload["result"], "archived_match")
         self.assertEqual(payload["reason"], "task_archived")
         self.assertEqual(payload["archived_match"]["task_id"], "T0001")
-        self.assertEqual(payload["restore_command"], "taskctl restore T0001")
+        self.assertEqual(
+            payload["restore_command"], tc.taskctl_command("restore", "T0001")
+        )
         self.assertIn("任务已归档", payload["exit_markdown"])
 
         code, restored = self._run("restore", "T0001")
@@ -993,7 +997,9 @@ hello
         )
         self.assertEqual(
             payload["exact_action"],
-            "taskctl archive T0001 --allow-dirty-checkout service-a",
+            tc.taskctl_command(
+                "archive", "T0001", "--allow-dirty-checkout", "service-a"
+            ),
         )
 
         code, payload = self._run(
@@ -1202,6 +1208,18 @@ hello
         self._mark_archive_ready(task)
         self._write_index(next_id=2)
 
+        # 3.4 planning-only dirtiness is a diagnostic even when the repo also
+        # carries the delivery role.
+        code, payload = self._run("archive", "T0001", "--dry-run")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["archive_gate"]["dirty_delivery_checkouts"], [])
+        self.assertEqual(
+            payload["archive_gate"]["non_blocking_dirty"][0]["reason"],
+            "planning_artifacts_only",
+        )
+
+        # 3.4 mixing code changes into the same working tree fails closed again.
+        (repo / "src.py").write_text("code\n", encoding="utf-8")
         code, payload = self._run("archive", "T0001")
 
         self.assertEqual(code, 2)
@@ -1231,7 +1249,8 @@ hello
         )
         self.assertEqual(code, 0)
         self.assertEqual(prepared["repos"][0]["action"], "created_worktree")
-        change = wt / "openspec/changes/life-change"
+        # Planning artifacts stay at the canonical planning root, not in the worktree.
+        change = repo / "openspec/changes/life-change"
         change.mkdir(parents=True)
         (change / "tasks.md").write_text("- [ ] implement\n", encoding="utf-8")
         code, advanced = self._run(
@@ -1239,7 +1258,8 @@ hello
         )
         self.assertEqual(code, 0)
         self.assertEqual(advanced["result"], "next")
-        self.assertEqual(advanced["targets"][0]["checkout"], "svc-life-wt")
+        self.assertEqual(advanced["targets"][0]["canonical_repo"], "svc")
+        (wt / "feature.py").write_text("implemented\n", encoding="utf-8")
         (change / "tasks.md").write_text("- [x] implement\n", encoding="utf-8")
         code, exhausted = self._run(
             "advance", "T0001", "--phase", "implementing", "--change", "life-change",
@@ -1280,9 +1300,10 @@ hello
         self.assertEqual(code, 0)
         self.assertEqual(done["result"], "done")
 
-        archived_change = wt / "openspec/changes/archive/2026-08-14-life-change"
+        archived_change = repo / "openspec/changes/archive/2026-08-14-life-change"
         archived_change.parent.mkdir(parents=True)
         shutil.move(str(change), str(archived_change))
+        (wt / "follow-up.py").write_text("post-archive tweak\n", encoding="utf-8")
         self._git(wt, "add", ".")
         self._git(wt, "commit", "-m", "archive lifecycle spec")
         (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
@@ -1291,7 +1312,7 @@ hello
         self.assertEqual(stale_archive["reason"], "stale_verification")
         self.assertEqual(
             stale_archive["exact_action"],
-            "taskctl archive T0001 --allow-missing-verification",
+            tc.taskctl_command("archive", "T0001", "--allow-missing-verification"),
         )
         code, retested = self._run(
             "advance", "T0001", "--phase", "testing", "--change", "life-change",
@@ -1425,7 +1446,7 @@ hello
         self.assertEqual(acceptance["affected"], ["done"])
         self.assertEqual(
             acceptance["exact_action"],
-            "taskctl archive T0001 --allow-unchecked-acceptance",
+            tc.taskctl_command("archive", "T0001", "--allow-unchecked-acceptance"),
         )
 
         code, verification = self._run(
@@ -1435,7 +1456,7 @@ hello
         self.assertEqual(verification["reason"], "stale_verification")
         self.assertEqual(
             verification["exact_action"],
-            "taskctl archive T0001 --allow-missing-verification",
+            tc.taskctl_command("archive", "T0001", "--allow-missing-verification"),
         )
 
         (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
@@ -2420,10 +2441,38 @@ hello
         )
         (task / "README.md").write_text(readme, encoding="utf-8")
         self._write_index(next_id=2)
+        # 4.4 rejected where the association is recorded, so the proposal phase
+        # cannot even reach `proposed`, let alone defer the failure to apply.
+        code, proposed = self._run("set-status", "T0001", "proposed")
+        self.assertEqual(code, 1)
+        diagnostic = proposed["catalog"]["diagnostics"][0]
+        self.assertEqual(diagnostic["reason"], "unsupported_openspec_store")
+        self.assertEqual(diagnostic["store"], "external-store")
+        self.assertEqual(diagnostic["diagnostic"]["section"], "关联 OpenSpec")
         code, payload = self._run("execution-context", "T0001")
         self.assertEqual(code, 1)
-        self.assertEqual(payload["reason"], "unsupported_openspec_store")
-        self.assertEqual(payload["store"], "external-store")
+        self.assertEqual(payload["reason"], "task_catalog_conflict")
+
+    def test_legacy_store_column_with_empty_value_still_parses(self) -> None:
+        task = self._seed_task("T0001", "legacy-store")
+        readme = (task / "README.md").read_text(encoding="utf-8").replace(
+            "## 验收标准",
+            """### 关联 OpenSpec
+
+| change | 路径 | 仓库 | store | 说明 |
+|--------|------|------|-------|------|
+| `demo-change` | `openspec/changes/demo-change/` | | — | legacy template |
+
+## 验收标准""",
+        )
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        self._write_index(next_id=2)
+        code, payload = self._run("resolve", "T0001")
+        self.assertEqual(code, 0, payload)
+        row = payload["task"]["openspec"][0]
+        self.assertEqual(row["name"], "demo-change")
+        self.assertEqual(row["store"], "")
+        self.assertEqual(row["order"], "")
 
     def test_new_reports_structured_rollback_failure(self) -> None:
         with mock.patch.object(tc, "write_index", side_effect=OSError("primary index failure")), mock.patch.object(
@@ -2505,6 +2554,845 @@ hello
         self.assertEqual(code, 1)
         self.assertEqual(payload["reason"], "rollback_failed")
         self.assertTrue(any("restore move-back failed" in error for error in payload["rollback_errors"]))
+
+    # --- repair-task-workflow-delivery-loop regressions ---
+
+    @staticmethod
+    def _scope_block(rows: list[tuple[str, str, str]]) -> str:
+        lines = [
+            "",
+            "### 涉及面",
+            "",
+            "| 逻辑库 | 路径 | 角色 |",
+            "|--------|------|------|",
+        ]
+        lines.extend(f"| {name} | `{path}` | {role} |" for name, path, role in rows)
+        return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _work_context_block(rows: list[tuple[str, str, str, str, str]]) -> str:
+        lines = [
+            "",
+            "## 工作上下文",
+            "",
+            "| 仓库 | 仓库路径 | checkout 路径 | worktree | 分支 | 基线 |",
+            "|------|----------|---------------|----------|------|------|",
+        ]
+        lines.extend(
+            f"| {name} | `{repo}` | `{checkout}` | {worktree} | `{branch}` | `main` |"
+            for name, repo, checkout, worktree, branch in rows
+        )
+        return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _openspec_block(rows: list[dict[str, str]], *, ordered: bool = False) -> str:
+        header = (
+            "| change | 路径 | 仓库 | 顺序 | 说明 |"
+            if ordered
+            else "| change | 路径 | 仓库 | 说明 |"
+        )
+        divider = (
+            "|--------|------|------|------|------|"
+            if ordered
+            else "|--------|------|------|------|"
+        )
+        lines = ["", "### 关联 OpenSpec", "", header, divider]
+        for row in rows:
+            cells = [f"`{row['name']}`", f"`{row['path']}`", f"`{row.get('repo', '')}`"]
+            if ordered:
+                cells.append(str(row.get("order", "")))
+            cells.append(row.get("note", "seeded"))
+            lines.append("| " + " | ".join(cells) + " |")
+        return "\n".join(lines) + "\n"
+
+    def _write_change(self, path: Path, tasks_md: str) -> Path:
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "tasks.md").write_text(tasks_md, encoding="utf-8")
+        return path
+
+    def test_prepare_branches_planning_dirty_is_not_an_unexplained_block(self) -> None:
+        """1.1 propose 写入未提交 change 后，in-place apply 不得报不可解释的 blocked_dirty。"""
+        repo = self._init_git_repo("svc")
+        self._write_change(
+            repo / "openspec/changes/demo-change", "- [ ] 1.1 implement\n"
+        )
+        block = self._scope_block([("svc", "svc", "必须")]) + self._openspec_block(
+            [
+                {
+                    "name": "demo-change",
+                    "path": "svc/openspec/changes/demo-change/",
+                    "repo": "svc",
+                }
+            ]
+        )
+        self._seed_task("T0001", "planning-dirty", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run(
+            "prepare-branches", "--slug", "planning-dirty", "--from-task", "T0001"
+        )
+
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["errors"], [])
+        entry = payload["repos"][0]
+        self.assertEqual(entry["dirty_role"], "planning")
+        self.assertIn("openspec", " ".join(entry["planning_dirty"]))
+        self.assertIn("openspec", entry["planning_action"])
+
+    def test_worktree_apply_resolves_change_at_canonical_planning_root(self) -> None:
+        """1.2 worktree 交付时 change 仍应在 canonical 侧可读，而不是 missing。"""
+        repo = self._init_git_repo("svc")
+        worktree = self.tmp / "svc-wt"
+        self._git(repo, "worktree", "add", str(worktree), "-b", "feat-canonical")
+        self._write_change(
+            repo / "openspec/changes/demo-change", "- [ ] 1.1 implement\n"
+        )
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-m", "add change")
+        block = (
+            self._scope_block([("svc", "svc", "必须")])
+            + self._work_context_block(
+                [("svc", "svc", "svc-wt", "是", "feat-canonical")]
+            )
+            + self._openspec_block(
+                [
+                    {
+                        "name": "demo-change",
+                        "path": "svc/openspec/changes/demo-change/",
+                        "repo": "svc",
+                    }
+                ]
+            )
+        )
+        self._seed_task("T0001", "canonical", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 0, payload)
+        target = payload["targets"][0]
+        self.assertEqual(target["progress"]["availability"], "active")
+        self.assertEqual(
+            target["planning_root"], str((repo / "openspec").resolve())
+        )
+        self.assertEqual(payload["apply_schedule"]["next"]["text"], "1.1 implement")
+
+    def test_prepare_branches_blocks_mixed_planning_and_code_dirt(self) -> None:
+        """3.4 planning 与代码混合 dirty 时按 delivery 归属继续 fail closed。"""
+        repo = self._init_git_repo("svc")
+        self._write_change(
+            repo / "openspec/changes/demo-change", "- [ ] 1.1 implement\n"
+        )
+        (repo / "src.py").write_text("code\n", encoding="utf-8")
+        block = self._scope_block([("svc", "svc", "必须")]) + self._openspec_block(
+            [
+                {
+                    "name": "demo-change",
+                    "path": "svc/openspec/changes/demo-change/",
+                    "repo": "svc",
+                }
+            ]
+        )
+        self._seed_task("T0001", "mixed-dirty", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run(
+            "prepare-branches", "--slug", "mixed-dirty", "--from-task", "T0001"
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["errors"][0]["action"], "blocked_dirty")
+        self.assertEqual(payload["errors"][0]["dirty_role"], "delivery")
+
+    def test_in_place_apply_locates_change_and_reports_planning_root(self) -> None:
+        """2.4 单仓 in-place 布局下 target 定位与 planning root 报告正确。"""
+        repo = self._init_git_repo("svc")
+        self._write_change(
+            repo / "openspec/changes/demo-change", "- [ ] 1.1 implement\n"
+        )
+        block = (
+            self._scope_block([("svc", "svc", "必须")])
+            + self._work_context_block([("svc", "svc", "svc", "否", "main")])
+            + self._openspec_block(
+                [
+                    {
+                        "name": "demo-change",
+                        "path": "svc/openspec/changes/demo-change/",
+                        "repo": "svc",
+                    }
+                ]
+            )
+        )
+        self._seed_task("T0001", "in-place", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 0, payload)
+        location = payload["openspec_locations"][0]
+        self.assertTrue(location["readable"])
+        self.assertEqual(location["canonical_repo"], "svc")
+        self.assertEqual(location["planning_root"], str((repo / "openspec").resolve()))
+        self.assertEqual(payload["apply_schedule"]["next"]["text"], "1.1 implement")
+
+    def test_unreadable_change_reports_planning_root_and_exact_action(self) -> None:
+        """2.3 change 在 canonical planning root 不可读时给出定位与精确动作。"""
+        self._init_git_repo("svc")
+        block = (
+            self._scope_block([("svc", "svc", "必须")])
+            + self._work_context_block([("svc", "svc", "svc", "否", "main")])
+            + self._openspec_block(
+                [
+                    {
+                        "name": "ghost-change",
+                        "path": "svc/openspec/changes/ghost-change/",
+                        "repo": "svc",
+                    }
+                ]
+            )
+        )
+        self._seed_task("T0001", "ghost", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 0, payload)
+        location = payload["openspec_locations"][0]
+        self.assertFalse(location["readable"])
+        self.assertEqual(
+            location["planning_root"], str((self.tmp / "svc/openspec").resolve())
+        )
+        self.assertIn("task-propose", location["action"])
+        self.assertNotIn("svc-wt", location["action"])
+
+    def test_archived_change_paths_require_whole_name_match(self) -> None:
+        """1.3 change 名互为后缀时不得把他人归档判成自己已归档。"""
+        archive_root = self.tmp / "openspec/changes/archive"
+        self._write_change(
+            archive_root / "2026-08-14-harden-demo-change", "- [x] done\n"
+        )
+        target = {
+            "name": "demo-change",
+            "planning_root": str(self.tmp / "openspec"),
+            "change_root": str(self.tmp / "openspec/changes/demo-change"),
+        }
+        self.assertEqual(tc.archived_change_paths(target), [])
+        state = tc.inspect_change_remainder(target)
+        self.assertEqual(state["state"], "missing")
+
+    def test_blocked_status_and_command_hints_match_documentation(self) -> None:
+        """1.4 blocked 的 status 口径与 CLI 命令提示必须是文档化且可执行的形式。"""
+        self._seed_task("T0001", "hints", openspec=True)
+        self._write_change(
+            self.tmp / "openspec/changes/demo-change", "- [ ] still candidate\n"
+        )
+        self._write_index(next_id=2)
+
+        code, blocked = self._run(
+            "advance", "T0001", "--phase", "blocked", "--blocker", "global outage"
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(blocked["result"], "blocked")
+        self.assertEqual(blocked["status"], "blocked")
+        readme = (self.tmp / "tasks/2026-08-01/T0001-hints/README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("**status：** blocked", readme)
+
+        script = str(tc.taskctl_script_path())
+        self.assertTrue(script.endswith("scripts/taskctl.py"))
+        self.assertEqual(
+            tc.taskctl_command("restore", "T0001"), f"python3 {script} restore T0001"
+        )
+        markdown = tc.remaining_confirm_markdown(
+            "T0001", [{"name": "demo-change", "complete": 0, "total": 1}]
+        )
+        self.assertIn(f"python3 {script} archive T0001 --force-merge", markdown)
+
+        bare = re.compile(
+            r"taskctl (?:list|resolve|set-status|new|restore|prepare-branches"
+            r"|execution-context|advance|archive|notes)\b"
+        )
+        tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+        offenders = [
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and bare.search(node.value)
+        ]
+        self.assertEqual(offenders, [])
+
+    def test_unsupported_openspec_schema_is_named_explicitly(self) -> None:
+        """1.4 非 spec-driven schema 必须明确报不支持，而不是伪装成 tasks.md 缺失。"""
+        self._seed_task("T0001", "schema", openspec=True)
+        self._write_change(self.tmp / "openspec/changes/demo-change", "- [ ] item\n")
+        (self.tmp / "openspec/config.yaml").write_text(
+            "schema: test-driven\n", encoding="utf-8"
+        )
+        self._write_index(next_id=2)
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "unsupported_openspec_schema")
+        self.assertIn("test-driven", payload["error"])
+
+    def test_change_order_column_drives_candidate_selection(self) -> None:
+        """1.5 多 change 的推进顺序必须由显式顺序列决定且不在 change 之间抖动。"""
+        self._write_change(
+            self.tmp / "openspec/changes/foundation-change",
+            "- [ ] 1.1 foundation first\n- [ ] 1.2 foundation second\n",
+        )
+        self._write_change(
+            self.tmp / "openspec/changes/later-change", "- [ ] 2.1 later item\n"
+        )
+        block = self._openspec_block(
+            [
+                {
+                    "name": "later-change",
+                    "path": "openspec/changes/later-change/",
+                    "order": "2",
+                },
+                {
+                    "name": "foundation-change",
+                    "path": "openspec/changes/foundation-change/",
+                    "order": "1",
+                },
+            ],
+            ordered=True,
+        )
+        self._seed_task("T0001", "ordered", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["apply_schedule"]["next"]["change"], "foundation-change")
+        self.assertEqual(
+            [row["change"] for row in payload["apply_schedule"]["candidates"]],
+            ["foundation-change", "foundation-change", "later-change"],
+        )
+
+        code, deferred = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "foundation-change",
+            "--current-task", "1.1 foundation first",
+            "--defer-current", "waiting on operator",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(deferred["next"]["change"], "foundation-change")
+        self.assertEqual(deferred["next"]["text"], "1.2 foundation second")
+
+    def test_ordered_defer_keeps_later_change_executable_without_jitter(self) -> None:
+        """7.4 前序 change 暂缓后，后序 change 独立项仍可执行且顺序稳定。"""
+        self._write_change(
+            self.tmp / "openspec/changes/foundation-change", "- [ ] 1.1 only item\n"
+        )
+        self._write_change(
+            self.tmp / "openspec/changes/later-change",
+            "- [ ] 2.1 independent\n- [ ] 2.2 also independent\n",
+        )
+        block = self._openspec_block(
+            [
+                {
+                    "name": "foundation-change",
+                    "path": "openspec/changes/foundation-change/",
+                    "order": "1",
+                },
+                {
+                    "name": "later-change",
+                    "path": "openspec/changes/later-change/",
+                    "order": "2",
+                },
+            ],
+            ordered=True,
+        )
+        self._seed_task("T0001", "ordered-defer", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, deferred = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "foundation-change",
+            "--current-task", "1.1 only item",
+            "--defer-current", "waiting on operator",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(deferred["result"], "next")
+        self.assertEqual(deferred["next"]["change"], "later-change")
+        self.assertEqual(deferred["next"]["text"], "2.1 independent")
+        self.assertEqual(
+            [row["change"] for row in deferred["apply_schedule"]["groups"]],
+            ["foundation-change", "later-change"],
+        )
+
+        for _ in range(3):
+            code, repeated = self._run("execution-context", "T0001")
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                [row["text"] for row in repeated["apply_schedule"]["candidates"]],
+                ["2.1 independent", "2.2 also independent"],
+            )
+        progress = (
+            self.tmp / "tasks/2026-08-01/T0001-ordered-defer/progress.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("| — | **合计** | 0 | 3 | 3 |", progress)
+        self.assertIn("- `later-change`（2）", progress)
+
+    def test_multi_repo_changes_locate_and_schedule_independently(self) -> None:
+        """7.5 多 change 分布在不同仓、不同 planning root 时定位与调度均正确。"""
+        alpha = self._init_git_repo("alpha")
+        beta = self._init_git_repo("beta")
+        self._write_change(
+            alpha / "openspec/changes/alpha-change", "- [ ] a1 alpha item\n"
+        )
+        self._write_change(
+            beta / "openspec/changes/beta-change", "- [ ] b1 beta item\n"
+        )
+        block = (
+            self._scope_block([("alpha", "alpha", "必须"), ("beta", "beta", "必须")])
+            + self._work_context_block(
+                [
+                    ("alpha", "alpha", "alpha", "否", "main"),
+                    ("beta", "beta", "beta", "否", "main"),
+                ]
+            )
+            + self._openspec_block(
+                [
+                    {
+                        "name": "beta-change",
+                        "path": "beta/openspec/changes/beta-change/",
+                        "repo": "beta",
+                        "order": "2",
+                    },
+                    {
+                        "name": "alpha-change",
+                        "path": "alpha/openspec/changes/alpha-change/",
+                        "repo": "alpha",
+                        "order": "1",
+                    },
+                ],
+                ordered=True,
+            )
+        )
+        self._seed_task("T0001", "multi-repo", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 0, payload)
+        roots = {
+            row["change"]: row["planning_root"] for row in payload["openspec_locations"]
+        }
+        self.assertEqual(roots["alpha-change"], str((alpha / "openspec").resolve()))
+        self.assertEqual(roots["beta-change"], str((beta / "openspec").resolve()))
+        self.assertEqual(
+            [row["change"] for row in payload["apply_schedule"]["candidates"]],
+            ["alpha-change", "beta-change"],
+        )
+        self.assertEqual(payload["openspec_remaining"]["total"], 2)
+
+    def test_execution_context_resume_reports_in_flight_item(self) -> None:
+        """1.6 中断恢复必须能区分「未开始」与「改了一半」。"""
+        repo = self._init_git_repo("svc")
+        self._git(repo, "checkout", "-b", "feat-resume")
+        self._write_change(
+            self.tmp / "openspec/changes/demo-change",
+            "- [ ] 1.1 first item\n- [ ] 1.2 second item\n",
+        )
+        block = (
+            self._scope_block([("svc", "svc", "必须")])
+            + self._work_context_block([("svc", "svc", "svc", "否", "feat-resume")])
+            + self._openspec_block(
+                [{"name": "demo-change", "path": "openspec/changes/demo-change/"}]
+            )
+        )
+        self._seed_task("T0001", "resume", scope_block=block)
+        self._write_index(next_id=2)
+        code, _ = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "1.1 first item",
+        )
+        self.assertEqual(code, 0)
+        (repo / "half-done.py").write_text("wip\n", encoding="utf-8")
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 0, payload)
+        resume = payload["resume"]
+        self.assertEqual(resume["phase"], "implementing")
+        self.assertEqual(resume["last_item"]["task"], "1.1 first item")
+        self.assertEqual(resume["last_item_state"], "in_flight")
+        self.assertFalse(resume["prepare_required"])
+        self.assertIn(
+            "half-done.py",
+            " ".join(
+                line for row in resume["uncommitted"] for line in row["porcelain"]
+            ),
+        )
+
+        # 8.5 a checked item is completed no matter what the artifact narrates.
+        (self.tmp / "openspec/changes/demo-change/tasks.md").write_text(
+            "- [x] 1.1 first item\n- [ ] 1.2 second item\n", encoding="utf-8"
+        )
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["resume"]["last_item_state"], "completed")
+
+    def test_resume_reports_prepare_required_when_binding_is_missing(self) -> None:
+        """8.5 binding 不全时恢复必须先要求准备，而不是直接实施。"""
+        self._init_git_repo("svc")
+        self._write_change(
+            self.tmp / "openspec/changes/demo-change", "- [ ] 1.1 first item\n"
+        )
+        block = self._scope_block([("svc", "svc", "必须")]) + self._openspec_block(
+            [{"name": "demo-change", "path": "openspec/changes/demo-change/"}]
+        )
+        self._seed_task("T0001", "unprepared", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, payload = self._run("execution-context", "T0001")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "checkout_not_prepared")
+        self.assertTrue(payload["resume"]["prepare_required"])
+        self.assertEqual(payload["resume"]["last_item_state"], "unknown")
+
+    def test_resume_degrades_to_unknown_for_legacy_or_absent_progress(self) -> None:
+        """8.6 旧版或缺失 progress.md 时恢复降级为 unknown 且不阻塞调度。"""
+        repo = self._init_git_repo("svc")
+        self._write_change(
+            self.tmp / "openspec/changes/demo-change", "- [ ] 1.1 first item\n"
+        )
+        block = (
+            self._scope_block([("svc", "svc", "必须")])
+            + self._work_context_block([("svc", "svc", "svc", "否", "main")])
+            + self._openspec_block(
+                [{"name": "demo-change", "path": "openspec/changes/demo-change/"}]
+            )
+        )
+        task = self._seed_task("T0001", "legacy-progress", scope_block=block)
+        self._write_index(next_id=2)
+
+        code, absent = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, absent)
+        self.assertEqual(absent["resume"]["phase"], "unknown")
+        self.assertEqual(absent["resume"]["last_item_state"], "unknown")
+        self.assertFalse(absent["resume"]["progress_parsed"])
+        self.assertEqual(absent["resume"]["verification"], "absent")
+        self.assertEqual(absent["apply_schedule"]["next"]["text"], "1.1 first item")
+
+        (task / "progress.md").write_text(
+            "# T0001 实施进度\n\n- 更新：2026-08-01\n\n## 本轮完成\n\n- 旧模板\n",
+            encoding="utf-8",
+        )
+        code, legacy = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, legacy)
+        self.assertEqual(legacy["resume"]["phase"], "unknown")
+        self.assertEqual(legacy["resume"]["last_item_state"], "unknown")
+        self.assertEqual(legacy["apply_schedule"]["next"]["text"], "1.1 first item")
+        self.assertTrue(repo.is_dir())
+
+    SCOPE_TEMPLATE_ROW = (
+        "| （待补） | `path/to/repo`（仅工作区自身是目标时才写 `.`） | 必须 / 建议 / 排除 |"
+    )
+    OPENSPEC_TEMPLATE_ROW = "| — | | | | （尚无） |"
+
+    def _seed_task_via_cli(
+        self,
+        *,
+        slug: str,
+        title: str,
+        scope_rows: list[str],
+        openspec_rows: list[str],
+        acceptance: str,
+        date: str = "2026-08-16",
+    ) -> Path:
+        code, created = self._run(
+            "new", "--slug", slug, "--title", title, "--date", date
+        )
+        self.assertEqual(code, 0, created)
+        task = self.tmp / created["task"]["task_root"]
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        readme = (
+            readme.replace(self.SCOPE_TEMPLATE_ROW, "\n".join(scope_rows))
+            .replace(self.OPENSPEC_TEMPLATE_ROW, "\n".join(openspec_rows))
+            .replace("- [ ] （待补）", f"- [ ] {acceptance}")
+        )
+        (task / "README.md").write_text(readme, encoding="utf-8")
+        return task
+
+    def _accept(self, task: Path, acceptance: str) -> None:
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace(f"- [ ] {acceptance}", f"- [x] {acceptance}"),
+            encoding="utf-8",
+        )
+
+    def test_e2e_single_repo_in_place_lifecycle(self) -> None:
+        """10.1 单仓 in-place 走完 new → propose → apply → archive。"""
+        repo = self._init_git_repo("svc")
+        task = self._seed_task_via_cli(
+            slug="inplace-e2e",
+            title="In-place e2e",
+            scope_rows=["| svc | `svc` | 必须 |"],
+            openspec_rows=[
+                "| `inplace-change` | `svc/openspec/changes/inplace-change/` | `svc` | 1 | e2e |"
+            ],
+            acceptance="e2e lifecycle passes",
+        )
+        # propose 的产物落在 canonical planning root，此时尚未提交。
+        change = self._write_change(
+            repo / "openspec/changes/inplace-change", "- [ ] 1.1 implement e2e\n"
+        )
+
+        code, prepared = self._run(
+            "prepare-branches", "--slug", "inplace-e2e", "--from-task", "T0001"
+        )
+        self.assertEqual(code, 0, prepared)
+        self.assertEqual(prepared["repos"][0]["dirty_role"], "planning")
+
+        code, ctx = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, ctx)
+        self.assertEqual(ctx["apply_schedule"]["next"]["text"], "1.1 implement e2e")
+        self.assertEqual(
+            ctx["openspec_locations"][0]["planning_root"],
+            str((repo / "openspec").resolve()),
+        )
+        self.assertFalse(ctx["resume"]["prepare_required"])
+
+        code, started = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "inplace-change", "--current-task", "1.1 implement e2e",
+        )
+        self.assertEqual(code, 0, started)
+        (repo / "feature.py").write_text("implemented\n", encoding="utf-8")
+        (change / "tasks.md").write_text("- [x] 1.1 implement e2e\n", encoding="utf-8")
+        code, exhausted = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "inplace-change",
+            "--completed", "1.1 implement e2e",
+        )
+        self.assertEqual(code, 0, exhausted)
+        self.assertEqual(exhausted["result"], "validation_required")
+
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-m", "implement e2e")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing", "--change", "inplace-change",
+            "--verification", "python3 -m unittest passed",
+        )
+        self.assertEqual(code, 0, testing)
+        self.assertEqual(testing["result"], "validation_recorded")
+        self._accept(task, "e2e lifecycle passes")
+        code, done = self._run("advance", "T0001", "--phase", "done")
+        self.assertEqual(code, 0, done)
+        self.assertEqual(done["result"], "done")
+
+        archived_change = repo / "openspec/changes/archive/2026-08-16-inplace-change"
+        archived_change.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(change), str(archived_change))
+        (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+
+        code, final = self._run("archive", "T0001", "--dry-run", "--date", "2026-08-16")
+        self.assertEqual(code, 0, final)
+        self.assertEqual(final["result"], "final_preflight")
+        # 归档动作本身留下的 planning dirty 只是诊断，不阻断 finalize。
+        self.assertEqual(final["archive_gate"]["dirty_delivery_checkouts"], [])
+        code, archived = self._run("archive", "T0001", "--date", "2026-08-16")
+        self.assertEqual(code, 0, archived)
+        self.assertEqual(archived["result"], "archived")
+        self.assertTrue(
+            (self.tmp / "tasks/archive/2026-08-16-T0001-inplace-e2e").is_dir()
+        )
+
+    def test_e2e_multi_repo_worktree_multi_change_with_defer(self) -> None:
+        """10.2 多仓 + worktree + 多 change（含 deferred）走完同一链路。"""
+        alpha = self._init_git_repo("alpha")
+        beta = self._init_git_repo("beta")
+        task = self._seed_task_via_cli(
+            slug="multi-e2e",
+            title="Multi e2e",
+            scope_rows=["| alpha | `alpha` | 必须 |", "| beta | `beta` | 必须 |"],
+            openspec_rows=[
+                "| `alpha-change` | `alpha/openspec/changes/alpha-change/` | `alpha` | 1 | 前序 |",
+                "| `beta-change` | `beta/openspec/changes/beta-change/` | `beta` | 2 | 后序 |",
+            ],
+            acceptance="multi-repo e2e passes",
+        )
+        alpha_change = self._write_change(
+            alpha / "openspec/changes/alpha-change",
+            "- [ ] 1.1 needs operator\n- [ ] 1.2 independent\n",
+        )
+        beta_change = self._write_change(
+            beta / "openspec/changes/beta-change", "- [ ] 2.1 beta item\n"
+        )
+
+        code, prepared = self._run(
+            "prepare-branches", "--slug", "multi-e2e", "--from-task", "T0001",
+            "--worktree", "alpha=alpha-wt", "--worktree", "beta=beta-wt",
+        )
+        self.assertEqual(code, 0, prepared)
+        self.assertEqual(
+            {row["checkout"]: row["action"] for row in prepared["repos"]},
+            {"alpha-wt": "created_worktree", "beta-wt": "created_worktree"},
+        )
+        alpha_wt = self.tmp / "alpha-wt"
+        beta_wt = self.tmp / "beta-wt"
+
+        code, ctx = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, ctx)
+        self.assertEqual(
+            [row["change"] for row in ctx["apply_schedule"]["candidates"]],
+            ["alpha-change", "alpha-change", "beta-change"],
+        )
+
+        code, deferred = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "alpha-change", "--current-task", "1.1 needs operator",
+            "--defer-current", "alpha-change 1.1 需要人工开通权限",
+        )
+        self.assertEqual(code, 0, deferred)
+        self.assertEqual(deferred["result"], "next")
+        self.assertEqual(deferred["next"]["text"], "1.2 independent")
+
+        (alpha_wt / "independent.py").write_text("done\n", encoding="utf-8")
+        (alpha_change / "tasks.md").write_text(
+            "- [ ] 1.1 needs operator\n- [x] 1.2 independent\n", encoding="utf-8"
+        )
+        code, next_change = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "alpha-change",
+            "--completed", "1.2 independent",
+        )
+        self.assertEqual(code, 0, next_change)
+        self.assertEqual(next_change["next"]["change"], "beta-change")
+
+        (beta_wt / "beta.py").write_text("done\n", encoding="utf-8")
+        (beta_change / "tasks.md").write_text("- [x] 2.1 beta item\n", encoding="utf-8")
+        code, only_deferred = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "beta-change",
+            "--completed", "2.1 beta item",
+        )
+        self.assertEqual(code, 0, only_deferred)
+        self.assertEqual(only_deferred["result"], "deferred_only")
+
+        code, resumed = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "alpha-change", "--current-task", "1.1 needs operator",
+            "--resume-current",
+        )
+        self.assertEqual(code, 0, resumed)
+        self.assertEqual(resumed["next"]["text"], "1.1 needs operator")
+        (alpha_wt / "operator.py").write_text("done\n", encoding="utf-8")
+        (alpha_change / "tasks.md").write_text(
+            "- [x] 1.1 needs operator\n- [x] 1.2 independent\n", encoding="utf-8"
+        )
+        code, exhausted = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "alpha-change",
+            "--completed", "1.1 needs operator",
+        )
+        self.assertEqual(code, 0, exhausted)
+        self.assertEqual(exhausted["result"], "validation_required")
+
+        for checkout in (alpha_wt, beta_wt):
+            self._git(checkout, "add", "-A")
+            self._git(checkout, "commit", "-m", "implement multi e2e")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing",
+            "--verification", "两仓回归通过",
+        )
+        self.assertEqual(code, 0, testing)
+        self.assertEqual(testing["result"], "validation_recorded")
+        self._accept(task, "multi-repo e2e passes")
+        code, done = self._run("advance", "T0001", "--phase", "done")
+        self.assertEqual(code, 0, done)
+
+        for repo_root, change_root, name in (
+            (alpha, alpha_change, "alpha-change"),
+            (beta, beta_change, "beta-change"),
+        ):
+            target = repo_root / f"openspec/changes/archive/2026-08-16-{name}"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(change_root), str(target))
+        (task / "changes.md").write_text("# Changes\n", encoding="utf-8")
+
+        code, final = self._run("archive", "T0001", "--dry-run", "--date", "2026-08-16")
+        self.assertEqual(code, 0, final)
+        self.assertEqual(final["result"], "final_preflight")
+        self.assertEqual(
+            sorted(row["checkout"] for row in final["archive_gate"]["delivery_summaries"]),
+            ["alpha-wt", "beta-wt"],
+        )
+        code, archived = self._run("archive", "T0001", "--date", "2026-08-16")
+        self.assertEqual(code, 0, archived)
+        self.assertTrue((self.tmp / "tasks/archive/2026-08-16-T0001-multi-e2e").is_dir())
+
+    def test_e2e_interrupted_apply_recovers_from_execution_context_alone(self) -> None:
+        """10.3 中途中断后只用 resolve + execution-context 恢复并跑完。"""
+        repo = self._init_git_repo("svc")
+        task = self._seed_task_via_cli(
+            slug="resume-e2e",
+            title="Resume e2e",
+            scope_rows=["| svc | `svc` | 必须 |"],
+            openspec_rows=[
+                "| `resume-change` | `svc/openspec/changes/resume-change/` | `svc` | 1 | e2e |"
+            ],
+            acceptance="resume e2e passes",
+        )
+        change = self._write_change(
+            repo / "openspec/changes/resume-change",
+            "- [ ] 1.1 first item\n- [ ] 1.2 second item\n",
+        )
+        code, prepared = self._run(
+            "prepare-branches", "--slug", "resume-e2e", "--from-task", "T0001"
+        )
+        self.assertEqual(code, 0, prepared)
+        code, started = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "resume-change", "--current-task", "1.1 first item",
+        )
+        self.assertEqual(code, 0, started)
+        (repo / "half-done.py").write_text("wip\n", encoding="utf-8")
+
+        # 中断后的唯一入口：resolve + execution-context。
+        code, resolved = self._run("resolve", "T0001", "--command", "task-apply")
+        self.assertEqual(code, 0, resolved)
+        code, ctx = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, ctx)
+        resume = ctx["resume"]
+        self.assertFalse(resume["prepare_required"])
+        self.assertEqual(resume["last_item_state"], "in_flight")
+        self.assertEqual(resume["last_item"]["task"], "1.1 first item")
+
+        (change / "tasks.md").write_text(
+            "- [x] 1.1 first item\n- [ ] 1.2 second item\n", encoding="utf-8"
+        )
+        code, after_first = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "resume-change",
+            "--completed", "1.1 first item",
+        )
+        self.assertEqual(code, 0, after_first)
+        self.assertEqual(after_first["next"]["text"], "1.2 second item")
+        (repo / "second.py").write_text("done\n", encoding="utf-8")
+        (change / "tasks.md").write_text(
+            "- [x] 1.1 first item\n- [x] 1.2 second item\n", encoding="utf-8"
+        )
+        code, exhausted = self._run(
+            "advance", "T0001", "--phase", "implementing", "--change", "resume-change",
+            "--completed", "1.2 second item",
+        )
+        self.assertEqual(code, 0, exhausted)
+        self.assertEqual(exhausted["result"], "validation_required")
+
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-m", "finish after interruption")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing",
+            "--verification", "恢复后回归通过",
+        )
+        self.assertEqual(code, 0, testing)
+        self.assertEqual(testing["result"], "validation_recorded")
+        self._accept(task, "resume e2e passes")
+        code, done = self._run("advance", "T0001", "--phase", "done")
+        self.assertEqual(code, 0, done)
+        self.assertEqual(done["result"], "done")
+
 
 if __name__ == "__main__":
     unittest.main()
