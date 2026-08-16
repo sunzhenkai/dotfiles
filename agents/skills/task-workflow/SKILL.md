@@ -63,6 +63,7 @@ python3 <this-skill>/scripts/taskctl.py <command> ...
 - 自然语言理解由 Agent 完成。CLI 不提取需求，不分类未完成项是验证还是实现。
 - status、INDEX、工作上下文和归档移动不得手改绕过 CLI；业务正文由 Agent 写入 README/OpenSpec。
 - 用户确认门出现时原样报告候选、dirty、剩余项或覆盖范围，等待明确选择；禁止自动 stash、reset、force checkout 或越权覆盖。
+- apply 的 `blocked` / `deferred_only` / `validation_required` 只停本轮调度，不宣称完成；只有 `done` 才允许宣称完成并桥接 archive。
 
 ## Task 数据模型
 

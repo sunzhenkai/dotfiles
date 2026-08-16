@@ -2187,6 +2187,46 @@ hello
         reasons = {row["task"]: row["reason"] for row in second["apply_schedule"]["deferred"]}
         self.assertIn("A manual environment", reasons["B depends on A"])
 
+    def test_later_change_independent_candidate_survives_predecessor_defer(self) -> None:
+        task = self._seed_task("T0001", "multi-change", openspec=True)
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace(
+                "| `demo-change` | `openspec/changes/demo-change/` | demo |",
+                "| `foundation-change` | `openspec/changes/foundation-change/` | predecessor |\n"
+                "| `later-change` | `openspec/changes/later-change/` | depends on foundation-change |",
+            ),
+            encoding="utf-8",
+        )
+        foundation = self.tmp / "openspec/changes/foundation-change"
+        later = self.tmp / "openspec/changes/later-change"
+        foundation.mkdir(parents=True)
+        later.mkdir(parents=True)
+        (foundation / "tasks.md").write_text(
+            "- [ ] 8.7 official image acceptance\n", encoding="utf-8"
+        )
+        (later / "tasks.md").write_text(
+            "- [ ] 1.2 define wire schema\n", encoding="utf-8"
+        )
+        self._write_index(next_id=2)
+        code, payload = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "foundation-change",
+            "--current-task", "8.7 official image acceptance",
+            "--defer-current", "environment cannot produce official image digest",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["result"], "next")
+        self.assertEqual(payload["status"], "in_progress")
+        self.assertEqual(payload["next"]["change"], "later-change")
+        self.assertEqual(payload["next"]["text"], "1.2 define wire schema")
+        self.assertNotEqual(payload["result"], "deferred_only")
+        self.assertNotEqual(payload["result"], "done")
+        code, done = self._run("advance", "T0001", "--phase", "done")
+        self.assertEqual(code, 1)
+        self.assertFalse(done["ok"])
+        self.assertIn("all OpenSpec checkboxes complete", done["error"])
+
     def test_catalog_omitted_row_is_repaired_and_id_not_reused(self) -> None:
         self._seed_task("T0009", "unindexed")
         (self.tmp / "tasks/INDEX.md").write_text(

@@ -98,6 +98,21 @@ class SkillContractTest(unittest.TestCase):
         self.assertTrue(referenced, "safety.md must reference regression tests")
         self.assertEqual(referenced - existing, set())
 
+    def test_apply_pause_outcomes_are_not_completion(self) -> None:
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        command_text = (COMMAND_ROOT / "task-apply.md").read_text(encoding="utf-8")
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        for text in (apply_text, command_text, skill_text):
+            self.assertIn("不宣称完成", text)
+            self.assertIn("只有 `done`", text)
+            self.assertNotIn("kiro", text.lower())
+            self.assertNotIn("goal(complete)", text.lower())
+        self.assertIn("停本轮调度", apply_text)
+        self.assertIn("不自动 defer", apply_text)
+        self.assertIn("后续 change", apply_text)
+        self.assertIn("停本轮调度", command_text)
+        self.assertNotIn("停止并执行对应阶段动作", command_text)
+
     def test_instruction_footprint_is_below_previous_baseline(self) -> None:
         paths = [SKILL_ROOT / "SKILL.md", *(SKILL_ROOT / "references").glob("*.md")]
         paths.extend(COMMAND_ROOT.glob("task-*.md"))

@@ -29,19 +29,20 @@ python3 <skill>/scripts/taskctl.py advance <id> \
 - 依赖 deferred 项：不得实施；先对该 candidate 使用 exact `--change` + `--current-task` 调用 `--defer-current`，reason 必须包含 blocker identity（change 与 checkbox 原文/稳定 ID），然后读取下一个 candidate。
 - 当前项因环境/手工验证局部不可执行：保持 checkbox 未勾选并 exact defer；恢复时对同一 change/task 用 `--resume-current`。
 - 只有全局故障或需要用户决策时才用 `--phase blocked --blocker ...`。
+- change 级「依赖前置 change」只约束该 change 的集成/验收，不自动 defer 后续 change 的全部 candidate。只按 checkbox 的直接/传递依赖判断；前置 change 处于 `deferred_only` 时，仍须检查后续 change 的独立项。
 
 ## Outcome 控制
 
-调用方只依据顶层 `result` 控制流程；候选事实不能覆盖 phase outcome：
+调用方只依据顶层 `result` 控制流程；候选事实不能覆盖 phase outcome。表中「停」只结束本轮 candidate 调度，不是 task 完成，也不是任何宿主完成信号。只有 `done` 才允许对外宣称完成并桥接 archive：
 
 | result | 行为 |
 |--------|------|
-| `blocked` | 全局停止，`next=null`；即使 candidates 非空也不得继续 |
+| `blocked` | 停本轮调度，`next=null`；即使 candidates 非空也不得继续；保持 `in_progress`，不宣称完成 |
 | `next` | 同一轮检查并处理 `next` candidate |
-| `deferred_only` | 无独立候选，汇总 deferred 后暂停 |
-| `validation_required` | checkbox 已耗尽但尚无 fresh final verification，或本轮验证仅 provisional |
-| `validation_recorded` | clean delivery branch/HEAD 的最终验证已记录 |
-| `done` | final done transition 已完成；checkbox 与 fresh verification 均满足 |
+| `deferred_only` | 无独立候选，汇总 deferred 后停本轮调度；保持 `in_progress`，不宣称完成 |
+| `validation_required` | checkbox 已耗尽但尚无 fresh final verification，或本轮验证仅 provisional；停本轮调度，不宣称完成 |
+| `validation_recorded` | clean delivery branch/HEAD 的最终验证已记录；只进入 done transition，不宣称对外完成 |
+| `done` | final done transition 已完成；checkbox 与 fresh verification 均满足；才允许对外宣称完成并桥接 archive |
 
 ## 验证与完成
 
