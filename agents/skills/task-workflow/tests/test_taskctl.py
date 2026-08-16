@@ -2227,6 +2227,58 @@ hello
         self.assertFalse(done["ok"])
         self.assertIn("all OpenSpec checkboxes complete", done["error"])
 
+    def test_later_change_gate_defer_keeps_sibling_candidate(self) -> None:
+        task = self._seed_task("T0001", "multi-change-gate", openspec=True)
+        readme = (task / "README.md").read_text(encoding="utf-8")
+        (task / "README.md").write_text(
+            readme.replace(
+                "| `demo-change` | `openspec/changes/demo-change/` | demo |",
+                "| `foundation-change` | `openspec/changes/foundation-change/` | predecessor |\n"
+                "| `later-change` | `openspec/changes/later-change/` | depends on foundation-change |",
+            ),
+            encoding="utf-8",
+        )
+        foundation = self.tmp / "openspec/changes/foundation-change"
+        later = self.tmp / "openspec/changes/later-change"
+        foundation.mkdir(parents=True)
+        later.mkdir(parents=True)
+        (foundation / "tasks.md").write_text(
+            "- [ ] 8.7 official image acceptance\n", encoding="utf-8"
+        )
+        (later / "tasks.md").write_text(
+            "- [ ] 1.1 apply gate for predecessor evidence\n"
+            "- [ ] 1.2 define wire schema\n",
+            encoding="utf-8",
+        )
+        self._write_index(next_id=2)
+        code, first = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "foundation-change",
+            "--current-task", "8.7 official image acceptance",
+            "--defer-current", "environment cannot produce official image digest",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(first["result"], "next")
+        self.assertEqual(first["next"]["text"], "1.1 apply gate for predecessor evidence")
+        code, second = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "later-change",
+            "--current-task", "1.1 apply gate for predecessor evidence",
+            "--defer-current",
+            "blocked by foundation-change:8.7 official image acceptance",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(second["result"], "next")
+        self.assertEqual(second["status"], "in_progress")
+        self.assertEqual(second["next"]["change"], "later-change")
+        self.assertEqual(second["next"]["text"], "1.2 define wire schema")
+        self.assertNotEqual(second["result"], "deferred_only")
+        code, testing = self._run(
+            "advance", "T0001", "--phase", "testing", "--verification", "local repos passed"
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(testing["reason"], "checkboxes_remaining")
+
     def test_catalog_omitted_row_is_repaired_and_id_not_reused(self) -> None:
         self._seed_task("T0009", "unindexed")
         (self.tmp / "tasks/INDEX.md").write_text(

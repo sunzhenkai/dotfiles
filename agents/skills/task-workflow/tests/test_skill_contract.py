@@ -105,12 +105,16 @@ class SkillContractTest(unittest.TestCase):
         for text in (apply_text, command_text, skill_text):
             self.assertIn("不宣称完成", text)
             self.assertIn("只有 `done`", text)
+            self.assertIn("禁止 testing/done", text)
             self.assertNotIn("kiro", text.lower())
             self.assertNotIn("goal(complete)", text.lower())
         self.assertIn("停本轮调度", apply_text)
-        self.assertIn("不自动 defer", apply_text)
+        self.assertIn("同 change 其余项", apply_text)
         self.assertIn("后续 change", apply_text)
+        self.assertIn("并行挂起", apply_text)
+        self.assertIn("仓级测试不是 final verification", apply_text)
         self.assertIn("停本轮调度", command_text)
+        self.assertIn("并行挂起", command_text)
         self.assertNotIn("停止并执行对应阶段动作", command_text)
 
     def test_instruction_footprint_is_below_previous_baseline(self) -> None:
