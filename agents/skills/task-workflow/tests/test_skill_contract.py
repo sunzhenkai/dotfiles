@@ -154,6 +154,10 @@ class SkillContractTest(unittest.TestCase):
             self.assertIn(token, apply_md, f"missing round-end condition: {token}")
         # 汇报点是继续点，不是交回控制权的地方。
         self.assertIn("立即继续", apply_md)
+        # 做不完必须有诚实出口，否则只能被迫谎报暂缓。
+        for body in (apply_md, self.refs["safety.md"]):
+            self.assertIn("本轮预算耗尽", body)
+        self.assertIn("续跑锚点", apply_md)
 
     def test_deferral_does_not_cascade_across_changes(self) -> None:
         self.assertIn("APPLY-2", self.refs["safety.md"])
@@ -161,6 +165,17 @@ class SkillContractTest(unittest.TestCase):
         apply_md = self.refs["apply.md"]
         self.assertIn("不是串行门", apply_md)
         self.assertIn("继续下一项", apply_md)
+
+    def test_deferral_must_be_itemized(self) -> None:
+        self.assertIn("APPLY-3", self.refs["safety.md"])
+        apply_md = self.refs["apply.md"]
+        # 暂缓与未判定是两种身份，报告必须分开。
+        self.assertIn("未判定剩余", apply_md)
+        self.assertIn("checkbox 原文", apply_md)
+        for token in ("行数必须等于", "不要编原因"):
+            self.assertIn(token, apply_md, f"apply.md 缺少逐项化约束: {token}")
+        # 按 change 汇总数量冒充暂缓，是本规则要拦的形态。
+        self.assertIn("冒充暂缓", apply_md)
 
     # ---- 安全规则可追溯 -------------------------------------------------- #
 
@@ -181,6 +196,27 @@ class SkillContractTest(unittest.TestCase):
             self.assertIn("planning_root", body)
             self.assertIn("change name", body)
         self.assertIn("openspec validate --strict", self.refs["planning.md"])
+
+    def test_openspec_cli_flags_match_installed_cli(self) -> None:
+        # openspec 1.6.0 起 validate 用 `--type change <name>`；`--change` 已被拒绝。
+        for name, body in self.refs.items():
+            self.assertNotIn(
+                "--strict --change",
+                body,
+                f"{name} 仍在用已废弃的 `openspec validate --strict --change`",
+            )
+        for body in (self.refs["planning.md"], self.refs["safety.md"], self.refs["archive.md"]):
+            self.assertIn("--strict --type change", body)
+
+    def test_archive_has_cli_path_and_failure_recovery(self) -> None:
+        archive = self.refs["archive.md"]
+        # 外部归档不得依赖目标仓未必生成的 openspec-* skill。
+        self.assertIn("openspec archive --yes", archive)
+        self.assertIn("--skip-specs", archive)
+        for token in ("已预同步", "逐字相同", "失败与续跑", "Aborted. No files were changed."):
+            self.assertIn(token, archive, f"archive.md 缺少失败恢复要素: {token}")
+        # skill 不可用时必须停下报告，而不是自行发明命令。
+        self.assertIn("不要自行发明等价命令", self.refs["planning.md"])
 
     def test_scope_roles_are_the_only_three(self) -> None:
         taskctl = load_taskctl()

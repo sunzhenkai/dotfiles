@@ -12,12 +12,35 @@
 
 ## 2. 外部归档
 
-对每个 pending change，在其 `planning_root` 下：
+`openspec-*` skill 由目标仓自己跑 `openspec init --tools <agent>` 生成，**不能假定存在**；归档统一直调 `openspec` CLI。绑定契约不变：在该 change 的 `planning_root` 下执行，且显式传 change name——CLI 只认 cwd 最近的 `openspec/`，缺任一项会写错位置或反问选 change。
 
-1. `openspec validate --strict --change <name>`，失败就停止并原样报告，task 保持 active。
-2. 按绑定契约（在 `planning_root` 下执行且显式传 change name）委托 `openspec-archive-change`。
+对每个 pending change：
 
-任一 change 失败立即停止。重跑 `archive --dry-run` 时 CLI 会按 `YYYY-MM-DD-<change>` 整名识别已归档的 change，部分成功不会丢。
+1. `openspec validate --strict --type change <name>`，失败就停止并原样报告，task 保持 active。
+2. 判定 delta 同步状态：把 `openspec/changes/<name>/specs/<capability>/spec.md` 中 `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` 下的每条 `### Requirement:` 标题**与正文**，对照主 spec `openspec/specs/<capability>/spec.md`。
+3. 按判定结果选命令：
+
+| 判定 | 命令 |
+|------|------|
+| 主 spec 不含这些 requirement（正常情况） | `openspec archive --yes <name>` |
+| 每条都已在主 spec 且正文逐字相同 | `openspec archive --yes --skip-specs <name>` |
+| 只同步了一部分，或标题相同但正文不同 | 停止，原样报告差异，等用户决定 |
+
+`--skip-specs` 仅用于第二种判定，且必须在报告里写明「主 spec 已预同步，跳过 spec 更新」。这是本文档授权的动作，不属于 `SKILL.md` 说的「自行扩大授权范围」——那条约束的对象是 taskctl 的 gate flag，不是 openspec CLI 参数。
+
+任一 change 失败立即停止。
+
+### 失败与续跑
+
+`openspec archive` 是原子的，失败时打印 `Aborted. No files were changed.`，不会留下部分落盘。
+
+| 症状 | 含义 | 处理 |
+|------|------|------|
+| `ADDED failed for header "..." - already exists` | 主 spec 已被提前同步，第 2 步判定漏做或漏判 | 回第 2 步逐条比对正文，确认逐字相同后改用 `--skip-specs` |
+| 报 requirement 找不到、正文对不上 | delta 与主 spec 不同源 | 停止报告，**不要**用 `--skip-specs` 掩盖 |
+| 归档若干个后中途失败 | 部分成功 | 修掉原因后直接重跑本节；CLI 按 `YYYY-MM-DD-<change>` 整名识别已归档的 change，不重复也不丢 |
+
+主 spec 被手工预同步（典型是有人在合并前先「sync specs」）会让整批 change 落入第二种判定。这只影响归档命令的选择，不改变 gate 结论。
 
 若 task 有 `design/` 且设计需要正式落地，此时按 README 记录的落点晋升到已列为 `必须` 的目标仓；不要往 `建议` / `排除` 仓猜落点。
 

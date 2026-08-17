@@ -1010,7 +1010,7 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
 
     if args.dry_run:
         payload["next_action"] = (
-            f"在各 planning root 下委托 openspec-archive-change 归档 {', '.join(active_changes)}，再跑 archive"
+            f"按 archive.md 第 2 节在各 planning root 下用 openspec CLI 归档 {', '.join(active_changes)}，再跑 archive"
             if active_changes
             else f"可直接 `archive {task.task_id}` 完成归档"
         )

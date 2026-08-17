@@ -10,7 +10,9 @@
 
 ## 委托 openspec-* 的绑定契约
 
-委托任何 `openspec-*` skill 前必须同时具备两项绑定：**在该 change 的 `planning_root` 下执行**，并**显式给出 change name**。缺任一项不得委托——openspec CLI 只认 cwd 最近的 `openspec/`，无绑定会写错位置或反问用户选 change。无法确定时停下报告。
+`openspec-*` skill 由目标仓自己跑 `openspec init --tools <agent>` 生成，**不是所有仓都有**。委托前先确认它在当前 agent 环境可用；不可用就停下报告并给出可选项（在目标仓 init，或改用 CLI 直调路径），**不要自行发明等价命令**——archive 的 CLI 直调路径见 `archive.md`，规划阶段没有对应替代。
+
+可用时，委托必须同时具备两项绑定：**在该 change 的 `planning_root` 下执行**，并**显式给出 change name**。缺任一项不得委托——openspec CLI 只认 cwd 最近的 `openspec/`，无绑定会写错位置或反问用户选 change。无法确定时停下报告。
 
 ## task-new
 
@@ -38,7 +40,7 @@
 2. 决定每个 change 的 canonical planning root：单仓 change 写该仓，跨仓或工作区级 change 写工作区根。这里只记录 planning root，不绑定实现 checkout。
 3. 按上文绑定契约对每个 change 委托 `openspec-propose`，生成 apply-ready artifacts。
 4. 更新 README「关联 OpenSpec」表：change 名称、相对路径、仓库（工作区根写 `.`）、说明。改表前先读实际小节，只替换最小唯一锚点。
-5. 收尾门：对每个 change 在其 `planning_root` 下跑 `openspec validate --strict --change <name>`，全部通过后才 `set-status <id> proposed`；失败原样报告并停止。
+5. 收尾门：对每个 change 在其 `planning_root` 下跑 `openspec validate --strict --type change <name>`，全部通过后才 `set-status <id> proposed`；失败原样报告并停止。
 6. 输出 change 列表与 `{{slash:task-apply}}` 桥接，并说明分支尚未准备。
 
 **产物如何进入 apply**：change 留在 canonical planning root，apply 一律在该处读取与勾选，不需要先提交到交付分支。propose 留下的未提交 planning 产物不影响 `prepare-branches`——它只看 `必须` 仓。

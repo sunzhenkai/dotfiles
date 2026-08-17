@@ -556,7 +556,8 @@ def test_archive_dry_run_points_at_openspec_archive(ready_to_archive: Path) -> N
     code, payload = run(ready_to_archive, "archive", "T0001", "--dry-run")
     assert code == 0
     assert payload["pending_openspec_archive"] == ["add-thing"]
-    assert "openspec-archive-change" in payload["next_action"]
+    assert "openspec CLI" in payload["next_action"]
+    assert "add-thing" in payload["next_action"]
 
 
 def test_archive_finalizes_and_records_delivery(ready_to_archive: Path) -> None:
