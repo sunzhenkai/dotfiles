@@ -266,6 +266,151 @@ def test_status_writes_nothing(workspace: Path) -> None:
     assert path.read_text() == before
 
 
+def test_validate_round_end_requires_exact_itemized_deferrals(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 已完成", "1.2 待处理", "1.3 也待处理"], done=1)
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    text = path.read_text(encoding="utf-8").replace(
+        "## 验证记录\n",
+        "## 验证记录\n\n"
+        "- 暂缓：`add-thing` / `1.2 待处理` — external `供应链 owner`；缺批准身份。\n"
+        "- 暂缓：`add-thing` / `1.3 也待处理` — external `测试环境`；缺集群。\n",
+    )
+    path.write_text(text, encoding="utf-8")
+
+    code, payload = run(
+        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
+    )
+    # 记录本身合格，但「每一项都动不了」不是本轮结束，是全局阻塞。
+    assert code == 1
+    assert payload["failure"] == "task_fully_blocked"
+    assert payload["deferrals"]["covered"] == 2
+    assert payload["deferrals"]["uncovered"] == []
+    assert "set-status T0001 blocked" in payload["action"]
+
+
+def test_validate_round_end_rejects_bulk_deferral_as_unjudged(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理", "1.2 也待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    text = path.read_text(encoding="utf-8").replace(
+        "## 验证记录\n",
+        "## 验证记录\n\n"
+        "- 暂缓：`add-thing` / `1.x 全部未勾选 checkbox` — external `某 owner`；等待发布。\n",
+    )
+    path.write_text(text, encoding="utf-8")
+
+    code, payload = run(
+        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
+    )
+    assert code == 1
+    assert payload["result"] == "round_end_invalid"
+    assert len(payload["deferrals"]["uncovered"]) == 2
+    assert payload["deferrals"]["covered"] == 0
+
+
+def test_validate_round_end_rejects_completed_and_self_dependencies(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "foundation", ["1.1 已发布"], done=1)
+    write_change(workspace, "consumer", ["2.1 接入", "2.2 收尾"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["foundation", "consumer"])
+    text = path.read_text(encoding="utf-8").replace(
+        "## 验证记录\n",
+        "## 验证记录\n\n"
+        "- 暂缓：`consumer` / `2.1 接入` — blocked-by `foundation:1.1`；等待前置。\n"
+        "- 暂缓：`consumer` / `2.2 收尾` — blocked-by `consumer:2.2`；等待本项契约。\n",
+    )
+    path.write_text(text, encoding="utf-8")
+
+    code, payload = run(
+        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
+    )
+    assert code == 1
+    assert payload["deferrals"]["stale"][0]["reason"] == "dependency_completed"
+    assert any(item["reason"] == "self_dependency" for item in payload["deferrals"]["invalid"])
+
+
+def test_validate_round_end_rejects_transitive_deferrals(workspace: Path) -> None:
+    """依赖必须直接：挂在另一条暂缓上，一个根阻塞就能顺着链条吞掉整个 task。"""
+    new_task(workspace, "alpha")
+    write_change(workspace, "foundation", ["1.1 根阻塞", "1.2 中间层"])
+    write_change(workspace, "consumer", ["2.1 末端"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["foundation", "consumer"])
+    text = path.read_text(encoding="utf-8").replace(
+        "## 验证记录\n",
+        "## 验证记录\n\n"
+        "- 暂缓：`foundation` / `1.2 中间层` — blocked-by `foundation:1.1`；等待根阻塞。\n"
+        "- 暂缓：`consumer` / `2.1 末端` — blocked-by `foundation:1.2`；等待中间层。\n",
+    )
+    path.write_text(text, encoding="utf-8")
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 1
+    deferrals = payload["deferrals"]
+    assert any(item["reason"] == "transitive_deferral" for item in deferrals["invalid"])
+    # 作废后它重新算作未判定，下一轮必须直接对根阻塞重判。
+    assert {"change": "consumer", "checkbox": "2.1 末端"} in deferrals["uncovered"]
+
+
+def test_validate_round_end_rejects_cascaded_deferrals(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "wide", [f"1.{n} 第{n}项" for n in range(1, 6)])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["wide"])
+    lines = "".join(
+        f"- 暂缓：`wide` / `1.{n} 第{n}项` — external `供应链 owner`；等待批准身份。\n"
+        for n in range(1, 6)
+    )
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("## 验证记录\n", f"## 验证记录\n\n{lines}"),
+        encoding="utf-8",
+    )
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 1
+    assert payload["failure"] == "cascade_suspected"
+    cascade = payload["deferrals"]["cascade"]
+    assert cascade[0]["blocker"] == "external 供应链 owner"
+    assert cascade[0]["count"] == 5
+
+
+def test_validate_round_end_demotes_cascade_to_unjudged_on_budget(workspace: Path) -> None:
+    """预算耗尽仍是诚实出口，但级联暂缓换不来「已判定」，下一轮照样要逐项判。"""
+    new_task(workspace, "alpha")
+    write_change(workspace, "wide", [f"1.{n} 第{n}项" for n in range(1, 6)])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["wide"])
+    lines = "".join(
+        f"- 暂缓：`wide` / `1.{n} 第{n}项` — external `供应链 owner`；等待批准身份。\n"
+        for n in range(1, 6)
+    )
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("## 验证记录\n", f"## 验证记录\n\n{lines}"),
+        encoding="utf-8",
+    )
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted")
+    assert code == 0
+    assert payload["deferred_count"] == 0
+    assert payload["unjudged_count"] == 5
+
+
+def test_validate_round_end_budget_exhaustion_keeps_uncovered_unjudged(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    fill_readme(readme_of(workspace, "T0001"), scope=[], changes=["add-thing"])
+
+    code, payload = run(
+        workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted"
+    )
+    assert code == 0
+    assert payload["unjudged"] == [{"change": "add-thing", "checkbox": "1.1 待处理"}]
+
+
 def test_missing_change_is_named_not_guessed(workspace: Path) -> None:
     new_task(workspace, "alpha")
     fill_readme(readme_of(workspace, "T0001"), scope=[], changes=["never-created"])
@@ -509,8 +654,9 @@ def test_archive_confirms_remaining_checkboxes(workspace: Path) -> None:
     assert code == 2
     assert "openspec_remaining" in gate_names(payload)
     confirm = next(c for c in payload["confirmations"] if c["gate"] == "openspec_remaining")
-    assert confirm["exact_action"] == "--allow-remaining"
     assert confirm["affected"][0]["remaining"] == ["二"]
+    # 放行只有一个口子，调用方不需要按 gate 拼 flag。
+    assert payload["confirm_command"] == "archive T0001 --confirmed"
 
 
 def test_archive_confirms_unchecked_acceptance(workspace: Path) -> None:
@@ -526,10 +672,47 @@ def test_archive_confirms_dirty_delivery_per_repo(ready_to_archive: Path) -> Non
     code, payload = run(ready_to_archive, "archive", "T0001", "--dry-run")
     assert code == 2
     confirm = next(c for c in payload["confirmations"] if c["gate"] == "dirty_delivery")
-    assert confirm["exact_action"] == "--allow-dirty svc"
+    assert confirm["affected"] == [{"repo": "svc", "dirty": ["?? wip.txt"]}]
 
 
-def test_archive_override_only_clears_its_own_gate(workspace: Path) -> None:
+def test_archive_dirty_gate_ignores_its_own_bookkeeping(workspace: Path) -> None:
+    """台账与本次 change 的 openspec 落点是归档流程自己写的，不该逼用户放行。"""
+    make_repo(workspace)
+    new_task(workspace, "alpha")
+    change = write_change(workspace, "add-thing", ["一"], done=1)
+    (change / "specs" / "billing").mkdir(parents=True)
+    (change / "specs" / "billing" / "spec.md").write_text("## ADDED\n", encoding="utf-8")
+    spec = workspace / "openspec" / "specs" / "billing"
+    spec.mkdir(parents=True)
+    (spec / "spec.md").write_text("# billing\n", encoding="utf-8")
+    fill_readme(
+        readme_of(workspace, "T0001"),
+        scope=[(".", "必须")],
+        changes=["add-thing"],
+        acceptance=[],
+    )
+    path = readme_of(workspace, "T0001")
+    path.write_text(path.read_text().replace("- [ ] ", "- [x] "), encoding="utf-8")
+    git(workspace, "add", "-A")
+    git(workspace, "commit", "-q", "-m", "wip")
+    git(workspace, "push", "-q", "origin", "main")
+    assert run(workspace, "prepare-branches", "T0001")[0] == 0
+
+    # 台账（README 与 INDEX 刚被 prepare-branches 改过）、change 目录与主 spec 都不算 dirty。
+    archive_change(workspace, "add-thing")
+    (spec / "spec.md").write_text("# billing\n\n新需求\n", encoding="utf-8")
+    code, payload = run(workspace, "archive", "T0001", "--dry-run")
+    assert code == 0, payload
+
+    # 同一个仓里的真实业务改动仍然照常拦。
+    (workspace / "wip.txt").write_text("x", encoding="utf-8")
+    code, payload = run(workspace, "archive", "T0001", "--dry-run")
+    assert code == 2
+    confirm = next(c for c in payload["confirmations"] if c["gate"] == "dirty_delivery")
+    assert confirm["affected"][0]["dirty"] == ["?? wip.txt"]
+
+
+def test_archive_confirmed_clears_every_reported_gate(workspace: Path) -> None:
     new_task(workspace, "alpha")
     write_change(workspace, "add-thing", ["一"], done=0)
     fill_readme(
@@ -538,9 +721,14 @@ def test_archive_override_only_clears_its_own_gate(workspace: Path) -> None:
         changes=["add-thing"],
         acceptance=["尚未达成"],
     )
-    code, payload = run(workspace, "archive", "T0001", "--dry-run", "--allow-remaining")
+    code, payload = run(workspace, "archive", "T0001", "--dry-run")
     assert code == 2
-    assert gate_names(payload) == {"unchecked_acceptance"}
+    assert gate_names(payload) == {"openspec_remaining", "unchecked_acceptance"}
+
+    code, payload = run(workspace, "archive", "T0001", "--dry-run", "--confirmed")
+    assert code == 0
+    assert gate_names(payload) == {"openspec_remaining", "unchecked_acceptance"}
+    assert "--confirmed" in payload["next_action"]
 
 
 def test_archive_refuses_finalize_while_change_active(ready_to_archive: Path) -> None:
@@ -580,11 +768,12 @@ def test_archive_audits_overrides(workspace: Path) -> None:
     new_task(workspace, "alpha")
     fill_readme(readme_of(workspace, "T0001"), scope=[("svc", "必须")], acceptance=["未达成"])
     assert run(workspace, "prepare-branches", "T0001")[0] == 0
-    code, payload = run(workspace, "archive", "T0001", "--allow-unchecked-acceptance")
+    code, payload = run(workspace, "archive", "T0001", "--confirmed")
     assert code == 0
-    assert payload["overrides"] == ["allow_unchecked_acceptance"]
+    # --confirmed 不分 gate，归档记录必须写清它实际放行了什么。
+    assert payload["overrides"] == ["unchecked_acceptance：1 项未勾"]
     changes = (workspace / payload["archived_path"] / "changes.md").read_text()
-    assert "allow_unchecked_acceptance" in changes
+    assert "unchecked_acceptance" in changes
 
 
 def test_archive_prunes_empty_date_directory(ready_to_archive: Path) -> None:
@@ -662,6 +851,7 @@ def test_public_command_surface_is_small() -> None:
         "list",
         "resolve",
         "status",
+        "validate-round-end",
         "set-status",
         "prepare-branches",
         "archive",

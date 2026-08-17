@@ -40,7 +40,7 @@ $TASKCTL <command> ...
 
 `taskctl` 是安装流程写入 `~/.local/bin/` 、指向 canonical 副本的 shim；PATH 上没有它时才回退到 `<this-skill>`（本次读取的 `SKILL.md` 所在目录）。
 
-命令固定为九条加一条维护命令：
+命令固定为十条加一条维护命令：
 
 | command | 用途 |
 |---------|------|
@@ -48,6 +48,7 @@ $TASKCTL <command> ...
 | `list` | 列 active（`--archived` 加归档） |
 | `resolve` | 唯一任务门；不唯一时退出码 2 |
 | `status` | 只读进度：README 事实 + 每个 change 的 checkbox 统计。不调 git |
+| `validate-round-end` | apply 本轮结束门：精确对账当前 remaining、逐项暂缓与陈旧依赖 |
 | `set-status` | apply 之外的人工改状态 |
 | `prepare-branches` | 把必须仓切到任务分支，dirty/fetch 失败即 fail closed |
 | `archive` | 归档校验（`--dry-run` 预检）与落盘 |
@@ -57,7 +58,7 @@ $TASKCTL <command> ...
 
 `--root` 在子命令前后均可写，两处都给且值不同即报错；默认从 cwd 向上寻找含 `tasks/` 的工作区。完整参数以 `<command> --help` 为准。
 
-stdout 只输出 JSON，stderr 是一行摘要。退出码：**0 成功，1 硬失败（含参数错误），2 需要用户确认**。看到 2 就原样报告 CLI 给出的 `affected` / `candidates` / `exact_action` 并等用户选择，不得自行扩大授权范围。
+stdout 只输出 JSON，stderr 是一行摘要。退出码：**0 成功，1 硬失败（含参数错误），2 需要用户确认**。看到 2 就原样报告 CLI 给出的 `affected` / `candidates` / `prompt` 并等用户选择，确认后按 CLI 给的 `confirm_command` 重跑，不得自行扩大授权范围。
 
 ## 公共执行契约
 

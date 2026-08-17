@@ -22,6 +22,7 @@ EXPECTED_COMMANDS = {
     "list",
     "resolve",
     "status",
+    "validate-round-end",
     "set-status",
     "prepare-branches",
     "archive",
@@ -177,6 +178,22 @@ class SkillContractTest(unittest.TestCase):
         # 按 change 汇总数量冒充暂缓，是本规则要拦的形态。
         self.assertIn("冒充暂缓", apply_md)
 
+    def test_round_end_validation_is_mandatory(self) -> None:
+        apply_md = self.refs["apply.md"]
+        safety = self.refs["safety.md"]
+        for token in ("validate-round-end", "all-deferred", "budget-exhausted"):
+            self.assertIn(token, apply_md)
+        self.assertIn("APPLY-4", safety)
+        self.assertIn("陈旧", apply_md)
+        self.assertIn("自循环阻塞", apply_md)
+        # 全暂缓不是本轮结束，是全局阻塞：这条一旦松掉，一个根阻塞就能合法收工。
+        for body in (apply_md, safety):
+            self.assertIn("task_fully_blocked", body)
+            self.assertIn("transitive_deferral", body)
+            self.assertIn("cascade_suspected", body)
+        self.assertIn("全局阻塞", apply_md)
+        self.assertNotIn("或余下每一项都已逐项", apply_md)
+
     # ---- 安全规则可追溯 -------------------------------------------------- #
 
     def test_safety_rules_reference_existing_tests(self) -> None:
@@ -217,6 +234,36 @@ class SkillContractTest(unittest.TestCase):
             self.assertIn(token, archive, f"archive.md 缺少失败恢复要素: {token}")
         # skill 不可用时必须停下报告，而不是自行发明命令。
         self.assertIn("不要自行发明等价命令", self.refs["planning.md"])
+
+    def test_archive_gate_asks_instead_of_exiting(self) -> None:
+        archive = self.refs["archive.md"]
+        # 退出码 2 是待确认；当成失败会让没做完的 task 永远归不了档。
+        self.assertIn("待确认，不是失败", archive)
+        self.assertIn("继续归档还是先补完", archive)
+        self.assertIn("待确认", self.refs["safety.md"])
+
+    def test_archive_gate_release_is_a_single_confirmation(self) -> None:
+        archive = self.refs["archive.md"]
+        # 按 gate 拆 flag 会让调用方一轮一轮地往上堆参数，最后变成无脑放行。
+        for flag in ("--allow-remaining", "--allow-unchecked-acceptance", "--allow-dirty"):
+            self.assertNotIn(flag, archive)
+            self.assertNotIn(flag, read(TASKCTL_PATH))
+        self.assertIn("--confirmed", archive)
+        self.assertIn("--confirmed", self.refs["safety.md"])
+        # 一次放行全部 gate，所以事后对账只剩 changes.md 一处。
+        self.assertIn("门禁覆盖", archive)
+
+    def test_archive_delta_diagnosis_is_section_aware(self) -> None:
+        archive = self.refs["archive.md"]
+        self.assertIn("ARCH-2", self.refs["safety.md"])
+        # MODIFIED 的正常待归档状态就是主 spec 里正文不同；
+        # 按「正文相同才算已同步」一刀切会把最健康的 change 判成冲突。
+        self.assertIn("不同才正常", archive)
+        self.assertNotIn("标题相同但正文不同", archive)
+        for section in ("ADDED", "MODIFIED", "REMOVED", "RENAMED"):
+            self.assertIn(f"| {section} |", archive)
+        # 判定权归 openspec：先跑归档，报错才手工比对。
+        self.assertIn("先跑、报错再分诊", archive)
 
     def test_scope_roles_are_the_only_three(self) -> None:
         taskctl = load_taskctl()

@@ -17,6 +17,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -32,6 +33,11 @@ STATUSES = (
     "archived",
 )
 ROLE_TO_KEY = {"必须": "must", "建议": "suggested", "排除": "excluded"}
+# 单个 blocker 能合法覆盖的暂缓上限：绝对值管大 task，占比管小 task，
+# 覆盖面小于 CASCADE_FLOOR 的一律放过，免得几项的 task 被占比误伤。
+CASCADE_LIMIT = 20
+CASCADE_RATIO = 0.25
+CASCADE_FLOOR = 3
 BRANCH_PREFIXES = ("feat", "fix", "chore", "refactor", "docs", "test", "perf")
 
 ID_RE = re.compile(r"^T\d{4}$")
@@ -570,6 +576,167 @@ def openspec_reports(root: Path, text: str) -> list[dict[str, Any]]:
     return [change_progress(root, entry) for entry in parse_openspec(text)]
 
 
+def checkbox_key(text: str) -> str:
+    match = re.match(r"^(\d+(?:\.\d+)+)\b", text.strip())
+    return match.group(1) if match else ""
+
+
+def markdown_code_text(text: str) -> str:
+    """还原暂缓记录中为容纳 checkbox 内部反引号而添加的转义。"""
+    return re.sub(r"\\+`", "`", text).replace("\\\\", "\\")
+
+
+def analyze_deferrals(root: Path, text: str, reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """把 README 暂缓记录与当前 remaining 精确对账，不产生第二份进度状态。"""
+    remaining = {
+        (report["change"], item)
+        for report in reports
+        for item in report["remaining"]
+    }
+    items_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for report in reports:
+        tasks_path = Path(report["tasks_path"])
+        if not tasks_path.is_absolute():
+            tasks_path = root / tasks_path
+        if not report["readable"] or not tasks_path.is_file():
+            continue
+        for item in parse_checkboxes(tasks_path.read_text(encoding="utf-8")):
+            key = checkbox_key(item["text"])
+            if key:
+                items_by_key[(report["change"], key)] = item
+
+    line_re = re.compile(
+        r"^\s*-\s*暂缓：`(?P<change>[^`]+)`\s*/\s*`(?P<item>.+)`\s+—\s+(?P<reason>.+?)\s*$"
+    )
+    blocked_by_re = re.compile(r"^blocked-by\s+`(?P<change>[^`]+):(?P<key>[^`]+)`；\s*(?P<detail>.+)$")
+    external_re = re.compile(r"^external\s+`(?P<identity>[^`]+)`；\s*(?P<detail>.+)$")
+    accepted: list[dict[str, Any]] = []
+    invalid: list[dict[str, Any]] = []
+    stale: list[dict[str, Any]] = []
+    obsolete: list[dict[str, Any]] = []
+    covered: set[tuple[str, str]] = set()
+
+    for raw in section_body(text, VERIFICATION_HEADING).splitlines():
+        if "暂缓：" not in raw:
+            continue
+        match = line_re.match(raw)
+        if not match:
+            invalid.append({"line": raw.strip(), "reason": "malformed_deferral"})
+            continue
+        change = match.group("change").strip()
+        item_text = markdown_code_text(match.group("item").strip())
+        target = (change, item_text)
+        record = {"change": change, "checkbox": item_text, "reason": match.group("reason").strip()}
+        if target not in remaining:
+            obsolete.append(record)
+            continue
+        if target in covered:
+            invalid.append({**record, "reason": "duplicate_deferral"})
+            continue
+
+        blocker = blocked_by_re.match(record["reason"])
+        external = external_re.match(record["reason"])
+        if blocker:
+            blocker_identity = (blocker.group("change").strip(), blocker.group("key").strip())
+            dependency = items_by_key.get(blocker_identity)
+            record["blocked_by"] = f"{blocker_identity[0]}:{blocker_identity[1]}"
+            if blocker_identity == (change, checkbox_key(item_text)):
+                invalid.append({**record, "reason": "self_dependency"})
+                continue
+            if dependency is None:
+                invalid.append({**record, "reason": "unknown_dependency"})
+                continue
+            if dependency["done"]:
+                stale.append({**record, "reason": "dependency_completed"})
+                continue
+            record["blocker_target"] = (blocker_identity[0], dependency["text"])
+        elif external:
+            record["external"] = external.group("identity").strip()
+        else:
+            invalid.append({**record, "reason": "missing_blocker_identity"})
+            continue
+        covered.add(target)
+        accepted.append(record)
+
+    # 传递链：把暂缓挂在另一条暂缓上，一个根阻塞就能顺着链条合法吞掉整个 task。
+    # 依赖必须是直接的，链上的项要么对根阻塞重判，要么本来就该继续做。
+    records: list[dict[str, Any]] = []
+    claimed = set(covered)
+    for record in accepted:
+        target = record.pop("blocker_target", None)
+        if target in claimed:
+            covered.discard((record["change"], record["checkbox"]))
+            invalid.append({**record, "reason": "transitive_deferral"})
+            continue
+        records.append(record)
+
+    cascade = detect_cascade(records, len(remaining))
+    uncovered = [
+        {"change": report["change"], "checkbox": item}
+        for report in reports
+        for item in report["remaining"]
+        if (report["change"], item) not in covered
+    ]
+    return {
+        "remaining": len(remaining),
+        "covered": len(covered),
+        "records": records,
+        "uncovered": uncovered,
+        "invalid": invalid,
+        "stale": stale,
+        "obsolete": obsolete,
+        "cascade": cascade,
+    }
+
+
+def detect_cascade(records: list[dict[str, Any]], remaining: int) -> list[dict[str, Any]]:
+    """揪出「一个阻塞挂着一大片」的暂缓。
+
+    单条记录再规范，几百条挂在同一个 blocker 上也说明这些项没被逐项判过——
+    真正的根阻塞挡不住那么宽的面。绝对上限管大 task，占比管小 task。
+    """
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        blocker = record.get("blocked_by") or f"external {record['external']}"
+        grouped.setdefault(blocker, []).append(record)
+    cascade = []
+    for blocker, items in sorted(grouped.items()):
+        count = len(items)
+        over_ratio = count > CASCADE_FLOOR and count > remaining * CASCADE_RATIO
+        if count > CASCADE_LIMIT or over_ratio:
+            cascade.append(
+                {
+                    "blocker": blocker,
+                    "count": count,
+                    "items": [
+                        {"change": item["change"], "checkbox": item["checkbox"]} for item in items
+                    ],
+                }
+            )
+    return cascade
+
+
+def workflow_owned_paths(root: Path, reports: list[dict[str, Any]]) -> list[Path]:
+    """归档流程自己会写的路径。
+
+    task 台账和本次 change 的 openspec 落点都是 archive 的产物，不是没交付完的活。
+    把它们算进 dirty 会让门禁每次归档必响，逼着调用方无脑放行，反而废掉门禁。
+    """
+    owned = [tasks_dir(root).resolve()]
+    for report in reports:
+        openspec = (planning_root(root, report["repo"]) / "openspec").resolve()
+        change_dirs = [openspec / "changes" / report["change"]]
+        change_dirs += [(root / p).resolve() for p in report.get("archived_as", [])]
+        owned += change_dirs
+        for change_dir in change_dirs:
+            specs = change_dir / "specs"
+            if not specs.is_dir():
+                continue
+            # 外部归档会把 delta 合进这些 capability 的主 spec。
+            owned += [openspec / "specs" / cap.name for cap in specs.iterdir() if cap.is_dir()]
+    return owned
+
+
 # --------------------------------------------------------------------------- #
 # Git
 # --------------------------------------------------------------------------- #
@@ -594,9 +761,39 @@ def current_branch(repo: Path) -> str:
     return run_git(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
 
 
-def dirty_entries(repo: Path, limit: int = 20) -> list[str]:
-    result = run_git(repo, "status", "--porcelain")
-    return [line for line in result.stdout.splitlines() if line.strip()][:limit]
+def within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def porcelain_paths(top: Path, line: str) -> list[Path]:
+    body = line[3:]
+    return [
+        (top / part.strip().strip('"')).resolve()
+        for part in body.split(" -> ")
+        if part.strip()
+    ]
+
+
+def dirty_entries(repo: Path, limit: int = 20, ignore: Sequence[Path] = ()) -> list[str]:
+    # 有排除项时逐文件列出：git 默认把未跟踪目录折叠成父目录，折叠后的路径落不进排除范围。
+    untracked = ("-uall",) if ignore else ()
+    result = run_git(repo, "status", "--porcelain", *untracked)
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if ignore:
+        top = git_toplevel(repo) or repo
+        lines = [
+            line
+            for line in lines
+            if not all(
+                any(within(path, parent) for parent in ignore)
+                for path in porcelain_paths(top, line)
+            )
+        ]
+    return lines[:limit]
 
 
 def detect_base(repo: Path, preferred: str = "") -> str:
@@ -808,6 +1005,96 @@ def cmd_status(root: Path, args: argparse.Namespace) -> int:
     )
 
 
+def cmd_validate_round_end(root: Path, args: argparse.Namespace) -> int:
+    task = require_task(root, args.query, include_archived=False)
+    text = task.text()
+    reports = openspec_reports(root, text)
+    analysis = analyze_deferrals(root, text, reports)
+    cascade = analysis["cascade"]
+    cascaded = [item for entry in cascade for item in entry["items"]]
+    limit = 20
+    public_analysis = {
+        "remaining": analysis["remaining"],
+        "covered": analysis["covered"],
+        "records": analysis["records"][:limit],
+        "record_count": len(analysis["records"]),
+        "uncovered": analysis["uncovered"][:limit],
+        "uncovered_count": len(analysis["uncovered"]),
+        "invalid": analysis["invalid"][:limit],
+        "invalid_count": len(analysis["invalid"]),
+        "stale": analysis["stale"][:limit],
+        "stale_count": len(analysis["stale"]),
+        "obsolete_count": len(analysis["obsolete"]),
+        "cascade": [
+            {"blocker": entry["blocker"], "count": entry["count"], "sample": entry["items"][:5]}
+            for entry in cascade
+        ],
+        "cascade_count": len(cascaded),
+        "truncated": any(
+            len(analysis[name]) > limit for name in ("records", "uncovered", "invalid", "stale")
+        ),
+    }
+    payload: dict[str, Any] = {
+        "ok": True,
+        "result": "round_end_valid",
+        "reason": args.reason,
+        "task": task_payload(root, task),
+        "deferrals": public_analysis,
+    }
+
+    def fail(reason: str, action: str, count: int) -> int:
+        payload.update(ok=False, result="round_end_invalid", failure=reason, action=action)
+        return emit(payload, code=1, summary=f"validate-round-end: {task.task_id} {reason} ({count})")
+
+    if args.reason == "all-deferred":
+        if cascade:
+            widest = max(cascade, key=lambda entry: entry["count"])
+            return fail(
+                "cascade_suspected",
+                f"`{widest['blocker']}` 一个人挡着 {widest['count']} 项，这些项没被逐项判过："
+                "回去对它们各自重判，不真依赖就继续做；若确认全都依赖，那是全局阻塞，改走 set-status blocked",
+                len(cascaded),
+            )
+        blockers = [*analysis["invalid"], *analysis["stale"], *analysis["uncovered"]]
+        if blockers:
+            return fail(
+                "itemization_incomplete",
+                "逐项修正无效/陈旧暂缓并处理 uncovered；不能用范围、其余或整个 change 冒充逐项暂缓",
+                len(blockers),
+            )
+        if analysis["remaining"]:
+            # 每一项都动不了 = 这个 task 全局阻塞，不是「本轮做到这」。
+            return fail(
+                "task_fully_blocked",
+                f"{analysis['remaining']} 项 remaining 全部挂在阻塞上，这不是本轮结束而是全局阻塞："
+                f"跑 `set-status {task.task_id} blocked`，再把每个根阻塞的解除条件（找谁、要什么）摆给用户等处理",
+                analysis["remaining"],
+            )
+
+    if args.reason == "budget-exhausted":
+        # 预算耗尽是诚实出口，不该因为记录有问题而彻底出不去；但级联暂缓一律降级为未判定，
+        # 这样假暂缓换不来任何进度声明，下一轮还得逐项判。
+        unjudged = [*analysis["uncovered"], *cascaded]
+        deferred = len(analysis["records"]) - len(cascaded)
+        payload["unjudged"] = unjudged[:limit]
+        payload["unjudged_count"] = len(unjudged)
+        payload["deferred_count"] = deferred
+        warnings = [*analysis["invalid"], *analysis["stale"]]
+        payload["warnings"] = warnings[:limit]
+        payload["warning_count"] = len(warnings)
+        payload["action"] = (
+            f"如实按暂缓 {deferred} 项 + 未判定 {len(unjudged)} 项分开报告并给出续跑锚点"
+            + ("；级联暂缓已降级为未判定，下一轮必须逐项重判" if cascaded else "")
+        )
+    return emit(
+        payload,
+        summary=(
+            f"validate-round-end: {task.task_id} {args.reason} — "
+            f"{analysis['covered']}/{analysis['remaining']} current deferral(s)"
+        ),
+    )
+
+
 def cmd_set_status(root: Path, args: argparse.Namespace) -> int:
     if args.status not in STATUSES:
         raise TaskError(
@@ -944,19 +1231,18 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
     text = task.text()
     reports = openspec_reports(root, text)
     acceptance = parse_acceptance(text)
-    allow_dirty = {p.strip().strip("`") for p in (args.allow_dirty or [])}
 
     confirms: list[dict[str, Any]] = []
     remaining = [r for r in reports if r["state"] == "active" and r["remaining"]]
-    if remaining and not args.allow_remaining:
+    if remaining:
         confirms.append(
             {
                 "gate": "openspec_remaining",
+                "prompt": "OpenSpec checkbox 未全部完成，是继续归档还是先补完？",
                 "affected": [
                     {"change": r["change"], "remaining": r["remaining"][:10], "count": len(r["remaining"])}
                     for r in remaining
                 ],
-                "exact_action": "--allow-remaining",
             }
         )
     unreadable = [r for r in reports if r["state"] == "missing"]
@@ -967,35 +1253,36 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
             affected=[r["tasks_path"] for r in unreadable],
         )
     unchecked = [item["text"] for item in acceptance if not item["done"]]
-    if unchecked and not args.allow_unchecked_acceptance:
+    if unchecked:
         confirms.append(
             {
                 "gate": "unchecked_acceptance",
+                "prompt": "验收标准仍有未勾项，是继续归档还是先验收？",
                 "affected": unchecked,
-                "exact_action": "--allow-unchecked-acceptance",
             }
         )
 
+    owned = workflow_owned_paths(root, reports)
     dirty_repos: list[dict[str, Any]] = []
     for row in parse_work_context(text):
         repo = (root / row["repo"]).resolve() if row["repo"] not in {".", ""} else root
         if not repo.is_dir() or git_toplevel(repo) is None:
             continue
-        entries = dirty_entries(repo)
-        if entries and row["repo"] not in allow_dirty:
+        entries = dirty_entries(repo, ignore=owned)
+        if entries:
             dirty_repos.append({"repo": row["repo"], "dirty": entries})
     if dirty_repos:
         confirms.append(
             {
                 "gate": "dirty_delivery",
+                "prompt": "交付仓还有未提交改动（已排除 task 台账与本次 change 的 openspec 落点），是继续归档还是先提交？",
                 "affected": dirty_repos,
-                "exact_action": " ".join(f"--allow-dirty {d['repo']}" for d in dirty_repos),
             }
         )
 
     active_changes = [r["change"] for r in reports if r["state"] == "active"]
     payload: dict[str, Any] = {
-        "ok": not confirms,
+        "ok": not confirms or args.confirmed,
         "result": "archive_preflight" if args.dry_run else "archive",
         "task": task.row(root),
         "openspec": reports,
@@ -1004,15 +1291,22 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
         "confirmations": confirms,
     }
 
-    if confirms:
-        payload["action"] = "原样报告每个 gate 与 exact_action，取得用户确认后只传对应 flag 重跑"
+    if confirms and not args.confirmed:
+        payload["action"] = (
+            "待确认，不是失败：把每个 gate 的 affected 原样报给用户，逐条问「继续归档还是先补完」，"
+            "得到明确同意后用 confirm_command 重跑；没同意就停在这里"
+        )
+        payload["confirm_command"] = f"archive {task.task_id} --confirmed"
         return emit(payload, code=2, summary=f"archive: {len(confirms)} confirmation(s) required")
 
     if args.dry_run:
+        # 落盘会重算 gate，确认过的项要继续带着 --confirmed 才不会再次卡住。
+        final = f"archive {task.task_id}" + (" --confirmed" if confirms else "")
         payload["next_action"] = (
-            f"按 archive.md 第 2 节在各 planning root 下用 openspec CLI 归档 {', '.join(active_changes)}，再跑 archive"
+            f"按 archive.md 第 2 节在各 planning root 下用 openspec CLI 归档 "
+            f"{', '.join(active_changes)}，再跑 `{final}`"
             if active_changes
-            else f"可直接 `archive {task.task_id}` 完成归档"
+            else f"可直接 `{final}` 完成归档"
         )
         return emit(payload, summary=f"archive preflight: {task.task_id} clear")
 
@@ -1028,9 +1322,7 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
     if dest.exists():
         raise TaskError(f"archive destination already exists: {dest}", reason="exists")
 
-    overrides = [c for c in ("allow_remaining", "allow_unchecked_acceptance") if getattr(args, c)]
-    if allow_dirty:
-        overrides.append("allow_dirty=" + ",".join(sorted(allow_dirty)))
+    overrides = [describe_override(c) for c in confirms]
     updated = set_frontmatter_field(text, "status", "archived")
     updated = append_changelog(updated, f"归档至 `{rel(root, dest)}`")
     write_text(task.readme(), updated)
@@ -1052,6 +1344,19 @@ def cmd_archive(root: Path, args: argparse.Namespace) -> int:
     )
     payload["task"] = {**task.row(root), "status": "archived", "path": rel(root, dest)}
     return emit(payload, summary=f"archive: {task.task_id} → {rel(root, dest)}")
+
+
+def describe_override(confirm: dict[str, Any]) -> str:
+    """`--confirmed` 不分 gate，归档记录里必须写清它实际放行了什么。"""
+    gate = confirm["gate"]
+    affected = confirm["affected"]
+    if gate == "openspec_remaining":
+        detail = "，".join(f"{item['change']} {item['count']} 项未勾" for item in affected)
+    elif gate == "dirty_delivery":
+        detail = "，".join(f"{item['repo']} {len(item['dirty'])} 处未提交" for item in affected)
+    else:
+        detail = f"{len(affected)} 项未勾"
+    return f"{gate}：{detail}"
 
 
 def render_changes_md(
@@ -1166,6 +1471,7 @@ COMMANDS = {
     "list": cmd_list,
     "resolve": cmd_resolve,
     "status": cmd_status,
+    "validate-round-end": cmd_validate_round_end,
     "set-status": cmd_set_status,
     "prepare-branches": cmd_prepare_branches,
     "archive": cmd_archive,
@@ -1210,6 +1516,14 @@ def build_parser() -> argparse.ArgumentParser:
     status = add("status", help="只读进度：README 事实 + OpenSpec checkbox 统计")
     status.add_argument("query")
 
+    validate_round_end = add("validate-round-end", help="结束 apply 本轮前对账逐项暂缓与 remaining")
+    validate_round_end.add_argument("query")
+    validate_round_end.add_argument(
+        "--reason",
+        required=True,
+        choices=("all-deferred", "budget-exhausted"),
+    )
+
     set_status = add("set-status", help="手动设置 status")
     set_status.add_argument("query")
     set_status.add_argument("status")
@@ -1223,9 +1537,11 @@ def build_parser() -> argparse.ArgumentParser:
     archive = add("archive", help="归档校验与落盘；--dry-run 只做预检")
     archive.add_argument("query")
     archive.add_argument("--dry-run", action="store_true")
-    archive.add_argument("--allow-remaining", action="store_true")
-    archive.add_argument("--allow-unchecked-acceptance", action="store_true")
-    archive.add_argument("--allow-dirty", action="append", help="按仓库路径逐个授权，可重复")
+    archive.add_argument(
+        "--confirmed",
+        action="store_true",
+        help="用户已逐条确认上一次报出的全部 gate；实际放行项写入 changes.md",
+    )
 
     restore = add("restore", help="把归档任务恢复为 active")
     restore.add_argument("query")
