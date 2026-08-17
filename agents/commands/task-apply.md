@@ -10,4 +10,4 @@ tags: [task, workflow, openspec]
 
 **MUST** 读取 skill `task-workflow`，然后只执行 `references/apply.md` 及其 safety 规则。输入可为 TNNNN、slug、路径或会话中已明确的唯一 task；可附 change 范围和分支前缀。
 
-进度只认 OpenSpec `tasks.md` 的 checkbox：`taskctl status` 给出的 remaining 就是待做项，勾选即记账。汇报模板以 `references/apply.md` 为准；只有 checkbox 全勾且验证已写入才允许宣称完成。用户决策、中断或暂缓都只结束本轮，task 保持 `in_progress`。
+进度只认 OpenSpec `tasks.md` 的 checkbox：`taskctl status` 给出的 remaining 就是待做项，勾选即记账。持续推进到 `references/apply.md` 允许的结束条件为止——单项暂缓和汇报点都不结束本轮。只有 checkbox 全勾且验证已写入才允许宣称完成，其余情况 task 保持 `in_progress`。

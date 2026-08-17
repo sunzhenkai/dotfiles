@@ -70,6 +70,23 @@ Implementation progress SHALL be derived exclusively from the checkbox state of 
 - **THEN** the Agent reads `status` and treats unchecked checkboxes as the remaining work
 - **THEN** no resume-state command is required
 
+### Requirement: Apply keeps scheduling independent work
+Because no CLI scheduler drives the apply loop, `apply.md` SHALL define the round-end conditions explicitly. A round MAY end only when every remaining checkbox is either ticked or individually recorded as deferred, when a user decision is required, or when a global failure occurs. Reaching a reporting checkpoint, deferring a single checkbox, or a failed delegation MUST NOT end the round. Deferral SHALL apply to the deferred checkbox alone and MUST NOT be inferred at change granularity.
+
+#### Scenario: Reporting checkpoint continues the round
+- **WHEN** the Agent reaches the reporting cadence with unchecked independent work left
+- **THEN** it emits the in-progress template and immediately continues with the next item
+- **THEN** it does not emit the round-end template or wait for user input
+
+#### Scenario: One blocked prerequisite does not stop other changes
+- **WHEN** a checkbox is deferred because a prerequisite is unavailable
+- **THEN** the remaining items of that change and items of later changes that do not depend on it are still attempted
+- **THEN** dependency is judged per checkbox rather than per change
+
+#### Scenario: Round-end reasons are enumerated
+- **WHEN** apply ends a round without completing the task
+- **THEN** the report names which of the three permitted round-end conditions applies
+
 ### Requirement: Task identity and index are derived from the directory tree
 Task IDs SHALL be `T` plus four digits, allocated by scanning `tasks/`, and MUST NOT be reused after archival. Active tasks live at `tasks/YYYY-MM-DD/TNNNN-<slug>/` and archived tasks at `tasks/archive/YYYY-MM-DD-TNNNN-<slug>/`. `tasks/INDEX.md` SHALL be a derived locator regenerated from the directory tree and MUST NOT store allocation or status state.
 

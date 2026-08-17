@@ -137,9 +137,30 @@ class SkillContractTest(unittest.TestCase):
             )
 
     def test_apply_reference_owns_the_reporting_templates(self) -> None:
-        self.assertIn("暂停", self.refs["apply.md"])
-        self.assertIn("完成", self.refs["apply.md"])
+        apply_md = self.refs["apply.md"]
+        # 汇报点与本轮终止必须是两套模板，否则汇报会被当成收尾。
+        self.assertIn("### 进行中", apply_md)
+        self.assertIn("### 本轮结束", apply_md)
+        self.assertIn("### 完成", apply_md)
         self.assertNotIn("汇报模板", self.refs["planning.md"])
+
+    # ---- apply 调度不得提前停摆 ------------------------------------------ #
+
+    def test_apply_round_end_conditions_are_pinned(self) -> None:
+        apply_md = self.refs["apply.md"]
+        self.assertIn("APPLY-1", self.refs["safety.md"])
+        self.assertIn("## 本轮结束条件", apply_md)
+        for token in ("需要用户决策", "全局故障", "都不是结束理由"):
+            self.assertIn(token, apply_md, f"missing round-end condition: {token}")
+        # 汇报点是继续点，不是交回控制权的地方。
+        self.assertIn("立即继续", apply_md)
+
+    def test_deferral_does_not_cascade_across_changes(self) -> None:
+        self.assertIn("APPLY-2", self.refs["safety.md"])
+        self.assertIn("后续 change 中不依赖它的项", self.refs["safety.md"])
+        apply_md = self.refs["apply.md"]
+        self.assertIn("不是串行门", apply_md)
+        self.assertIn("继续下一项", apply_md)
 
     # ---- 安全规则可追溯 -------------------------------------------------- #
 
