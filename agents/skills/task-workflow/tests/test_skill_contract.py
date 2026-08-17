@@ -14,6 +14,7 @@ TASKCTL_PATH = SKILL_ROOT / "scripts/taskctl.py"
 EXPECTED_COMMANDS = {
     "list",
     "resolve",
+    "status",
     "set-status",
     "new",
     "archive",
@@ -100,21 +101,46 @@ class SkillContractTest(unittest.TestCase):
 
     def test_apply_pause_outcomes_are_not_completion(self) -> None:
         apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
         command_text = (COMMAND_ROOT / "task-apply.md").read_text(encoding="utf-8")
         skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         for text in (apply_text, command_text, skill_text):
-            self.assertIn("不宣称完成", text)
-            self.assertIn("只有 `done`", text)
-            self.assertIn("禁止 testing/done", text)
             self.assertNotIn("kiro", text.lower())
             self.assertNotIn("goal(complete)", text.lower())
+        # 规则正文只在 safety.md；apply.md 只保留 outcome 契约与模板。
+        self.assertIn("只有 `done` 可宣称完成", safety)
+        self.assertIn("并行挂起", safety)
         self.assertIn("停本轮调度", apply_text)
-        self.assertIn("同 change 其余项", apply_text)
-        self.assertIn("后续 change", apply_text)
-        self.assertIn("并行挂起", apply_text)
         self.assertIn("仓级测试不是 final verification", apply_text)
-        self.assertIn("并行挂起", command_text)
+        self.assertIn("只有 `done` 才允许套完成模板", apply_text)
+        # 完成措辞不再靠禁令重复，而是靠模板结构与 CLI 的 forbidden 标识。
+        for follower in (command_text, skill_text):
+            self.assertIn("next_action.forbidden", follower)
+            self.assertNotIn("不宣称完成", follower)
+        self.assertIn("claim_complete", apply_text)
         self.assertNotIn("停止并执行对应阶段动作", command_text)
+
+    def test_apply_reporting_templates_are_fixed(self) -> None:
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        self.assertIn("## 汇报模板", apply_text)
+        self.assertIn("### 暂停", apply_text)
+        self.assertIn("### 完成", apply_text)
+        self.assertIn("本轮以 `<result>` 结束（未完成）", apply_text)
+        self.assertIn("`advance --phase done` 返回 `done`", apply_text)
+
+    def test_next_action_contract_is_pinned_in_references(self) -> None:
+        apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
+        source = TASKCTL_PATH.read_text(encoding="utf-8")
+        for token in (
+            "claim_complete",
+            "schedule_candidate",
+            "assume_not_started",
+            "budget",
+            "should_report",
+        ):
+            self.assertIn(token, apply_text, token)
+            self.assertIn(token, source, token)
+        self.assertIn("以 `result` 为准", apply_text)
 
     def test_apply_outcome_contract_has_one_complete_source(self) -> None:
         outcomes = (
@@ -189,25 +215,38 @@ class SkillContractTest(unittest.TestCase):
             )
         )
         skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("`--root` 是全局参数", skill_text)
-        self.assertIn("子命令之前", skill_text)
+        self.assertIn("`--root` 在子命令前后均可写", skill_text)
+        self.assertIn("值不同即报错", skill_text)
+
+    def test_script_entry_point_is_resolved_once(self) -> None:
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("每阶段解析一次", skill_text)
+        self.assertIn("command -v taskctl", skill_text)
+        self.assertIn("~/.local/bin/", skill_text)
+        self.assertEqual(skill_text.count("<this-skill>"), 2)
 
     def test_delegation_budget_rules_are_pinned(self) -> None:
         safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
         apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
         self.assertIn("DELEG-1", safety)
         self.assertIn("DELEG-1", apply_text)
-        for token in ("墙钟上限", "连续失败上限", "降级"):
-            self.assertIn(token, safety, token)
+        # 硬规则表只保留可验证部分；不可计量的墙钟/失败次数是 apply.md 的建议。
+        self.assertIn("不得因委托失败判 blocked", safety)
+        for token in ("墙钟上限", "连续失败上限", "降级", "15 分钟"):
+            self.assertNotIn(token, safety, token)
+            self.assertIn(token, apply_text, token)
         self.assertIn("必经路径", apply_text)
-        self.assertIn("15 分钟", apply_text)
 
     def test_apply_rhythm_rules_are_pinned(self) -> None:
         safety = (SKILL_ROOT / "references/safety.md").read_text(encoding="utf-8")
         apply_text = (SKILL_ROOT / "references/apply.md").read_text(encoding="utf-8")
         self.assertIn("APPLY-7", safety)
         self.assertIn("APPLY-1/2/3/4/5/6/7", apply_text)
-        for token in ("首轮", "targeted 验证", "5 个 candidate", "60 分钟"):
+        self.assertIn("budget.should_report", safety)
+        self.assertNotIn("60 分钟", safety)
+        for token in ("首轮", "targeted 验证", "不重复审阅"):
+            self.assertIn(token, safety, token)
+        for token in ("targeted 验证", "5 个 candidate", "60 分钟"):
             self.assertIn(token, apply_text, token)
         self.assertIn("openspec-apply-change", apply_text)
 

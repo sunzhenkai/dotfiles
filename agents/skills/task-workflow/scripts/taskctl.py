@@ -6,6 +6,7 @@ Invoke from this skill directory (the folder that contains SKILL.md), not the pr
   python3 scripts/taskctl.py list
   python3 scripts/taskctl.py resolve T0002 --command task-apply
   python3 scripts/taskctl.py resolve --infer --command task-apply --hint "继续 T0002"
+  python3 scripts/taskctl.py status T0002
   python3 scripts/taskctl.py set-status T0002 exploring
   python3 scripts/taskctl.py new --slug my-feature --title "标题"
   python3 scripts/taskctl.py new --title "Optimize providers from model.dev"
@@ -34,6 +35,7 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1920,9 +1922,18 @@ def delivery_repo_keys(info: TaskInfo) -> list[str]:
     return keys
 
 
-def validate_checkout_binding(root: Path, info: TaskInfo, repo_key: str) -> dict[str, Any]:
+def validate_checkout_binding(
+    root: Path, info: TaskInfo, repo_key: str, *, level: str = "full"
+) -> dict[str, Any]:
+    """Verify one delivery checkout binding.
+
+    `light` keeps the checks whose absence would silently write to the wrong
+    place — binding recorded, checkout present, branch still the task branch —
+    and drops repository identity and worktree inspection, which cost a git
+    subprocess each. It is chosen by phase, never by the caller.
+    """
     repo_key = normalize_repo_path(repo_key)
-    base: dict[str, Any] = {"repo": repo_key, "ok": False}
+    base: dict[str, Any] = {"repo": repo_key, "ok": False, "level": level}
     binding = binding_for_repo(info, repo_key)
     if binding is None:
         return {**base, "reason": "checkout_not_prepared", "checkout": None}
@@ -1931,16 +1942,19 @@ def validate_checkout_binding(root: Path, info: TaskInfo, repo_key: str) -> dict
     base.update({"binding": binding, "expected_branch": expected, "checkout": checkout_raw or None})
     if not checkout_raw or not expected:
         return {**base, "reason": "checkout_not_prepared"}
-    try:
-        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
-    except TaskError as exc:
-        return {**base, "reason": "canonical_repository_unavailable", "detail": str(exc)}
     checkout = resolve_checkout_path(root, checkout_raw)
     base["checkout"] = display_checkout_path(root, checkout)
-    if not checkout.is_dir():
+    if level == "full":
+        try:
+            canonical = Path(locate_repo(root, repo_key)["git_root_abs"])
+        except TaskError as exc:
+            return {**base, "reason": "canonical_repository_unavailable", "detail": str(exc)}
+        if not checkout.is_dir():
+            return {**base, "reason": "checkout_missing"}
+        if not same_git_repository(canonical, checkout):
+            return {**base, "reason": "wrong_repository"}
+    elif not checkout.is_dir():
         return {**base, "reason": "checkout_missing"}
-    if not same_git_repository(canonical, checkout):
-        return {**base, "reason": "wrong_repository"}
     actual = current_branch(checkout)
     base["actual_branch"] = actual or None
     if not actual:
@@ -1950,9 +1964,19 @@ def validate_checkout_binding(root: Path, info: TaskInfo, repo_key: str) -> dict
     return {**base, "ok": True, "reason": "ok", "checkout_abs": str(checkout), "actual_branch": actual}
 
 
-def evaluate_delivery_checkout_bindings(root: Path, info: TaskInfo) -> dict[str, Any]:
-    bindings = [validate_checkout_binding(root, info, key) for key in delivery_repo_keys(info)]
-    return {"ok": all(row["ok"] for row in bindings), "bindings": bindings, "blocking": [row for row in bindings if not row["ok"]]}
+def evaluate_delivery_checkout_bindings(
+    root: Path, info: TaskInfo, *, level: str = "full"
+) -> dict[str, Any]:
+    bindings = [
+        validate_checkout_binding(root, info, key, level=level)
+        for key in delivery_repo_keys(info)
+    ]
+    return {
+        "ok": all(row["ok"] for row in bindings),
+        "level": level,
+        "bindings": bindings,
+        "blocking": [row for row in bindings if not row["ok"]],
+    }
 
 
 def checkout_gate_failure(gate: dict[str, Any]) -> TaskError:
@@ -2021,8 +2045,12 @@ def normalize_repo_path(raw: str) -> str:
     return p
 
 
-def resolve_repo(root: Path, raw: str) -> dict[str, Any]:
-    """Map a workspace-relative path to its git root (`.` = workspace itself)."""
+def locate_repo(root: Path, raw: str) -> dict[str, Any]:
+    """Map a workspace-relative path to its git root without running git.
+
+    Callers that only need the repository location (change targets, checkout
+    gates) must not pay for worktree inspection.
+    """
     logical = normalize_repo_path(raw)
     root_res = root.resolve()
     if Path(logical).is_absolute():
@@ -2048,15 +2076,19 @@ def resolve_repo(root: Path, raw: str) -> dict[str, Any]:
     git_rel_out = "./" if git_rel == "." else git_rel.rstrip("/") + "/"
     rel_parts = git_rel_out.strip("./").split("/") if git_rel_out not in {".", "./"} else []
 
-    checkout = inspect_git_checkout(root_res, git_root)
     return {
         "input": logical,
         "git_root": git_rel_out,
         "git_root_abs": str(git_root),
         "excluded_by_default": any(m in rel_parts for m in DEFAULT_EXCLUDE_REPO_MARKERS),
-        "is_worktree": checkout["is_worktree"],
-        "main_worktree": checkout["main_worktree"],
     }
+
+
+def resolve_repo(root: Path, raw: str) -> dict[str, Any]:
+    """Locate a repository and report whether the path is a linked worktree."""
+    located = locate_repo(root, raw)
+    checkout = inspect_git_checkout(root.resolve(), Path(located["git_root_abs"]))
+    return {**located, "is_worktree": checkout["is_worktree"], "main_worktree": checkout["main_worktree"]}
 
 
 def detect_base_branch(repo: Path, preferred: str | None = None) -> str:
@@ -2701,7 +2733,7 @@ def resolve_change_target(root: Path, change: dict[str, str]) -> dict[str, Any]:
     raw_repo = (change.get("repo") or "").strip()
     repo_key = normalize_repo_path(raw_repo) if raw_repo else ""
     canonical = (
-        Path(resolve_repo(root, repo_key)["git_root_abs"]) if repo_key else root.resolve()
+        Path(locate_repo(root, repo_key)["git_root_abs"]) if repo_key else root.resolve()
     )
     raw_path = (change.get("path") or "").strip().strip("`").rstrip("/")
     if raw_path and Path(raw_path).is_absolute():
@@ -3045,22 +3077,33 @@ def git_head(repo: Path) -> str:
     return result.stdout.strip()
 
 
-def collect_delivery_snapshots(root: Path, info: TaskInfo) -> list[dict[str, Any]]:
-    gate = evaluate_delivery_checkout_bindings(root, info)
+def collect_delivery_snapshots(
+    root: Path, info: TaskInfo, *, gate: dict[str, Any] | None = None, level: str = "full"
+) -> list[dict[str, Any]]:
+    """Snapshot every delivery checkout; `light` skips dirty inspection.
+
+    Dirty state only decides verification freshness, so the phases that record
+    or consume final verification always ask for the full level.
+    """
+    gate = gate or evaluate_delivery_checkout_bindings(root, info, level=level)
     if not gate["ok"]:
         raise checkout_gate_failure(gate)
-    planning_roots = task_planning_roots(root, info)
+    planning_roots = task_planning_roots(root, info) if level == "full" else []
     snapshots: list[dict[str, Any]] = []
     for checked in gate["bindings"]:
         checkout = Path(checked["checkout_abs"])
-        ownership = classify_dirty_paths(checkout, planning_roots)
+        ownership = (
+            classify_dirty_paths(checkout, planning_roots)
+            if level == "full"
+            else {"role": "unknown", "porcelain": []}
+        )
         snapshots.append(
             {
                 "repo": checked["repo"],
                 "checkout": checked["checkout"],
                 "branch": checked["actual_branch"],
                 "head": git_head(checkout),
-                "dirty": ownership["role"] != "clean",
+                "dirty": None if level != "full" else ownership["role"] != "clean",
                 "dirty_role": ownership["role"],
                 "delivery_dirty": ownership["role"] == "delivery",
                 "dirty_porcelain": ownership["porcelain"],
@@ -3358,7 +3401,7 @@ def build_resume_facts(
     uncommitted: list[dict[str, Any]] = []
     verification = "unknown"
     if not prepare_required:
-        for snapshot in collect_delivery_snapshots(root, info):
+        for snapshot in collect_delivery_snapshots(root, info, gate=checkout_gate):
             uncommitted.append(
                 {
                     "repo": snapshot["repo"],
@@ -3400,6 +3443,175 @@ def build_resume_facts(
     }
 
 
+BUDGET_REPORT_INTERVAL = 5
+# Forbidden-action identifiers; the Agent reads these instead of remembering prose.
+FORBID_TESTING = "testing"
+FORBID_DONE = "done"
+FORBID_CLAIM_COMPLETE = "claim_complete"
+FORBID_SCHEDULE_CANDIDATE = "schedule_candidate"
+FORBID_ASSUME_NOT_STARTED = "assume_not_started"
+
+
+def build_budget(accounted_items: int) -> dict[str, Any]:
+    """Derive the reporting rhythm from the accounting `progress.md` already keeps.
+
+    Counting restarts at every report point, so no second state file is needed
+    to know when the Agent last reported.
+    """
+    interval = BUDGET_REPORT_INTERVAL
+    if accounted_items <= 0:
+        return {"items_since_report": 0, "should_report": False, "interval": interval}
+    since = accounted_items - interval * ((accounted_items - 1) // interval)
+    return {
+        "items_since_report": since,
+        "should_report": since >= interval,
+        "interval": interval,
+    }
+
+
+def candidate_advance_command(task_id: str, item: dict[str, Any] | None) -> str | None:
+    """Render the exact command that schedules one candidate, verbatim text included."""
+    if not item:
+        return None
+    return taskctl_command(
+        "advance",
+        task_id,
+        "--phase",
+        "implementing",
+        "--change",
+        str(item.get("change") or ""),
+        "--current-task",
+        shlex.quote(str(item.get("text") or "")),
+    )
+
+
+def build_next_action(
+    result: str,
+    task_id: str,
+    *,
+    next_item: dict[str, Any] | None = None,
+    verification: str = "",
+) -> dict[str, Any]:
+    """Derive the next step from the outcome that was already decided.
+
+    This is a view over `result`, never a second decision: when the two would
+    disagree, `result` wins and this table follows it.
+    """
+    if result in {"next", "execution_context"}:
+        return {
+            "summary": (
+                f"实施候选项：{next_item['text']}" if next_item else "本轮无可调度候选项"
+            ),
+            "command": candidate_advance_command(task_id, next_item),
+            "forbidden": [FORBID_TESTING, FORBID_DONE, FORBID_CLAIM_COMPLETE],
+        }
+    if result == "blocked":
+        return {
+            "summary": "原样报告阻塞事实并等待用户决策",
+            "command": None,
+            "forbidden": [
+                FORBID_TESTING,
+                FORBID_DONE,
+                FORBID_CLAIM_COMPLETE,
+                FORBID_SCHEDULE_CANDIDATE,
+            ],
+        }
+    if result == "deferred_only":
+        return {
+            "summary": "无独立候选项：汇总 deferred 与阻塞身份后停本轮调度",
+            "command": None,
+            "forbidden": [
+                FORBID_TESTING,
+                FORBID_DONE,
+                FORBID_CLAIM_COMPLETE,
+                FORBID_SCHEDULE_CANDIDATE,
+            ],
+        }
+    if result == "validation_required":
+        return {
+            "summary": (
+                "提交或清理全部 delivery checkout 后记录验证证据"
+                if verification != "fresh"
+                else "重新记录验证证据"
+            ),
+            "command": taskctl_command(
+                "advance", task_id, "--phase", "testing", "--verification", '"<命令与结果>"'
+            ),
+            "forbidden": [
+                FORBID_DONE,
+                FORBID_CLAIM_COMPLETE,
+                FORBID_SCHEDULE_CANDIDATE,
+            ],
+        }
+    if result == "validation_recorded":
+        return {
+            "summary": "最终验证已记录：执行 done transition",
+            "command": taskctl_command("advance", task_id, "--phase", "done"),
+            "forbidden": [FORBID_CLAIM_COMPLETE, FORBID_SCHEDULE_CANDIDATE],
+        }
+    if result == "done":
+        return {
+            "summary": f"交付完成：桥接 task-archive {task_id}",
+            "command": None,
+            "forbidden": [],
+        }
+    return {"summary": "", "command": None, "forbidden": []}
+
+
+def context_next_action(
+    task_id: str,
+    schedule: dict[str, Any],
+    resume: dict[str, Any],
+    *,
+    progress_recorded: bool,
+) -> dict[str, Any]:
+    """Translate the apply state into one executable next step.
+
+    A task that has never recorded progress is a first run, not an ambiguous
+    resume: `unknown` only blocks when an earlier round left something behind.
+    """
+    if progress_recorded and resume.get("last_item_state") == "unknown":
+        return {
+            "summary": "上次处理项状态无法判定：原样报告并等待用户确认",
+            "command": None,
+            "forbidden": [
+                FORBID_SCHEDULE_CANDIDATE,
+                FORBID_CLAIM_COMPLETE,
+                FORBID_ASSUME_NOT_STARTED,
+            ],
+        }
+    state = schedule["state"]
+    if state == "candidates":
+        return build_next_action("next", task_id, next_item=schedule["next"])
+    if state == "deferred_only":
+        return build_next_action("deferred_only", task_id)
+    verification = str(resume.get("verification") or "")
+    if verification == "fresh":
+        return build_next_action("validation_recorded", task_id)
+    return build_next_action("validation_required", task_id, verification=verification)
+
+
+def gate_next_action(task_id: str, slug: str, gate: dict[str, Any]) -> dict[str, Any]:
+    """Name the recovery for a failed checkout gate; never a candidate command."""
+    reasons = {str(row.get("reason") or "") for row in gate["blocking"]}
+    if reasons == {"checkout_not_prepared"}:
+        return {
+            "summary": "delivery checkout 尚未准备：补跑 prepare-branches",
+            "command": taskctl_command(
+                "prepare-branches", "--slug", slug, "--from-task", task_id
+            ),
+            "forbidden": [FORBID_SCHEDULE_CANDIDATE, FORBID_CLAIM_COMPLETE],
+        }
+    return {
+        "summary": (
+            "delivery checkout 与记录不一致（" + ", ".join(sorted(reasons)) + "）："
+            "原样报告并等待用户处理，禁止自动 stash/reset/force checkout"
+        ),
+        "command": None,
+        "forbidden": [FORBID_SCHEDULE_CANDIDATE, FORBID_CLAIM_COMPLETE],
+    }
+
+
 def describe_openspec_locations(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Report where each change actually lives and whether it can be read there."""
     rows: list[dict[str, Any]] = []
@@ -3418,6 +3630,53 @@ def describe_openspec_locations(targets: list[dict[str, Any]]) -> list[dict[str,
             }
         )
     return rows
+
+
+def cmd_status(root: Path, args: argparse.Namespace) -> int:
+    """Report task facts without Git, without the checkout gate, without writes.
+
+    Reading progress must stay available while a delivery checkout is missing or
+    stale; `execution-context` fails closed on the gate by design.
+    """
+    matches = match_query(list_active_infos(root), args.query)
+    if len(matches) != 1:
+        return emit(
+            {
+                "ok": False,
+                "result": "zero" if not matches else "multi",
+                "exit_markdown": exit_markdown(matches, "task-apply"),
+            },
+            code=2,
+        )
+    info = matches[0]
+    targets = resolve_change_targets(root, info)
+    schedule = build_apply_schedule(
+        targets, load_deferred_items(apply_state_path(root, info))
+    )
+    complete = sum(int(t["progress"]["complete"]) for t in targets)
+    total = sum(int(t["progress"]["total"]) for t in targets)
+    progress_path = root / info.task_root.rstrip("/") / "progress.md"
+    return emit(
+        {
+            "ok": True,
+            "result": "status",
+            "task": asdict(info),
+            "status": info.status,
+            "targets": targets,
+            "openspec_locations": describe_openspec_locations(targets),
+            "openspec_remaining": {
+                "state": aggregate_remaining_state(targets),
+                "complete": complete,
+                "total": total,
+                "remaining": total - complete,
+                "items": schedule["remaining"],
+            },
+            "deferred": schedule["deferred"],
+            "candidates": schedule["candidates"],
+            "progress_path": rel_posix(root, progress_path),
+            "progress_exists": progress_path.is_file(),
+        }
+    )
 
 
 def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
@@ -3445,6 +3704,9 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
             "prepare_required": True,
             "last_item_state": "unknown",
         }
+        failure.details["next_action"] = gate_next_action(
+            info.task_id, info.slug, checkout_gate
+        )
         raise failure
     targets = resolve_change_targets(root, info)
     schedule = build_apply_schedule(
@@ -3452,6 +3714,9 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
     )
     complete = sum(int(t["progress"]["complete"]) for t in targets)
     total = sum(int(t["progress"]["total"]) for t in targets)
+    resume = build_resume_facts(
+        root, info, targets, schedule, progress_text, checkout_gate
+    )
     return emit(
         {
             "ok": True,
@@ -3470,8 +3735,12 @@ def cmd_execution_context(root: Path, args: argparse.Namespace) -> int:
                 "items": schedule["remaining"],
             },
             "apply_schedule": schedule,
-            "resume": build_resume_facts(
-                root, info, targets, schedule, progress_text, checkout_gate
+            "resume": resume,
+            "next_action": context_next_action(
+                info.task_id,
+                schedule,
+                resume,
+                progress_recorded=bool(progress_text.strip()),
             ),
             "progress_path": rel_posix(root, progress_path),
             "progress_exists": progress_path.is_file(),
@@ -3492,10 +3761,11 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             code=2,
         )
     info = matches[0]
-    checkout_gate = evaluate_delivery_checkout_bindings(root, info)
+    phase = args.phase
+    gate_level = "light" if phase == "implementing" else "full"
+    checkout_gate = evaluate_delivery_checkout_bindings(root, info, level=gate_level)
     if not checkout_gate["ok"]:
         raise checkout_gate_failure(checkout_gate)
-    phase = args.phase
     status = "blocked" if phase == "blocked" else "in_progress"
     task_readme = root / info.readme
     original_readme = task_readme.read_text(encoding="utf-8")
@@ -3626,7 +3896,9 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
 
     completed_items = list(dict.fromkeys([*previous_items("本轮完成"), *(args.completed or [])]))
     verification_items = list(dict.fromkeys([*previous_items("验证证据"), *(args.verification or [])]))
-    snapshots = collect_delivery_snapshots(root, info)
+    snapshots = collect_delivery_snapshots(
+        root, info, gate=checkout_gate, level=gate_level
+    )
     previous_final = parse_final_verification(previous_text)
     final_verification = previous_final
     if phase == "implementing":
@@ -3721,10 +3993,11 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
         ]
     )
     for snapshot in snapshots:
+        dirty = snapshot["dirty"]
         lines.append(
             f"- `{snapshot['repo']}` checkout=`{snapshot['checkout']}` "
             f"branch=`{snapshot['branch']}` head=`{snapshot['head']}` "
-            f"dirty={'yes' if snapshot['dirty'] else 'no'}"
+            f"dirty={'unchecked' if dirty is None else 'yes' if dirty else 'no'}"
         )
         for dirty_line in snapshot["dirty_porcelain"]:
             lines.append(f"  - `{dirty_line}`")
@@ -3803,6 +4076,15 @@ def _cmd_advance_unlocked(root: Path, args: argparse.Namespace) -> int:
             **checkpoint,
             "apply_schedule": schedule,
             "next": next_item,
+            "next_action": build_next_action(
+                result,
+                info.task_id,
+                next_item=next_item,
+                verification=final_verification["status"],
+            ),
+            "budget": (
+                build_budget(len(completed_items)) if phase == "implementing" else None
+            ),
             "targets": targets,
             "verification": final_verification,
             "checkout_gate": checkout_gate,
@@ -4318,7 +4600,7 @@ def evaluate_archive_repository_gate(
         roles = set(use["roles"])
         if roles == {"reference"}:
             continue
-        canonical = Path(resolve_repo(root, repo_key)["git_root_abs"])
+        canonical = Path(locate_repo(root, repo_key)["git_root_abs"])
         if "delivery" in roles:
             checked = validate_checkout_binding(root, info, repo_key)
             binding = checked.get("binding")
@@ -5012,21 +5294,67 @@ def cmd_notes(root: Path, args: argparse.Namespace) -> int:
     return emit({"ok": True, "result": "missing" if not notes["exists"] else "loaded", **notes})
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "--root",
-        type=Path,
-        default=None,
-        help="workspace root containing tasks/ (default: auto-detect from cwd)",
-    )
-    sub = p.add_subparsers(dest="cmd", required=True)
+class TaskctlArgumentParser(argparse.ArgumentParser):
+    """Keep exit code 2 reserved for "user confirmation required".
 
-    list_p = sub.add_parser("list", help="list active (or archived) tasks as JSON")
+    argparse exits with 2 on usage errors, which collides with the workflow's
+    own meaning for that code, so a malformed invocation is a hard failure (1).
+    """
+
+    def error(self, message: str) -> Any:  # noqa: D102 - argparse contract
+        self.print_usage(sys.stderr)
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": f"{self.prog}: {message}",
+                    "reason": "usage_error",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(1)
+
+
+def resolve_root_argument(args: argparse.Namespace) -> Path | None:
+    """Accept `--root` before or after the subcommand; refuse to pick a winner."""
+    top = getattr(args, "root", None)
+    sub = getattr(args, "sub_root", None)
+    if top is not None and sub is not None:
+        left, right = Path(top).expanduser(), Path(sub).expanduser()
+        if left.resolve() != right.resolve():
+            raise TaskError(
+                f"conflicting --root values: {left} (before subcommand) vs "
+                f"{right} (after subcommand)",
+                reason="conflicting_root",
+                details={
+                    "root_before_subcommand": str(left),
+                    "root_after_subcommand": str(right),
+                    "recovery_hint": "pass --root exactly once",
+                },
+            )
+    return sub if sub is not None else top
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = TaskctlArgumentParser(description=__doc__)
+    root_help = "workspace root containing tasks/ (default: auto-detect from cwd)"
+    p.add_argument("--root", type=Path, default=None, help=root_help)
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--root", dest="sub_root", type=Path, default=None, help=root_help
+    )
+    subparsers = p.add_subparsers(dest="cmd", required=True)
+
+    def add_command(name: str, **kwargs: Any) -> argparse.ArgumentParser:
+        return subparsers.add_parser(name, parents=[common], **kwargs)
+
+    list_p = add_command("list", help="list active (or archived) tasks as JSON")
     list_p.add_argument("--archived", action="store_true", help="list archived INDEX rows")
     list_p.set_defaults(func=cmd_list)
 
-    resolve_p = sub.add_parser(
+    resolve_p = add_command(
         "resolve",
         help="Task Resolution Gate (optional query → auto-infer)",
     )
@@ -5066,15 +5394,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     resolve_p.set_defaults(func=cmd_resolve)
 
-    status_p = sub.add_parser("set-status", help="update README + INDEX status")
+    status_p = add_command(
+        "status",
+        help="read-only task status, OpenSpec targets, progress and deferred items",
+    )
     status_p.add_argument("query", help="TNNNN / slug / path")
-    status_p.add_argument(
+    status_p.set_defaults(func=cmd_status)
+
+    set_status_p = add_command("set-status", help="update README + INDEX status")
+    set_status_p.add_argument("query", help="TNNNN / slug / path")
+    set_status_p.add_argument(
         "status", help="draft|exploring|designed|proposed|in_progress|blocked"
     )
-    status_p.add_argument("--date", help="updated date YYYY-MM-DD (default: today)")
-    status_p.set_defaults(func=cmd_set_status)
+    set_status_p.add_argument("--date", help="updated date YYYY-MM-DD (default: today)")
+    set_status_p.set_defaults(func=cmd_set_status)
 
-    new_p = sub.add_parser("new", help="allocate id, scaffold task dir, update INDEX")
+    new_p = add_command("new", help="allocate id, scaffold task dir, update INDEX")
     new_p.add_argument(
         "--slug",
         default="",
@@ -5085,7 +5420,7 @@ def build_parser() -> argparse.ArgumentParser:
     new_p.add_argument("--dry-run", action="store_true")
     new_p.set_defaults(func=cmd_new)
 
-    arch_p = sub.add_parser("archive", help="move task to archive/ and update INDEX")
+    arch_p = add_command("archive", help="move task to archive/ and update INDEX")
     arch_p.add_argument("query", help="TNNNN / slug / path")
     arch_p.add_argument("--date", help="archived_on date YYYY-MM-DD (default: today)")
     arch_p.add_argument("--dry-run", action="store_true")
@@ -5106,7 +5441,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     arch_p.set_defaults(func=cmd_archive)
 
-    restore_p = sub.add_parser(
+    restore_p = add_command(
         "restore", help="restore an archived task to its original active date directory"
     )
     restore_p.add_argument("query", help="archived TNNNN / slug / path")
@@ -5119,7 +5454,7 @@ def build_parser() -> argparse.ArgumentParser:
     restore_p.add_argument("--dry-run", action="store_true")
     restore_p.set_defaults(func=cmd_restore)
 
-    prep_p = sub.add_parser(
+    prep_p = add_command(
         "prepare-branches",
         help="git safety check + create/checkout <prefix>-<slug> on must-modify git repos only",
     )
@@ -5159,14 +5494,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prep_p.set_defaults(func=cmd_prepare_branches)
 
-    context_p = sub.add_parser(
+    context_p = add_command(
         "execution-context",
         help="resolve persisted checkout/worktree and OpenSpec execution targets",
     )
     context_p.add_argument("query", help="TNNNN / slug / path")
     context_p.set_defaults(func=cmd_execution_context)
 
-    advance_p = sub.add_parser(
+    advance_p = add_command(
         "advance",
         help="atomically persist apply progress and return the next candidate item",
     )
@@ -5197,7 +5532,7 @@ def build_parser() -> argparse.ArgumentParser:
     advance_p.add_argument("--date", default=None)
     advance_p.set_defaults(func=cmd_advance)
 
-    notes_p = sub.add_parser(
+    notes_p = add_command(
         "notes",
         help="read/write workspace .task-workflow.md (standing requirements / specs)",
     )
@@ -5232,7 +5567,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        root = (args.root or find_repo_root()).resolve()
+        root = (resolve_root_argument(args) or find_repo_root()).resolve()
         if not (root / "tasks").exists():
             raise TaskError(f"tasks/ not found under {root}")
         return args.func(root, args)

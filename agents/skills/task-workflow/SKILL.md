@@ -29,17 +29,18 @@ task-new → task-explore? → task-design? → task-propose → task-apply → 
 
 ## taskctl
 
-机械记账只通过与本 `SKILL.md` 同目录的 `scripts/taskctl.py`：
+机械记账只通过 `scripts/taskctl.py`。脚本入口**每阶段解析一次**并复用，不要每条命令重新自省：
 
 ```bash
-python3 <this-skill>/scripts/taskctl.py <command> ...
+TASKCTL=$(command -v taskctl || echo "python3 <this-skill>/scripts/taskctl.py")
+$TASKCTL <command> ...
 ```
 
-`<this-skill>` 由本次读取的 `SKILL.md` 绝对路径确定。PATH 上没有 `taskctl` 可执行文件，禁止运行裸 `taskctl ...`。默认从 cwd 向上寻找含 `tasks/` 的工作区；`--root` 是全局参数，必须写在子命令之前（`taskctl.py --root <workspace> <command> ...`），写在子命令之后会被拒绝。
+`taskctl` 是安装流程写入 `~/.local/bin/` 、指向 canonical 副本的 shim；PATH 上没有它时才回退到 `<this-skill>`（本次读取的 `SKILL.md` 所在目录）。
 
-公共命令固定为：`list`（列 active/archive）、`resolve`（唯一任务 Resolution Gate）、`set-status`、`new`、`restore`、`prepare-branches`（apply 的 checkout/worktree Gate）、`execution-context`（scope、真实 checkout、OpenSpec targets 与调度）、`advance`（原子保存进度并返回 control outcome）、`archive`（preflight 与原子 finalize）、`notes`。
+公共命令固定为：`list`（列 active/archive）、`resolve`（唯一任务 Resolution Gate）、`status`（只读进度：不调 git、不过 checkout gate）、`set-status`、`new`、`restore`、`prepare-branches`（apply 的 checkout/worktree Gate）、`execution-context`（scope、真实 checkout、OpenSpec targets 与调度）、`advance`（原子保存进度并返回 control outcome）、`archive`（preflight 与原子 finalize）、`notes`。
 
-没有 `status` 子命令；查状态用 `execution-context` 或 `list`。完整参数以 `<command> --help` 为准。stdout 只输出 JSON，stderr 是一行摘要。退出码 2 表示需要确认/选择，不得继续写操作；1 表示硬失败。CLI 对锁与 git 都设了上限，`lock_timeout`／`git_timeout` 是有界失败，按 `recovery_hint` 处理后重试，不要当成 task 阻塞。
+`--root` 在子命令前后均可写，两处都给且值不同即报错；默认从 cwd 向上寻找含 `tasks/` 的工作区。完整参数以 `<command> --help` 为准。stdout 只输出 JSON，stderr 是一行摘要。退出码 2 只表示需要确认/选择，不得继续写操作；1 是硬失败，含参数用法错误。CLI 对锁与 git 都设了上限，`lock_timeout`／`git_timeout` 是有界失败，按 `recovery_hint` 处理后重试，不要当成 task 阻塞。
 
 ## 公共执行契约
 
@@ -47,7 +48,7 @@ python3 <this-skill>/scripts/taskctl.py <command> ...
 - `resolve` / `new` JSON 中的 `workflow_notes` 存在时视为跨任务硬约束。
 - 自然语言理解由 Agent 完成；CLI 不提取需求，也不分类未完成项。status、INDEX、工作上下文和归档移动不得手改绕过 CLI，业务正文由 Agent 写入 README/OpenSpec。
 - 用户确认门出现时原样报告候选、dirty、剩余项或覆盖范围并等待选择；禁止自动 stash、reset、force checkout 或越权覆盖。
-- apply 的 outcome 契约以 `references/apply.md` 的表为唯一来源。跨阶段边界：暂停类 outcome 只停本轮调度、不宣称完成，`next` 时继续独立项并禁止 testing/done，只有 `done` 才允许宣称完成并桥接 archive。
+- apply 的 outcome 契约与汇报模板以 `references/apply.md` 为唯一来源；本轮禁止动作按 CLI 返回的 `next_action.forbidden` 执行，规则正文见 `safety.md` APPLY-5。
 
 ## Task 数据模型
 

@@ -10,4 +10,4 @@ tags: [task, workflow, openspec]
 
 **MUST** 读取 skill `task-workflow`，然后只执行 `references/apply.md` 及其 safety 规则。输入可为 TNNNN、slug、路径或会话中已明确的唯一 task；可附 change 范围和分支前缀。
 
-只依据顶层 `result` 控制，逐条语义以 `references/apply.md` 的 outcome 表为准。跨阶段边界：`next` 时继续独立 candidate、已 defer 项并行挂起且禁止 testing/done；暂停类 outcome 停本轮调度并保持 `in_progress`，不宣称完成；只有 `done` 才允许对外完成并桥接 archive。用户决策或中断同样只停调度。
+只依据顶层 `result` 控制流程，逐条语义与汇报模板以 `references/apply.md` 为准；本轮禁止动作照 CLI 返回的 `next_action.forbidden` 执行。用户决策或中断同样只停本轮调度。

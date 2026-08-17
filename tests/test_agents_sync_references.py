@@ -53,6 +53,23 @@ def test_sync_copies_skill_scripts(tmp_path: Path) -> None:
     assert dest.read_bytes() == src.read_bytes()
 
 
+def test_sync_installs_taskctl_shim_pointing_at_the_canonical_copy(tmp_path: Path) -> None:
+    r = _run_sync(tmp_path, "kimi-code")
+    assert r.returncode == 0, r.stderr + r.stdout
+    shim = tmp_path / ".local" / "bin" / "taskctl"
+    assert shim.is_file(), f"shim 未生成: {shim}\n{r.stdout}"
+    assert os.access(shim, os.X_OK)
+    canonical = ROOT / "agents" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
+    body = shim.read_text()
+    assert str(canonical) in body
+    # 镜像副本不得成为 shim 的目标。
+    assert ".kimi-code" not in body and ".claude" not in body
+
+    r2 = _run_sync(tmp_path, "kimi-code")
+    assert r2.returncode == 0, r2.stderr + r2.stdout
+    assert f"  = {shim}" in r2.stdout
+
+
 def test_sync_kiro_commands_as_argument_aware_skills(tmp_path: Path) -> None:
     r = _run_sync(tmp_path, "kiro")
     assert r.returncode == 0, r.stderr + r.stdout

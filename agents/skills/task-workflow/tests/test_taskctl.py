@@ -10,13 +10,14 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest import mock
@@ -3200,6 +3201,8 @@ hello
         self.assertFalse(absent["resume"]["progress_parsed"])
         self.assertEqual(absent["resume"]["verification"], "absent")
         self.assertEqual(absent["apply_schedule"]["next"]["text"], "1.1 first item")
+        # 从未记账过 ≠ 上次处理项状态不明：首跑直接给出候选命令。
+        self.assertIn("1.1 first item", absent["next_action"]["command"])
 
         (task / "progress.md").write_text(
             "# T0001 实施进度\n\n- 更新：2026-08-01\n\n## 本轮完成\n\n- 旧模板\n",
@@ -3210,6 +3213,9 @@ hello
         self.assertEqual(legacy["resume"]["phase"], "unknown")
         self.assertEqual(legacy["resume"]["last_item_state"], "unknown")
         self.assertEqual(legacy["apply_schedule"]["next"]["text"], "1.1 first item")
+        # 已有记账但无法判定：候选仍在，但必须先报告等确认（APPLY-6）。
+        self.assertIsNone(legacy["next_action"]["command"])
+        self.assertIn("assume_not_started", legacy["next_action"]["forbidden"])
         self.assertTrue(repo.is_dir())
 
     SCOPE_TEMPLATE_ROW = (
@@ -3481,6 +3487,8 @@ hello
         self.assertFalse(resume["prepare_required"])
         self.assertEqual(resume["last_item_state"], "in_flight")
         self.assertEqual(resume["last_item"]["task"], "1.1 first item")
+        self.assertIn("1.1 first item", ctx["next_action"]["command"])
+        self.assertIn("claim_complete", ctx["next_action"]["forbidden"])
 
         (change / "tasks.md").write_text(
             "- [x] 1.1 first item\n- [ ] 1.2 second item\n", encoding="utf-8"
@@ -3514,6 +3522,364 @@ hello
         code, done = self._run("advance", "T0001", "--phase", "done")
         self.assertEqual(code, 0, done)
         self.assertEqual(done["result"], "done")
+
+    def test_next_action_is_defined_for_every_apply_outcome(self) -> None:
+        """六种 outcome 逐个断言：暂停类禁止宣称完成，只有 done 无禁止项。"""
+        self._seed_task("T0002", "outcomes", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        tasks = change / "tasks.md"
+        tasks.write_text(
+            "- [ ] manual verification\n- [ ] implement next\n", encoding="utf-8"
+        )
+        self._write_index()
+
+        code, deferred = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "manual verification",
+            "--defer-current", "requires operator validation",
+        )
+        self.assertEqual(code, 0, deferred)
+        self.assertEqual(deferred["result"], "next")
+        action = deferred["next_action"]
+        self.assertIn("implement next", action["summary"])
+        self.assertIn("--current-task", action["command"])
+        self.assertIn("implement next", action["command"])
+        self.assertIn("--change demo-change", action["command"])
+        for token in ("testing", "done", "claim_complete"):
+            self.assertIn(token, action["forbidden"])
+
+        tasks.write_text(
+            "- [ ] manual verification\n- [x] implement next\n", encoding="utf-8"
+        )
+        code, deferred_only = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+            "--current-task", "implement next",
+        )
+        self.assertEqual(deferred_only["result"], "deferred_only")
+        self.assertIsNone(deferred_only["next_action"]["command"])
+        self.assertIn("claim_complete", deferred_only["next_action"]["forbidden"])
+
+        code, blocked = self._run(
+            "advance", "T0002", "--phase", "blocked", "--blocker", "等待用户决策",
+        )
+        self.assertEqual(blocked["result"], "blocked")
+        self.assertIsNone(blocked["next_action"]["command"])
+        self.assertIn("claim_complete", blocked["next_action"]["forbidden"])
+        self.assertIsNone(blocked["budget"])
+
+        tasks.write_text(
+            "- [x] manual verification\n- [x] implement next\n", encoding="utf-8"
+        )
+        code, required = self._run(
+            "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+        )
+        self.assertEqual(required["result"], "validation_required")
+        self.assertIn("--phase testing", required["next_action"]["command"])
+        self.assertIn("claim_complete", required["next_action"]["forbidden"])
+
+        code, recorded = self._run(
+            "advance", "T0002", "--phase", "testing", "--verification", "回归通过",
+        )
+        self.assertEqual(recorded["result"], "validation_recorded")
+        self.assertIn("--phase done", recorded["next_action"]["command"])
+        self.assertIn("claim_complete", recorded["next_action"]["forbidden"])
+
+        code, done = self._run("advance", "T0002", "--phase", "done")
+        self.assertEqual(done["result"], "done")
+        self.assertIn("task-archive", done["next_action"]["summary"])
+        self.assertEqual(done["next_action"]["forbidden"], [])
+
+    def test_budget_reports_every_interval_without_changing_the_outcome(self) -> None:
+        """汇报点由 CLI 计数，且只是汇报点，不改变 result。"""
+        self._seed_task("T0002", "budget", openspec=True)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        items = [f"{n}.1 item" for n in range(1, 8)]
+        (change / "tasks.md").write_text(
+            "".join(f"- [ ] {item}\n" for item in items), encoding="utf-8"
+        )
+        self._write_index()
+        seen: list[tuple[int, bool]] = []
+        for item in items[: tc.BUDGET_REPORT_INTERVAL + 1]:
+            code, payload = self._run(
+                "advance", "T0002", "--phase", "implementing", "--change", "demo-change",
+                "--completed", item,
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["result"], "next")
+            seen.append(
+                (payload["budget"]["items_since_report"], payload["budget"]["should_report"])
+            )
+        interval = tc.BUDGET_REPORT_INTERVAL
+        self.assertEqual(seen[interval - 1], (interval, True))
+        self.assertEqual(seen[interval], (1, False))
+        self.assertFalse(any(flag for _, flag in seen[: interval - 1]))
+        # 计数只从既有记账派生，没有为 budget 新增状态文件。
+        task_files = {
+            path.name
+            for path in (self.tmp / "tasks/2026-08-01/T0002-budget").iterdir()
+        }
+        self.assertEqual(task_files, {"README.md", "progress.md", ".task-apply-state.json"})
+
+    def test_execution_context_next_action_recovers_from_a_failed_gate(self) -> None:
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+"""
+        self._init_git_repo("svc")
+        self._seed_task("T0002", "gate-action", openspec=True, scope_block=scope_block)
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text("- [ ] first\n", encoding="utf-8")
+        self._write_index()
+        code, payload = self._run("execution-context", "T0002")
+        self.assertEqual(code, 1)
+        action = payload["next_action"]
+        self.assertIn("prepare-branches", action["command"])
+        self.assertIn("--from-task T0002", action["command"])
+        self.assertIn("schedule_candidate", action["forbidden"])
+
+    def _seed_gate_task(self, slug: str) -> tuple[Path, Path, Path]:
+        repo = self._init_git_repo("svc")
+        task = self._seed_task_via_cli(
+            slug=slug,
+            title=slug,
+            scope_rows=["| svc | `svc` | 必须 |"],
+            openspec_rows=[
+                f"| `{slug}-change` | `svc/openspec/changes/{slug}-change/` | `svc` | 1 | gate |"
+            ],
+            acceptance="gate passes",
+        )
+        change = self._write_change(
+            repo / f"openspec/changes/{slug}-change",
+            "- [ ] 1.1 first item\n- [ ] 1.2 second item\n",
+        )
+        code, prepared = self._run(
+            "prepare-branches", "--slug", slug, "--from-task", "T0001"
+        )
+        self.assertEqual(code, 0, prepared)
+        return repo, task, change
+
+    def _count_git(self, *argv: str) -> tuple[int, dict, int]:
+        calls: list[tuple] = []
+        real = tc.run_git
+
+        def counting(repo, *git_args, **kwargs):
+            calls.append(git_args)
+            return real(repo, *git_args, **kwargs)
+
+        with mock.patch.object(tc, "run_git", counting):
+            code, payload = self._run(*argv)
+        return code, payload, len(calls)
+
+    def test_implementing_uses_the_lightweight_gate_and_terminal_phases_do_not(self) -> None:
+        """implementing 只做 binding/路径/分支校验；终态阶段仍付全量 gate 的代价。"""
+        repo, task, change = self._seed_gate_task("gate-level")
+        code, implementing, light_calls = self._count_git(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "gate-level-change", "--current-task", "1.1 first item",
+        )
+        self.assertEqual(code, 0, implementing)
+        self.assertEqual(implementing["checkout_gate"]["level"], "light")
+        self.assertLessEqual(light_calls, 2)
+
+        (change / "tasks.md").write_text(
+            "- [x] 1.1 first item\n- [x] 1.2 second item\n", encoding="utf-8"
+        )
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-m", "finish")
+        code, testing, full_calls = self._count_git(
+            "advance", "T0001", "--phase", "testing", "--verification", "回归通过",
+        )
+        self.assertEqual(code, 0, testing)
+        self.assertEqual(testing["checkout_gate"]["level"], "full")
+        self.assertGreater(full_calls, light_calls)
+        # 完整 gate 的判定项在轻量校验里不存在。
+        self.assertEqual(testing["verification"]["status"], "fresh")
+        self.assertFalse(testing["verification"]["snapshots"][0]["delivery_dirty"])
+
+    def test_branch_drift_during_implementing_still_fails_closed(self) -> None:
+        """轻量校验仍必须拦下误切分支，并且不记录任何进度。"""
+        repo, task, change = self._seed_gate_task("gate-drift")
+        code, first = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "gate-drift-change", "--current-task", "1.1 first item",
+        )
+        self.assertEqual(code, 0, first)
+        progress = task / "progress.md"
+        recorded = progress.read_text(encoding="utf-8")
+
+        self._git(repo, "checkout", "main")
+        code, blocked = self._run(
+            "advance", "T0001", "--phase", "implementing",
+            "--change", "gate-drift-change", "--current-task", "1.2 second item",
+            "--completed", "1.1 first item",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(blocked["reason"], "branch_mismatch")
+        blocking = blocked["checkout_gate"]["blocking"][0]
+        self.assertEqual(blocking["expected_branch"], "feat-gate-drift")
+        self.assertEqual(blocking["actual_branch"], "main")
+        self.assertEqual(progress.read_text(encoding="utf-8"), recorded)
+
+    def test_no_cli_flag_downgrades_the_gate(self) -> None:
+        parser = tc.build_parser()
+        source = tc.taskctl_script_path().read_text(encoding="utf-8")
+        for action in parser._actions:
+            self.assertNotIn("--level", action.option_strings)
+        for flag in ("--skip-gate", "--gate", "--level", "--no-git", "--light"):
+            self.assertNotIn(f'"{flag}"', source, flag)
+        # 分级只由 phase 推导，终态阶段没有降级入口。
+        self.assertIn('gate_level = "light" if phase == "implementing" else "full"', source)
+
+    def test_status_reports_progress_without_git_gate_or_writes(self) -> None:
+        """`status` 是查进度的轻路径：缺 binding 也能用，且不碰 git、不写任何文件。"""
+        scope_block = """
+### 涉及面
+
+| 逻辑库 | 路径 | 角色 |
+|--------|------|------|
+| svc | `svc` | 必须 |
+"""
+        self._init_git_repo("svc")
+        task = self._seed_task(
+            "T0002", "status-only", openspec=True, scope_block=scope_block
+        )
+        change = self.tmp / "openspec/changes/demo-change"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text("- [x] first\n- [ ] second\n", encoding="utf-8")
+        self._write_index()
+
+        # 同一 task 上 execution-context 因缺 binding 而 fail closed。
+        code, blocked = self._run("execution-context", "T0002")
+        self.assertEqual(code, 1)
+        self.assertEqual(blocked["reason"], "checkout_not_prepared")
+
+        before = {
+            path: path.read_bytes()
+            for path in sorted(self.tmp.rglob("*"))
+            if path.is_file()
+        }
+        with mock.patch.object(
+            tc, "run_git", side_effect=AssertionError("status must not run git")
+        ):
+            code, payload = self._run("status", "T0002")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["result"], "status")
+        self.assertEqual(payload["status"], "draft")
+        self.assertEqual(payload["targets"][0]["name"], "demo-change")
+        self.assertEqual(payload["openspec_remaining"]["remaining"], 1)
+        self.assertEqual(payload["candidates"][0]["text"], "second")
+        self.assertNotIn("checkout_gate", payload)
+
+        after = {
+            path: path.read_bytes()
+            for path in sorted(self.tmp.rglob("*"))
+            if path.is_file()
+        }
+        self.assertEqual(before, after)
+
+    def test_next_action_alone_drives_a_full_apply_round(self) -> None:
+        """只读 next_action 就能跑完一轮 apply：不看 markdown，也不提前宣称完成。"""
+        repo = self._init_git_repo("svc")
+        task = self._seed_task_via_cli(
+            slug="driven",
+            title="CLI driven apply",
+            scope_rows=["| svc | `svc` | 必须 |"],
+            openspec_rows=[
+                "| `driven-change` | `svc/openspec/changes/driven-change/` | `svc` | 1 | driven |"
+            ],
+            acceptance="driven apply passes",
+        )
+        change = self._write_change(
+            repo / "openspec/changes/driven-change",
+            "- [ ] 1.1 first\n- [ ] 1.2 second\n- [ ] 1.3 third\n",
+        )
+        code, prepared = self._run(
+            "prepare-branches", "--slug", "driven", "--from-task", "T0001"
+        )
+        self.assertEqual(code, 0, prepared)
+
+        code, payload = self._run("execution-context", "T0001")
+        self.assertEqual(code, 0, payload)
+        results: list[str] = []
+        for _ in range(12):
+            action = payload["next_action"]
+            if payload.get("result") == "done":
+                break
+            self.assertIn(
+                "claim_complete", action["forbidden"], "done 之前一律禁止宣称完成"
+            )
+            self.assertIsNotNone(action["command"], action)
+            argv = shlex.split(action["command"])[2:]
+            if "--current-task" in argv:
+                item = argv[argv.index("--current-task") + 1]
+                tasks_md = (change / "tasks.md").read_text(encoding="utf-8")
+                (change / "tasks.md").write_text(
+                    tasks_md.replace(f"- [ ] {item}", f"- [x] {item}"), encoding="utf-8"
+                )
+                (repo / f"{item.split()[0]}.py").write_text("done\n", encoding="utf-8")
+                argv += ["--completed", item]
+            if "--phase" in argv and argv[argv.index("--phase") + 1] == "testing":
+                self._git(repo, "add", "-A")
+                self._git(repo, "commit", "-m", "deliver")
+                self._accept(task, "driven apply passes")
+                argv[argv.index("--verification") + 1] = "pytest 通过"
+            code, payload = self._run(*argv)
+            self.assertEqual(code, 0, payload)
+            results.append(payload["result"])
+            self.assertNotEqual(
+                payload["result"] == "done",
+                "claim_complete" in payload["next_action"]["forbidden"],
+            )
+
+        self.assertEqual(payload["result"], "done")
+        self.assertEqual(payload["next_action"]["forbidden"], [])
+        self.assertIn("task-archive", payload["next_action"]["summary"])
+        self.assertEqual(
+            results,
+            ["next", "next", "validation_required", "validation_recorded", "done"],
+        )
+
+    def _run_raw(self, *argv: str) -> tuple[int, dict]:
+        out = StringIO()
+        with redirect_stdout(out), redirect_stderr(StringIO()):
+            code = tc.main(list(argv))
+        return code, json.loads(out.getvalue())
+
+    def test_root_is_accepted_before_and_after_the_subcommand(self) -> None:
+        self._seed_task("T0001", "alpha")
+        self._write_index(next_id=2)
+        before_code, before = self._run_raw("--root", str(self.tmp), "list")
+        after_code, after = self._run_raw("list", "--root", str(self.tmp))
+        self.assertEqual((before_code, after_code), (0, 0))
+        self.assertEqual(before, after)
+
+    def test_conflicting_root_positions_name_both_values(self) -> None:
+        self._seed_task("T0001", "alpha")
+        self._write_index(next_id=2)
+        other = self.tmp / "elsewhere"
+        other.mkdir()
+        code, payload = self._run_raw(
+            "--root", str(self.tmp), "list", "--root", str(other)
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["reason"], "conflicting_root")
+        self.assertEqual(payload["root_before_subcommand"], str(self.tmp))
+        self.assertEqual(payload["root_after_subcommand"], str(other))
+
+    def test_usage_error_is_not_a_confirmation_request(self) -> None:
+        for argv in (["list", "--bogus"], ["not-a-command"]):
+            out = StringIO()
+            with redirect_stdout(out), redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit) as ctx:
+                    tc.main(["--root", str(self.tmp), *argv])
+            self.assertEqual(ctx.exception.code, 1, argv)
+            self.assertEqual(json.loads(out.getvalue())["reason"], "usage_error")
 
 
 if __name__ == "__main__":
