@@ -12,24 +12,26 @@ description: 跟踪一次需求交付（new/explore/design?/propose/apply/archiv
 task-new → task-explore? → task-design? → task-propose → task-apply → task-archive
 ```
 
-`tasks/` 跟踪交付生命周期，OpenSpec change 承载可验证契约；两者并行且互不替代。`task-design` 仅用于新子系统、多方案或跨模块契约，局部且路径唯一时跳过。
+`tasks/` 跟踪交付生命周期，OpenSpec change 承载可验证契约。两者分工固定：**task README 记身份、涉及面、验收与验证；OpenSpec `tasks.md` 的 checkbox 是唯一进度真相**。不要再造第三份进度记录。
+
+`task-design` 仅用于新子系统、多方案或跨模块契约；局部且路径唯一时跳过。
 
 ## Phase 路由
 
-每次只读本文件、下表指定 reference，以及 reference 点名的 `safety.md` 规则；不要加载其他阶段正文。
+每次只读本文件加下表指定的一份 reference；不要加载其他阶段正文。
 
 | command | reference |
 |---------|-----------|
-| `task-new` / `task-explore` / `task-propose` | `references/planning.md#task-<phase>` |
-| `task-design` | `references/planning.md#task-design` + skill `task-design` |
+| `task-new` / `task-explore` / `task-propose` | `references/planning.md` |
+| `task-design` | `references/planning.md` + skill `task-design` |
 | `task-apply` | `references/apply.md` |
 | `task-archive` | `references/archive.md` |
 
-跨阶段硬门禁、仓库角色与状态所有权集中在 `references/safety.md`；阶段 reference 通过规则 ID 引用，不复制算法，也不在别处复制这些表。
+`references/safety.md` 是硬门禁的唯一来源，篇幅很短，每个阶段都读。
 
 ## taskctl
 
-机械记账只通过 `scripts/taskctl.py`。脚本入口**每阶段解析一次**并复用，不要每条命令重新自省：
+机械记账只通过 `scripts/taskctl.py`。脚本入口每阶段解析一次并复用：
 
 ```bash
 TASKCTL=$(command -v taskctl || echo "python3 <this-skill>/scripts/taskctl.py")
@@ -38,27 +40,44 @@ $TASKCTL <command> ...
 
 `taskctl` 是安装流程写入 `~/.local/bin/` 、指向 canonical 副本的 shim；PATH 上没有它时才回退到 `<this-skill>`（本次读取的 `SKILL.md` 所在目录）。
 
-公共命令固定为：`list`（列 active/archive）、`resolve`（唯一任务 Resolution Gate）、`status`（只读进度：不调 git、不过 checkout gate）、`set-status`、`new`、`restore`、`prepare-branches`（apply 的 checkout/worktree Gate）、`execution-context`（scope、真实 checkout、OpenSpec targets 与调度）、`advance`（原子保存进度并返回 control outcome）、`archive`（preflight 与原子 finalize）、`notes`。
+命令固定为九条加一条维护命令：
 
-`--root` 在子命令前后均可写，两处都给且值不同即报错；默认从 cwd 向上寻找含 `tasks/` 的工作区。完整参数以 `<command> --help` 为准。stdout 只输出 JSON，stderr 是一行摘要。退出码 2 只表示需要确认/选择，不得继续写操作；1 是硬失败，含参数用法错误。CLI 对锁与 git 都设了上限，`lock_timeout`／`git_timeout` 是有界失败，按 `recovery_hint` 处理后重试，不要当成 task 阻塞。
+| command | 用途 |
+|---------|------|
+| `new` | 分配 ID、建目录与 README 骨架 |
+| `list` | 列 active（`--archived` 加归档） |
+| `resolve` | 唯一任务门；不唯一时退出码 2 |
+| `status` | 只读进度：README 事实 + 每个 change 的 checkbox 统计。不调 git |
+| `set-status` | apply 之外的人工改状态 |
+| `prepare-branches` | 把必须仓切到任务分支，dirty/fetch 失败即 fail closed |
+| `archive` | 归档校验（`--dry-run` 预检）与落盘 |
+| `restore` | 把归档任务恢复为 active |
+| `notes` | 读写工作区 `.task-workflow.md` |
+| `sync-index` | 按 `tasks/` 实际目录重建 `INDEX.md` |
+
+`--root` 在子命令前后均可写，两处都给且值不同即报错；默认从 cwd 向上寻找含 `tasks/` 的工作区。完整参数以 `<command> --help` 为准。
+
+stdout 只输出 JSON，stderr 是一行摘要。退出码：**0 成功，1 硬失败（含参数错误），2 需要用户确认**。看到 2 就原样报告 CLI 给出的 `affected` / `candidates` / `exact_action` 并等用户选择，不得自行扩大授权范围。
 
 ## 公共执行契约
 
-- 除 `task-new` 外，任何 task command 都先通过 `resolve`；本条或会话已有唯一 `TNNNN` 时必须显式传入。
-- `resolve` / `new` JSON 中的 `workflow_notes` 存在时视为跨任务硬约束。
-- 自然语言理解由 Agent 完成；CLI 不提取需求，也不分类未完成项。status、INDEX、工作上下文和归档移动不得手改绕过 CLI，业务正文由 Agent 写入 README/OpenSpec。
-- 用户确认门出现时原样报告候选、dirty、剩余项或覆盖范围并等待选择；禁止自动 stash、reset、force checkout 或越权覆盖。
-- apply 的 outcome 契约与汇报模板以 `references/apply.md` 为唯一来源；本轮禁止动作按 CLI 返回的 `next_action.forbidden` 执行，规则正文见 `safety.md` APPLY-5。
+- 除 `task-new` 外，任何 task command 都先 `resolve`；本条或会话已有唯一 `TNNNN` 时必须显式传入，不要丢掉焦点改走启发式。
+- `resolve` / `new` 返回的 `workflow_notes` 存在时视为跨任务硬约束。
+- 自然语言理解由 Agent 完成：CLI 不提取需求、不归纳标题、不分类未完成项。反过来，status、INDEX、工作上下文和归档移动不得手改绕过 CLI。
+- 业务正文（README 各节、OpenSpec artifacts）由 Agent 写入。
 
 ## Task 数据模型
 
-- ID：`T` + 四位数字；新 ID 由 `tasks/INDEX.md` frontmatter `next_id` 分配。active 为 `tasks/YYYY-MM-DD/TNNNN-<slug>/`，archive 为 `tasks/archive/YYYY-MM-DD-TNNNN-<slug>/`。slug 小写 kebab-case，中文需求由 Agent 自行生成，不追问用户。
-- README 小节以 `new` 生成的骨架为准；现状缺口按 `信息 / 实现 / 资产 / 配置 / 依赖确认` 记录并给出补齐方式，未知写“待确认”；涉及面区分必须（会修改）、建议（只读）、排除；工作上下文规划阶段写“尚未准备”，apply 后由 `prepare-branches` 更新。不写密钥、token 或凭证，只记录环境变量名。
-- status：`draft → exploring? → designed? → proposed → in_progress/blocked → archived`。缺 status 视为 draft；README 为事实来源，INDEX 是由 CLI 同步的定位索引。
+- ID 为 `T` + 四位数字，由 `new` 扫描 `tasks/` 分配，归档后不回收。active 在 `tasks/YYYY-MM-DD/TNNNN-<slug>/`，归档在 `tasks/archive/YYYY-MM-DD-TNNNN-<slug>/`。slug 小写 kebab-case，由 Agent 生成，不追问用户。
+- `tasks/INDEX.md` 是 CLI 按目录扫描生成的**派生索引**，不含状态，坏了跑 `sync-index` 重建。
+- README 小节以 `new` 的骨架为准：概述、涉及面、关联 OpenSpec、工作上下文、验收标准、验证记录、变更记录。explore/design 可另加小节，CLI 只读它认识的那几个。
+- 涉及面角色只有 `必须`（会修改，apply 时切分支）、`建议`（只读参考）、`排除`。工作上下文由 `prepare-branches` 写入，规划阶段保持「尚未准备」。
+- status：`draft → exploring? → designed? → proposed → in_progress/blocked → archived`。缺 status 视为 draft。
+- 不写密钥、token 或凭证，只记录环境变量名。
 
 ## 工作区笔记
 
-`.task-workflow.md` 只记录跨任务仍有效的特殊要求、规格、默认涉及面和踩坑，由各 phase 从 taskctl JSON 读取；单次需求、验收和方案写 task README。用户给出稳定约定时用 `notes --set-section` 更新，禁止写入凭证。
+`.task-workflow.md` 只记录跨任务仍有效的特殊要求、规格、默认涉及面和踩坑；单次需求、验收和方案写 task README。用户给出稳定约定时用 `notes --set-section` 更新，禁止写入凭证。
 
 ## 输出桥接
 

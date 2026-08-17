@@ -6,8 +6,8 @@ category: Workflow
 tags: [task, workflow, openspec]
 ---
 
-在真实 delivery checkout 上持续实施 task 的 OpenSpec changes。
+在准备好的交付分支上持续实施 task 的 OpenSpec changes。
 
 **MUST** 读取 skill `task-workflow`，然后只执行 `references/apply.md` 及其 safety 规则。输入可为 TNNNN、slug、路径或会话中已明确的唯一 task；可附 change 范围和分支前缀。
 
-只依据顶层 `result` 控制流程，逐条语义与汇报模板以 `references/apply.md` 为准；本轮禁止动作照 CLI 返回的 `next_action.forbidden` 执行。用户决策或中断同样只停本轮调度。
+进度只认 OpenSpec `tasks.md` 的 checkbox：`taskctl status` 给出的 remaining 就是待做项，勾选即记账。汇报模板以 `references/apply.md` 为准；只有 checkbox 全勾且验证已写入才允许宣称完成。用户决策、中断或暂缓都只结束本轮，task 保持 `in_progress`。
