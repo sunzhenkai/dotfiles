@@ -9,6 +9,7 @@ vendor 日期：2026-08-14。升级流程见 `../README.md`。第三方快照不
 | baoyu-markdown-to-html | jimliu/baoyu-skills | skills/baoyu-markdown-to-html | 6b7a2e417500561a5ecdd0b168332f4142584617 |
 | html-ppt | lewislulu/html-ppt-skill | 仓库根（skill 即仓库） | f3a8435d3901697d5ac5e64d356c933637e43107 |
 | html-slides | claude-office-skills/skills | html-slides | 9c4c7d5cd2813a8936bf2c9fdb174ea883b85a11 |
+| frontend-design | anthropics/claude-code | plugins/frontend-design/skills/frontend-design | 354757e5b2d9aa1ebb62e5d05ecd384f0e11c0f7 |
 
 审计脚本：`agents/skills/skills-store/scripts/audit-skill.sh`。
 

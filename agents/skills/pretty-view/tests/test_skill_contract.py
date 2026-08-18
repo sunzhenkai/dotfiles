@@ -63,6 +63,18 @@ class PrettyViewContractTest(unittest.TestCase):
                 self.assertIn(route, self.skill)
                 self.assertTrue(path.is_file(), path)
 
+    def test_frontend_design_is_an_explicit_reference_only(self) -> None:
+        for text in (
+            "`frontend-design` 仅在用户点名",
+            "不是输出路径",
+            "仅说“漂亮”“网页”“HTML”不算命中",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, self.skill)
+
+        self.assertIn("frontend-design", self.skill)
+        self.assertIn("frontend-design", (ROOT / "README.md").read_text(encoding="utf-8"))
+
     def test_retired_reading_page_references_are_not_distributed(self) -> None:
         for relpath in (
             "html-doc.md",

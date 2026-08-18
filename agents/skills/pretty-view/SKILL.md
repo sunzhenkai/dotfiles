@@ -1,22 +1,23 @@
 ---
 id: pretty-view
 name: pretty-view
-description: 把文档、知识、报告、code review、方案等以优雅的 HTML 或 Markdown 展示。HTML 默认统一走 html-page 阅读页与 stone-ink 视觉系统，只按内容模式组合组件；baoyu-markdown-to-html 仅当用户显式要把已有 Markdown 转成 HTML（或点名 baoyu / 公众号排版）；html-ppt / html-slides 仅当用户显式要做 HTML PPT / 幻灯片 / reveal.js。禁止把「出 HTML」、技术分享、路演、小红书当成 PPT 或转换。默认只生成 Markdown 或 HTML 其中一种。用户点名 pretty-view，或明确要求展示/呈现/做成漂亮的网页、阅读页、PPT、slides 时使用。普通写文档、写方案、做 code review 本身不要加载本 skill。
+description: 将已有文档、知识、报告、方案或 code review 做成优雅的 Markdown 或 HTML 展示；默认使用 html-page / stone-ink 阅读页。仅在用户点名 pretty-view，或明确要求把内容做成漂亮的网页、阅读页、Markdown、HTML、PPT 或 slides 时使用；普通写作、方案和 code review 不触发。baoyu、html-ppt、html-slides 与 frontend-design 仅在用户显式点名对应转换器、演示格式或视觉设计参考时加载。
 ---
 
 # pretty-view（优雅展示门卫）
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
 
-本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。流程固定为：推断或确认 **介质（HTML / Markdown）** → HTML 先核对 **PPT / baoyu 显式口令** → 未命中则统一进入 `html-page` 阅读页；Markdown 走文末内置准则。所有阅读页共用 `stone-ink` 视觉系统，只按内容选择结构与组件，不再按规格、图解、技术文档或长文切换 reference。**交付结尾**必须写明本次 reference 与主题。
+本 skill 是**路由器**：把已有内容做成好看的展示，不负责替用户写第一稿。流程固定为：确认用户确实要展示 → 推断或确认 **介质（HTML / Markdown）** → HTML 先核对专用路径的显式口令 → 未命中则统一进入 `html-page` 阅读页；Markdown 走文末内置准则。`frontend-design` 只是可选的视觉设计参考，不是输出路径，也不得因“漂亮”“网页”或 HTML 自动加载。所有阅读页共用 `stone-ink` 视觉系统，只按内容选择结构与组件，不再按规格、图解、技术文档或长文切换 reference。**交付结尾**必须写明本次 reference 与主题。
 
-## 五道门禁
+## 六道门禁
 
 1. **门 1 · 收窄触发**：仅在用户点名 `pretty-view`，或明确要**展示/呈现**（做成网页、阅读页、PPT、slides、漂亮的 Markdown）时使用。用户只是在写方案、写文档、做 code review，不要加载。
 2. **门 2 · 先定介质**：展示样式只有 **HTML** 和 **Markdown** 两种。按「介质推断」自动选择；不明确时必须向用户确认。介质未定时，禁止 Read `references/`。
-3. **门 3 · HTML 再路由**：介质为 HTML 后，先核对 **PPT / baoyu 显式口令**。未命中则只 Read `references/html-page.md`，直写统一阅读页。禁止因 `html`、技术分享、路演、小红书、公众号二字或「做成文档」就加载 baoyu / html-ppt。
-4. **门 4 · 产物不污染快照**：禁止写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把所需 `assets/` 与模板拷到实际落盘目录，按相对路径引用。
-5. **门 5 · 单介质**：默认只生成 Markdown **或** HTML 其中一种。选 HTML 不等于先写 `.md` 再转 HTML 并保留两份。把已有 Markdown 转成 HTML 须显式说明。
+3. **门 3 · HTML 再路由**：介质为 HTML 后，先核对专用路径的显式口令。未命中则只 Read `references/html-page.md`，直写统一阅读页。禁止因 `html`、技术分享、路演、小红书、公众号二字或「做成文档」就加载 baoyu / html-ppt / html-slides。
+4. **门 4 · 设计参考显式化**：`frontend-design` 仅在用户点名 `frontend-design`，或明确要求视觉设计、审美方向、UI 重设计、反模板化设计时 Read。它只影响设计决策，不改变介质、输出路径、页面壳或主题；仅说“漂亮”“网页”“HTML”不算命中。
+5. **门 5 · 产物不污染快照**：禁止写入 `references/` 下的第三方快照。`html-ppt` 的 `scripts/new-deck.sh` 默认在 skill 目录 `examples/` 落盘，**不要对 vendor 快照执行**；把所需 `assets/` 与模板拷到实际落盘目录，按相对路径引用。
+6. **门 6 · 单介质**：默认只生成 Markdown **或** HTML 其中一种。选 HTML 不等于先写 `.md` 再转 HTML 并保留两份。把已有 Markdown 转成 HTML 须显式说明。
 
 ## 介质推断（HTML vs Markdown）
 
@@ -54,7 +55,7 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 
 ## HTML 路由
 
-### PPT / baoyu 显式口令
+### 专用路径显式口令
 
 未列入的词（技术分享、路演、分享会、演讲、周报、pitch、小红书、做成文档、html、阅读页）一律不够。
 
@@ -67,6 +68,8 @@ description: 把文档、知识、报告、code review、方案等以优雅的 H
 | 介质为 Markdown | 内置 Markdown 准则 | — |
 
 只说「PPT」未点名 reveal.js → `html-ppt`。两类幻灯片口令同时出现时再问。`html-slides` 依赖 jsDelivr；离线或用户禁止外链时改走 `html-ppt` 并说明原因。
+
+`frontend-design` 不属于上述输出路径。它只能作为显式请求下的设计参考，与 `html-page`、`html-ppt`、`html-slides` 或 `baoyu-markdown-to-html` 叠加使用；若用户未显式要求视觉设计参考，不得 Read。
 
 ### 统一阅读页
 
@@ -270,7 +273,7 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view
 ## 边界
 
 - 不自动触发普通写作或评审。
-- HTML 一次只走一条路径：统一阅读页、baoyu、html-ppt、html-slides 四选一。
+- HTML 一次只走一条输出路径：统一阅读页、baoyu、html-ppt、html-slides 四选一；`frontend-design` 不是输出路径。
 - 默认只生成 Markdown / HTML 其中一种。
 - 不修改第三方快照，不把密钥、内部 URL、公司代码贴进可公开产物。
 - 本 skill 不替代内容创作 skill；输入应是已有草稿、仓库文件或本轮已生成正文。

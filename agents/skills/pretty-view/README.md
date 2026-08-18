@@ -46,10 +46,11 @@ PPT、reveal.js、baoyu 仍只认显式口令。技术分享、路演、小红�
 | 门 1 · 收窄触发 | 日常写作被当成展示 |
 | 门 2 · 先定介质 | HTML / Markdown 猜错 |
 | 门 3 · 专用路径只认显式口令 | 技术分享或 HTML 误进 PPT / baoyu |
-| 门 4 · 产物不写进 references | 污染 vendor 快照 |
-| 门 5 · 单介质 | 默认同时维护 `.md` 和 `.html` 两套正文 |
+| 门 4 · 设计参考只认显式口令 | “漂亮 / HTML”误加载 `frontend-design` |
+| 门 5 · 产物不写进 references | 污染 vendor 快照 |
+| 门 6 · 单介质 | 默认同时维护 `.md` 和 `.html` 两套正文 |
 
-主题规则：`html-page` 固定使用 `stone-ink`；多主题路径（html-ppt / html-slides / baoyu）仍须推荐并确认。交付结尾必须报告 reference 与主题。
+主题规则：`html-page` 固定使用 `stone-ink`；多主题路径（html-ppt / html-slides / baoyu）仍须推荐并确认。`frontend-design` 只提供视觉决策参考，不改变输出路径或主题。交付结尾必须报告 reference 与主题。
 
 ## 4. reference / 生成路径
 
@@ -59,6 +60,7 @@ PPT、reveal.js、baoyu 仍只认显式口令。技术分享、路演、小红�
 | `baoyu-markdown-to-html` | **仅显式** md→html / baoyu / 公众号或微信排版 | `jimliu/baoyu-skills` |
 | `html-ppt` | **仅显式** HTML PPT / 幻灯片 / slides / html-ppt | `lewislulu/html-ppt-skill` |
 | `html-slides` | **仅显式** reveal.js / html-slides | `claude-office-skills/skills` |
+| `frontend-design` | 前端视觉设计参考 | `anthropics/claude-code` |
 
 当前 vendor commit 与审计说明见 `references/UPSTREAM.md`。第三方快照不要直接修改。
 
