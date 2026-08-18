@@ -1,0 +1,128 @@
+---
+id: taskflow
+name: taskflow
+description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。与 `task-workflow`（taskctl + `tasks/` 台账）并存但互斥，同一任务只用一套。
+---
+
+# taskflow
+
+面向用户默认使用简体中文；命令、路径、代码、状态值与既成术语保持原文。
+
+一个任务 = 一个 driver change `{task}-driver`。实现拆成若干子 change `{task}-<slice>`，与 driver 同一 planning root；跨 root 时在 driver 涉及面表里显式记录 root 或 store id。共享 `{task}` 前缀让 `openspec list` 直接看出归属，不需要额外元数据。
+
+**进度只有 checkbox 一种真相。** 不建 `tasks/` 台账、不写索引文件、不引入编号体系、不带脚本。
+
+`task-workflow` 是另一套并存的工作流（taskctl + `tasks/` + status 字段）。同一任务只走一套，不要混用两个命令族。
+
+## 阶段路由
+
+| 阶段 | 入口 | 参数 |
+|------|------|------|
+| 立项 | 本文件「脚手架」小节（command `taskflow-new`） | 任务描述 |
+| 澄清 | stock skill `openspec-explore` | `{task}-driver` |
+| 提案 | stock skill `openspec-propose` | `{task}-driver` |
+| 实施 | stock skill `openspec-apply-change` | `{task}-driver` |
+| 归档 | stock skill `openspec-archive-change` | `{task}-driver`（只归档 driver 自身） |
+
+taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stock skill，不另造等价命令。
+
+## 委托契约
+
+`openspec-*` skill 由目标仓自己跑 `openspec init --tools <agent>` 生成，**不是所有仓都有**。委托前确认它在当前 agent 环境可用；不可用就停下报告并给出可选项（在目标仓 init，或改用 openspec CLI 直调），**不要自行发明等价命令**。
+
+可用时，委托必须同时具备两项绑定：**在 driver 的 planning root 下执行**，并**显式给出 change name `{task}-driver`**。缺任一项不得委托——openspec CLI 只认 cwd 最近的 `openspec/`，无绑定会写错位置或反问用户选 change。无法确定时停下报告。
+
+## 脚手架
+
+`taskflow-new {任务描述}` 固定三步，不多做：
+
+1. 由任务描述归纳 kebab-case 的 `{task}`（Agent 自己归纳，不追问用户；描述确实为空时才问「要做什么？」）。
+2. `openspec new change {task}-driver --goal "<任务描述原文>"`。
+3. 在该 change 的 `.openspec.yaml` 补 `skip_specs: true`，再按下方模板写 `proposal.md`。
+
+`skip_specs: true` 必须显式写入：driver 无 spec 增量，不写这行会让 `openspec validate --strict` 失败；写了之后 `openspec status --change {task}-driver --json` 中 specs 为 `skipped`。
+
+**不要写 `tasks.md`。** 它留给 propose 阶段：stock `openspec-propose` 只处理未完成的 artifact，脚手架把 tasks 写满会让它空转，留出空缺才会读 proposal 并按协议产出登记了子 change 的 `tasks.md`。这也是协议必须写在 proposal 而不是别处的原因——`openspec instructions apply --json` 的 `contextFiles` 保证 proposal 必然被读到。
+
+### driver `proposal.md` 模板
+
+`Driver 协议` 小节是固定文本，逐字写入，不要改写或精简；其余小节按任务填写。
+
+````markdown
+## Why
+<任务描述>
+
+## What Changes
+- 本 change 是 taskflow driver，不直接改代码，只编排子 change
+
+## Non-goals
+- <...>
+
+## 涉及面
+| 仓库 | 角色 | 说明 |
+|------|------|------|
+| . | 必须 | 会修改，实施前切任务分支 |
+
+## 验收标准
+- [ ] <...>
+
+## Driver 协议
+- 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
+- 子 change 一律命名 `{task}-<slice>`，与本 change 同一 planning root；跨 root 时在涉及面表显式记录 root 或 store id
+- 实现进度只认子 change 自己的 `tasks.md`；本文件的 checkbox 只在对应子 change 全勾且 `validate --strict` 通过后才勾
+- 涉及面里角色为 `必须` 的仓在实施前切任务分支；dirty 或 fetch 失败一律停下问用户，不自动 stash / reset / 强制切换
+- 只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了就保持未勾，在验证记录写一行原因后继续下一项
+- 结束时逐条列出未勾项与原因，不按 change 汇总
+
+## 验证记录
+````
+
+### 脚手架输出
+
+报告 change name、`proposal.md` 路径、涉及面与验收标准里仍需用户确认的空缺，并桥接到 stock `openspec-propose`（方案未定时先 `openspec-explore`）。
+
+同时提示：driver 已存在 proposal，`openspec-propose` 会问「继续已有 change 还是新建」，**应选继续**。
+
+## propose 阶段的产出约定
+
+`openspec-propose` 对 driver 产出的 `tasks.md` 按下列骨架组织：准备段切分支，实施段每个子 change 至少一条，收尾段含回归、回填验收、提交与逐个子 change 的归档条目。
+
+子 change 的 artifacts 在 propose 阶段一次性备齐（拆分粒度本身是提案决策），apply 阶段只做实施，不在实施循环里改 change 语义。
+
+````markdown
+## 1. 准备
+- [ ] 1.1 把涉及面里角色为必须的仓切到任务分支
+
+## 2. 实施
+- [ ] 2.1 完成子 change `{task}-api`：apply 至全部 checkbox 勾选且 validate --strict 通过
+- [ ] 2.2 完成子 change `{task}-ui`：同上
+
+## 3. 收尾
+- [ ] 3.1 全仓回归与静态检查，命令与结果写入 proposal 验证记录
+- [ ] 3.2 回填 proposal 验收标准
+- [ ] 3.3 提交交付仓改动
+- [ ] 3.4 归档全部子 change
+````
+
+子 change 的归档是收尾段的普通 checkbox，在 apply 阶段完成。因此 driver 全勾时子 change 已全部 `openspec archive`，对 driver 执行 stock 归档不需要任何递归处理。
+
+## 纪律
+
+### 进度归属
+
+- 子 change 的 `tasks.md` 记**实现**进度，driver 的 `tasks.md` 记**编排**进度，后者必然滞后于前者。
+- driver 的某条实施 checkbox 只在对应子 change 全部 checkbox 已勾、且在其 planning root 下 `openspec validate --strict --type change {task}-<slice>` 通过之后才允许勾选。
+- 不持久化第二份完成度、暂缓或分支状态记录。暂缓原因写进 driver `proposal.md` 的验证记录小节。
+- 已知代价：`openspec archive` 对未勾 checkbox 不设防。完成度靠上述纪律与 stock skill 的确认环节，taskflow 不补脚本。
+
+### 涉及面与交付分支
+
+- 角色只有三个取值：`必须`（会修改，实施前切任务分支）、`建议`（只读参考）、`排除`。
+- 分支准备是 driver `tasks.md` 里的 checkbox，只处理 `必须` 仓；`建议` 与 `排除` 仓保持只读。
+- fail closed：某个必须仓存在非目标分支的未提交改动，或 origin fetch 失败，就报告该仓并等用户处理；**禁止**自动 stash、reset 或强制切换。已准备成功的仓保留现状以便重试。
+
+### 一轮结束
+
+只有三种情况允许结束一轮：**checkbox 全勾**、**需要用户决策**、**本轮预算耗尽**。
+
+单项做不了（依赖、环境或授权）就保持未勾，在验证记录写一行原因，继续处理不依赖它的其余条目——不要因为一项卡住就整轮停下，也不要把未完成项勾成完成。结束时逐条列出未勾条目与原因，不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
