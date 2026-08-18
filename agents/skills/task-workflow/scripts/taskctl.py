@@ -11,6 +11,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -33,11 +34,10 @@ STATUSES = (
     "archived",
 )
 ROLE_TO_KEY = {"必须": "must", "建议": "suggested", "排除": "excluded"}
-# 单个 blocker 能合法覆盖的暂缓上限：绝对值管大 task，占比管小 task，
-# 覆盖面小于 CASCADE_FLOOR 的一律放过，免得几项的 task 被占比误伤。
-CASCADE_LIMIT = 20
-CASCADE_RATIO = 0.25
-CASCADE_FLOOR = 3
+EXTERNAL_KINDS = frozenset(
+    {"approval", "credential", "environment", "service", "human-validation"}
+)
+EXTERNAL_STABLE_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 BRANCH_PREFIXES = ("feat", "fix", "chore", "refactor", "docs", "test", "perf")
 
 ID_RE = re.compile(r"^T\d{4}$")
@@ -586,6 +586,92 @@ def markdown_code_text(text: str) -> str:
     return re.sub(r"\\+`", "`", text).replace("\\\\", "\\")
 
 
+def parse_external_identity(identity: str) -> tuple[str, str]:
+    """严格验证 typed external root，不猜测或自动修正调用方意图。"""
+    raw = identity.strip()
+    if ":" not in raw:
+        return "", "legacy_external_identity"
+    kind, stable = raw.split(":", 1)
+    if kind not in EXTERNAL_KINDS:
+        return "", "unsupported_external_kind"
+    if not stable or stable == "owner":
+        return "", "generic_external_identity"
+    if not EXTERNAL_STABLE_ID_RE.fullmatch(stable) or raw != f"{kind}:{stable}":
+        return "", "malformed_external_identity"
+    return raw, ""
+
+
+def blocker_target(record: dict[str, Any]) -> tuple[str, str]:
+    return record["change"], record["checkbox"]
+
+
+def blocker_root(record: dict[str, Any]) -> str:
+    if record.get("blocked_by"):
+        return f"blocked-by {record['blocked_by']}"
+    return f"external {record['external']}"
+
+
+def public_record(record: dict[str, Any]) -> dict[str, Any]:
+    """公共诊断不回显仅用于摘要绑定的原始 reason。"""
+    return {
+        key: value
+        for key, value in record.items()
+        if key not in {"raw_reason", "blocker_target"}
+    }
+
+
+def summarize_blocker_roots(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        grouped.setdefault(blocker_root(record), []).append(record)
+    summaries: list[dict[str, Any]] = []
+    for root, items in sorted(grouped.items()):
+        summary: dict[str, Any] = {
+            "root": root,
+            "count": len(items),
+            "sample": [
+                {"change": item["change"], "checkbox": item["checkbox"]}
+                for item in items[:5]
+            ],
+        }
+        details = sorted({item.get("detail", "") for item in items if item.get("detail")})
+        if details:
+            summary["details"] = details
+        summaries.append(summary)
+    return summaries
+
+
+def blocker_confirmation_digest(
+    task_id: str,
+    reports: list[dict[str, Any]],
+    records: list[dict[str, Any]],
+) -> str:
+    remaining = sorted(
+        [report["change"], item]
+        for report in reports
+        for item in report["remaining"]
+    )
+    mappings = sorted(
+        (
+            {
+                "change": record["change"],
+                "checkbox": record["checkbox"],
+                "root": blocker_root(record),
+                "reason": record.get("raw_reason", ""),
+            }
+            for record in records
+        ),
+        key=lambda item: (item["change"], item["checkbox"], item["root"]),
+    )
+    canonical = json.dumps(
+        {"task": task_id, "remaining": remaining, "mappings": mappings},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def analyze_deferrals(root: Path, text: str, reports: list[dict[str, Any]]) -> dict[str, Any]:
     """把 README 暂缓记录与当前 remaining 精确对账，不产生第二份进度状态。"""
     remaining = {
@@ -608,8 +694,12 @@ def analyze_deferrals(root: Path, text: str, reports: list[dict[str, Any]]) -> d
     line_re = re.compile(
         r"^\s*-\s*暂缓：`(?P<change>[^`]+)`\s*/\s*`(?P<item>.+)`\s+—\s+(?P<reason>.+?)\s*$"
     )
-    blocked_by_re = re.compile(r"^blocked-by\s+`(?P<change>[^`]+):(?P<key>[^`]+)`；\s*(?P<detail>.+)$")
-    external_re = re.compile(r"^external\s+`(?P<identity>[^`]+)`；\s*(?P<detail>.+)$")
+    blocked_by_re = re.compile(
+        r"^blocked-by\s+`(?P<change>[^`]+):(?P<key>[^`]+)`[；;]\s*(?P<detail>.+)$"
+    )
+    external_re = re.compile(
+        r"^external\s+`(?P<identity>[^`]+)`[；;]\s*(?P<detail>.*)$"
+    )
     accepted: list[dict[str, Any]] = []
     invalid: list[dict[str, Any]] = []
     stale: list[dict[str, Any]] = []
@@ -621,56 +711,88 @@ def analyze_deferrals(root: Path, text: str, reports: list[dict[str, Any]]) -> d
             continue
         match = line_re.match(raw)
         if not match:
-            invalid.append({"line": raw.strip(), "reason": "malformed_deferral"})
+            invalid.append({"reason": "malformed_deferral"})
             continue
         change = match.group("change").strip()
         item_text = markdown_code_text(match.group("item").strip())
         target = (change, item_text)
-        record = {"change": change, "checkbox": item_text, "reason": match.group("reason").strip()}
+        raw_reason = match.group("reason").strip()
+        record: dict[str, Any] = {
+            "change": change,
+            "checkbox": item_text,
+            "raw_reason": raw_reason,
+        }
         if target not in remaining:
-            obsolete.append(record)
+            obsolete.append({"change": change, "checkbox": item_text})
             continue
         if target in covered:
-            invalid.append({**record, "reason": "duplicate_deferral"})
+            invalid.append(
+                {"change": change, "checkbox": item_text, "reason": "duplicate_deferral"}
+            )
             continue
 
-        blocker = blocked_by_re.match(record["reason"])
-        external = external_re.match(record["reason"])
+        blocker = blocked_by_re.match(raw_reason)
+        external = external_re.match(raw_reason)
         if blocker:
             blocker_identity = (blocker.group("change").strip(), blocker.group("key").strip())
             dependency = items_by_key.get(blocker_identity)
             record["blocked_by"] = f"{blocker_identity[0]}:{blocker_identity[1]}"
+            record["detail"] = blocker.group("detail").strip()
             if blocker_identity == (change, checkbox_key(item_text)):
-                invalid.append({**record, "reason": "self_dependency"})
+                invalid.append(
+                    {"change": change, "checkbox": item_text, "reason": "self_dependency"}
+                )
                 continue
             if dependency is None:
-                invalid.append({**record, "reason": "unknown_dependency"})
+                invalid.append(
+                    {"change": change, "checkbox": item_text, "reason": "unknown_dependency"}
+                )
                 continue
             if dependency["done"]:
-                stale.append({**record, "reason": "dependency_completed"})
+                stale.append(
+                    {"change": change, "checkbox": item_text, "reason": "dependency_completed"}
+                )
                 continue
             record["blocker_target"] = (blocker_identity[0], dependency["text"])
         elif external:
-            record["external"] = external.group("identity").strip()
+            identity, identity_error = parse_external_identity(external.group("identity"))
+            if identity_error:
+                invalid.append(
+                    {"change": change, "checkbox": item_text, "reason": identity_error}
+                )
+                continue
+            detail = external.group("detail").strip()
+            if not detail:
+                invalid.append(
+                    {"change": change, "checkbox": item_text, "reason": "missing_external_detail"}
+                )
+                continue
+            record.update(external=identity, detail=detail)
         else:
-            invalid.append({**record, "reason": "missing_blocker_identity"})
+            invalid.append(
+                {"change": change, "checkbox": item_text, "reason": "missing_blocker_identity"}
+            )
             continue
         covered.add(target)
         accepted.append(record)
 
-    # 传递链：把暂缓挂在另一条暂缓上，一个根阻塞就能顺着链条合法吞掉整个 task。
-    # 依赖必须是直接的，链上的项要么对根阻塞重判，要么本来就该继续做。
+    # 依赖必须直接：指向另一条暂缓的记录会制造传递闭包，不能算已判定。
     records: list[dict[str, Any]] = []
     claimed = set(covered)
     for record in accepted:
         target = record.pop("blocker_target", None)
         if target in claimed:
-            covered.discard((record["change"], record["checkbox"]))
-            invalid.append({**record, "reason": "transitive_deferral"})
+            covered.discard(blocker_target(record))
+            invalid.append(
+                {
+                    "change": record["change"],
+                    "checkbox": record["checkbox"],
+                    "reason": "transitive_deferral",
+                }
+            )
             continue
         records.append(record)
 
-    cascade = detect_cascade(records, len(remaining))
     uncovered = [
         {"change": report["change"], "checkbox": item}
         for report in reports
@@ -685,35 +807,8 @@ def analyze_deferrals(root: Path, text: str, reports: list[dict[str, Any]]) -> d
         "invalid": invalid,
         "stale": stale,
         "obsolete": obsolete,
-        "cascade": cascade,
+        "roots": summarize_blocker_roots(records),
     }
-
-
-def detect_cascade(records: list[dict[str, Any]], remaining: int) -> list[dict[str, Any]]:
-    """揪出「一个阻塞挂着一大片」的暂缓。
-
-    单条记录再规范，几百条挂在同一个 blocker 上也说明这些项没被逐项判过——
-    真正的根阻塞挡不住那么宽的面。绝对上限管大 task，占比管小 task。
-    """
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for record in records:
-        blocker = record.get("blocked_by") or f"external {record['external']}"
-        grouped.setdefault(blocker, []).append(record)
-    cascade = []
-    for blocker, items in sorted(grouped.items()):
-        count = len(items)
-        over_ratio = count > CASCADE_FLOOR and count > remaining * CASCADE_RATIO
-        if count > CASCADE_LIMIT or over_ratio:
-            cascade.append(
-                {
-                    "blocker": blocker,
-                    "count": count,
-                    "items": [
-                        {"change": item["change"], "checkbox": item["checkbox"]} for item in items
-                    ],
-                }
-            )
-    return cascade
 
 
 def workflow_owned_paths(root: Path, reports: list[dict[str, Any]]) -> list[Path]:
@@ -1010,13 +1105,11 @@ def cmd_validate_round_end(root: Path, args: argparse.Namespace) -> int:
     text = task.text()
     reports = openspec_reports(root, text)
     analysis = analyze_deferrals(root, text, reports)
-    cascade = analysis["cascade"]
-    cascaded = [item for entry in cascade for item in entry["items"]]
     limit = 20
     public_analysis = {
         "remaining": analysis["remaining"],
         "covered": analysis["covered"],
-        "records": analysis["records"][:limit],
+        "records": [public_record(record) for record in analysis["records"][:limit]],
         "record_count": len(analysis["records"]),
         "uncovered": analysis["uncovered"][:limit],
         "uncovered_count": len(analysis["uncovered"]),
@@ -1025,13 +1118,11 @@ def cmd_validate_round_end(root: Path, args: argparse.Namespace) -> int:
         "stale": analysis["stale"][:limit],
         "stale_count": len(analysis["stale"]),
         "obsolete_count": len(analysis["obsolete"]),
-        "cascade": [
-            {"blocker": entry["blocker"], "count": entry["count"], "sample": entry["items"][:5]}
-            for entry in cascade
-        ],
-        "cascade_count": len(cascaded),
+        "roots": analysis["roots"][:limit],
+        "root_count": len(analysis["roots"]),
         "truncated": any(
-            len(analysis[name]) > limit for name in ("records", "uncovered", "invalid", "stale")
+            len(analysis[name]) > limit
+            for name in ("records", "uncovered", "invalid", "stale", "roots")
         ),
     }
     payload: dict[str, Any] = {
@@ -1046,45 +1137,84 @@ def cmd_validate_round_end(root: Path, args: argparse.Namespace) -> int:
         payload.update(ok=False, result="round_end_invalid", failure=reason, action=action)
         return emit(payload, code=1, summary=f"validate-round-end: {task.task_id} {reason} ({count})")
 
+    def confirm(reason: str, digest: str) -> int:
+        confirm_args = [
+            "validate-round-end",
+            task.task_id,
+            "--root",
+            str(root),
+            "--reason",
+            "all-deferred",
+            "--confirm-blockers",
+            digest,
+        ]
+        payload.update(
+            ok=False,
+            result="needs_confirm",
+            failure=reason,
+            affected=analysis["roots"],
+            prompt=(
+                f"确认这 {len(analysis['roots'])} 个 blocker root 确实位于任务范围外，"
+                f"并直接阻塞全部 {analysis['remaining']} 项 remaining？任务仍未完成。"
+            ),
+            confirmation_digest=digest,
+            confirm_args=confirm_args,
+        )
+        return emit(
+            payload,
+            code=2,
+            summary=f"validate-round-end: {task.task_id} {reason} ({analysis['remaining']})",
+        )
+
     if args.reason == "all-deferred":
-        if cascade:
-            widest = max(cascade, key=lambda entry: entry["count"])
-            return fail(
-                "cascade_suspected",
-                f"`{widest['blocker']}` 一个人挡着 {widest['count']} 项，这些项没被逐项判过："
-                "回去对它们各自重判，不真依赖就继续做；若确认全都依赖，那是全局阻塞，改走 set-status blocked",
-                len(cascaded),
-            )
         blockers = [*analysis["invalid"], *analysis["stale"], *analysis["uncovered"]]
         if blockers:
             return fail(
                 "itemization_incomplete",
-                "逐项修正无效/陈旧暂缓并处理 uncovered；不能用范围、其余或整个 change 冒充逐项暂缓",
+                "逐项修正无效/陈旧暂缓并处理 uncovered；确认不能覆盖 malformed、legacy、"
+                "unknown、self、transitive 或 stale 记录",
                 len(blockers),
             )
         if analysis["remaining"]:
-            # 每一项都动不了 = 这个 task 全局阻塞，不是「本轮做到这」。
-            return fail(
-                "task_fully_blocked",
-                f"{analysis['remaining']} 项 remaining 全部挂在阻塞上，这不是本轮结束而是全局阻塞："
-                f"跑 `set-status {task.task_id} blocked`，再把每个根阻塞的解除条件（找谁、要什么）摆给用户等处理",
-                analysis["remaining"],
+            digest = blocker_confirmation_digest(task.task_id, reports, analysis["records"])
+            if not args.confirm_blockers:
+                return confirm("blocker_confirmation_required", digest)
+            if args.confirm_blockers != digest:
+                return confirm("blocker_confirmation_stale", digest)
+            payload.update(
+                ok=True,
+                result="global_block_confirmed",
+                confirmation_digest=digest,
+                blocker_roots=analysis["roots"],
+                authorized_action={"command": "set-status", "args": [task.task_id, "blocked"]},
+                action=(
+                    f"当前摘要绑定的 {analysis['remaining']} 项 remaining 已获用户确认；"
+                    "可将 task 设置为 blocked，并逐 root 报告所需输入与解除条件。"
+                    "任务仍未完成，不得使用完成模板、archive bridge 或 task-level success"
+                ),
+            )
+            return emit(
+                payload,
+                summary=f"validate-round-end: {task.task_id} global_block_confirmed",
             )
 
     if args.reason == "budget-exhausted":
-        # 预算耗尽是诚实出口，不该因为记录有问题而彻底出不去；但级联暂缓一律降级为未判定，
-        # 这样假暂缓换不来任何进度声明，下一轮还得逐项判。
-        unjudged = [*analysis["uncovered"], *cascaded]
-        deferred = len(analysis["records"]) - len(cascaded)
+        deferred_targets = {blocker_target(record) for record in analysis["records"]}
+        unjudged = [
+            {"change": report["change"], "checkbox": item}
+            for report in reports
+            for item in report["remaining"]
+            if (report["change"], item) not in deferred_targets
+        ]
         payload["unjudged"] = unjudged[:limit]
         payload["unjudged_count"] = len(unjudged)
-        payload["deferred_count"] = deferred
+        payload["deferred_count"] = len(deferred_targets)
         warnings = [*analysis["invalid"], *analysis["stale"]]
         payload["warnings"] = warnings[:limit]
         payload["warning_count"] = len(warnings)
         payload["action"] = (
-            f"如实按暂缓 {deferred} 项 + 未判定 {len(unjudged)} 项分开报告并给出续跑锚点"
-            + ("；级联暂缓已降级为未判定，下一轮必须逐项重判" if cascaded else "")
+            f"如实按暂缓 {len(deferred_targets)} 项 + 未判定 {len(unjudged)} 项分开报告并给出续跑锚点"
+            + ("；无效或陈旧记录已降级为未判定，下一轮必须重判" if warnings else "")
         )
     return emit(
         payload,
@@ -1522,6 +1652,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--reason",
         required=True,
         choices=("all-deferred", "budget-exhausted"),
+    )
+    validate_round_end.add_argument(
+        "--confirm-blockers",
+        metavar="SHA256",
+        help="确认当前 remaining 到 blocker roots 的精确摘要；事实变化后自动失效",
     )
 
     set_status = add("set-status", help="手动设置 status")

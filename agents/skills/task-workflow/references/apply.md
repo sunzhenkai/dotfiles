@@ -20,8 +20,8 @@
 2. 依赖未满足、或因环境/凭据/人工验证局部不可执行：**保持 checkbox 未勾**，在 README 验证记录小节记一行「暂缓：`<change>` / `<checkbox 原文>` — `<原因含阻塞身份>`」，然后**继续下一项**。暂缓只作用于该 checkbox 本身（APPLY-2）。
 3. 可执行：实现，跑受影响范围的 targeted 验证，然后在该 change 的 `planning_root` 下勾选 `tasks.md` 对应 checkbox。全仓回归留到收尾一次性跑。
 4. 已勾选的项不重复审阅。
-暂缓记录只允许 `- 暂缓：<change> / <checkbox 原文> — blocked-by <change>:<checkbox 编号>；<原因>` 或把 `blocked-by ...` 换成 `external <任务范围外的明确身份>`；前三个身份按 Markdown 反引号包裹，checkbox 内部反引号写成 `\``。
-`blocked-by` 只引用同一 task 内真实存在且未勾选的精确 checkbox；依赖完成后该记录立即失效并必须重判。不得把本 checkbox 负责实现的契约、同一交付范围内的笼统 “owner” 写成 external，否则是自循环阻塞，不是暂缓理由。依赖还必须**直接**：`blocked-by` 指向的项自己也被暂缓时判 `transitive_deferral` 作废——顺着链条挂下去，一个根阻塞就能合法吞掉整个 task，链上的项要么直接对根阻塞重判，要么本来就该继续做；单个 blocker（`blocked-by` 目标或 `external` 身份）覆盖超过 20 项或 remaining 的 25%（不足 4 项不算）判 `cascade_suspected`，一条记录再规范，几百条挂在同一个阻塞上也说明这些项根本没被逐项判过。
+暂缓记录只允许 `- 暂缓：<change> / <checkbox 原文> — blocked-by <change>:<checkbox 编号>；<原因>`，或 `- 暂缓：<change> / <checkbox 原文> — external <kind>:<stable-id>；需要 <任务外输入>；解除条件 <可验证证据>`；身份均用 Markdown 反引号，checkbox 内部反引号写成 `\``。external kind 仅限 `approval|credential|environment|service|human-validation`，stable-id 必须直接使用 lowercase kebab-case。
+`blocked-by` 只引用同一 task 内真实存在且未勾选的精确 checkbox；完成、自依赖、未知或其目标也被暂缓时分别作废，传递依赖记为 `transitive_deferral`。external 不得包装本 checkbox 或 `必须` 仓职责；这项业务判断由 Agent 完成，CLI 只严格校验 identity 和逐项覆盖，不用关键词解释文本，也不自动修复 alias。暂缓不是串行门，必须继续同 change 其余项和后续 change 中不依赖它的项。
 ## 本轮结束条件
 
 只有下面五种情况允许结束本轮（APPLY-1）。「余下每一项都已逐项暂缓」**不再是**独立的结束理由——它等价于这个 task 一项都动不了，走全局阻塞那行：
@@ -31,12 +31,12 @@
 | `remaining` 已全部勾选 | 走收尾 |
 | 本轮预算耗尽：上下文、时间或轮次上限到了，还有项没来得及逐项判定 | 套「本轮结束」模板，如实分开「暂缓」与「未判定剩余」，给出续跑锚点 |
 | 需要用户决策：方案分歧、缺授权、change 本身有误 | 提问并等待 |
-| **全局阻塞**：每一项 remaining 都动不了 | `set-status <id> blocked`，把每个根阻塞的解除条件（找谁、要什么）摆给用户等处理。**不套「本轮结束」模板**——那读起来像正常暂停，实际是要人来解 |
+| **全局阻塞**：每一项 remaining 都被任务外 root 阻塞 | 先跑 `all-deferred`；退出码 2 时报告 `affected`/`prompt`，用户确认后用同一 `$TASKCTL` 加 `confirm_args` 重跑；只有 exit 0 / `global_block_confirmed` 才 `set-status <id> blocked`。任务仍未完成，不套结束/完成模板、不桥接 archive、不发 task-level success |
 | 全局故障：交付仓不可用、工具链坏、`prepare-branches` 退出码 2 | 原样报告并等用户处理 |
 
 其余情况一律继续下一项——**刚做完一项、刚到汇报点、刚记下一条暂缓、子 agent 委托失败，都不是结束理由**。
 
-预算耗尽是诚实出口，不是省事出口：**不得把没判定过的项说成暂缓**（APPLY-3）。**暂缓**是已读过该项、判过依赖、README 里有对应那一行的项，报告须逐条给出 `<change>` + checkbox 原文 + 原因，行数必须等于声称的暂缓数；**未判定剩余**是还没轮到的项，按 change 给出数量与首个 remaining 原文即可，不要编原因。剩余只按 change 报成几个总数是未判定项冒充暂缓的典型形态。结束前必须运行 `validate-round-end <id> --reason all-deferred|budget-exhausted`（APPLY-4），命令失败不得结束。`all-deferred` 是对账入口不是通行证：级联、无效、陈旧或 uncovered 都具名失败，而**全部合格恰恰说明这个 task 一项都动不了**，CLI 判 `task_fully_blocked` 要求改走 `set-status blocked`——它永远不会放你套「本轮结束」模板。`budget-exhausted` 把 uncovered 归为 `unjudged`，并把级联暂缓一并降级为未判定，假暂缓换不来任何进度声明；报告按 CLI 返回的 `deferred_count` 与 `unjudged_count` 写，别用自己记的数。每完成一个 checkbox 都重新 `status`；依赖已勾选必须回头重判，禁止沿用陈旧依赖闭包。
+预算耗尽是诚实出口，不是省事出口：**不得把没判定过的项说成暂缓**（APPLY-3）。暂缓须逐条给出 `<change>` + checkbox 原文 + 原因，行数必须等于 `deferred_count`；未判定剩余按 change 给数量、首项和续跑锚点，不要编原因，按 change 汇总数量仍是冒充暂缓。结束前必须跑 `validate-round-end <id> --reason all-deferred|budget-exhausted`（APPLY-4）。`all-deferred` 的 malformed、legacy、unknown、completed、self、`transitive_deferral`、stale 或 uncovered 不可确认覆盖；结构完整先以退出码 2 返回状态绑定摘要和 `confirm_args`，事实变化则 `blocker_confirmation_stale`，匹配后 exit 0 / `global_block_confirmed`。`budget-exhausted` 保留结构有效的逐项 blocked-by 与 typed external 为 deferred，其余为 unjudged；报告只用 CLI 计数。每完成一个 checkbox 都重新 `status` 并重判陈旧记录。
 
 ## 汇报节奏
 
@@ -84,7 +84,7 @@
 - 下一步：{{slash:task-archive}} <id>
 ```
 
-只有 checkbox 全勾且验证已写入才允许套完成模板。结束本轮不等于 task 完成，task 保持 `in_progress`。
+只有 checkbox 全勾且验证已写入才允许套完成模板或发 task-level success。预算结束时 task 保持 `in_progress`；经确认的 `blocked` 仍未完成，不得桥接 archive。解除后重新 `status`、重判陈旧暂缓并 `set-status <id> in_progress` 再续作。
 
 ## 回路与例外
 

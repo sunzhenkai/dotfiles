@@ -109,6 +109,17 @@ class SkillContractTest(unittest.TestCase):
         self.assertEqual(set(subparsers.choices), EXPECTED_COMMANDS)
         self.assertTrue(REMOVED_COMMANDS.isdisjoint(subparsers.choices))
 
+    def test_round_end_confirmation_flag_is_pinned(self) -> None:
+        parser = load_taskctl().build_parser()
+        subparsers = next(
+            action
+            for action in parser._actions
+            if isinstance(action, argparse._SubParsersAction)
+        )
+        validate = subparsers.choices["validate-round-end"]
+        options = {option for action in validate._actions for option in action.option_strings}
+        self.assertIn("--confirm-blockers", options)
+
     def test_skill_documents_exactly_the_real_commands(self) -> None:
         taskctl_section = self.skill.split("## taskctl", 1)[1].split("\n## ", 1)[0]
         documented = set(re.findall(r"^\| `([a-z-]+)` \|", taskctl_section, re.MULTILINE))
@@ -184,13 +195,20 @@ class SkillContractTest(unittest.TestCase):
         for token in ("validate-round-end", "all-deferred", "budget-exhausted"):
             self.assertIn(token, apply_md)
         self.assertIn("APPLY-4", safety)
-        self.assertIn("陈旧", apply_md)
-        self.assertIn("自循环阻塞", apply_md)
-        # 全暂缓不是本轮结束，是全局阻塞：这条一旦松掉，一个根阻塞就能合法收工。
-        for body in (apply_md, safety):
-            self.assertIn("task_fully_blocked", body)
-            self.assertIn("transitive_deferral", body)
-            self.assertIn("cascade_suspected", body)
+        for token in (
+            "<kind>:<stable-id>",
+            "transitive_deferral",
+            "confirm_args",
+            "blocker_confirmation_stale",
+            "global_block_confirmed",
+        ):
+            self.assertIn(token, apply_md, f"apply.md missing round-end contract: {token}")
+        for token in ("退出码 2", "task-level success", "set-status <id> in_progress"):
+            self.assertIn(token, apply_md)
+        for token in ("<kind>:<stable-id>", "confirm_args", "global_block_confirmed"):
+            self.assertIn(token, safety)
+        for removed in ("task_internal_responsibility", "cascade_suspected", "identity_split_suspected"):
+            self.assertNotIn(removed, apply_md + safety)
         self.assertIn("全局阻塞", apply_md)
         self.assertNotIn("或余下每一项都已逐项", apply_md)
 

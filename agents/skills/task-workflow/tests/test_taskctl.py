@@ -266,28 +266,101 @@ def test_status_writes_nothing(workspace: Path) -> None:
     assert path.read_text() == before
 
 
+def write_deferrals(path: Path, lines: list[str]) -> None:
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("## 验证记录\n", "## 验证记录\n\n" + "".join(lines)),
+        encoding="utf-8",
+    )
+
+
+def external_line(
+    change: str,
+    item: str,
+    identity: str = "approval:org-signing",
+    *,
+    needs: str = "组织批准的签名策略",
+    release: str = "批准记录可验证",
+) -> str:
+    return (
+        f"- 暂缓：`{change}` / `{item}` — external `{identity}`；"
+        f"需要 {needs}；解除条件 {release}\n"
+    )
+
+
+def confirm_args(payload: dict) -> list[str]:
+    args = payload["confirm_args"]
+    assert args[0] == "validate-round-end"
+    assert "--root" in args
+    assert "--confirm-blockers" in args
+    return args
+
+
 def test_validate_round_end_requires_exact_itemized_deferrals(workspace: Path) -> None:
     new_task(workspace, "alpha")
-    write_change(workspace, "add-thing", ["1.1 已完成", "1.2 待处理", "1.3 也待处理"], done=1)
+    items = ["1.1 已完成", "1.2 待处理", "1.3 也待处理"]
+    write_change(workspace, "add-thing", items, done=1)
     path = readme_of(workspace, "T0001")
     fill_readme(path, scope=[], changes=["add-thing"])
-    text = path.read_text(encoding="utf-8").replace(
-        "## 验证记录\n",
-        "## 验证记录\n\n"
-        "- 暂缓：`add-thing` / `1.2 待处理` — external `供应链 owner`；缺批准身份。\n"
-        "- 暂缓：`add-thing` / `1.3 也待处理` — external `测试环境`；缺集群。\n",
+    write_deferrals(
+        path,
+        [
+            external_line("add-thing", items[1]),
+            external_line(
+                "add-thing",
+                items[2],
+                "environment:acceptance-cluster",
+                needs="隔离验收集群",
+                release="健康探测与访问授权通过",
+            ),
+        ],
     )
-    path.write_text(text, encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
 
-    code, payload = run(
-        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
-    )
-    # 记录本身合格，但「每一项都动不了」不是本轮结束，是全局阻塞。
-    assert code == 1
-    assert payload["failure"] == "task_fully_blocked"
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 2
+    assert payload["failure"] == "blocker_confirmation_required"
     assert payload["deferrals"]["covered"] == 2
-    assert payload["deferrals"]["uncovered"] == []
-    assert "set-status T0001 blocked" in payload["action"]
+    assert payload["deferrals"]["invalid_count"] == 0
+    assert payload["deferrals"]["root_count"] == 2
+    assert payload["affected"]
+    assert payload["prompt"]
+    assert "confirm_command" not in payload
+    assert path.read_text(encoding="utf-8") == before
+
+    code, confirmed = run(workspace, *confirm_args(payload))
+    assert code == 0
+    assert confirmed["ok"] is True
+    assert confirmed["result"] == "global_block_confirmed"
+    assert "failure" not in confirmed
+    assert len(confirmed["blocker_roots"]) == 2
+    assert confirmed["authorized_action"] == {
+        "command": "set-status",
+        "args": ["T0001", "blocked"],
+    }
+    assert "task-level success" in confirmed["action"]
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_confirmation_args_replay_with_python_fallback(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    write_deferrals(path, [external_line("add-thing", "1.1 待处理")])
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 2
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), *confirm_args(payload)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    confirmed = json.loads(proc.stdout)
+    assert confirmed["result"] == "global_block_confirmed"
+    assert len(proc.stderr.splitlines()) == 1
 
 
 def test_validate_round_end_rejects_bulk_deferral_as_unjudged(workspace: Path) -> None:
@@ -295,20 +368,77 @@ def test_validate_round_end_rejects_bulk_deferral_as_unjudged(workspace: Path) -
     write_change(workspace, "add-thing", ["1.1 待处理", "1.2 也待处理"])
     path = readme_of(workspace, "T0001")
     fill_readme(path, scope=[], changes=["add-thing"])
-    text = path.read_text(encoding="utf-8").replace(
-        "## 验证记录\n",
-        "## 验证记录\n\n"
-        "- 暂缓：`add-thing` / `1.x 全部未勾选 checkbox` — external `某 owner`；等待发布。\n",
+    write_deferrals(
+        path,
+        ["- 暂缓：`add-thing` / `1.x 全部未勾选 checkbox` — external `某 owner`；等待发布。\n"],
     )
-    path.write_text(text, encoding="utf-8")
 
-    code, payload = run(
-        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
-    )
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
     assert code == 1
     assert payload["result"] == "round_end_invalid"
     assert len(payload["deferrals"]["uncovered"]) == 2
     assert payload["deferrals"]["covered"] == 0
+
+
+@pytest.mark.parametrize(
+    ("identity", "expected"),
+    [
+        ("supply-chain owner", "legacy_external_identity"),
+        ("unknown:signing", "unsupported_external_kind"),
+        ("Approval:org-signing", "unsupported_external_kind"),
+        ("approval:org_signing", "malformed_external_identity"),
+        ("approval:owner", "generic_external_identity"),
+        ("approval:", "generic_external_identity"),
+    ],
+)
+def test_validate_round_end_rejects_noncanonical_external_identities(
+    workspace: Path, identity: str, expected: str
+) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    write_deferrals(path, [external_line("add-thing", "1.1 待处理", identity)])
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 1
+    assert payload["deferrals"]["invalid"][0]["reason"] == expected
+
+
+def test_invalid_external_identity_is_not_echoed(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    raw = "approval:user@example.com"
+    write_deferrals(path, [external_line("add-thing", "1.1 待处理", raw)])
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 1
+    assert raw not in json.dumps(payload, ensure_ascii=False)
+    assert payload["deferrals"]["invalid"][0]["reason"] == "malformed_external_identity"
+
+
+def test_external_detail_is_not_classified_by_keywords_and_accepts_ascii_separator(
+    workspace: Path,
+) -> None:
+    new_task(workspace, "alpha")
+    item = "1.1 Implement client against provider contract"
+    write_change(workspace, "add-thing", [item])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[("client-repo", "必须")], changes=["add-thing"])
+    write_deferrals(
+        path,
+        [
+            f"- 暂缓：`add-thing` / `{item}` — external `service:provider-contract`; "
+            "需要 provider contract v2；解除条件 provider publishes signed schema\n"
+        ],
+    )
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 2
+    assert payload["deferrals"]["invalid_count"] == 0
+    assert payload["affected"][0]["root"] == "external service:provider-contract"
 
 
 def test_validate_round_end_rejects_completed_and_self_dependencies(workspace: Path) -> None:
@@ -317,98 +447,161 @@ def test_validate_round_end_rejects_completed_and_self_dependencies(workspace: P
     write_change(workspace, "consumer", ["2.1 接入", "2.2 收尾"])
     path = readme_of(workspace, "T0001")
     fill_readme(path, scope=[], changes=["foundation", "consumer"])
-    text = path.read_text(encoding="utf-8").replace(
-        "## 验证记录\n",
-        "## 验证记录\n\n"
-        "- 暂缓：`consumer` / `2.1 接入` — blocked-by `foundation:1.1`；等待前置。\n"
-        "- 暂缓：`consumer` / `2.2 收尾` — blocked-by `consumer:2.2`；等待本项契约。\n",
+    write_deferrals(
+        path,
+        [
+            "- 暂缓：`consumer` / `2.1 接入` — blocked-by `foundation:1.1`；等待前置。\n",
+            "- 暂缓：`consumer` / `2.2 收尾` — blocked-by `consumer:2.2`；等待本项契约。\n",
+        ],
     )
-    path.write_text(text, encoding="utf-8")
 
-    code, payload = run(
-        workspace, "validate-round-end", "T0001", "--reason", "all-deferred"
-    )
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
     assert code == 1
     assert payload["deferrals"]["stale"][0]["reason"] == "dependency_completed"
     assert any(item["reason"] == "self_dependency" for item in payload["deferrals"]["invalid"])
 
 
 def test_validate_round_end_rejects_transitive_deferrals(workspace: Path) -> None:
-    """依赖必须直接：挂在另一条暂缓上，一个根阻塞就能顺着链条吞掉整个 task。"""
     new_task(workspace, "alpha")
     write_change(workspace, "foundation", ["1.1 根阻塞", "1.2 中间层"])
     write_change(workspace, "consumer", ["2.1 末端"])
     path = readme_of(workspace, "T0001")
     fill_readme(path, scope=[], changes=["foundation", "consumer"])
-    text = path.read_text(encoding="utf-8").replace(
-        "## 验证记录\n",
-        "## 验证记录\n\n"
-        "- 暂缓：`foundation` / `1.2 中间层` — blocked-by `foundation:1.1`；等待根阻塞。\n"
-        "- 暂缓：`consumer` / `2.1 末端` — blocked-by `foundation:1.2`；等待中间层。\n",
+    write_deferrals(
+        path,
+        [
+            "- 暂缓：`foundation` / `1.2 中间层` — blocked-by `foundation:1.1`；等待根阻塞。\n",
+            "- 暂缓：`consumer` / `2.1 末端` — blocked-by `foundation:1.2`；等待中间层。\n",
+        ],
     )
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 1
+    assert any(
+        item["reason"] == "transitive_deferral"
+        for item in payload["deferrals"]["invalid"]
+    )
+    assert {"change": "consumer", "checkbox": "2.1 末端"} in payload["deferrals"]["uncovered"]
+
+
+def test_validate_round_end_requires_confirmation_for_all_external(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    items = [f"1.{n} 第{n}项" for n in range(1, 9)]
+    write_change(workspace, "wide", items)
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["wide"])
+    write_deferrals(
+        path,
+        [external_line("wide", item, f"approval:review-{index}") for index, item in enumerate(items)],
+    )
+
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert code == 2
+    assert payload["deferrals"]["root_count"] == 8
+    assert "cascade" not in payload["deferrals"]
+    assert "identity_split_suspected" not in payload["deferrals"]
+
+    code, confirmed = run(workspace, *confirm_args(payload))
+    assert code == 0
+    assert confirmed["result"] == "global_block_confirmed"
+
+
+def test_confirmation_digest_is_stable_and_stale_after_detail_change(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    write_deferrals(path, [external_line("add-thing", "1.1 待处理")])
+
+    code, first = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    code2, second = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    assert (code, code2) == (2, 2)
+    assert first["confirmation_digest"] == second["confirmation_digest"]
+
+    text = path.read_text(encoding="utf-8").replace("批准记录可验证", "批准记录和签名均可验证")
     path.write_text(text, encoding="utf-8")
-
-    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
-    assert code == 1
-    deferrals = payload["deferrals"]
-    assert any(item["reason"] == "transitive_deferral" for item in deferrals["invalid"])
-    # 作废后它重新算作未判定，下一轮必须直接对根阻塞重判。
-    assert {"change": "consumer", "checkbox": "2.1 末端"} in deferrals["uncovered"]
+    code, stale = run(workspace, *confirm_args(first))
+    assert code == 2
+    assert stale["failure"] == "blocker_confirmation_stale"
+    assert stale["confirmation_digest"] != first["confirmation_digest"]
 
 
-def test_validate_round_end_rejects_cascaded_deferrals(workspace: Path) -> None:
+def test_confirmation_never_overrides_structural_errors(workspace: Path) -> None:
     new_task(workspace, "alpha")
-    write_change(workspace, "wide", [f"1.{n} 第{n}项" for n in range(1, 6)])
+    write_change(workspace, "add-thing", ["1.1 待处理"])
     path = readme_of(workspace, "T0001")
-    fill_readme(path, scope=[], changes=["wide"])
-    lines = "".join(
-        f"- 暂缓：`wide` / `1.{n} 第{n}项` — external `供应链 owner`；等待批准身份。\n"
-        for n in range(1, 6)
-    )
+    fill_readme(path, scope=[], changes=["add-thing"])
+    write_deferrals(path, [external_line("add-thing", "1.1 待处理")])
+    _, first = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
     path.write_text(
-        path.read_text(encoding="utf-8").replace("## 验证记录\n", f"## 验证记录\n\n{lines}"),
+        path.read_text(encoding="utf-8").replace("approval:org-signing", "supply-chain owner"),
         encoding="utf-8",
     )
 
-    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "all-deferred")
+    code, payload = run(workspace, *confirm_args(first))
     assert code == 1
-    assert payload["failure"] == "cascade_suspected"
-    cascade = payload["deferrals"]["cascade"]
-    assert cascade[0]["blocker"] == "external 供应链 owner"
-    assert cascade[0]["count"] == 5
+    assert payload["failure"] == "itemization_incomplete"
 
 
-def test_validate_round_end_demotes_cascade_to_unjudged_on_budget(workspace: Path) -> None:
-    """预算耗尽仍是诚实出口，但级联暂缓换不来「已判定」，下一轮照样要逐项判。"""
+def test_validate_round_end_budget_keeps_valid_external_deferrals(workspace: Path) -> None:
     new_task(workspace, "alpha")
-    write_change(workspace, "wide", [f"1.{n} 第{n}项" for n in range(1, 6)])
+    items = [f"1.{n} 第{n}项" for n in range(1, 6)]
+    write_change(workspace, "wide", items)
     path = readme_of(workspace, "T0001")
     fill_readme(path, scope=[], changes=["wide"])
-    lines = "".join(
-        f"- 暂缓：`wide` / `1.{n} 第{n}项` — external `供应链 owner`；等待批准身份。\n"
-        for n in range(1, 6)
-    )
-    path.write_text(
-        path.read_text(encoding="utf-8").replace("## 验证记录\n", f"## 验证记录\n\n{lines}"),
-        encoding="utf-8",
-    )
+    write_deferrals(path, [external_line("wide", item) for item in items])
 
     code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted")
     assert code == 0
-    assert payload["deferred_count"] == 0
-    assert payload["unjudged_count"] == 5
+    assert payload["deferred_count"] == 5
+    assert payload["unjudged_count"] == 0
+
+
+def test_validate_round_end_budget_keeps_direct_internal_deferral(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "foundation", ["1.1 根阻塞"])
+    write_change(workspace, "consumer", ["2.1 接入"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["foundation", "consumer"])
+    write_deferrals(
+        path,
+        ["- 暂缓：`consumer` / `2.1 接入` — blocked-by `foundation:1.1`；等待直接前置。\n"],
+    )
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted")
+    assert code == 0
+    assert payload["deferred_count"] == 1
+    assert payload["unjudged"] == [{"change": "foundation", "checkbox": "1.1 根阻塞"}]
 
 
 def test_validate_round_end_budget_exhaustion_keeps_uncovered_unjudged(workspace: Path) -> None:
     new_task(workspace, "alpha")
     write_change(workspace, "add-thing", ["1.1 待处理"])
     fill_readme(readme_of(workspace, "T0001"), scope=[], changes=["add-thing"])
-
-    code, payload = run(
-        workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted"
-    )
+    code, payload = run(workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted")
     assert code == 0
     assert payload["unjudged"] == [{"change": "add-thing", "checkbox": "1.1 待处理"}]
+
+
+def test_status_reads_legacy_external_without_rewriting(workspace: Path) -> None:
+    new_task(workspace, "alpha")
+    write_change(workspace, "add-thing", ["1.1 待处理"])
+    path = readme_of(workspace, "T0001")
+    fill_readme(path, scope=[], changes=["add-thing"])
+    write_deferrals(
+        path,
+        ["- 暂缓：`add-thing` / `1.1 待处理` — external `旧 owner`；历史记录。\n"],
+    )
+    before = path.read_text(encoding="utf-8")
+    code, payload = run(workspace, "status", "T0001")
+    assert code == 0
+    assert "旧 owner" in payload["verification"]
+    assert path.read_text(encoding="utf-8") == before
+
+    code, budget = run(workspace, "validate-round-end", "T0001", "--reason", "budget-exhausted")
+    assert code == 0
+    assert budget["deferred_count"] == 0
+    assert budget["unjudged_count"] == 1
+    assert path.read_text(encoding="utf-8") == before
 
 
 def test_missing_change_is_named_not_guessed(workspace: Path) -> None:

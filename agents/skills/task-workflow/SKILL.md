@@ -58,7 +58,7 @@ $TASKCTL <command> ...
 
 `--root` 在子命令前后均可写，两处都给且值不同即报错；默认从 cwd 向上寻找含 `tasks/` 的工作区。完整参数以 `<command> --help` 为准。
 
-stdout 只输出 JSON，stderr 是一行摘要。退出码：**0 成功，1 硬失败（含参数错误），2 需要用户确认**。看到 2 就原样报告 CLI 给出的 `affected` / `candidates` / `prompt` 并等用户选择，确认后按 CLI 给的 `confirm_command` 重跑，不得自行扩大授权范围。
+stdout 只输出 JSON，stderr 是一行摘要。退出码：**0 成功，1 硬失败（含参数错误），2 需要用户确认**。看到 2 就原样报告 CLI 给出的 `affected` / `candidates` / `prompt` 并等用户选择；`validate-round-end` 确认后用同一 `$TASKCTL` 加 CLI 返回的 `confirm_args` 重跑，其他命令按各自 `confirm_command` 重跑，不得自行扩大授权范围。
 
 ## 公共执行契约
 
