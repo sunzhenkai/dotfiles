@@ -125,7 +125,7 @@ install_claude() {
     mkdir -p "$claude_dir"
   fi
 
-  if [ -z "$ZHIPU_API_KEY" ]; then
+  if [ -z "${ZHIPU_API_KEY:-}" ]; then
     echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
   fi
@@ -137,8 +137,8 @@ install_claude() {
     mv "$settings_target" "$settings_target-$TIMESTAMP"
   fi
 
-  if [ -n "$ZHIPU_API_KEY" ]; then
-    sed "s|\${ZHIPU_API_KEY}|$ZHIPU_API_KEY|g" "$settings_template" >"$settings_target"
+  if [ -n "${ZHIPU_API_KEY:-}" ]; then
+    sed "s|\${ZHIPU_API_KEY}|${ZHIPU_API_KEY}|g" "$settings_template" >"$settings_target"
     echo "已安装: settings.json (已使用 ZHIPU_API_KEY)"
   else
     cp "$settings_template" "$settings_target"
@@ -241,7 +241,7 @@ install_tmux() {
 
 # 特殊配置：cursor（MCP + skills 由统一 agents sync）
 install_cursor() {
-  if [ -z "$ZHIPU_API_KEY" ]; then
+  if [ -z "${ZHIPU_API_KEY:-}" ]; then
     echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
   fi
@@ -253,7 +253,7 @@ install_cursor() {
 # 特殊配置：kiro
 # MCP → ~/.kiro/settings/mcp.json；skills/commands → ~/.kiro/skills
 install_kiro_config() {
-  if [ -z "$ZHIPU_API_KEY" ]; then
+  if [ -z "${ZHIPU_API_KEY:-}" ]; then
     echo "⚠️  警告: ZHIPU_API_KEY 环境变量未设置"
     echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
   fi

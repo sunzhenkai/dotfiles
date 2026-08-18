@@ -69,7 +69,9 @@ runner_now_ms() {
   # 优先纳秒；不可用时退回秒精度
   local ns
   ns=$(date +%s%N 2>/dev/null || true)
-  if [ -n "$ns" ] && [ "${#ns}" -gt 10 ]; then
+  # macOS 的 BSD date 不支持 %N，会原样返回例如 1787039024N；
+  # 只有纯数字结果才能参与 Bash 算术展开。
+  if [[ "$ns" =~ ^[0-9]+$ ]] && [ "${#ns}" -gt 10 ]; then
     printf '%s\n' "$((ns / 1000000))"
   else
     printf '%s\n' "$(($(date +%s) * 1000))"

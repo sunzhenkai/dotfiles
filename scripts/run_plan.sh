@@ -154,6 +154,7 @@ UNCHANGED=0
 SKIPPED=0
 FAILED_N=0
 RESULT_LINES=()
+FAILED_ITEMS=()
 
 # 向处理器传播非交互授权（模块内 confirm 应尊重）
 if [ "$ASSUME_YES" -eq 1 ]; then
@@ -213,18 +214,29 @@ for row in "${ACTIONS[@]}"; do
     skipped) SKIPPED=$((SKIPPED + 1)) ;;
     failed) FAILED_N=$((FAILED_N + 1)) ;;
     esac
+    if [ "$st" = "failed" ]; then
+      FAILED_ITEMS+=("$module/$action: ${_reason:-failed}")
+    fi
+  elif [ "$rc" -ne 0 ]; then
+    FAILED_N=$((FAILED_N + 1))
+    FAILED_ITEMS+=("$module/$action: exit $rc")
   fi
   rm -f "$out"
 
   if [ "$rc" -ne 0 ]; then
     FAILED=1
-    echo "计划因失败中止" >&2
-    break
+    echo "动作失败，继续执行后续计划: $module/$action" >&2
   fi
 done
 
 echo ""
 echo "汇总: changed=$CHANGED unchanged=$UNCHANGED skipped=$SKIPPED failed=$FAILED_N"
+if [ ${#FAILED_ITEMS[@]} -gt 0 ]; then
+  echo "错误项目:"
+  for item in "${FAILED_ITEMS[@]}"; do
+    echo "  - $item"
+  done
+fi
 
 # 持久化最近执行报告（status 模式不写）
 if [ "${DOTF_STATUS_MODE:-0}" != "1" ] && [ ${#RESULT_LINES[@]} -gt 0 ]; then
