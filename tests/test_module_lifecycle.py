@@ -148,7 +148,7 @@ def test_declared_missing_handler_reported_by_validate(tmp_path: Path, monkeypat
     assert any("缺少处理器" in e and "needinstall" in e for e in errors)
 
 
-def test_handler_failure_propagates(tmp_home: Path, tmp_path: Path) -> None:
+def test_handler_failure_does_not_abort_the_plan(tmp_home: Path, tmp_path: Path) -> None:
     handlers = tmp_path / "handlers"
     _write_handler(
         handlers,
@@ -162,28 +162,30 @@ def test_handler_failure_propagates(tmp_home: Path, tmp_path: Path) -> None:
         ),
     )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "boom"), ("install", "never"))
-    # 第二个不应被加载
+    _write_plan(plan, ("install", "boom"), ("install", "after"))
+    # 一个坏模块不应锁住后续交付
     _write_handler(
         handlers,
-        "never",
+        "after",
         "install",
         textwrap.dedent(
             """\
             #!/usr/bin/env bash
-            dotf_result_changed "should not run"
+            dotf_result_changed "runs anyway"
             """
         ),
     )
     load_log = tmp_path / "load.log"
     r = _run_plan(plan, home=tmp_home, handlers=handlers, load_log=load_log)
+    # 失败只传播到退出码与错误项回放，不中止计划
     assert r.returncode != 0
     assert "RESULT\tfailed\tboom\tinstall" in (r.stdout + r.stderr)
     assert "failed=1" in r.stdout or "→ failed" in (r.stdout + r.stderr)
-    # 失败传播：不应加载第二个处理器
+    assert "boom/install" in r.stdout
+    assert "RESULT\tchanged\tafter\tinstall" in (r.stdout + r.stderr)
     loaded = load_log.read_text(encoding="utf-8") if load_log.exists() else ""
     assert "boom\tinstall" in loaded
-    assert "never\tinstall" not in loaded
+    assert "after\tinstall" in loaded
 
 
 def test_lazy_load_only_planned_handler(tmp_home: Path, tmp_path: Path) -> None:
