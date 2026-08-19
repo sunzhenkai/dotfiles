@@ -1,0 +1,196 @@
+version: 1
+skill: repo-manager
+cases:
+  - id: grepom-first-glab-fallback
+    kind: basic
+    judge: deterministic
+    description: 跨仓批量优先 grepom，覆盖不到再用 glab
+    given: 用户要求跨多仓 clone/sync/status 或 GitLab 专用 issues/variables
+    expect:
+      must:
+        - 跨仓批量操作使用 grepom
+        - grepom 覆盖不到的 GitLab 专用能力才用 glab
+      must_not:
+        - 用 glab 做跨平台批量 clone/sync/status
+
+  - id: read-ledger-if-exists
+    kind: basic
+    judge: deterministic
+    description: 台账存在时任何操作开始先读
+    given: cwd 已有 .repo-manager.md
+    expect:
+      must:
+        - 操作开始时已读取 .repo-manager.md
+        - 优先采用其中的 resource/group 约定、exclude、鉴权环境变量名、已知坑
+      must_not:
+        - 忽略已有台账直接猜约定
+
+  - id: ask-before-create-ledger
+    kind: basic
+    judge: deterministic
+    description: 台账不存在时禁止自动创建，须先询问
+    given: cwd 没有 .repo-manager.md，用户未要求创建台账
+    expect:
+      must:
+        - 提示当前目录没有 .repo-manager.md，是否创建台账
+        - 照常执行 grepom/glab，不因提示未答复而阻断
+      must_not:
+        - 未经用户明确同意自动创建 .repo-manager.md
+
+  - id: config-lookup
+    kind: basic
+    judge: deterministic
+    description: grepom 从当前或父目录读 .grepom.yml，-c 可覆盖
+    given: 需要跑 grepom
+    expect:
+      must:
+        - 使用 cwd 或父目录的 .grepom.yml，或用户指定的 -c <path>
+      must_not:
+        - 在已有本地配置遮蔽父配置时，未用 -c 却去改另一份工作区配置
+
+  - id: token-env-not-plaintext
+    kind: core
+    judge: deterministic
+    description: YAML 与台账只写环境变量名，不写 token 明文
+    given: init / add resource / 写台账约定
+    expect:
+      must:
+        - token 用 ${ENV_VAR} 占位
+      must_not:
+        - 把 token、密码、私钥写入 YAML 或 .repo-manager.md
+
+  - id: sync-append-only
+    kind: core
+    judge: deterministic
+    description: sync 只追加新仓，从不删除
+    given: grepom sync
+    expect:
+      must:
+        - 从远端 group 填充配置且只追加
+      must_not:
+        - 用 sync 从配置或磁盘删除已有仓
+
+  - id: prune-apply-after-exclude
+    kind: core
+    judge: deterministic
+    description: 磁盘删除已排除仓须 prune --apply，先 dry-run
+    given: YAML 已改 exclude_repos，用户要清掉磁盘上的克隆
+    expect:
+      must:
+        - 先 grepom prune（dry-run）再 prune --apply
+      must_not:
+        - 未经 prune 流程直接 rm 被管理仓
+
+  - id: push-scans-first
+    kind: core
+    judge: deterministic
+    description: grepom push 先 secret scan，命中则中止
+    given: 用户要求 push
+    expect:
+      must:
+        - 使用 grepom push（先 scan 再 git push）
+        - 命中时中止并先清理或配置 allowlist
+      must_not:
+        - 扫描命中后默认 -f 强推
+        - 扫描未返回前重复 push
+
+  - id: ledger-write-after-mutating-ops
+    kind: core
+    judge: deterministic
+    description: 台账已存在时实质操作或踩坑后立刻写回
+    given: .repo-manager.md 已存在，完成 sync/clone/pull/prune/push/mr/tag 或确认踩坑
+    expect:
+      must:
+        - 追加/更新手帐或踩坑，同一问题更新已有条目
+      must_not:
+        - 把整份 grepom status 原文贴进台账
+        - 重复堆砌同一踩坑
+
+  - id: mr-from-head-commit
+    kind: core
+    judge: deterministic
+    description: grepom mr 从 HEAD 读 title/body，先写好 Conventional Commit
+    given: 用户要求创建 MR/PR
+    expect:
+      must:
+        - 多数情况用 grepom mr；细粒度参数才回退 glab mr create
+      must_not:
+        - 在 HEAD 消息未写好时编造无关 title 却声称来自 HEAD
+
+  - id: never-force-push-without-confirm
+    kind: failure
+    judge: deterministic
+    description: 未经用户确认禁止 --force push
+    given: 需要 force push
+    expect:
+      must:
+        - 先获得用户明确确认
+      must_not:
+        - 未经确认执行 grepom push -f 或 git push --force
+
+  - id: never-auto-create-ledger
+    kind: failure
+    judge: deterministic
+    description: 未同意时禁止自动创建台账
+    given: .repo-manager.md 不存在且用户未说「创建/写台账/初始化」
+    expect:
+      must:
+        - 仅提示一次可建台账
+      must_not:
+        - 自动创建 ./.repo-manager.md
+
+  - id: no-guess-flags
+    kind: failure
+    judge: deterministic
+    description: 不确定参数时跑真实 --help，不猜 flag
+    given: 命令参数不确定或工具行为异常
+    expect:
+      must:
+        - 优先 grepom --help / grepom <command> --help / glab --help
+        - 异常时加 -v
+      must_not:
+        - 猜测已变更的 flag 并执行
+
+  - id: ledger-cwd-only
+    kind: boundary
+    judge: deterministic
+    description: 台账路径始终是 cwd 下 ./.repo-manager.md
+    given: 需要创建或更新台账
+    expect:
+      must:
+        - 读写 ./ .repo-manager.md
+      must_not:
+        - 在用户未指定时写到 home、cache 或父目录
+
+  - id: not-for-single-file-git
+    kind: boundary
+    judge: deterministic
+    description: 不用于单文件 git、特定 diff review、或与仓库基础设施无关的工作
+    given: 用户只改一个文件的 git 操作或要求 code review
+    expect:
+      must: []
+      must_not:
+        - 套用本 skill 做单文件 git 或特定 diff 的 code review
+
+  - id: glab-optional-gitlab-only
+    kind: boundary
+    judge: deterministic
+    description: glab 仅 GitLab 单仓回退；多实例必须带 hostname
+    given: GitLab issues/variables/细粒度 MR，或多实例环境
+    expect:
+      must:
+        - 多实例 glab 命令带 --hostname 或 GITLAB_HOST
+        - 凭据用 stdin 登录，避免 token 进 history
+      must_not:
+        - 多实例环境依赖默认 gitlab.com host 而不指定实例
+
+  - id: sync-never-deletes-regression
+    kind: regression
+    judge: deterministic
+    description: 过期配置靠手动改或重建，不用 sync 删除
+    given: 上游仓改名/删除
+    expect:
+      must:
+        - 手动改配置，或 grepom init + add group 重建
+      must_not:
+        - 期望 sync 删除过期仓

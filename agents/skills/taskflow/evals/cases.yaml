@@ -1,0 +1,193 @@
+version: 1
+skill: taskflow
+cases:
+  - id: one-driver-change
+    kind: basic
+    judge: deterministic
+    description: 一个任务等于一个 {task}-driver，子 change 共享前缀
+    given: 用户点名 taskflow 或要把任务拆成多个 OpenSpec change
+    expect:
+      must:
+        - 建 {task}-driver；子 change 命名 {task}-<slice>
+        - 与 driver 同一 planning root；跨 root 时在涉及面表显式记录
+      must_not:
+        - 另建 tasks/ 台账、索引文件或编号体系
+
+  - id: only-taskflow-new-command
+    kind: basic
+    judge: deterministic
+    description: 只提供 taskflow-new；其余阶段委托 stock openspec-*
+    given: 澄清 / 提案 / 实施 / 归档
+    expect:
+      must:
+        - explore/propose/apply/archive 委托对应 stock skill，参数为 {task}-driver
+      must_not:
+        - 另造等价的 taskflow-explore/propose/apply/archive 命令
+
+  - id: skip-specs-required
+    kind: basic
+    judge: deterministic
+    description: driver 必须显式 skip_specs: true
+    given: taskflow-new 脚手架
+    expect:
+      must:
+        - 在 driver 的 .openspec.yaml 写入 skip_specs: true
+      must_not:
+        - 让 driver 带 spec 增量却不写 skip_specs
+
+  - id: scaffold-three-steps
+    kind: core
+    judge: deterministic
+    description: taskflow-new 固定三步且不写 tasks.md
+    given: taskflow-new {任务描述}
+    expect:
+      must:
+        - 归纳 kebab-case {task}（描述为空才问）
+        - openspec new change {task}-driver --goal 任务描述原文
+        - 写 skip_specs 并按模板写 proposal.md
+        - 报告 change name、proposal 路径与待确认空缺，并提示 propose 应选继续已有 change
+      must_not:
+        - 脚手架阶段写 tasks.md
+        - 改写或精简 Driver 协议固定文本
+
+  - id: driver-protocol-verbatim
+    kind: core
+    judge: deterministic
+    description: proposal.md 的 Driver 协议小节逐字写入
+    given: 写 driver proposal
+    expect:
+      must:
+        - Driver 协议与 SKILL 模板固定文本一致
+        - 含 skip_specs、子 change 命名、checkbox 进度、必须仓切分支、一轮结束三条件
+      must_not:
+        - 改写、精简或挪走 Driver 协议
+
+  - id: propose-tasks-skeleton
+    kind: core
+    judge: deterministic
+    description: propose 产出的 driver tasks.md 含准备/实施/收尾骨架
+    given: openspec-propose 处理 {task}-driver
+    expect:
+      must:
+        - 准备段切必须仓分支
+        - 实施段每个子 change 至少一条，且须 apply 至全勾且 validate --strict 通过
+        - 收尾段含回归、回填验收、提交与归档全部子 change
+      must_not:
+        - 在 apply 实施循环里改 change 语义或补拆子 change
+
+  - id: checkbox-ssot
+    kind: core
+    judge: deterministic
+    description: 进度只有 checkbox 一种真相
+    given: 判断 driver 或子 change 完成度
+    expect:
+      must:
+        - 子 change tasks.md 记实现进度，driver tasks.md 记编排进度
+        - driver 实施 checkbox 仅在对应子 change 全勾且 validate --strict 通过后才勾
+        - 暂缓原因写进 proposal 验证记录
+      must_not:
+        - 持久化第二份完成度、暂缓或分支状态记录
+
+  - id: fail-closed-must-repos
+    kind: core
+    judge: deterministic
+    description: 必须仓 dirty 或 fetch 失败则停下，不自动 stash/reset/强制切换
+    given: 准备涉及面角色为必须的仓
+    expect:
+      must:
+        - 报告该仓并等用户处理；已准备成功的仓保留现状
+      must_not:
+        - 自动 stash、reset 或强制切换
+        - 对建议/排除仓切分支
+
+  - id: round-end-three-only
+    kind: core
+    judge: deterministic
+    description: 只有全勾、需用户决策、预算耗尽允许结束一轮
+    given: apply {task}-driver 一轮
+    expect:
+      must:
+        - 单项做不了保持未勾，写原因后继续其余项
+        - 结束时逐条列出未勾项与原因
+      must_not:
+        - 把未完成项勾成完成
+        - 用按 change 汇总的剩余数量代替逐条说明
+        - 因一项卡住整轮停下
+
+  - id: no-invented-openspec-commands
+    kind: failure
+    judge: deterministic
+    description: openspec-* 不可用时停下报告，不发明等价命令
+    given: 目标仓没有 openspec-* skill
+    expect:
+      must:
+        - 停下并给出可选项（在目标仓 init，或 openspec CLI 直调）
+      must_not:
+        - 自行发明等价命令并继续
+
+  - id: no-unbound-delegation
+    kind: failure
+    judge: deterministic
+    description: 委托必须在 driver planning root 下且显式给 {task}-driver
+    given: 委托 openspec-explore/propose/apply/archive
+    expect:
+      must:
+        - 在 driver 的 planning root 下执行
+        - 显式给出 change name {task}-driver
+      must_not:
+        - 缺绑定仍委托
+
+  - id: no-mix-with-task-workflow
+    kind: failure
+    judge: deterministic
+    description: 同一任务不与 task-workflow 混用
+    given: 用户已用 taskflow 立项，或已有 taskctl tasks/ 台账的同一需求
+    expect:
+      must:
+        - 同一任务只用一套命令族
+      must_not:
+        - 为同一任务同时建 {task}-driver 与 tasks/TNNNN 台账
+
+  - id: archive-driver-only
+    kind: boundary
+    judge: deterministic
+    description: stock 归档只归档 driver 自身；子 change 在收尾 checkbox 已归档
+    given: 对 {task}-driver 执行 openspec-archive-change
+    expect:
+      must:
+        - 只归档 driver 自身，不做递归
+      must_not:
+        - 在 driver 归档步骤里再递归归档子 change（应收尾段已完成）
+
+  - id: mutually-exclusive-with-task-workflow
+    kind: boundary
+    judge: deterministic
+    description: 与 task-workflow 并存但互斥
+    given: 用户要跟进需求交付
+    expect:
+      must:
+        - 点名 taskflow 或要拆多个 OpenSpec change 时走本 skill
+      must_not:
+        - 引入脚本或第二份任务账本
+
+  - id: skip-specs-regression
+    kind: regression
+    judge: deterministic
+    description: 不写 skip_specs 会导致 validate --strict 失败
+    given: 新建 driver 后跑 openspec status/validate
+    expect:
+      must:
+        - skip_specs 已写入；status --json 中 specs 为 skipped
+      must_not:
+        - driver 无 spec 却未设 skip_specs
+
+  - id: scaffold-must-leave-tasks-empty
+    kind: regression
+    judge: deterministic
+    description: 脚手架写满 tasks.md 会让 openspec-propose 空转
+    given: taskflow-new 刚完成
+    expect:
+      must:
+        - tasks.md 不存在或未由脚手架写满，留给 propose
+      must_not:
+        - 脚手架阶段把 tasks 写满

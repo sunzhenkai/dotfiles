@@ -350,3 +350,90 @@ glab --help
 - **新建远程项目后的登记方式**：远程项目已存在于已追踪的 GitLab group 时，重新执行 `grepom sync --group <group>` 即可发现；不在已追踪 group 中时使用 `grepom add repo --name ... --resource ... --url ...`。创建远程项目属于 GitLab API 能力，grepom 未覆盖时用 `glab repo create <host>/<group>/<repo> --skipGitInit`，创建后再回到 sync/clone 流程。
 - **克隆基目录应纳入忽略**：如果 `base` 指向项目内的 `repos/`，将 `repos/` 加入项目 `.gitignore`，避免把被管理仓库的工作树误提交到当前配置仓库；配置文件 `.grepom.yml` 是否提交则按项目约定处理。
 - **安全推送**：完成仓库内提交后优先用 `grepom push -- origin <branch>`，它会先执行 secret scan；扫描包含大二进制文件时可能较安静且耗时，等待命令返回，不要在未确认结果前重复 push。发现命中时先清理或配置 allowlist，不要默认使用 `-f`。
+
+---
+
+## Self-evolution
+
+本 Skill 具备经验积累、评估与持续进化能力。目录（均相对本 Skill 根目录）：
+
+```text
+agents/skills/repo-manager/
+├── SKILL.md
+├── examples/      # 经过验证的优秀执行案例
+├── evals/         # 可验证成功标准
+└── experience/    # 真实失败 / 成功 / 规律
+```
+
+不要为了自进化而破坏上文已规定的目标、流程、工具用法、输出与约束。
+
+### Examples
+
+执行复杂任务前：
+
+1. 检查 `examples/`
+2. 找到与当前任务相关的成功案例
+3. 优先复用已经验证的方法
+
+没有相关案例时按上文正常执行，不要编造案例。
+
+### Evaluation
+
+任务完成前：
+
+1. 检查相关 `evals/`
+2. 验证关键输出
+3. 检查是否违反 Skill 约束
+4. 尽可能运行相关 Eval Cases（见 `evals/cases.yaml`）
+
+优先确定性 Eval；无法确定性判断时再用 LLM Judge。Eval 失败则先修输出，不要带着失败交卷。
+
+### Experience
+
+任务完成后，出现以下情况才写入 `experience/`：
+
+- 失败
+- 用户纠正
+- 明显成功
+- 新的有效执行方法
+- 可复用的经验
+
+不要记录 trivial information。不要伪造条目。密钥、内部 URL、凭据不得写入。
+
+单次失败 → `experience/failures/`。重复出现的规律 → `experience/patterns/`（至少两次同类证据）。
+
+### Evolution
+
+只有当 Experience 暴露出**可复用、稳定的问题或模式**时，才考虑修改本 Skill。
+
+遵循：
+
+```text
+Experience
+    ↓
+Repeated Pattern
+    ↓
+Improvement Proposal
+    ↓
+Eval
+    ↓
+Pass
+    ↓
+Update Skill
+```
+
+禁止：
+
+```text
+Single Failure
+    ↓
+Directly modify SKILL.md
+```
+
+进入 Skill 正文的 Experience 必须同时满足：可复用于多个类似任务、有足够证据、能明确改善结果、不破坏已有能力、可通过 Eval 验证。一次性特殊情况只留 Experience，不改 Skill。
+
+实际更新生产 `SKILL.md` 时：
+
+1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
+2. 若当前环境有 `skill-evolver`，委托它走候选 patch → 验证 → 晋升，不要本 Skill 自己改生产稿。
+3. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
