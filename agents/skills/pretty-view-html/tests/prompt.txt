@@ -1,0 +1,2 @@
+基于 @agents/skills/pretty-view-html/SKILL.md 生成里面测试内容为 html，并保存到
+docs/pretty-view-html 中
