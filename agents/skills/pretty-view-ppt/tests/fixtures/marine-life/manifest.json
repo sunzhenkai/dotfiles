@@ -1,0 +1,18 @@
+{
+  "id": "marine-life",
+  "title": "潮间带到深渊：一份海洋生物分层图鉴",
+  "source": "fixtures/marine-life/SOURCE.md",
+  "phrases": ["潮间带", "灯笼鱼", "马里亚纳", "藤壶", "鲸鲨"],
+  "outputs": {
+    "html-ppt": {
+      "path": "golden/marine-life/html-ppt/index.html",
+      "reference": "html-ppt",
+      "theme": "academic-paper"
+    },
+    "html-slides": {
+      "path": "golden/marine-life/html-slides/index.html",
+      "reference": "html-slides",
+      "theme": "white"
+    }
+  }
+}

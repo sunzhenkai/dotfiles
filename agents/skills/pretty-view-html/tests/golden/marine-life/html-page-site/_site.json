@@ -1,0 +1,19 @@
+{
+  "title": "潮间带到深渊：一份海洋生物分层图鉴",
+  "home": "index.html",
+  "pages": [
+    {
+      "title": "海洋分区",
+      "path": "zones/index.html",
+      "children": [
+        {"title": "潮间带", "path": "zones/intertidal.html"},
+        {"title": "浅海陆架", "path": "zones/shelf.html"},
+        {"title": "大洋中上层", "path": "zones/pelagic.html"},
+        {"title": "深海与海沟", "path": "zones/deep.html"}
+      ]
+    },
+    {"title": "关键时间线", "path": "timeline.html"},
+    {"title": "代表物种", "path": "taxa.html"},
+    {"title": "调查与保护", "path": "field-guide.html"}
+  ]
+}

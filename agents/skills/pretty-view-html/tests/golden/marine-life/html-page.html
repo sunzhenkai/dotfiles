@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>潮间带到深渊：一份海洋生物分层图鉴</title>
+  <style>
+    /* brief
+       Subject: 从潮间带到海沟的分层图鉴
+       Audience: 科普入门，浏览器连续阅读
+       Page job: 建立「深度 → 生境 → 代表种 → 数据」心智模型
+       Direction: 潮间带观测站的湿盐标本日志
+       Signature: 左侧可点击的深度目录
+       Tokens: abyss #07151C / kelp #1A4A3C / foam #E6EEE9 / barnacle #C9BBA4 / rust #B5523A / tide #3A7A78
+    */
+    :root {
+      --abyss: #07151C;
+      --kelp: #1A4A3C;
+      --foam: #E6EEE9;
+      --paper: #F4F1E8;
+      --barnacle: #C9BBA4;
+      --rust: #B5523A;
+      --tide: #3A7A78;
+      --ink: #122028;
+      --muted: #4E5C58;
+      --line: rgba(18, 32, 40, 0.16);
+      --display: "Palatino Linotype", Palatino, "Songti SC", "Noto Serif SC", serif;
+      --body: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      --data: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: var(--foam);
+      color: var(--ink);
+      font-family: var(--body);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+    a { color: var(--kelp); }
+    a:focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
+    html { scroll-behavior: smooth; }
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      background: var(--paper);
+      padding: 8px 12px;
+    }
+    .skip:focus { left: 8px; z-index: 20; }
+    .shell {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .shell:has(.site-nav details:not([open])) {
+      grid-template-columns: 48px minmax(0, 1fr);
+    }
+    .site-nav {
+      background: var(--abyss);
+      color: var(--barnacle);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 22px 16px 32px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .site-nav .nav-kicker {
+      font-family: var(--data);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--tide);
+      margin: 0 0 14px;
+      cursor: pointer;
+    }
+    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
+    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
+    .site-nav details:not([open]) .nav-kicker {
+      writing-mode: vertical-rl;
+      white-space: nowrap;
+      margin: 0 auto;
+    }
+    .site-nav a {
+      color: #E6EEE9;
+      text-decoration: none;
+    }
+    .site-nav a:hover { color: #fff; }
+    .site-nav a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+    .site-nav ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .site-nav details > ol > li { margin: 0 0 10px; }
+    .site-nav details > ol > li > a { font-weight: 600; }
+    .site-nav ol ol {
+      margin: 6px 0 0;
+      padding-left: 10px;
+      border-left: 1px solid rgba(196, 184, 164, 0.28);
+    }
+    .site-nav ol ol li { margin: 0 0 6px; }
+    .site-nav .m {
+      font-family: var(--data);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: var(--barnacle);
+      margin-left: 6px;
+    }
+    .page {
+      width: 100%;
+      margin: 0;
+      padding: 40px 28px 96px;
+    }
+    .page > header,
+    article > * { max-width: 68ch; }
+    article > .wide {
+      width: 100%;
+      max-width: min(100%, 110ch);
+    }
+    header.mast {
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    .kicker {
+      font-family: var(--data);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--tide);
+      margin: 0 0 12px;
+    }
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(2rem, 5vw, 3.1rem);
+      font-weight: 600;
+      line-height: 1.15;
+      margin: 0 0 16px;
+    }
+    .lede { font-size: 1.08rem; color: var(--muted); margin: 0; }
+    .tldr {
+      margin: 28px 0 0;
+      padding: 18px 20px;
+      background: var(--paper);
+      border-left: 4px solid var(--kelp);
+    }
+    .tldr h2 { margin: 0 0 8px; font-size: 0.92rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--kelp); }
+    .tldr ol { margin: 0; padding-left: 1.2em; }
+    h2 {
+      font-family: var(--display);
+      font-size: 1.7rem;
+      margin: 2.4rem 0 0.7rem;
+      scroll-margin-top: 16px;
+    }
+    h3 { font-size: 1.2rem; margin: 1.6rem 0 0.5rem; color: var(--kelp); scroll-margin-top: 16px; }
+    h4 {
+      font-size: 0.95rem;
+      margin: 1.2rem 0 0.4rem;
+      font-family: var(--data);
+      letter-spacing: 0.04em;
+    }
+    p { margin: 0 0 0.9rem; }
+    blockquote {
+      margin: 1.2rem 0;
+      padding: 8px 0 8px 16px;
+      border-left: 3px solid var(--tide);
+      color: var(--muted);
+    }
+    .callout {
+      margin: 1.2rem 0;
+      padding: 14px 16px;
+      background: #F7E8E2;
+      border: 1px solid #E3C2B6;
+    }
+    .depth-chip {
+      display: inline-block;
+      font-family: var(--data);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+      margin-left: 8px;
+      border: 1px solid var(--barnacle);
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    .timeline {
+      list-style: none;
+      margin: 1.2rem 0 1.6rem;
+      padding: 0;
+      border-left: 2px solid var(--kelp);
+    }
+    .timeline li {
+      position: relative;
+      padding: 0 0 1.1rem 22px;
+    }
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: 0.45em;
+      width: 12px;
+      height: 12px;
+      background: var(--rust);
+      border: 2px solid var(--foam);
+    }
+    .timeline time {
+      font-family: var(--data);
+      font-size: 12px;
+      color: var(--tide);
+      display: block;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem 0 1.6rem;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      font-family: var(--data);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--paper);
+    }
+    td.num { font-family: var(--data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    em { font-style: italic; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1.2rem 0;
+    }
+    .comparison > div {
+      padding: 16px;
+      background: #fff;
+      border-top: 3px solid var(--kelp);
+    }
+    .comparison .hunt { border-top-color: var(--rust); }
+    ul, ol { margin: 0 0 1rem; padding-left: 1.25em; }
+    footer.meta {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    @media (max-width: 720px) {
+      .shell { grid-template-columns: 1fr; }
+      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
+      .site-nav {
+        height: auto;
+        position: static;
+        max-height: none;
+      }
+      .site-nav details:not([open]) .nav-kicker {
+        writing-mode: horizontal-tb;
+        margin: 0;
+      }
+      .comparison { grid-template-columns: 1fr; }
+      .page { padding: 24px 16px 64px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+    @media print {
+      .skip { display: none; }
+      .site-nav {
+        position: static;
+        height: auto;
+        color: #111;
+        background: #fff;
+        padding: 0 0 16px;
+      }
+      .site-nav a, .site-nav .nav-kicker { color: #111; }
+      .site-nav details > * { display: block !important; }
+      .shell { display: block; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">跳到正文</a>
+  <div class="shell">
+    <nav class="site-nav" aria-label="本页目录">
+      <details open>
+        <summary class="nav-kicker">本页目录</summary>
+        <ol>
+          <li><a href="#why">为什么分层</a></li>
+          <li>
+            <a href="#zones">海洋分区</a>
+            <ol>
+              <li><a href="#zones-intertidal">潮间带 <span class="m">0 m</span></a></li>
+              <li><a href="#zones-shelf">浅海陆架 <span class="m">200 m</span></a></li>
+              <li><a href="#zones-pelagic">中上层 <span class="m">1000 m</span></a></li>
+              <li><a href="#zones-deep">深海海沟 <span class="m">11000 m</span></a></li>
+            </ol>
+          </li>
+          <li><a href="#timeline">时间线</a></li>
+          <li><a href="#taxa">代表种</a></li>
+          <li><a href="#lists">调查清单</a></li>
+          <li><a href="#compare">滤食 / 猎食</a></li>
+          <li><a href="#protect">保护优先级</a></li>
+        </ol>
+      </details>
+    </nav>
+    <div class="page" id="content">
+      <header class="mast">
+        <p class="kicker">Field log · 海洋分层图鉴</p>
+        <h1>潮间带到深渊：一份海洋生物分层图鉴</h1>
+        <p class="lede">光照、压力和食物通量随深度断崖变化。物种策略跟着变。这篇把分区、时间线和代表种放在同一张观测台上。</p>
+        <div class="tldr">
+          <h2>结论</h2>
+          <ol>
+            <li>分层不是装饰：代谢、体型和感官都沿深度轴演化。</li>
+            <li>潮间带浅，但干湿交替比深海更残酷。</li>
+            <li>全球生物量峰值在真光层，不在珊瑚礁明信片上。</li>
+          </ol>
+        </div>
+      </header>
+
+      <article>
+        <h2 id="why">1. 为什么按深度分层</h2>
+        <p>海水不是均质蓝块。每下降约 10 米，压力增加 1 个大气压；可见光在真光层下沿被滤掉，剩下蓝绿残光，再往下是持续的黑夜。分层是代谢、体型和感官演化的主轴。</p>
+        <blockquote>观测站备忘：同一条垂直剖面里，你可能在 5 米看到褐藻森林，在 600 米撞上垂直洄游的灯笼鱼群。</blockquote>
+
+        <h2 id="zones">2. 海洋分区</h2>
+        <p>分区是稳定的「领域 → 生境」关系：潮间带、浅海陆架、大洋中上层、深海与海沟。</p>
+
+        <h3 id="zones-intertidal">2.1 潮间带（Intertidal）<span class="depth-chip">高潮–低潮线</span></h3>
+        <p>陆地与海洋的摩擦带。生物必须同时应付日晒、淡水冲刷、波浪和被捕食。</p>
+        <h4>2.1.1 岩石岸</h4>
+        <p>藤壶用钙质壳胶在岩石上；贻贝以足丝成簇；海星靠管足撬开双壳类。从高潮到低潮通常可见：</p>
+        <ul>
+          <li>黑海藻与滨螺带：暴露时间最长</li>
+          <li>藤壶带：钙质壳抗浪</li>
+          <li>贻贝床：足丝成簇，内部湿度更高</li>
+          <li>海藻与海葵带：只在低潮短暂露出</li>
+        </ul>
+        <h4>2.1.2 沙滩与泥滩</h4>
+        <p>颗粒越细，持水越好，氧气越差。沙蟹挖穴；缢蛏把水管伸到表层滤食。泥滩看起来空旷，单位面积生物量可以很高。</p>
+
+        <h3 id="zones-shelf">2.2 浅海陆架（Neritic）<span class="depth-chip">≤ 200 m</span></h3>
+        <h4>2.2.1 海草床与褐藻林</h4>
+        <p>海草是显花植物，不是海藻。褐藻林常见于冷温带沿岸 5–40 米：海獭控制海胆，海胆控制褐藻。</p>
+        <h4>2.2.2 珊瑚礁</h4>
+        <p>造礁石珊瑚与虫黄藻共生。白化是共生藻被排出后的能量危机。礁坪、礁坡、礁基分层清晰，多样性峰值在礁坡。</p>
+
+        <h3 id="zones-pelagic">2.3 大洋中上层（Pelagic）</h3>
+        <h4>2.3.1 真光层 0–200 m</h4>
+        <p>浮游植物在这里固碳。金枪鱼、海龟、鲸鲨直接或间接依赖这一层。</p>
+        <h4>2.3.2 中层带 200–1000 m</h4>
+        <p>灯笼鱼有发光器和日夜垂直洄游：白天待在黑暗里，晚上上到真光层吃饭。这里是脊椎动物数量最大的区间之一。</p>
+
+        <h3 id="zones-deep">2.4 深海与海沟</h3>
+        <h4>2.4.1 深层带与深渊带 1000–6000 m</h4>
+        <p>没有光合作用。食物来自海洋雪、尸体和鲸落。鮟鱇用发光诱饵；大王酸浆鱿被抹香鲸追到这一层。</p>
+        <h4>2.4.2 超深渊 / 海沟 &gt;6000 m</h4>
+        <p>马里亚纳海沟挑战者深渊超过 10,000 米。已知有超深渊蜗牛鱼、钩虾和微生物膜。特有性高，名录仍短。</p>
+
+        <h2 id="timeline">3. 关键时间线</h2>
+        <p>形态爆发、灭绝与人类观测是三条交错的线。每次灭绝后的恢复，才是现生类群分布的原因。</p>
+        <ol class="timeline">
+          <li><time>约 5.41 亿年前</time><strong>寒武纪生命大爆发</strong> — 现生门类的基本身体方案出现</li>
+          <li><time>约 4.45 亿年前</time><strong>奥陶纪末期灭绝</strong> — 海洋无脊椎动物大幅受创</li>
+          <li><time>约 2.52 亿年前</time><strong>二叠纪末期灭绝</strong> — 海洋物种损失最重的一次</li>
+          <li><time>6600 万年前</time><strong>白垩纪末期</strong> — 海洋爬行动物退场</li>
+          <li><time>1977 年</time><strong>发现热液喷口生物群</strong> — 生态系统可以不依赖阳光</li>
+          <li><time>2012 年</time><strong>卡梅隆下潜挑战者深渊</strong> — 超深渊变成可重复观测</li>
+          <li><time>2020 年代</time><strong>环境 DNA 普查</strong> — 不必捕到个体也能知道谁在水里</li>
+        </ol>
+
+        <h2 id="taxa">4. 代表物种数据表</h2>
+        <p>下表用于对照，不是完整名录。体长取成体常见量级。</p>
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr>
+                <th>物种</th><th>拉丁名</th><th>类群</th><th>水层</th><th>体长</th><th>取食</th><th>IUCN</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>藤壶</td><td><em>Balanus</em> spp.</td><td>甲壳</td><td>潮间带</td><td class="num">1–3 cm</td><td>滤食</td><td>未评估为主</td></tr>
+              <tr><td>海獭</td><td><em>Enhydra lutris</em></td><td>哺乳</td><td>浅海褐藻林</td><td class="num">1.0–1.5 m</td><td>海胆、贝类</td><td>Endangered</td></tr>
+              <tr><td>造礁石珊瑚</td><td><em>Acropora</em> spp.</td><td>刺胞</td><td>浅海礁坡</td><td class="num">群体数米</td><td>共生 + 浮游</td><td>多种受胁</td></tr>
+              <tr><td>鲸鲨</td><td><em>Rhincodon typus</em></td><td>软骨鱼</td><td>真光层</td><td class="num">10–18 m</td><td>滤食浮游</td><td>Endangered</td></tr>
+              <tr><td>灯笼鱼</td><td>Myctophidae</td><td>硬骨鱼</td><td>中层带</td><td class="num">5–15 cm</td><td>浮游动物</td><td>数据缺乏</td></tr>
+              <tr><td>鮟鱇</td><td>Ceratioidea</td><td>硬骨鱼</td><td>深层带</td><td class="num">数 cm–1 m</td><td>伏击</td><td>数据缺乏</td></tr>
+              <tr><td>超深渊蜗牛鱼</td><td><em>Pseudoliparis</em> spp.</td><td>硬骨鱼</td><td>海沟</td><td class="num">10–30 cm</td><td>小型甲壳</td><td>数据缺乏</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>水层</th><th>深度</th><th>光</th><th>压力</th><th>食物来源</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>潮间带</td><td class="num">高潮–低潮线</td><td>全日照 / 全黑暗交替</td><td class="num">~1 atm</td><td>藻类、碎屑、滤食</td></tr>
+              <tr><td>真光层</td><td class="num">0–200 m</td><td>可光合</td><td class="num">1–21 atm</td><td>初级生产</td></tr>
+              <tr><td>中层带</td><td class="num">200–1000 m</td><td>残光到无光</td><td class="num">21–101 atm</td><td>垂直洄游 + 海洋雪</td></tr>
+              <tr><td>深层 / 深渊</td><td class="num">1000–6000 m</td><td>无光</td><td class="num">101–601 atm</td><td>海洋雪、尸体、喷口</td></tr>
+              <tr><td>海沟</td><td class="num">&gt;6000 m</td><td>无光</td><td class="num">&gt;601 atm</td><td>极少沉降物</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="lists">5. 清单：一次潮间带调查带什么</h2>
+        <p>必备：</p>
+        <ul>
+          <li>潮汐表和手表</li>
+          <li>防滑鞋，不是普通运动鞋</li>
+          <li>笔记本：铅笔比水笔可靠</li>
+          <li>尺子、样品袋、防水相机</li>
+          <li>淡水冲洗瓶</li>
+        </ul>
+        <p>不要做：把海星带回家「养两天」；翻石头后不翻回去；在贻贝床上反复踩踏。</p>
+        <p>深海观测则是另一套顺序：</p>
+        <ol>
+          <li>多波束测深，先画地形</li>
+          <li>ROV 或载人潜器走航</li>
+          <li>沉积物柱状样与水体 eDNA</li>
+          <li>实验室形态 + 分子交叉鉴定</li>
+        </ol>
+
+        <h2 id="compare">6. 滤食者对比猎食者</h2>
+        <div class="comparison wide">
+          <div>
+            <h3>滤食者</h3>
+            <ul>
+              <li>低单价、高通量</li>
+              <li>鲸鲨、贻贝、藤壶</li>
+              <li>群体可以改变局部水流</li>
+            </ul>
+          </div>
+          <div class="hunt">
+            <h3>猎食者</h3>
+            <ul>
+              <li>高单价、低相遇率</li>
+              <li>海星撬壳、鮟鱇诱捕、金枪鱼巡游</li>
+              <li>感官和运动预算更贵</li>
+            </ul>
+          </div>
+        </div>
+        <p>同一条食物链上两者经常叠在一起：磷虾滤食浮游植物，须鲸再滤食磷虾。</p>
+
+        <h2 id="protect">7. 保护优先级</h2>
+        <ol>
+          <li>潮间带：管住践踏和非法采集。</li>
+          <li>陆架：海草床和红树林是育幼场，填海比深海采矿更先毁掉它们。</li>
+          <li>大洋：灯光渔业打中中层垂直洄游种类。</li>
+          <li>深海：热液喷口和海山的特有种一旦挖掉，恢复以千年计。</li>
+        </ol>
+        <div class="callout">
+          <strong>风险。</strong> 深海采矿的「试验性开采」不是可逆实验。沉积羽流会让滤食者在可见破坏之外先窒息。
+        </div>
+        <p>中层带生物量估算仍可能差一个数量级。公众能做的最短路径：选一个固定潮间带断面，按季节记录。</p>
+      </article>
+      <footer class="meta">
+        参考入口：IPBES 海洋评估、IUCN Red List、NOAA Ocean Explorer。本页为 pretty-view 阅读页夹具，主模式 article，按默认单页生成，使用页内目录组织。
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

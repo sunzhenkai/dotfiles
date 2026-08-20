@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>灯塔网关 SEV-1 热修复评审：signed-url TTL 单位</title>
+  <style>
+    /* brief
+       Subject: 灯塔网关热修复 PR 的代码证据台
+       Audience: 即将合入的评审人，不是事故叙事读者
+       Page job: 按严重度扫发现、核对路径与摘录、看清残留风险
+       Direction: 工程师方格草稿纸上的红笔检查台——蓝格纸、石墨字、荧光笔标证据
+       Signature: 每条发现左侧色条编码阻断/主要/次要，路径像编辑器页签钉在发现头
+       Tokens: pad #E4EEF3 / graphite #243038 / grid #C3D2DA / highlighter #E6C84A / blocker #9B2C2C / major #B86A12 / minor #3D6B8A
+    */
+    :root {
+      --pad: #E4EEF3;
+      --paper: #F7FBFC;
+      --graphite: #243038;
+      --grid: #C3D2DA;
+      --highlighter: #E6C84A;
+      --blocker: #9B2C2C;
+      --major: #B86A12;
+      --minor: #3D6B8A;
+      --pass: #2C6A4A;
+      --muted: #5A6B74;
+      --line: rgba(36, 48, 56, 0.12);
+      --display: "Lucida Grande", "Lucida Sans Unicode", "PingFang SC", sans-serif;
+      --body: "Trebuchet MS", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      --data: ui-monospace, Menlo, "Sarasa Mono SC", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background:
+        linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 28px,
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 28px 100%,
+        var(--pad);
+      color: var(--graphite);
+      font-family: var(--body);
+      font-size: 17px;
+      line-height: 1.62;
+    }
+    a { color: var(--minor); }
+    a:focus-visible { outline: 2px solid var(--major); outline-offset: 3px; }
+    html { scroll-behavior: smooth; }
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      background: var(--paper);
+      padding: 8px 12px;
+    }
+    .skip:focus { left: 8px; z-index: 20; }
+    .shell {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .shell:has(.site-nav details:not([open])) {
+      grid-template-columns: 48px minmax(0, 1fr);
+    }
+    .site-nav {
+      background: var(--graphite);
+      color: #D5E0E6;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 20px 14px 32px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .site-nav .nav-kicker {
+      font-family: var(--data);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--highlighter);
+      margin: 0 0 12px;
+      cursor: pointer;
+    }
+    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 3px; }
+    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
+    .site-nav details:not([open]) .nav-kicker {
+      writing-mode: vertical-rl;
+      white-space: nowrap;
+      margin: 0 auto;
+    }
+    .site-nav ol { margin: 0; padding-left: 1.1em; }
+    .site-nav li { margin: 0 0 8px; }
+    .site-nav a { color: #F7FBFC; text-decoration: none; }
+    .site-nav a:hover { text-decoration: underline; }
+    .site-nav a:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 2px; }
+    .sev-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .sev-dot.blocker { background: #E8A0A0; }
+    .sev-dot.major { background: var(--highlighter); }
+    .sev-dot.minor { background: #8FB4C8; }
+    .page {
+      width: 100%;
+      padding: 28px 32px 72px;
+      background: var(--paper);
+    }
+    .page > header,
+    article > * { max-width: 68ch; }
+    article > .wide {
+      max-width: min(100%, 110ch);
+    }
+    .mast { margin: 0 0 24px; }
+    .verdict {
+      display: inline-block;
+      font-family: var(--data);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      background: var(--highlighter);
+      color: var(--graphite);
+      padding: 3px 8px;
+      margin: 0 0 10px;
+    }
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+      line-height: 1.25;
+      margin: 0 0 10px;
+    }
+    .lede { color: var(--muted); margin: 0 0 16px; }
+    .tldr {
+      border: 1px solid var(--grid);
+      padding: 14px 16px;
+      background: #fff;
+    }
+    .tldr h2 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      font-family: var(--data);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--minor);
+    }
+    h2 {
+      font-family: var(--display);
+      font-size: 1.2rem;
+      margin: 2rem 0 0.65rem;
+    }
+    h3 {
+      font-size: 1.02rem;
+      margin: 1.2rem 0 0.45rem;
+    }
+    p { margin: 0 0 0.85rem; }
+    .finding {
+      margin: 0 0 1.1rem;
+      padding: 12px 14px 12px 16px;
+      border-left: 5px solid var(--minor);
+      background: #fff;
+    }
+    .finding.blocker { border-left-color: var(--blocker); }
+    .finding.major { border-left-color: var(--major); }
+    .finding .path {
+      font-family: var(--data);
+      font-size: 12px;
+      background: var(--pad);
+      display: inline-block;
+      padding: 2px 8px;
+      margin: 0 0 8px;
+    }
+    pre, code { font-family: var(--data); font-size: 0.86em; }
+    pre {
+      margin: 0.4rem 0 0;
+      padding: 12px 14px;
+      background: var(--graphite);
+      color: #EAF2F6;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem 0 1.4rem;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th {
+      font-family: var(--data);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--pad);
+    }
+    ul, ol { margin: 0 0 1rem; padding-left: 1.3em; }
+    @media (max-width: 720px) {
+      .shell { grid-template-columns: 1fr; }
+      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
+      .site-nav { height: auto; position: static; max-height: none; }
+      .site-nav details:not([open]) .nav-kicker {
+        writing-mode: horizontal-tb;
+        margin: 0;
+      }
+      .page { padding: 24px 16px 64px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+    @media print {
+      .skip { display: none; }
+      .site-nav {
+        position: static;
+        height: auto;
+        color: #111;
+        background: #fff;
+        padding: 0 0 16px;
+      }
+      .site-nav a, .site-nav .nav-kicker { color: #111; }
+      .site-nav details > * { display: block !important; }
+      .shell { display: block; }
+      body { background: #fff; }
+      pre { color: #111; background: #f3f3f3; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">跳到正文</a>
+  <div class="shell">
+    <nav class="site-nav" aria-label="本页目录">
+      <details open>
+        <summary class="nav-kicker">评审目录</summary>
+        <ol>
+          <li><a href="#tldr">结论</a></li>
+          <li><a href="#scope">范围</a></li>
+          <li><a href="#blocker"><span class="sev-dot blocker"></span>阻断</a></li>
+          <li><a href="#major"><span class="sev-dot major"></span>主要</a></li>
+          <li><a href="#minor"><span class="sev-dot minor"></span>次要</a></li>
+          <li><a href="#tests">测试覆盖</a></li>
+          <li><a href="#residual">残留风险</a></li>
+        </ol>
+      </details>
+    </nav>
+    <div class="page" id="content">
+      <header class="mast">
+        <p class="verdict">带条件可合入</p>
+        <h1>灯塔网关 SEV-1 热修复评审：signed-url TTL 单位</h1>
+        <p class="lede">审查的是热修复，不是整次毫秒化重构。事故叙事见同夹具复盘页。灯塔网关（Beacon Gate）的私有下载仍靠短时 <code>signed-url</code>。</p>
+        <div class="tldr" id="tldr">
+          <h2>结论</h2>
+          <p>范围：PR <code>#1843</code>，热修复 <code>internal/auth/session.go</code> 中 <code>ttl_ms</code> 被当成秒写入 Redis 的问题。结论：<strong>带条件可合入</strong>——阻断项必须先改；主要项可在合入后 24h 内补，但要登记。残留风险不因热修复关闭 SEV-1 的结构债。</p>
+        </div>
+      </header>
+
+      <article>
+        <h2 id="scope">1. 范围</h2>
+        <ul>
+          <li>合入目标：让 <code>signed-url</code> 的 Redis TTL 回到约 90s。</li>
+          <li>已看文件：<code>internal/auth/session.go</code>、<code>internal/auth/session_test.go</code>、<code>internal/auth/redis_expire.go</code>。</li>
+          <li>未看：网关其他模块是否还有 <code>ttl_ms * time.Second</code>；那是复盘动作项，不在本 PR。</li>
+        </ul>
+        <p>当前补丁把 <code>persistSignature</code> 改成：</p>
+        <div class="wide">
+          <pre><code>ttl_ms := 90_000
+if err := rdb.Expire(ctx, key, time.Duration(ttl_ms)*time.Millisecond).Err(); err != nil {
+    return err
+}</code></pre>
+        </div>
+        <p>方向正确。下面按严重度分组，每条给路径、证据和建议。</p>
+
+        <h2 id="blocker">2. 阻断</h2>
+        <div class="finding blocker">
+          <p class="path">internal/auth/session.go:142</p>
+          <h3>2.1 零值与负值仍会写入</h3>
+          <p>换算前没有拒绝非法 <code>ttl_ms</code>。测试里用 <code>ttl_ms := 0</code> 时，<code>Expire</code> 仍被调用。</p>
+          <div class="wide">
+            <pre><code>func persistSignature(ctx context.Context, key string, ttl_ms int64) error {
+    return rdb.Expire(ctx, key, time.Duration(ttl_ms)*time.Millisecond).Err()
+}</code></pre>
+          </div>
+          <p>Redis 对 0 duration 的行为与「立即过期」并不总一致；负值会变成巨大的 uint 转换风险。热修复必须在调用 <code>Expire</code> 前拒绝 <code>ttl_ms &lt;= 0</code>，并覆盖该分支。不修则带条件结论不成立。</p>
+        </div>
+
+        <h2 id="major">3. 主要</h2>
+        <div class="finding major">
+          <p class="path">internal/auth/session_test.go</p>
+          <h3>3.1 跨日边界没有测试</h3>
+          <p>只在同一假时钟下断言 90s。没有覆盖 23:59 → 00:01 的签发与校验。灯塔网关的签名校验用的是墙钟 <code>expires_at</code>，TTL 与墙钟任一偏差都会在跨日复现成「链接已过期但 Redis 仍活着」，或反过来。</p>
+          <p>建议：用固定 <code>time.Time</code> 在 <code>2026-08-12 23:59:30</code> 签发，拨到次日 00:00:30 再取，断言 Redis TTL 与 <code>expires_at</code> 同向收缩。</p>
+        </div>
+        <div class="finding major">
+          <p class="path">internal/auth/session.go:168</p>
+          <h3>3.2 日志可能带完整 token</h3>
+          <p>失败路径把完整签名打进可检索文本：</p>
+          <div class="wide">
+            <pre><code>log.Printf("signed-url persist failed key=%s token=%s", key, raw)</code></pre>
+          </div>
+          <p>SEV-1 窗口里的审计已经证明链接可被二次使用；再把 token 打进日志等于把私有文件钥匙写进可检索文本。改为 <code>sig</code> 前 8 位，或只打 <code>key</code>。</p>
+        </div>
+        <div class="finding major">
+          <p class="path">internal/auth/session.go</p>
+          <h3>3.3 没有 expire-mismatch 指标</h3>
+          <p>修复让单次写入变对，但名义 TTL 与 Redis <code>TTL</code> 再漂一个数量级时仍然静默。复盘已把该指标列为结构项；本 PR 至少要留 hook 或 TODO 不够——需要一次对比采样，差 ≥10× 告警。</p>
+        </div>
+
+        <h2 id="minor">4. 次要</h2>
+        <div class="finding">
+          <p class="path">internal/auth/session.go · session_test.go</p>
+          <ul>
+            <li><code>ttl_ms</code> 在注释里仍写成「毫秒整数，传给 Expire 时乘 Second」——那是旧 bug 的句子，会误导下一轮评审。改注释。</li>
+            <li><code>session_test.go</code> 的测试名 <code>TestExpireCalled</code> 已过时，应改成量级断言的名字。</li>
+            <li>魔法数 <code>90_000</code> 建议变成具名常量 <code>defaultSignatureTTL</code>。</li>
+          </ul>
+        </div>
+
+        <h2 id="tests">5. 测试覆盖</h2>
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr><th>场景</th><th>现状</th><th>合入前</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>ttl_ms</code> 乘 <code>Millisecond</code></td><td>有，断言 duration == 90s</td><td>保留</td></tr>
+              <tr><td><code>ttl_ms &lt;= 0</code> 拒绝</td><td>无</td><td>阻断，必须有</td></tr>
+              <tr><td>跨日 23:59 / 00:01</td><td>无</td><td>主要，24h 内可补但须登记</td></tr>
+              <tr><td>mock 只数调用次数</td><td>旧测试仍在</td><td>删掉或改成量级断言</td></tr>
+              <tr><td>日志不含完整 token</td><td>无</td><td>主要，与 3.2 一起</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="residual">6. 残留风险</h2>
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr><th>风险</th><th>是否被本 PR 关闭</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>已吊销 <code>signed-url</code> 仍可下载</td><td>是，热路径</td><td>依赖缓解脚本已跑完</td></tr>
+              <tr><td>其他模块仍按秒乘 <code>ttl_ms</code></td><td>否</td><td>全库检索是复盘动作项</td></tr>
+              <tr><td>跨日墙钟与 Redis TTL 漂移</td><td>否</td><td>见 3.1</td></tr>
+              <tr><td>日志泄露 token</td><td>否</td><td>见 3.2</td></tr>
+              <tr><td>名义 TTL 与实际 TTL 再漂数量级</td><td>否</td><td>见 3.3，SEV-1 结构债仍在</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>合入后仍按 SEV-1 跟踪结构债，直到 <code>expire-mismatch</code> 告警在预发打过一次真阳性。</p>
+      </article>
+    </div>
+  </div>
+</body>
+</html>

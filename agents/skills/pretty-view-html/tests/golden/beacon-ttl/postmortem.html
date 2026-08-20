@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>灯塔网关 SEV-1：signed-url 过期窗口放大 1000 倍</title>
+  <style>
+    /* brief
+       Subject: 灯塔网关 signed-url TTL 事故，值班台账
+       Audience: 值班工程师与跟动作项的研发，事故后复盘
+       Page job: 五分钟内重建窗口、根因和下一步
+       Direction: 钠灯港湾值班桌——雾玻璃底、钠黄警告、铜铭牌，不是暖米色衬线报告
+       Signature: 左侧值班带是可点击时间戳目录，报头盖 SEV-1 印章
+       Tokens: fog #D4DCE3 / glass #E8EEF2 / harbor #12202C / sodium #C9840A / brass #8B7340 / alarm #B42318
+    */
+    :root {
+      --fog: #D4DCE3;
+      --glass: #E8EEF2;
+      --paper: #F3F6F8;
+      --harbor: #12202C;
+      --sodium: #C9840A;
+      --brass: #8B7340;
+      --alarm: #B42318;
+      --ink: #1A2832;
+      --muted: #4A5A66;
+      --line: rgba(18, 32, 44, 0.14);
+      --display: Bahnschrift, "DIN Alternate", "Arial Narrow", "PingFang SC", sans-serif;
+      --body: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      --data: ui-monospace, "Cascadia Mono", "Sarasa Mono SC", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: var(--fog);
+      color: var(--ink);
+      font-family: var(--body);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+    a { color: #1F4E63; }
+    a:focus-visible { outline: 2px solid var(--sodium); outline-offset: 3px; }
+    html { scroll-behavior: smooth; }
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      background: var(--paper);
+      padding: 8px 12px;
+    }
+    .skip:focus { left: 8px; z-index: 20; }
+    .shell {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .shell:has(.site-nav details:not([open])) {
+      grid-template-columns: 48px minmax(0, 1fr);
+    }
+    .site-nav {
+      background: var(--harbor);
+      color: #C9D6DE;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 20px 14px 32px;
+      font-family: var(--data);
+      font-size: 12px;
+      line-height: 1.4;
+      border-right: 4px solid var(--sodium);
+    }
+    .site-nav .nav-kicker {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--sodium);
+      margin: 0 0 12px;
+      cursor: pointer;
+    }
+    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--sodium); outline-offset: 3px; }
+    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
+    .site-nav details:not([open]) .nav-kicker {
+      writing-mode: vertical-rl;
+      white-space: nowrap;
+      margin: 0 auto;
+    }
+    .site-nav ol { list-style: none; margin: 0; padding: 0; }
+    .site-nav li { margin: 0 0 10px; padding: 0 0 10px; border-bottom: 1px dashed rgba(201, 214, 222, 0.2); }
+    .site-nav time {
+      display: block;
+      color: var(--brass);
+      font-size: 11px;
+    }
+    .site-nav a {
+      color: #E8EEF2;
+      text-decoration: none;
+    }
+    .site-nav a:hover { color: #fff; }
+    .site-nav a:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+    .page {
+      width: 100%;
+      padding: 28px 32px 72px;
+      background: var(--paper);
+    }
+    .page > header,
+    article > * { max-width: 68ch; }
+    article > .wide {
+      max-width: min(100%, 110ch);
+    }
+    .mast { margin: 0 0 28px; }
+    .stamp {
+      display: inline-block;
+      font-family: var(--display);
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--alarm);
+      border: 2px solid var(--alarm);
+      padding: 4px 10px;
+      transform: rotate(-3deg);
+      margin: 0 0 12px;
+    }
+    h1 {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+      margin: 0 0 12px;
+      color: var(--harbor);
+    }
+    .lede { color: var(--muted); margin: 0 0 18px; }
+    .tldr {
+      background: var(--glass);
+      border-left: 5px solid var(--sodium);
+      padding: 14px 16px;
+    }
+    .tldr h2 { margin: 0 0 8px; font-size: 1rem; font-family: var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass); }
+    .tldr ol { margin: 0; padding-left: 1.2em; }
+    h2 {
+      font-family: var(--display);
+      font-size: 1.25rem;
+      margin: 2rem 0 0.7rem;
+      color: var(--harbor);
+    }
+    h3 { font-size: 1.05rem; margin: 1.4rem 0 0.5rem; }
+    p { margin: 0 0 0.9rem; }
+    blockquote, .callout {
+      margin: 1.1rem 0;
+      padding: 12px 14px;
+      background: #F8E8E4;
+      border-left: 4px solid var(--alarm);
+    }
+    .callout strong { color: var(--alarm); }
+    .timeline {
+      list-style: none;
+      margin: 1.1rem 0 1.5rem;
+      padding: 0;
+      border-left: 2px solid var(--brass);
+    }
+    .timeline li {
+      position: relative;
+      padding: 0 0 1rem 22px;
+    }
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+      top: 0.4em;
+      width: 10px;
+      height: 10px;
+      background: var(--sodium);
+      border: 2px solid var(--paper);
+    }
+    .timeline time {
+      font-family: var(--data);
+      font-size: 12px;
+      color: var(--brass);
+      display: block;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem 0 1.5rem;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th {
+      font-family: var(--display);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--glass);
+    }
+    pre, code { font-family: var(--data); font-size: 0.86em; }
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      background: var(--harbor);
+      color: #E8EEF2;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    ul, ol { margin: 0 0 1rem; padding-left: 1.3em; }
+    @media (max-width: 720px) {
+      .shell { grid-template-columns: 1fr; }
+      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
+      .site-nav {
+        height: auto;
+        position: static;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 4px solid var(--sodium);
+      }
+      .site-nav details:not([open]) .nav-kicker {
+        writing-mode: horizontal-tb;
+        margin: 0;
+      }
+      .page { padding: 24px 16px 64px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+    @media print {
+      .skip { display: none; }
+      .site-nav {
+        position: static;
+        height: auto;
+        color: #111;
+        background: #fff;
+        padding: 0 0 16px;
+        border: 0;
+      }
+      .site-nav a, .site-nav .nav-kicker, .site-nav time { color: #111; }
+      .site-nav details > * { display: block !important; }
+      .shell { display: block; }
+      body { background: #fff; }
+      pre { color: #111; background: #f3f3f3; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">跳到正文</a>
+  <div class="shell">
+    <nav class="site-nav" aria-label="本页目录">
+      <details open>
+        <summary class="nav-kicker">值班带 · UTC+8</summary>
+        <ol>
+          <li><time>结论</time><a href="#tldr">先看结论</a></li>
+          <li><time>19:14</time><a href="#impact">影响范围</a></li>
+          <li><time>18:51–20:40</time><a href="#timeline">时间线</a></li>
+          <li><time>19:48</time><a href="#root-cause">根因</a></li>
+          <li><time>—</time><a href="#detection">为什么检测失败</a></li>
+          <li><time>19:31</time><a href="#mitigation">缓解与修复</a></li>
+          <li><time>之后</time><a href="#actions">动作项</a></li>
+          <li><time>未关</time><a href="#open">未决项</a></li>
+        </ol>
+      </details>
+    </nav>
+    <div class="page" id="content">
+      <header class="mast">
+        <p class="stamp">SEV-1</p>
+        <h1>灯塔网关 SEV-1：signed-url 过期窗口放大 1000 倍</h1>
+        <p class="lede">灯塔网关（Beacon Gate）是虚构的个人文件分发网关。2026-08-12 的窗口里，已吊销链接仍能下载私有文件。这不是数据损坏，是授权窗口失效。</p>
+        <div class="tldr" id="tldr">
+          <h2>结论</h2>
+          <ol>
+            <li>2026-08-12 19:14–20:01（UTC+8）窗口内，已吊销的 <code>signed-url</code> 仍能下载私有文件，最长存活约 47 分钟。</li>
+            <li>根因是 TTL 单位重构把调用值改成 <code>ttl_ms</code>，但 Redis <code>EXPIRE</code> 仍按秒解释，过期时间被放大约 1000 倍。</li>
+            <li>当前状态：热修复已上线，旧会话已批量失效；残留风险见动作项，不在本复盘里关闭。</li>
+          </ol>
+        </div>
+      </header>
+
+      <article>
+        <h2 id="impact">1. 影响范围</h2>
+        <p>事故等级 <strong>SEV-1</strong>。灯塔网关的私有文件下载依赖短时 <code>signed-url</code>；注销、权限回收和「链接过期」都走同一条 Redis TTL。</p>
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr><th>面</th><th>事实</th><th>窗口</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>用户面</td><td>已注销或权限已回收的下载链接仍返回 200</td><td>19:14–20:01 UTC+8</td></tr>
+              <tr><td>数据面</td><td>私有对象未被改写；问题是授权窗口，不是内容损坏</td><td>同上</td></tr>
+              <tr><td>会话面</td><td><code>session.go</code> 写入的 TTL 名义 90s，实际约 90_000s</td><td>部署 <code>beacon-gate@2.14.0</code> 起</td></tr>
+              <tr><td>规模</td><td>受影响签名约 1.2k 条；确认被二次使用 37 条</td><td>审计日志</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <strong>SEV-1</strong> 不是因为数据丢失，而是因为「已吊销」在用户面不成立。私有文件在过期前提前泄露，等同于鉴权失效。
+        </div>
+
+        <h2 id="timeline">2. 时间线</h2>
+        <p>按值班台账记录，时间均为 UTC+8。19:31 的缓解已经堵住新泄露；根因确认发生在缓解之后。不要把「已缓解」写成「已修复」。</p>
+        <ol class="timeline">
+          <li><time>18:51</time><strong>滚动完成</strong> — <code>beacon-gate@2.14.0</code>。变更说明：会话与签名 TTL 统一为毫秒。</li>
+          <li><time>19:14</time><strong>用户反馈</strong> — 注销后旧 <code>signed-url</code> 仍能打开附件。</li>
+          <li><time>19:22</time><strong>值班复现</strong> — Redis <code>TTL</code> 对 <code>sig:*</code> 键返回约 89910，单位被当成秒。</li>
+          <li><time>19:31</time><strong>切流量</strong> — 停止签发新链接，对现存 <code>sig:*</code> 执行 <code>EXPIRE 90</code>。</li>
+          <li><time>19:48</time><strong>根因确认</strong> — <code>internal/auth/session.go</code> 把 <code>ttl_ms</code> 传给仍按秒解释的 <code>Expire</code>。</li>
+          <li><time>20:01</time><strong>热修复上线</strong> — 审计显示 19:31 之后无新的二次使用。</li>
+          <li><time>20:40</time><strong>残留扫描</strong> — 全量扫描残留键，最长 TTL 已压回 90s。</li>
+        </ol>
+
+        <h2 id="root-cause">3. 根因</h2>
+        <p>PR <code>#1842</code> 把内部时钟统一成毫秒，避免 <code>time.Second</code> 与 <code>time.Millisecond</code> 混用。<code>BuildSignedURL</code> 改为：</p>
+        <div class="wide">
+          <pre><code>ttl_ms := 90_000
+if err := rdb.Expire(ctx, key, time.Duration(ttl_ms)*time.Second).Err(); err != nil {
+    return err
+}</code></pre>
+        </div>
+        <p>问题不在 Redis，而在调用方：<code>ttl_ms</code> 已经是毫秒整数，却乘上 <code>time.Second</code>。<code>Expire</code> 的参数类型是 <code>time.Duration</code>，这里实际写入约 90_000 秒。</p>
+        <p>正确写法应是 <code>time.Duration(ttl_ms)*time.Millisecond</code>，或直接传 <code>90*time.Second</code> 并禁止再引入裸整数。出错位置：<code>internal/auth/session.go</code> 中 <code>persistSignature</code> 一段。同一 PR 改了测试的期望注释（「90s」），但断言仍只检查 <code>Expire</code> 被调用，不检查 duration 量级。</p>
+
+        <h2 id="detection">4. 为什么检测失败</h2>
+        <ul>
+          <li>单元测试 mock 了 Redis，只断言调用次数，不断言 <code>time.Duration</code> 的数量级。</li>
+          <li>集成测试的 TTL 等待用的是 90ms 轮询，键在测试结束前不会到期，绿的是假象。</li>
+          <li>仪表盘有 <code>signed_url_issued</code>，没有 <code>expire-mismatch</code>：名义 TTL 与 Redis <code>TTL</code> 差一个数量级时无人报警。</li>
+          <li>code review 看了「单位统一」的方向，没有抽查调用点是否仍按秒换算。</li>
+        </ul>
+
+        <h2 id="mitigation">5. 缓解与修复</h2>
+        <p>立即：</p>
+        <ol>
+          <li>停止签发，对 <code>sig:*</code> 重写 <code>EXPIRE 90</code>。</li>
+          <li>吊销 19:14 之后仍被使用的 37 条审计命中。</li>
+          <li>热修复：<code>persistSignature</code> 改为 <code>time.Duration(ttl_ms)*time.Millisecond</code>。</li>
+        </ol>
+        <p>短期：补一条断言——<code>Expire</code> 的 duration 必须落在 1s–10min。跨日边界与 0 值拒绝见修复评审，不在热修复里夹带。</p>
+
+        <h2 id="actions">6. 动作项</h2>
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr><th>优先级</th><th>项</th><th>负责人向</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>立即</td><td>热修复已上线；确认无残留 <code>TTL &gt; 120</code> 的 <code>sig:*</code></td><td>值班</td></tr>
+              <tr><td>短期</td><td>给 <code>Expire</code> mock 增加 duration 量级断言；补跨日边界测试</td><td>认证</td></tr>
+              <tr><td>短期</td><td>日志去掉完整 token；只保留 <code>sig</code> 前 8 位</td><td>认证</td></tr>
+              <tr><td>结构</td><td>增加 <code>expire-mismatch</code> 指标：名义 TTL 与 Redis TTL 相差 ≥10× 则告警</td><td>可观测</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="open">7. 未决项</h2>
+        <ul>
+          <li>37 条二次使用是否构成对外通知，法务未决。本复盘不代替通知决策。</li>
+          <li><code>ttl_ms</code> 在网关其他模块是否还有按秒乘的调用点，需要全库检索，不在本次热修复范围。</li>
+          <li>修复 PR 的残留风险由独立 code review 跟踪，见同夹具修复评审页。</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</body>
+</html>

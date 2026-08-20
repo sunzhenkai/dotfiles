@@ -1,0 +1,56 @@
+:root {
+  --bg: #f7f4ec;
+  --surface: #fffdf7;
+  --text-1: #17202a;
+  --text-2: #43515c;
+  --text-3: #6b777f;
+  --accent: #1f6674;
+  --border: #cfd5d2;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: Georgia, "Noto Serif SC", serif;
+}
+.deck { min-height: 100vh; }
+.slide {
+  display: none;
+  width: 100vw;
+  min-height: 100vh;
+  padding: clamp(28px, 5vw, 72px);
+  overflow: auto;
+}
+.slide.is-active { display: block; }
+.slide:first-child { display: block; }
+.deck.is-ready .slide:first-child { display: none; }
+.deck.is-ready .slide.is-active { display: block; }
+.center { place-content: center; }
+.slide.center.is-active { display: grid; }
+.tc { text-align: center; }
+.h1 { font-size: clamp(2.4rem, 7vw, 5.8rem); line-height: 1.02; margin: 0.2em 0; }
+.lede { max-width: 62ch; color: var(--text-2); font-size: clamp(1.05rem, 2vw, 1.45rem); }
+.kicker, .eyebrow, .dim2 { color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; }
+.deck-header, .deck-footer, .row { display: flex; justify-content: space-between; gap: 20px; }
+.deck-footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); }
+.wrap { flex-wrap: wrap; }
+.card, .side { border: 1px solid var(--border); background: var(--surface); padding: 20px; }
+.grid { display: grid; gap: 18px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mt-l { margin-top: 32px; }
+.dim { color: var(--text-2); }
+.notes { display: none; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+@media (max-width: 760px) {
+  .g2, .g3, .steps, .vs { grid-template-columns: 1fr !important; }
+  .slide { padding: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; }
+}
+@media print {
+  .slide { display: block !important; min-height: auto; break-after: page; }
+}
