@@ -15,29 +15,31 @@
        ├─ 显式 PPT / 幻灯片 / html-ppt → html-ppt
        ├─ 显式 reveal.js / html-slides → html-slides
        ├─ 显式 md→html / baoyu / 公众号排版 → baoyu-markdown-to-html
-       └─ 其他全部 → html-page + stone-ink
-                         只按 spec / visual / doc / article / review 组合组件
+       └─ 其他全部 → html-page + frontend-design
+                         先判断页面架构，再按内容建立视觉方向
 ```
 
 PPT、reveal.js、baoyu 仍只认显式口令。技术分享、路演、小红书或只说 HTML 不足以进入这些专用路径。
 
-## 2. 统一阅读页设计
+## 2. HTML 阅读页设计
 
-过去规格、图解、技术文档和普通长文分别进入多套 reference，导致页面壳、token、字体和组件不一致。现在所有阅读页只 Read `references/html-page.md`：
+阅读页同时加载两个职责互补的 reference：
 
-- 唯一 reference：`html-page`
-- 唯一默认主题：`stone-ink`
-- 统一页面壳、排版、语义 token 和组件族
-- 内容差异仅通过 `spec`、`visual`、`doc`、`article`、`review` 模式表达
-- 图解、宽表、目录和少量交互仍可按需使用，但不再形成独立视觉系统
+- `html-page`：信息架构、单页/多页判断、导航、维护与工程质量
+- `frontend-design`：基于主题、受众和页面任务确定字体、配色、布局与视觉 signature
+- 不为所有文档套同一张皮
+- 同一个多页包必须共用设计系统；不同产物允许有各自的视觉身份
 
-这保证同一项目生成的规格、方案、报告和技术说明看起来属于同一个产品，同时保留不同信息结构。
+生成前必须形成简短视觉 brief，生成后在桌面和移动端做视觉复核；环境支持浏览器时使用截图检查并至少修正一轮。
 
 ### 单页与多页策略
 
-阅读页**默认单页**。内容长、章节多或同时有图表/代码时，优先使用页内目录与锚点，不因此拆页。只有命中强信号才自动拆页：用户明确要求多页；输入由多个独立文档构成；存在总览加至少两个独立查阅模块；或不同部分面向不同受众/维护周期。无法确定时保持单页，不向用户确认。
+阅读页默认单页。内容长、章节多或同时有图表/代码时，优先使用页内目录与锚点，不因此拆页。多页分两类：
 
-自动拆页不需要确认，但必须先用一句话告知推断结果和页面地图。多页包保持一层结构：`index.html` 是唯一根入口并链接全部附属页；附属页用相对路径返回主文件；所有页面继续使用 `html-page` / `stone-ink`。路径不存在或文件冲突仍走原有落盘确认门。
+- **扁平多页**：多个独立同级模块，没有真实父子关系。
+- **层级多页**：存在稳定的“领域 → 子主题”关系，分组页有自己的总览职责；默认最多两级内容页。
+
+多页包以 `_site.json` 作为页面标题、路径、顺序和层级的唯一维护源。`index.html` 是唯一对外入口；层级包的每个目录都有 `index.html`。页面变动按 `_site.json` → 文件 → 页面地图 → 导航/面包屑 → 链接检查的顺序维护，根 catalog 只登记包入口。
 
 ## 3. 门禁
 
@@ -46,21 +48,21 @@ PPT、reveal.js、baoyu 仍只认显式口令。技术分享、路演、小红�
 | 门 1 · 收窄触发 | 日常写作被当成展示 |
 | 门 2 · 先定介质 | HTML / Markdown 猜错 |
 | 门 3 · 专用路径只认显式口令 | 技术分享或 HTML 误进 PPT / baoyu |
-| 门 4 · 设计参考只认显式口令 | “漂亮 / HTML”误加载 `frontend-design` |
+| 门 4 · HTML 必做视觉设计 | 固定模板、无内容依据的配色和布局 |
 | 门 5 · 产物不写进 references | 污染 vendor 快照 |
 | 门 6 · 单介质 | 默认同时维护 `.md` 和 `.html` 两套正文 |
 
-主题规则：`html-page` 固定使用 `stone-ink`；多主题路径（html-ppt / html-slides / baoyu）仍须推荐并确认。`frontend-design` 只提供视觉决策参考，不改变输出路径或主题。交付结尾必须报告 reference 与主题。
+视觉规则：所有 HTML 路径都叠加 `frontend-design`，但它不改变输出路径。普通阅读页按内容推导视觉方向；多主题转换器仍须推荐并确认。交付结尾必须报告 reference 与实际视觉方向或主题。
 
 ## 4. reference / 生成路径
 
 | 路径 | 场景 | 来源 |
 |------|------|------|
-| `references/html-page.md` | 所有普通 HTML 阅读页 | 本仓库第一方统一设计系统 |
+| `references/html-page.md` | 所有普通 HTML 阅读页 | 本仓库第一方信息架构与工程合同 |
 | `baoyu-markdown-to-html` | **仅显式** md→html / baoyu / 公众号或微信排版 | `jimliu/baoyu-skills` |
 | `html-ppt` | **仅显式** HTML PPT / 幻灯片 / slides / html-ppt | `lewislulu/html-ppt-skill` |
 | `html-slides` | **仅显式** reveal.js / html-slides | `claude-office-skills/skills` |
-| `frontend-design` | 前端视觉设计参考 | `anthropics/claude-code` |
+| `frontend-design` | 所有 HTML 路径的视觉设计参考 | `anthropics/claude-code` |
 
 当前 vendor commit 与审计说明见 `references/UPSTREAM.md`。第三方快照不要直接修改。
 
@@ -86,7 +88,7 @@ scripts/agents/sync.sh all
 
 - 默认根不存在时先确认再创建。
 - 根下只放 `INDEX.md`、有 HTML 时的 `index.html` 与可选 `_assets/`。
-- 单文件用 `kind/YYYY-MM-DD-<slug>.html`；多文件用 `kind/YYYY-MM-DD-<slug>/index.html`。
+- 单文件用 `kind/YYYY-MM-DD-<slug>.html`；多文件包包含 `index.html`、`_site.json`、内容页和共享 `assets/`。
 - 每个单文件或包只在 `INDEX.md` 登记一行。
 - 树里有 HTML 时运行 `scripts/update-catalog.py` 生成根 `index.html`。
 - 默认只落 `.md` 或 `.html` 一种；显式 md→html 才使用 baoyu。

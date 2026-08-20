@@ -11,7 +11,7 @@ description: 浏览器自动化（Playwright MCP）使用规范：导航、页�
 
 ## 截图产物
 
-- 截图、trace、downloads **不得**写入工作区或提交到 git。
+- 截图、trace、downloads **不得**写入工作区。
 - MCP 已配置 `--output-dir` → `/tmp/agent-env/browser/artifacts`（与 `artifact_dir` 一致）。
 - **默认不要传 `filename`**：让 MCP 自动命名（`page-{timestamp}.png`），文件会进 `--output-dir`。
 - 若必须命名：只传 **basename**（如 `example.png`），禁止绝对路径、禁止带目录分隔符。

@@ -18,39 +18,46 @@ class PrettyViewContractTest(unittest.TestCase):
         cls.skill = SKILL.read_text(encoding="utf-8")
         cls.reading_page = (REFERENCES / "html-page.md").read_text(encoding="utf-8")
 
-    def test_reading_pages_have_one_runtime_reference_and_theme(self) -> None:
+    def test_reading_pages_pair_structure_and_design_references(self) -> None:
         self.assertIn("所有未命中 PPT、reveal.js、显式 md→html 的 HTML 请求", self.skill)
         self.assertIn("**reference**：`html-page`", self.skill)
-        self.assertIn("**主题**：`stone-ink`", self.skill)
-        self.assertIn("只 Read `references/html-page.md`", self.skill)
+        self.assertIn("**设计参考**：`frontend-design`", self.skill)
+        self.assertIn(
+            "Read `references/html-page.md` 与 `references/frontend-design/SKILL.md`",
+            self.skill,
+        )
 
         for retired in ("spec-to-readable-html", "html-artifact", "html-doc"):
             self.assertNotIn(retired, self.skill)
 
-    def test_unified_reference_keeps_content_modes_in_one_visual_system(self) -> None:
+    def test_reading_reference_keeps_content_modes_and_requires_a_brief(self) -> None:
         for mode in ("`spec`", "`visual`", "`doc`", "`article`", "`review`"):
             self.assertIn(mode, self.reading_page)
-        for token in ("--canvas", "--paper", "--ink", "--accent", "--line"):
-            self.assertIn(token, self.reading_page)
-        self.assertIn("同壳、同 token、按内容换组件", self.reading_page)
+        for item in ("**Subject**", "**Audience**", "**Page job**", "**Signature**"):
+            self.assertIn(item, self.reading_page)
+        self.assertIn("不使用固定皮肤", self.reading_page)
 
-    def test_page_split_gate_defaults_to_single_page_and_auto_infers_packages(self) -> None:
+    def test_page_architecture_covers_single_flat_and_hierarchical(self) -> None:
         for text in (
-            "**默认生成单页。**",
-            "信号不确定时保持单页",
-            "强信号",
-            "自动生成多文件包",
-            "无需用户确认拆页决策",
-            "index.html` 是总览与唯一对外入口",
-            "每页都必须用相对链接返回 `index.html`",
+            "**单页**（默认）",
+            "**扁平多页**",
+            "**层级多页**",
+            "`_site.json` 是页面树、标题、顺序和父子关系的**唯一维护源**",
+            "默认最多两级内容页",
+            "新增、删除、移动或改名页面时",
         ):
             with self.subTest(text=text):
                 self.assertIn(text, self.skill)
 
-        self.assertIn("默认生成**一个 HTML 页面**", self.reading_page)
-        self.assertIn("判断不确定时保持单页，不向用户追问", self.reading_page)
-        self.assertIn("所有本地 `href` / `src` 都使用相对路径", self.reading_page)
-        self.assertIn("附属页不得单独登记", self.reading_page)
+        for text in (
+            "## 单页合同",
+            "## 扁平多页合同",
+            "## 层级多页合同",
+            "## `_site.json`：多页唯一维护源",
+            "页面文件不得游离于 `_site.json`",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, self.reading_page)
 
     def test_special_routes_remain_available(self) -> None:
         expected = {
@@ -63,16 +70,17 @@ class PrettyViewContractTest(unittest.TestCase):
                 self.assertIn(route, self.skill)
                 self.assertTrue(path.is_file(), path)
 
-    def test_frontend_design_is_an_explicit_reference_only(self) -> None:
+    def test_frontend_design_is_required_for_html(self) -> None:
         for text in (
-            "`frontend-design` 仅在用户点名",
+            "**门 4 · HTML 必做视觉设计**",
+            "进入任何 HTML 输出路径后 Read `references/frontend-design/SKILL.md`",
             "不是输出路径",
-            "仅说“漂亮”“网页”“HTML”不算命中",
         ):
             with self.subTest(text=text):
                 self.assertIn(text, self.skill)
 
         self.assertIn("frontend-design", self.skill)
+        self.assertIn("## 视觉验收（MUST）", self.reading_page)
         self.assertIn("frontend-design", (ROOT / "README.md").read_text(encoding="utf-8"))
 
     def test_retired_reading_page_references_are_not_distributed(self) -> None:

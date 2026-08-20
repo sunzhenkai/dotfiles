@@ -1,259 +1,194 @@
-# 统一 HTML 阅读页（html-page）
+# HTML 阅读页（html-page）
 
-本文件是 pretty-view 的第一方统一阅读页 reference，不是第三方 skill，**禁止**改成 `SKILL.md`。介质已定为 HTML 且未命中 PPT、reveal.js 或显式 md→html 时，只 Read 本文件。
+本文件负责 HTML 阅读页的信息架构、页面关系、工程质量和维护合同。视觉方向必须同时 Read `frontend-design/SKILL.md` 后按内容推导，不使用固定皮肤。
 
-**直写一个可打开的 `.html`。** 不写临时 Markdown，不加载 baoyu / html-ppt / html-slides，也不搜索其他阅读页 reference。落盘与索引仍走门卫 `SKILL.md`。
+- reference：`html-page` + `frontend-design`
+- 生成方式：直写可打开的 `.html`
+- 不加载：baoyu / html-ppt / html-slides，除非门卫命中对应显式口令
+- 落盘、根索引和交付格式：服从上级 `SKILL.md`
 
-- reference：`html-page`
-- 主题：`stone-ink`
-- 目标：规格、图解、技术文档、报告、方案、知识和长文看起来属于同一个产品，而不是多套孤立模板
+## 先做两次判断
 
-## 核心合同：同壳、同 token、按内容换组件
+### 1. 内容模式
 
-所有阅读页必须复用以下四层：
-
-1. **页面壳**：相同背景、顶部标识、主容器宽度、留白和响应式断点。
-2. **排版**：相同字体栈、标题比例、正文行高、代码字体和链接样式。
-3. **语义 token**：相同 `ink / muted / line / paper / accent / success / warning / danger`。
-4. **组件**：摘要、元信息、callout、表格、代码、卡片、图示、时间线都来自同一组件族。
-
-内容是规格、图解或技术文档，只改变结构和启用哪些组件；**不得**另起主题、换字体、换页面壳或引入另一套配色。用户要求换气质时允许整体调整 token，但同一产物和同一项目仍只保留一套 token。
-
-## 内容模式
-
-先判断内容模式，再在统一组件中取用。一个页面可组合相邻模式，但视觉系统不变。
-
-| 模式 | 推荐结构 | 重点组件 |
+| 模式 | 推荐结构 | 重点表达 |
 |------|----------|----------|
-| `spec` 规格 / RFC / PRD / 对齐 | 标题与状态 → 摘要 → 背景/目标 → 需求与约束 → 决策 → 可追溯 → 未决项 | `.meta`、`.status`、`.callout`、`.traceability` |
-| `visual` 图解 / 架构 / 对比 / 时间线 | 标题 → 摘要 → 图例 → 主图/矩阵/时间线 → 证据与解释 | `.legend`、`.diagram`、`.comparison`、`.timeline` |
-| `doc` 技术文档 / 操作说明 | 标题与元信息 → 摘要 → 分节正文 → 示例/代码 → 风险或注意事项 | `.toc`、`.callout`、`table`、`pre`、`kbd` |
-| `article` 报告 / 方案 / 知识 / 长文 | 结论 → 背景 → 要点 → 细节 → 风险/下一步/参考 | `.lede`、`.grid`、`.metric`、`.references` |
-| `review` HTML code review | 范围与结论 → 严重度分组 → 位置与证据 → 测试与残留风险 | `.finding`、`.severity-*`、`code`、`.callout` |
+| `spec` 规格 / RFC / PRD | 状态与摘要 → 背景/目标 → 需求与约束 → 决策 → 追溯 → 未决项 | 决策、状态、可追溯 |
+| `visual` 架构 / 对比 / 时间线 | 摘要 → 图例 → 主图/矩阵/时间线 → 证据与解释 | 关系、差异、演进 |
+| `doc` 技术文档 / 操作说明 | 摘要 → 目录 → 分节正文 → 示例/代码 → 注意事项 | 查找、步骤、准确性 |
+| `article` 报告 / 方案 / 知识 / 长文 | 结论 → 背景 → 要点 → 细节 → 风险/下一步/参考 | 阅读节奏、论证 |
+| `review` HTML code review | 范围与结论 → 严重度分组 → 位置与证据 → 测试与残留风险 | 优先级、证据、行动 |
 
-可在 `<body data-page-kind="spec|visual|doc|article|review">` 标记模式，便于维护；不要据此换主题。
+一个产物可组合相邻模式，但必须有一个主模式。模式决定信息结构，不直接决定配色和字体。
 
-## 单页 / 多页自动推断
+### 2. 页面架构
 
-默认生成**一个 HTML 页面**。长内容优先使用页内目录、锚点和分节；长度、章节数、表格、代码、图解或内容模式混合本身都不触发拆页。判断不确定时保持单页，不向用户追问。
+默认单页。按内容边界、受众和维护关系选择：
 
-仅在命中以下强信号时自动拆成多文件包：
+| 架构 | 判断标准 | 维护单元 |
+|------|----------|----------|
+| 单页 | 一个主题、连续阅读、共同发布和维护 | 一个 HTML |
+| 扁平多页 | 多个独立且同级的模块，没有真实父子关系 | 一个包 + `_site.json` |
+| 层级多页 | 存在稳定的父子分类，分组有自己的总览职责 | 一个包 + `_site.json` + 分组目录 |
 
-- 用户明确要求多页、每章一页或文档站。
-- 输入是多个独立文档，但需要统一入口。
-- 存在总览和至少两个可独立查阅、独立分享或独立维护的模块。
-- 不同部分面向明显不同的受众或维护周期。
+不要因为篇幅长、标题多、表格多或代码多就拆页。只是顺序关系也不构成层级。
 
-自动拆页时先用一句话告知推断结果和页面地图，然后直接生成；拆页本身不需要确认。默认落盘根不存在、路径冲突等情况仍服从门卫 `SKILL.md` 的确认规则。
+## 视觉设计流程（MUST）
 
-多页包合同：
+Read `frontend-design/SKILL.md`，在写代码前完成以下内部 brief：
+
+1. **Subject**：内容具体在讲什么，它所属世界有哪些真实材料、符号或工作方式。
+2. **Audience**：谁读，阅读环境是什么，读完要做什么。
+3. **Page job**：页面唯一主要任务，例如“快速作出决策”或“准确查到操作步骤”。
+4. **Direction**：一句视觉方向；不得只是“简洁、现代、高级”。
+5. **Tokens**：4–6 个有语义的颜色、至少两种字体角色、间距与圆角规则。
+6. **Layout**：内容结构如何映射为版式，不为装饰而制造编号、卡片或 hero。
+7. **Signature**：一个与主题有关、可解释的记忆点；其余部分保持克制。
+
+自检 brief：如果换成另一篇文档仍完全成立，说明它过于通用，必须重做。避免固定套用暖米色衬线、暗色荧光、报纸细线、紫色渐变灰卡等常见 AI 默认外观，除非内容本身确实支持。
+
+### 同一包的一致性
+
+多页包必须共用：
+
+- 一份 `assets/site.css`；需要脚本时共用 `assets/site.js`
+- 同一 token、字体角色、网格、导航、组件与交互语言
+- 同一页眉/侧栏/面包屑规则
+- 同一视觉 signature 的变化形式，而不是每页另做主题
+
+统一的是设计系统，不是把每段正文塞进同一种卡片。
+
+## 单页合同
 
 ```text
-<kind>/YYYY-MM-DD-<slug>/
-├── index.html          # 总览、结论、页面地图；唯一根入口
-├── <topic-a>.html      # 独立模块，返回 index.html
-├── <topic-b>.html      # 独立模块，返回 index.html
-└── assets/             # 可选的包内资源
+YYYY-MM-DD-<slug>.html
 ```
 
-- 只允许一层附属页，不再嵌套子目录页面。
-- `index.html` 必须链接全部附属页；每个附属页必须使用相对链接返回 `index.html`，并提供一致的包内导航。
-- 所有本地 `href` / `src` 都使用相对路径；禁止绝对磁盘路径和 `file:///...`。
-- 根 catalog 只登记 `index.html`。附属页不得单独登记，也不得成为无法从主文件访问的孤儿页。
-- 每一页都复制同一套 stone-ink token、页面壳和组件；拆页只改变信息边界，不改变视觉系统。
+- 一个 H1；开头给结论或 TL;DR。
+- 长文使用页内目录和稳定锚点。
+- 正文保持可读行宽；表格、代码、图和矩阵可突破正文栏。
+- 仅一个文件时 CSS 可内联；图片使用同目录相对路径。
+- 不为了“像网站”添加没有内容职责的导航。
 
-## 布局合同
+## 扁平多页合同
 
-- `html, body { width: 100%; margin: 0; }`，背景铺满视口。
-- `.shell` 是统一页面容器：`max-width: 1440px; margin: 0 auto; padding: 40px clamp(20px, 4vw, 56px) 88px`。
-- 普通正文放在 `.prose`，建议 `max-width: 76ch`；它不是独立白卡，也不居中成公众号窄栏。
-- 宽表、代码、图、矩阵和网格使用 `.wide`，可占满 `.shell`。不要为了正文行宽把信息密集块压窄。
-- 有目录时使用 `.layout` 两栏：左侧 `.toc`，右侧正文；小屏退化为单栏。没有目录时仍复用同一 `.shell`。
-- 统一 header 只放 eyebrow、H1、元信息和摘要；不要做营销导航、居中 hero 或大面积装饰封面。
-- 根 catalog 注入的「← 目录」位于 `<body>` 后；正文不要手写同类回链。
+```text
+YYYY-MM-DD-<slug>/
+├── index.html
+├── _site.json
+├── topic-a.html
+├── topic-b.html
+└── assets/
+    ├── site.css
+    └── site.js          # 可选
+```
 
-## stone-ink token
+- `index.html` 给出结论、范围和完整页面地图，是唯一对外入口。
+- 内容页是同级关系；全局导航顺序与 `_site.json` 一致。
+- 每页提供首页、上一页、下一页或同级导航，但不伪造父子关系。
 
-除非用户明确要求整体换气质，否则复制这组 token，不要逐页随意改色。
+## 层级多页合同
 
-```css
-:root {
-  color-scheme: light;
-  --canvas: #f5f2ec;
-  --paper: #fffdf8;
-  --paper-strong: #ffffff;
-  --ink: #1c1917;
-  --muted: #78716c;
-  --faint: #a8a29e;
-  --line: #ded8ce;
-  --line-strong: #c8bfb2;
-  --accent: #1d4ed8;
-  --accent-soft: #eaf1ff;
-  --success: #166534;
-  --success-soft: #ecfdf3;
-  --warning: #a16207;
-  --warning-soft: #fff8e1;
-  --danger: #b91c1c;
-  --danger-soft: #fff1f1;
-  --code-bg: #211f1c;
-  --code-ink: #f5f5f4;
-  --shadow: 0 18px 50px rgba(54, 45, 35, .08);
-  --sans: ui-sans-serif, system-ui, "Noto Sans SC", "PingFang SC", sans-serif;
-  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --canvas: #171513;
-    --paper: #211f1c;
-    --paper-strong: #292623;
-    --ink: #f5f2ec;
-    --muted: #b8b0a5;
-    --faint: #8f877e;
-    --line: #3d3833;
-    --line-strong: #544d46;
-    --accent: #93b4ff;
-    --accent-soft: #202c49;
-    --success: #86d39a;
-    --success-soft: #193222;
-    --warning: #f1c56b;
-    --warning-soft: #382d16;
-    --danger: #f4a3a3;
-    --danger-soft: #3d2020;
-    --code-bg: #11100f;
-    --code-ink: #f5f5f4;
-    --shadow: none;
-  }
+```text
+YYYY-MM-DD-<slug>/
+├── index.html
+├── _site.json
+├── domain-a/
+│   ├── index.html
+│   ├── topic-a.html
+│   └── topic-b.html
+├── domain-b/
+│   ├── index.html
+│   └── topic-c.html
+└── assets/
+    ├── site.css
+    └── site.js          # 可选
+```
+
+- 默认最多两级内容页。
+- 每个目录 `index.html` 必须解释该分组并链接直属子页，不能只是空跳转。
+- 内容页提供“首页 → 分组 → 当前页”面包屑及同级导航。
+- 跨分组链接用于真实关联，不用来弥补错误分类。
+
+## `_site.json`：多页唯一维护源
+
+多页必须创建 `_site.json`。页面标题、路径、顺序和层级只在这里定义一次：
+
+```json
+{
+  "title": "展示包标题",
+  "home": "index.html",
+  "pages": [
+    {
+      "title": "领域 A",
+      "path": "domain-a/index.html",
+      "children": [
+        {"title": "主题 A", "path": "domain-a/topic-a.html"}
+      ]
+    }
+  ]
 }
 ```
 
-## 基础骨架
+约束：
 
-按内容模式填充结构；可以删掉不用的组件，但不要替换页面壳和 token。
+- `path` 必须是包内相对路径，不以 `/` 开头，不含 `..`。
+- `title` 与对应页面 H1 一致。
+- 扁平包的 `pages` 不使用 `children`。
+- 层级包的父节点必须指向真实分组 `index.html`。
+- 页面文件不得游离于 `_site.json`；资源文件和根 `index.html` 除外。
 
-```html
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>标题</title>
-<style>
-  /* 复制 stone-ink token 到这里 */
-  * { box-sizing: border-box; }
-  html, body { width: 100%; margin: 0; }
-  body { background: var(--canvas); color: var(--ink); font: 16px/1.7 var(--sans); }
-  a { color: var(--accent); text-underline-offset: .18em; }
-  .shell { width: 100%; max-width: 1440px; margin: 0 auto;
-    padding: 40px clamp(20px, 4vw, 56px) 88px; }
-  .page-header { padding: clamp(24px, 4vw, 52px); background: var(--paper);
-    border: 1px solid var(--line); box-shadow: var(--shadow); }
-  .eyebrow, .meta { color: var(--muted); font-size: .82rem; letter-spacing: .08em; }
-  .eyebrow { text-transform: uppercase; font-weight: 700; }
-  h1 { max-width: 24ch; margin: .35rem 0 .75rem; font-size: clamp(2rem, 5vw, 4.5rem);
-    line-height: 1.04; letter-spacing: -.045em; }
-  .lede { max-width: 76ch; margin: 0; color: var(--muted); font-size: 1.08rem; }
-  .layout { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-    gap: clamp(28px, 5vw, 72px); margin-top: 36px; align-items: start; }
-  .layout.no-toc { grid-template-columns: minmax(0, 1fr); }
-  .toc { position: sticky; top: 20px; padding: 18px 0; border-top: 1px solid var(--line); }
-  .toc a { display: block; padding: 5px 0; color: var(--muted); text-decoration: none; }
-  .toc a:hover { color: var(--accent); }
-  article { min-width: 0; }
-  .prose { max-width: 76ch; }
-  section { padding: 8px 0 28px; }
-  h2 { margin: 36px 0 14px; padding-top: 22px; border-top: 1px solid var(--line);
-    font-size: clamp(1.25rem, 2vw, 1.65rem); letter-spacing: -.02em; }
-  h3 { margin: 24px 0 8px; font-size: 1.05rem; }
-  p, ul, ol { margin: 0 0 14px; }
-  .wide { width: 100%; max-width: none; margin: 24px 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-  .card { min-width: 0; padding: 18px; background: var(--paper);
-    border: 1px solid var(--line); border-radius: 2px; }
-  .callout { max-width: 76ch; margin: 18px 0; padding: 14px 16px;
-    border-left: 3px solid var(--accent); background: var(--accent-soft); }
-  .callout.success { border-color: var(--success); background: var(--success-soft); }
-  .callout.warning { border-color: var(--warning); background: var(--warning-soft); }
-  .callout.danger { border-color: var(--danger); background: var(--danger-soft); }
-  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-  th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-  th { color: var(--muted); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; }
-  pre { width: 100%; overflow: auto; padding: 18px 20px; background: var(--code-bg);
-    color: var(--code-ink); border-radius: 2px; font: .86rem/1.6 var(--mono); }
-  code, kbd { font-family: var(--mono); }
-  :not(pre) > code, kbd { padding: .12em .35em; border: 1px solid var(--line);
-    background: var(--paper); font-size: .88em; }
-  .diagram { min-height: 160px; padding: 20px; background: var(--paper);
-    border: 1px solid var(--line-strong); overflow: auto; }
-  .timeline { border-left: 2px solid var(--line-strong); padding-left: 22px; }
-  .timeline > * { position: relative; margin-bottom: 20px; }
-  .timeline > *::before { content: ""; position: absolute; left: -28px; top: .5em;
-    width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
-  .status { display: inline-flex; align-items: center; padding: 3px 8px;
-    border: 1px solid var(--line-strong); color: var(--muted); font-size: .78rem; }
-  @media (max-width: 820px) {
-    .shell { padding-top: 20px; }
-    .page-header { padding: 24px 20px; }
-    .layout { grid-template-columns: 1fr; }
-    .toc { position: static; }
-  }
-  @media print {
-    body { background: #fff; color: #000; }
-    .shell { max-width: none; padding: 0; }
-    .page-header { box-shadow: none; }
-    .toc { display: none; }
-    a { color: inherit; }
-  }
-</style>
-</head>
-<body data-page-kind="article">
-<main class="shell">
-  <header class="page-header">
-    <div class="eyebrow">内容类型 · 日期</div>
-    <h1>标题</h1>
-    <p class="meta">状态 / 受众 / 作者等必要元信息</p>
-    <p class="lede">结论或 TL;DR，3–7 行。</p>
-  </header>
-  <div class="layout no-toc">
-    <article>
-      <div class="prose">
-        <!-- 按内容模式组织正文 -->
-      </div>
-      <!-- 宽表、图、代码、矩阵放到 .wide -->
-    </article>
-  </div>
-</main>
-</body>
-</html>
-```
+### 维护顺序
 
-## 组件使用规则
+新增、删除、移动、改名或重排页面时：
 
-- **摘要**：`.lede` 只放结论，不重复标题。
-- **卡片**：只用于真正并列的对象；正文段落不要逐段卡片化。
-- **callout**：默认用于信息/决策，`success` 用于已完成，`warning` 用于风险，`danger` 用于阻断项。
-- **表格**：字段、对比、追溯、评审发现优先用表格；小屏允许横向滚动，不删除列。
-- **图解**：优先使用语义 HTML + CSS；复杂 SVG 必须带文字说明。图示颜色仍取 stone-ink token。
-- **交互**：只有筛选、折叠或图解确有必要时才用少量原生 JS；核心内容在 JS 失败时仍可读。
-- **状态**：统一使用 `.status`，不要每种文档发明不同 badge 风格。
-- **证据**：引用、代码、路径和数据紧邻结论，不把重要约束藏在 hover 或折叠区。
+1. 先改 `_site.json`。
+2. 再创建、移动或删除页面文件。
+3. 同步首页和分组页的页面地图。
+4. 同步受影响页面的导航、面包屑和前后页。
+5. 检查所有本地链接、资源路径、重复路径和孤儿页。
+6. 最后更新根 `docs/pretty-view/INDEX.md`；根 catalog 仍只登记包的 `index.html`。
 
-## 自检
+禁止只改某一页导航而不改 `_site.json`。
 
-生成后逐项检查：
+## 工程质量底线
 
-- [ ] reference 只有 `html-page`，主题只有 `stone-ink`
-- [ ] 页面壳、token、字体和组件来自本文件
-- [ ] 一个 H1，开头有结论或 TL;DR
-- [ ] 正文行宽可读，宽内容没有被压进窄栏
-- [ ] `file://` 可打开；关键内容不依赖外网或 JS
-- [ ] 移动端无横向页面溢出（宽表/代码可在自身容器滚动）
-- [ ] 未手写 catalog 回链，未修改根 `index.html`
+- 完整文档：`<!DOCTYPE html>`、`lang="zh-CN"`、charset、viewport、准确 `<title>`。
+- 语义 HTML；一个 H1；标题层级连续；跳转链接和可见键盘焦点完整。
+- `file://` 可打开；本地 `href/src` 全部使用相对路径。
+- 默认不依赖外网 JS、字体或图标；外链资源必须有明确理由和降级方案。
+- 响应式到窄屏；页面本身不能横向溢出，宽表/代码可在自身容器滚动。
+- 尊重 `prefers-reduced-motion`；核心内容在 JS 失败时仍可读。
+- 打印时隐藏无关导航，保留正文、链接语义和分页可读性。
+- 不把密钥、内部 URL 或公司私有内容放入可公开产物。
 
-## 不要
+## 组件原则
 
-- 因为内容是 spec、架构图或技术文档就切换另一套 reference / 主题。
-- 先写 `.md` 再转换（除非命中 baoyu 显式口令）。
-- 紫渐变 + Inter 灰卡片、营销 landing page、居中大 hero、每段一卡。
-- 为追求「统一」把所有内容都压成同一种卡片；统一的是视觉语言，不是信息结构。
-- 外链未说明的字体、图标或框架；引用 skill 目录里的运行时资源。
+- 摘要只放结论，不复述标题。
+- 卡片只表达真正并列的对象；普通段落不逐段卡片化。
+- callout 用于决策、风险、阻断或必要提示，不用于装饰。
+- 表格用于字段、对比、追溯和评审发现；小屏横向滚动，不静默删列。
+- 图解优先使用语义 HTML/CSS；复杂 SVG 必须有文字说明。
+- 编号只用于真实顺序；状态、标签和分隔符必须编码真实信息。
+- 引用、代码、路径和数据紧邻其结论，不把关键约束藏在 hover 或折叠区。
+
+## 视觉验收（MUST）
+
+生成后必须做一次设计复核；环境支持浏览器时，打开页面并至少检查桌面和移动端截图：
+
+- 5 秒内是否看得出主题、结论和阅读入口。
+- 字体角色、层级、留白和密度是否服务内容。
+- 是否存在模板感、无意义 hero、渐变、装饰编号或卡片海洋。
+- 表格、代码、长标题、中文与英文混排是否溢出。
+- 多页的首页、面包屑、同级导航和返回路径是否一致。
+- 键盘焦点、对比度、减少动效和打印是否可用。
+
+发现问题后至少修正一轮，再交付。
+
+## 禁止
+
+- 先写临时 Markdown 再转换，除非命中 baoyu 显式口令。
+- 从本 reference 复制一套固定颜色或“万能模板”。
+- 把阅读页做成营销 landing page，或为视觉冲击牺牲可读性。
+- 多页时复制多份 CSS，或让 `_site.json`、首页地图和导航互相漂移。
+- 手写根 catalog 的「← 目录」回链，或修改 vendor reference。
