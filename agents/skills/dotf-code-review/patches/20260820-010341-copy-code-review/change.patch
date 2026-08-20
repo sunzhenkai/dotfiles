@@ -1,0 +1,893 @@
+diff --git a/agents/skills/code-review/SKILL.md b/agents/skills/code-review/SKILL.md
+new file mode 100644
+index 0000000..d126f74
+--- /dev/null
++++ b/agents/skills/code-review/SKILL.md
+@@ -0,0 +1,143 @@
++---
++name: code-review
++description: 使用 OCR 兼容的代码审查 CLI，审查指定 Git 仓库的未提交改动、相对默认分支的 diff，或 GitLab/GitHub Merge Request / Pull Request；完整结果写入 review workspace 的 docs/reviews/{日期}/{change-name}，对话只打印按 P0~Pn 排序的总结。在用户要求 code review、审查 MR/PR、评审未提交改动时使用。
++license: MIT
++---
++
++# code-review
++
++用 OCR 兼容的 CLI 做 **Git diff 级代码审查**。机械步骤走 `scripts/reviewctl.py`；审查引擎使用已配置的 `ocr` 命令，不要用通用 agent 逐文件替代。
++
++不替代：架构评审、岗位视角评审、需求/规格符合性评审。默认只审查、不改代码。
++
++## 调用
++
++```text
++/code-review repo=<仓库名|仓库路径> [mode=uncommitted|default-branch] [change-name=<slug>]
++/code-review <GitLab/GitHub MR 或 PR URL>
++```
++
++可选：业务背景（commit/MR 说明、需求一句话）→ 传给 `ocr --background`。
++
++## MUST 先读取并执行
++
++1. 本文件全文。
++2. 机械命令用 [`scripts/reviewctl.py`](scripts/reviewctl.py)，`--root` 指向审查 workspace 根目录。
++
++```bash
++python3 <skill-root>/scripts/reviewctl.py --root <workspace-root> inspect --repo <name-or-path>
++python3 <skill-root>/scripts/reviewctl.py parse-mr --url '<url>'
++python3 <skill-root>/scripts/reviewctl.py write --ocr-json /tmp/ocr.json --meta-json /tmp/meta.json
++```
++
++## 前置
++
++```bash
++which ocr || echo "NOT INSTALLED"
++ocr llm test
++```
++
++未安装：按 OCR CLI 的上游文档安装（先征得用户同意）。`ocr llm test` 失败则停下来，让用户配置 LLM（环境变量或 `ocr config`），**禁止编造 API key**。
++
++GitLab 自建实例认证：
++
++- 优先使用环境变量 `GITLAB_TOKEN`，不要把 token 写入命令行参数、日志或审查产物。
++- 调用 `glab` 时映射为：`GITLAB_TOKEN="$GITLAB_TOKEN" glab ...`；GitLab API 需要 token 具备 `api` scope。
++- 若 `GITLAB_TOKEN` 未设置且目标需要认证，停止并请用户配置该变量；禁止编造或输出 token。
++
++## 流程
++
++### 1. 解析目标
++
++- 用户给了 **MR/PR URL** → 走「MR 模式」，忽略本地脏工作区。
++- 用户给了 **仓库名或路径** → `reviewctl inspect`。
++- 都没给：若当前对话已点名仓库则用之；否则询问。多命中时列出 `candidates` 让用户选。
++
++### 2. 确定审查范围（确认门）
++
++**仓库模式**（`inspect` 的 `recommendation`）：
++
++| recommendation | 含义 | 下一步 |
++|---|---|---|
++| `uncommitted` | 仅工作区脏 | 建议 workspace 审查；**仍须用户确认** |
++| `default-branch` | 干净且相对默认分支有提交 | 建议 `--from <comparison_ref> --to HEAD`；**仍须用户确认** |
++| `ask` | 既有未提交又有分支提交 | **必须**让用户选其一，禁止默默合并两种 diff |
++| `nothing` | 干净且无新提交 | 停止，问是否改用 MR 链接或其它 ref |
++
++用户已显式给 `mode=` 时，不再改推荐，仍要先 `ocr review --preview` 展示文件列表再跑 LLM。
++
++**MR/PR 模式**：
++
++1. `reviewctl parse-mr --url ...` → `kind` / `host` / `project` / `iid` / `repo_hint`
++2. 用 `repo_hint`（或 URL 里的 project）`inspect`/`resolve-repo` 定位本地仓；找不到则列出候选或请用户给仓库路径。
++3. 取源/目标分支：
++   - GitLab：`GITLAB_TOKEN="$GITLAB_TOKEN" glab mr view <iid> --repo https://<host>/<project> -F json`
++   - GitHub：`gh pr view <iid> --repo <project> --json baseRefName,headRefName,title`
++4. **只 fetch，不 checkout、不 stash**：
++
++```bash
++git -C <git_root_abs> fetch origin
++# GitLab
++git -C <git_root_abs> fetch origin "merge-requests/<iid>/head:refs/code-review/mr-<iid>"
++# GitHub
++git -C <git_root_abs> fetch origin "pull/<iid>/head:refs/code-review/pr-<iid>"
++```
++
++5. 审查范围：`--from origin/<target_branch> --to refs/code-review/mr-<iid>`（GitHub 用 `pr-<iid>`）
++6. `ocr review --preview` 后确认再跑 LLM。
++
++### 3. 跑 ocr
++
++始终：`--audience agent --format json --repo <git_root_abs>`，有背景就加 `-b`。stdout 重定向到文件，禁止 `head`/`tail` 截断。
++
++```bash
++# 未提交
++ocr review --audience agent --format json --repo <abs> -b "<background>" > /tmp/ocr.json 2>/tmp/ocr.err
++# 相对默认分支 / MR / PR
++ocr review --audience agent --format json --repo <abs> -b "<background>" \
++  --from <from> --to <to> > /tmp/ocr.json 2>/tmp/ocr.err
++```
++
++先看 exit code 与 `/tmp/ocr.err`。JSON `status=skipped` 视为无审查对象，不是失败。
++
++### 4. 分级并落盘
++
++读取 ocr JSON 的 `comments[]`，为每条指定 `priority`：`P0`（发布阻断 / 安全 / 数据损坏）· `P1`（应尽快修的缺陷）· `P2`（普通缺陷）· `P3`（低影响仍值得修）。可先用 `reviewctl` 启发式，**有把握时覆盖**。把带 `priority` 的 comments 写回临时 JSON。
++
++`change-name`：用户指定优先；否则 `reviewctl change-name`。日期使用运行当天的 `YYYY-MM-DD`。
++
++```bash
++python3 <skill-root>/scripts/reviewctl.py --root <workspace-root> write \
++  --ocr-json /tmp/ocr.classified.json --meta-json /tmp/meta.json
++```
++
++`meta.json` 至少含：`repo`、`mode`、`date`、`change_name`、`branch`、`from`、`to`、`default_branch`；MR/PR 再加 `mr_url`、`mr_iid`、`title`。
++
++产物目录：`<workspace-root>/docs/reviews/{YYYY-MM-DD}/{change-name}/`
++
++| 文件 | 内容 |
++|------|------|
++| `ocr-raw.json` | ocr 完整 JSON |
++| `review.md` | 完整审查（含现有代码 / 建议 / 推理） |
++| `summary.md` | 总结版（同对话打印） |
++
++并更新 `docs/reviews/INDEX.md`。
++
++### 5. MR/PR 评论确认门
++
++仅在 **MR/PR 模式** 且 `review.md` 已成功落盘后，询问用户：
++
++> 完整 review 报告已保存到 `<review.md 路径>`。是否将该完整报告作为评论发布到 `<MR/PR URL>`？这会对远程平台产生写操作，请确认目标和内容。
++
++在用户明确确认前，禁止调用 `glab mr note`、`gh pr comment` 或任何等效的远程写接口。确认时再次核对目标 URL/IID 与待发布文件；用户拒绝、未确认或目标不明确时，只保留本地报告，不发布评论。用户确认后，以 `review.md` 的完整内容发布一条评论，并在结果中报告成功或失败。仓库模式不询问，也不发布评论。
++
++### 6. 对用户只打印总结
++
++对话输出 **仅** `write` 返回的 `summary`（已按 P0→Pn 排序），再给完整文档路径。不要把 `thinking`、大段代码、原始 JSON 贴进对话。无 findings 时打印 `No findings.` + 文档链接。
++
++## 边界
++
++- 默认不改业务代码、不 commit、不 push、不在 MR/PR 上发评论；远程评论必须经过上一步的明确确认。用户明确要求「顺手修」才可改代码。
++- 不 `checkout` / `stash` / `reset` 目标仓；MR/PR 只用 fetch 的 `refs/code-review/*`。
++- 完整结果只写 `--root` 指定 workspace 的 `docs/reviews/`，不写目标仓的代码目录。
++- 架构评审、岗位视角评审、需求/规格符合性评审分别使用适合的专门流程。
+diff --git a/agents/skills/code-review/scripts/reviewctl.py b/agents/skills/code-review/scripts/reviewctl.py
+new file mode 100644
+index 0000000..013950c
+--- /dev/null
++++ b/agents/skills/code-review/scripts/reviewctl.py
+@@ -0,0 +1,589 @@
++#!/usr/bin/env python3
++"""Helpers for /code-review: resolve repositories, inspect change source, parse MR/PR, and write docs."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import subprocess
++import sys
++from datetime import date
++from pathlib import Path
++from typing import Any
++
++SKIP_DIRS = {
++    ".git",
++    "node_modules",
++    "vendor",
++    "dist",
++    "build",
++    ".venv",
++    "__pycache__",
++    "target",
++    ".tox",
++}
++PRIORITY_ORDER = ("P0", "P1", "P2", "P3", "P4")
++GITLAB_MR = re.compile(
++    r"^https?://(?P<host>[^/]+)/(?P<project>.+?)/-/?merge_requests/(?P<iid>\d+)(?:[/?#].*)?$",
++    re.I,
++)
++GITLAB_MR_ALT = re.compile(
++    r"^https?://(?P<host>[^/]+)/(?P<project>.+?)/merge_requests/(?P<iid>\d+)(?:[/?#].*)?$",
++    re.I,
++)
++GITHUB_PR = re.compile(
++    r"^https?://(?P<host>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<iid>\d+)(?:[/?#].*)?$",
++    re.I,
++)
++P0_RE = re.compile(
++    r"(sql\s*injection|xss|rce|auth(?:entication)? bypass|越权|数据丢失|secret|凭证泄露|"
++    r"任意文件|路径穿越|panic\b|segfault|生产事故|P0)",
++    re.I,
++)
++P1_RE = re.compile(
++    r"(race|deadlock|nil deref|npe|空指针|正确性|逻辑错误|并发安全|数据竞争|丢事件|"
++    r"broken api|崩溃|crash|P1)",
++    re.I,
++)
++P2_RE = re.compile(
++    r"(error handling|missing test|缺少测试|可维护|资源泄露|timeout|重试|P2)",
++    re.I,
++)
++
++
++class ReviewError(Exception):
++    pass
++
++
++def repo_root_from_script() -> Path:
++    return Path.cwd()
++
++
++def git(args: list[str], cwd: Path, check: bool = True) -> str:
++    proc = subprocess.run(
++        ["git", *args],
++        cwd=cwd,
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    if check and proc.returncode != 0:
++        err = (proc.stderr or proc.stdout or "").strip()
++        raise ReviewError(f"git {' '.join(args)} failed: {err}")
++    return (proc.stdout or "").strip()
++
++
++def iter_git_roots(codes: Path, max_depth: int = 8) -> list[Path]:
++    if not codes.exists():
++        return []
++    start = codes.resolve()
++    skip_expr: list[str] = []
++    for name in sorted(SKIP_DIRS - {".git"}):
++        skip_expr += ["-name", name, "-o"]
++    find_cmd = [
++        "find",
++        str(start),
++        "-maxdepth",
++        str(max_depth),
++        "(",
++        *skip_expr[:-1],
++        ")",
++        "-prune",
++        "-o",
++        "-name",
++        ".git",
++        "-prune",
++        "-print",
++    ]
++    proc = subprocess.run(find_cmd, capture_output=True, text=True, check=False)
++    if proc.returncode == 0 and proc.stdout.strip():
++        return [Path(line).parent for line in proc.stdout.splitlines() if line.strip()]
++
++    roots: list[Path] = []
++
++    def walk(path: Path, depth: int) -> None:
++        if (path / ".git").exists():
++            roots.append(path)
++        if depth >= max_depth:
++            return
++        try:
++            entries = list(path.iterdir())
++        except OSError:
++            return
++        for entry in entries:
++            if not entry.is_dir() or entry.name in SKIP_DIRS:
++                continue
++            walk(entry, depth + 1)
++
++    walk(start, 0)
++    return roots
++
++
++def find_git_root(path: Path) -> Path | None:
++    cur = path if path.is_dir() else path.parent
++    for candidate in [cur, *cur.parents]:
++        if (candidate / ".git").exists():
++            return candidate
++    return None
++
++
++def resolve_repo(work_root: Path, raw: str) -> dict[str, Any]:
++    name = raw.strip().rstrip("/")
++    if not name:
++        raise ReviewError("repo name is empty")
++
++    workspace = work_root.resolve()
++    if name in {"workspace", ".", str(workspace)}:
++        if (workspace / ".git").exists():
++            return {
++                "input": name,
++                "git_root": ".",
++                "git_root_abs": str(workspace),
++                "basename": workspace.name,
++            }
++        raise ReviewError("workspace root is not a Git repository; specify a repository path")
++
++    path = Path(name).expanduser()
++    if path.is_absolute():
++        target = path
++        if not target.exists():
++            raise ReviewError(f"path does not exist: {name}")
++    else:
++        candidate = workspace / path
++        target = candidate if candidate.exists() else None
++
++    if target is not None:
++        git_root = find_git_root(target.resolve())
++        if git_root is None:
++            raise ReviewError(f"no git root for: {name}")
++        rel = _rel_display(work_root, git_root)
++        return {
++            "input": name,
++            "git_root": rel,
++            "git_root_abs": str(git_root),
++            "basename": git_root.name,
++        }
++
++    roots = ([workspace] if (workspace / ".git").exists() else []) + iter_git_roots(workspace)
++    exact = [p for p in roots if p.name == name]
++    if len(exact) == 1:
++        git_root = exact[0]
++        return {
++            "input": name,
++            "git_root": _rel_display(work_root, git_root),
++            "git_root_abs": str(git_root),
++            "basename": git_root.name,
++        }
++    if len(exact) > 1:
++        return {
++            "input": name,
++            "ambiguous": True,
++            "candidates": [_rel_display(work_root, p) for p in exact],
++        }
++
++    suffix = [p for p in roots if p.as_posix().endswith("/" + name)]
++    if len(suffix) == 1:
++        git_root = suffix[0]
++        return {
++            "input": name,
++            "git_root": _rel_display(work_root, git_root),
++            "git_root_abs": str(git_root),
++            "basename": git_root.name,
++        }
++    if suffix:
++        return {
++            "input": name,
++            "ambiguous": True,
++            "candidates": [_rel_display(work_root, p) for p in suffix],
++        }
++    raise ReviewError(f"repo not found under workspace root: {name}")
++
++
++def _rel_display(work_root: Path, git_root: Path) -> str:
++    try:
++        rel = git_root.resolve().relative_to(work_root.resolve()).as_posix()
++        return rel if rel != "." else "."
++    except ValueError:
++        return str(git_root)
++
++
++def default_branch(git_root: Path) -> str:
++    head = git(["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], git_root, check=False)
++    if head:
++        return head.replace("refs/remotes/origin/", "").strip()
++    for name in ("main", "master", "develop"):
++        exists = git(["rev-parse", "--verify", "--quiet", name], git_root, check=False)
++        remote = git(["rev-parse", "--verify", "--quiet", f"origin/{name}"], git_root, check=False)
++        if exists or remote:
++            return name
++    current = git(["rev-parse", "--abbrev-ref", "HEAD"], git_root, check=False)
++    return current or "main"
++
++
++def comparison_ref(git_root: Path, branch: str) -> str:
++    remote = git(["rev-parse", "--verify", "--quiet", f"origin/{branch}"], git_root, check=False)
++    if remote:
++        return f"origin/{branch}"
++    return branch
++
++
++def inspect_repo(work_root: Path, raw: str) -> dict[str, Any]:
++    resolved = resolve_repo(work_root, raw)
++    if resolved.get("ambiguous"):
++        return resolved
++    git_root = Path(resolved["git_root_abs"])
++    branch = git(["rev-parse", "--abbrev-ref", "HEAD"], git_root, check=False) or "HEAD"
++    porcelain = git(["status", "--porcelain"], git_root, check=False)
++    dirty_paths = [line[3:] for line in porcelain.splitlines() if line.strip()]
++    base = default_branch(git_root)
++    cmp_ref = comparison_ref(git_root, base)
++    ahead = 0
++    if git(["rev-parse", "--verify", "--quiet", cmp_ref], git_root, check=False):
++        count = git(["rev-list", "--count", f"{cmp_ref}..HEAD"], git_root, check=False)
++        ahead = int(count or "0")
++    dirty = bool(dirty_paths)
++    on_default = branch == base or branch == f"origin/{base}"
++    if dirty and ahead:
++        recommendation = "ask"
++        reason = "同时存在未提交改动和相对默认分支的提交，需用户确认审查范围"
++    elif dirty:
++        recommendation = "uncommitted"
++        reason = "工作区有未提交改动（含 untracked）"
++    elif ahead:
++        recommendation = "default-branch"
++        reason = f"当前分支相对 {cmp_ref} 超前 {ahead} 个提交"
++    else:
++        recommendation = "nothing"
++        reason = "工作区干净且相对默认分支没有新提交"
++    return {
++        **resolved,
++        "branch": branch,
++        "default_branch": base,
++        "comparison_ref": cmp_ref,
++        "on_default": on_default,
++        "dirty": dirty,
++        "dirty_paths": dirty_paths,
++        "ahead_of_default": ahead,
++        "recommendation": recommendation,
++        "reason": reason,
++        "needs_confirm": True,
++    }
++
++
++def parse_mr_url(url: str) -> dict[str, Any]:
++    text = url.strip()
++    m = GITLAB_MR.match(text) or GITLAB_MR_ALT.match(text)
++    if m:
++        project = m.group("project").strip("/")
++        basename = project.rsplit("/", 1)[-1]
++        return {
++            "kind": "gitlab",
++            "host": m.group("host"),
++            "project": project,
++            "iid": int(m.group("iid")),
++            "repo_hint": basename,
++            "url": text,
++        }
++    m = GITHUB_PR.match(text)
++    if m:
++        return {
++            "kind": "github",
++            "host": m.group("host"),
++            "project": f"{m.group('owner')}/{m.group('repo')}",
++            "iid": int(m.group("iid")),
++            "repo_hint": m.group("repo"),
++            "url": text,
++        }
++    raise ReviewError(f"unsupported merge request URL: {url}")
++
++
++def slugify(text: str, max_len: int = 48) -> str:
++    out = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower()).strip("-")
++    return (out or "change")[:max_len].rstrip("-")
++
++
++def change_name(*, repo_basename: str, mode: str, branch: str = "", mr_iid: int | None = None, title: str = "") -> str:
++    base = slugify(repo_basename, 32)
++    if mode == "mr" and mr_iid is not None:
++        extra = slugify(title, 24) if title else ""
++        return f"{base}-mr-{mr_iid}" + (f"-{extra}" if extra else "")
++    if mode == "uncommitted":
++        return f"{base}-{slugify(branch or 'wip', 24)}-uncommitted"
++    if mode == "default-branch":
++        return f"{base}-{slugify(branch or 'branch', 24)}"
++    return f"{base}-{slugify(mode or 'review', 24)}"
++
++
++def classify_priority(content: str) -> str:
++    if P0_RE.search(content or ""):
++        return "P0"
++    if P1_RE.search(content or ""):
++        return "P1"
++    if P2_RE.search(content or ""):
++        return "P2"
++    return "P3"
++
++
++def _line_ref(comment: dict[str, Any]) -> str:
++    start = int(comment.get("start_line") or 0)
++    end = int(comment.get("end_line") or 0)
++    path = comment.get("path") or "unknown"
++    if start <= 0 and end <= 0:
++        return path
++    if end > start:
++        return f"{path}:{start}-{end}"
++    return f"{path}:{start or end}"
++
++
++def _title(comment: dict[str, Any]) -> str:
++    content = (comment.get("content") or "").strip().splitlines()
++    if not content:
++        return "Untitled finding"
++    first = content[0].strip()
++    return first[:120] + ("…" if len(first) > 120 else "")
++
++
++def normalize_comments(ocr: dict[str, Any]) -> list[dict[str, Any]]:
++    comments = list(ocr.get("comments") or [])
++    out = []
++    for item in comments:
++        comment = dict(item)
++        pri = str(comment.get("priority") or "").upper()
++        if pri not in PRIORITY_ORDER:
++            comment["priority"] = classify_priority(str(comment.get("content") or ""))
++        else:
++            comment["priority"] = pri
++        out.append(comment)
++    out.sort(key=lambda c: (PRIORITY_ORDER.index(c["priority"]), c.get("path") or "", int(c.get("start_line") or 0)))
++    return out
++
++
++def counts(comments: list[dict[str, Any]]) -> dict[str, int]:
++    data = {k: 0 for k in PRIORITY_ORDER}
++    for comment in comments:
++        data[comment["priority"]] += 1
++    return data
++
++
++def render_full(meta: dict[str, Any], ocr: dict[str, Any], comments: list[dict[str, Any]]) -> str:
++    tally = counts(comments)
++    tally_line = " / ".join(f"{k}={tally[k]}" for k in PRIORITY_ORDER if tally[k] or k in ("P0", "P1", "P2", "P3"))
++    lines = [
++        "---",
++        f"repo: {meta.get('repo', '')}",
++        f"mode: {meta.get('mode', '')}",
++        f"date: {meta.get('date', '')}",
++        f"change_name: {meta.get('change_name', '')}",
++        f"branch: {meta.get('branch', '')}",
++        f"from: {meta.get('from', '')}",
++        f"to: {meta.get('to', '')}",
++        f"mr: {meta.get('mr_url', '')}",
++        f"ocr_session: {ocr.get('session_id', '')}",
++        f"ocr_status: {ocr.get('status', '')}",
++        "---",
++        "",
++        f"# Code Review · {meta.get('change_name', '')}",
++        "",
++        "## Meta",
++        "",
++        f"- 仓库：`{meta.get('repo', '')}`",
++        f"- 范围：`{meta.get('mode', '')}` `{meta.get('from', '')}` → `{meta.get('to', '')}`",
++        f"- 分支：`{meta.get('branch', '')}`（默认 `{meta.get('default_branch', '')}`）",
++    ]
++    if meta.get("mr_url"):
++        lines.append(f"- Merge Request：{meta['mr_url']}")
++    summary = ocr.get("summary") or {}
++    if summary:
++        lines.append(
++            f"- OCR：files={summary.get('files_reviewed', '?')} comments={summary.get('comments', len(comments))} "
++            f"elapsed={summary.get('elapsed', '?')} session=`{ocr.get('session_id', '')}`"
++        )
++    if ocr.get("message"):
++        lines.append(f"- OCR message：{ocr['message']}")
++    lines += ["", "## 统计", "", tally_line, "", "## Findings（完整）", ""]
++    if not comments:
++        lines.append("No findings.")
++    else:
++        for pri in PRIORITY_ORDER:
++            group = [c for c in comments if c["priority"] == pri]
++            if not group:
++                continue
++            lines += [f"### {pri}", ""]
++            for i, comment in enumerate(group, 1):
++                lines += [
++                    f"#### {i}. {_title(comment)}",
++                    "",
++                    f"- 位置：`{_line_ref(comment)}`",
++                    f"- 优先级：{pri}",
++                    "",
++                    comment.get("content") or "",
++                    "",
++                ]
++                if comment.get("existing_code"):
++                    lines += ["**现有代码**", "", "```", str(comment["existing_code"]).rstrip(), "```", ""]
++                if comment.get("suggestion_code"):
++                    lines += ["**建议改法**", "", "```", str(comment["suggestion_code"]).rstrip(), "```", ""]
++                if comment.get("thinking"):
++                    lines += ["**推理**", "", str(comment["thinking"]).rstrip(), ""]
++    warnings = ocr.get("warnings") or []
++    if warnings:
++        lines += ["## Warnings", ""]
++        for item in warnings:
++            lines.append(f"- {item}")
++        lines.append("")
++    return "\n".join(lines).rstrip() + "\n"
++
++
++def render_summary(meta: dict[str, Any], comments: list[dict[str, Any]], doc_path: str) -> str:
++    tally = counts(comments)
++    tally_line = " ".join(f"{k}={tally[k]}" for k in PRIORITY_ORDER if tally[k] or k in ("P0", "P1", "P2", "P3"))
++    lines = [
++        f"## Review 总结 · {meta.get('change_name', '')}",
++        "",
++        f"范围：`{meta.get('repo', '')}` / `{meta.get('mode', '')}` `{meta.get('from', '')}` → `{meta.get('to', '')}`",
++        f"结论：{tally_line}",
++        f"完整文档：`{doc_path}`",
++        "",
++    ]
++    if not comments:
++        lines.append("No findings.")
++        return "\n".join(lines).rstrip() + "\n"
++    for pri in PRIORITY_ORDER:
++        group = [c for c in comments if c["priority"] == pri]
++        if not group:
++            continue
++        lines.append(f"### {pri}")
++        lines.append("")
++        for comment in group:
++            lines.append(f"- [{pri}] {_title(comment)} — `{_line_ref(comment)}`")
++        lines.append("")
++    return "\n".join(lines).rstrip() + "\n"
++
++
++def update_index(reviews_root: Path, meta: dict[str, Any], tally: dict[str, int], doc_rel: str) -> None:
++    index = reviews_root / "INDEX.md"
++    header = (
++        "# Code reviews\n\n"
++        "| 日期 | change | 仓库 | 范围 | P0 | P1 | P2 | P3 | 文档 |\n"
++        "|------|--------|------|------|----|----|----|----|------|\n"
++    )
++    row = (
++        f"| {meta.get('date', '')} | {meta.get('change_name', '')} | `{meta.get('repo', '')}` | "
++        f"{meta.get('mode', '')} | {tally.get('P0', 0)} | {tally.get('P1', 0)} | {tally.get('P2', 0)} | "
++        f"{tally.get('P3', 0)} | [{meta.get('change_name', '')}]({doc_rel}) |"
++    )
++    if not index.exists():
++        index.write_text(header + row + "\n", encoding="utf-8")
++        return
++    text = index.read_text(encoding="utf-8")
++    lines = text.splitlines()
++    key = f"| {meta.get('date', '')} | {meta.get('change_name', '')} |"
++    kept = [ln for ln in lines if not ln.startswith(key)]
++    if len(kept) < 3:
++        index.write_text(header + row + "\n", encoding="utf-8")
++        return
++    kept.append(row)
++    index.write_text("\n".join(kept).rstrip() + "\n", encoding="utf-8")
++
++
++def write_review(work_root: Path, ocr: dict[str, Any], meta: dict[str, Any]) -> dict[str, Any]:
++    comments = normalize_comments(ocr)
++    day = meta.get("date") or date.today().isoformat()
++    name = meta.get("change_name") or change_name(
++        repo_basename=Path(str(meta.get("repo") or "repo")).name,
++        mode=str(meta.get("mode") or "review"),
++        branch=str(meta.get("branch") or ""),
++        mr_iid=meta.get("mr_iid"),
++        title=str(meta.get("title") or ""),
++    )
++    meta = {**meta, "date": day, "change_name": name}
++    out_dir = work_root / "docs" / "reviews" / day / name
++    out_dir.mkdir(parents=True, exist_ok=True)
++    raw_path = out_dir / "ocr-raw.json"
++    review_path = out_dir / "review.md"
++    raw_path.write_text(json.dumps(ocr, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    review_path.write_text(render_full(meta, ocr, comments), encoding="utf-8")
++    doc_rel = f"docs/reviews/{day}/{name}/review.md"
++    update_index(work_root / "docs" / "reviews", meta, counts(comments), f"{day}/{name}/review.md")
++    summary = render_summary(meta, comments, doc_rel)
++    (out_dir / "summary.md").write_text(summary, encoding="utf-8")
++    return {
++        "out_dir": str(out_dir.relative_to(work_root)),
++        "review": doc_rel,
++        "raw": f"docs/reviews/{day}/{name}/ocr-raw.json",
++        "summary": summary,
++        "counts": counts(comments),
++        "change_name": name,
++        "date": day,
++    }
++
++
++def _load_json(path: str) -> dict[str, Any]:
++    return json.loads(Path(path).read_text(encoding="utf-8"))
++
++
++def emit(payload: dict[str, Any], code: int = 0) -> int:
++    sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
++    return code
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(prog="reviewctl")
++    parser.add_argument("--root", default="", help="work workspace root")
++    sub = parser.add_subparsers(dest="cmd", required=True)
++
++    p_resolve = sub.add_parser("resolve-repo")
++    p_resolve.add_argument("repo")
++
++    p_inspect = sub.add_parser("inspect")
++    p_inspect.add_argument("--repo", required=True)
++
++    p_mr = sub.add_parser("parse-mr")
++    p_mr.add_argument("--url", required=True)
++
++    p_name = sub.add_parser("change-name")
++    p_name.add_argument("--repo-basename", required=True)
++    p_name.add_argument("--mode", required=True)
++    p_name.add_argument("--branch", default="")
++    p_name.add_argument("--mr-iid", type=int, default=None)
++    p_name.add_argument("--title", default="")
++
++    p_write = sub.add_parser("write")
++    p_write.add_argument("--ocr-json", required=True)
++    p_write.add_argument("--meta-json", required=True)
++
++    args = parser.parse_args(argv)
++    root = Path(args.root).resolve() if args.root else repo_root_from_script()
++    try:
++        if args.cmd == "resolve-repo":
++            payload = resolve_repo(root, args.repo)
++            if payload.get("ambiguous"):
++                return emit({"ok": False, **payload}, 1)
++            return emit({"ok": True, **payload})
++        if args.cmd == "inspect":
++            payload = inspect_repo(root, args.repo)
++            if payload.get("ambiguous"):
++                return emit({"ok": False, **payload}, 1)
++            return emit({"ok": True, **payload})
++        if args.cmd == "parse-mr":
++            return emit({"ok": True, **parse_mr_url(args.url)})
++        if args.cmd == "change-name":
++            name = change_name(
++                repo_basename=args.repo_basename,
++                mode=args.mode,
++                branch=args.branch,
++                mr_iid=args.mr_iid,
++                title=args.title,
++            )
++            return emit({"ok": True, "change_name": name})
++        if args.cmd == "write":
++            result = write_review(root, _load_json(args.ocr_json), _load_json(args.meta_json))
++            return emit({"ok": True, **result})
++        raise ReviewError(f"unknown command: {args.cmd}")
++    except ReviewError as exc:
++        return emit({"ok": False, "error": str(exc)}, 1)
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/agents/skills/code-review/tests/test_reviewctl.py b/agents/skills/code-review/tests/test_reviewctl.py
+new file mode 100644
+index 0000000..99de1a5
+--- /dev/null
++++ b/agents/skills/code-review/tests/test_reviewctl.py
+@@ -0,0 +1,143 @@
++from __future__ import annotations
++
++import importlib.util
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "reviewctl.py"
++
++
++def load_reviewctl():
++    spec = importlib.util.spec_from_file_location("reviewctl", SCRIPT)
++    assert spec and spec.loader
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules["reviewctl"] = mod
++    spec.loader.exec_module(mod)
++    return mod
++
++
++rc = load_reviewctl()
++
++
++class ReviewctlTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.tmp = Path(tempfile.mkdtemp())
++        (self.tmp / "repos").mkdir()
++
++    def _git(self, repo: Path, *args: str) -> None:
++        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
++
++    def _init_repo(self, rel: str, name: str | None = None) -> Path:
++        repo = self.tmp / "repos" / rel
++        repo.mkdir(parents=True)
++        self._git(repo, "init")
++        self._git(repo, "config", "user.email", "test@example.invalid")
++        self._git(repo, "config", "user.name", "tester")
++        (repo / "README").write_text("init\n", encoding="utf-8")
++        self._git(repo, "add", ".")
++        self._git(repo, "commit", "-m", "init")
++        self._git(repo, "branch", "-M", "main")
++        if name:
++            pass
++        return repo
++
++    def test_resolve_by_basename_and_ambiguous(self) -> None:
++        self._init_repo("group/service")
++        hit = rc.resolve_repo(self.tmp, "service")
++        self.assertEqual(hit["basename"], "service")
++        self.assertTrue(hit["git_root"].endswith("service"))
++
++        self._init_repo("other/service")
++        amb = rc.resolve_repo(self.tmp, "service")
++        self.assertTrue(amb.get("ambiguous"))
++        self.assertEqual(len(amb["candidates"]), 2)
++
++    def test_inspect_recommends_uncommitted_vs_default_branch(self) -> None:
++        repo = self._init_repo("svc")
++        (repo / "dirty.txt").write_text("x\n", encoding="utf-8")
++        payload = rc.inspect_repo(self.tmp, "svc")
++        self.assertEqual(payload["recommendation"], "uncommitted")
++        self.assertTrue(payload["needs_confirm"])
++
++        self._git(repo, "add", "dirty.txt")
++        self._git(repo, "commit", "-m", "dirty")
++        self._git(repo, "checkout", "-b", "feat-x")
++        (repo / "feat.txt").write_text("y\n", encoding="utf-8")
++        self._git(repo, "add", "feat.txt")
++        self._git(repo, "commit", "-m", "feat")
++        payload = rc.inspect_repo(self.tmp, "svc")
++        self.assertEqual(payload["recommendation"], "default-branch")
++        self.assertEqual(payload["ahead_of_default"], 1)
++
++        (repo / "wip.txt").write_text("z\n", encoding="utf-8")
++        payload = rc.inspect_repo(self.tmp, "svc")
++        self.assertEqual(payload["recommendation"], "ask")
++
++    def test_parse_mr_urls(self) -> None:
++        gl = rc.parse_mr_url("https://gitlab.example.invalid/group/service/-/merge_requests/88")
++        self.assertEqual(gl["kind"], "gitlab")
++        self.assertEqual(gl["project"], "group/service")
++        self.assertEqual(gl["iid"], 88)
++        self.assertEqual(gl["repo_hint"], "service")
++
++        gh = rc.parse_mr_url("https://github.example.invalid/example-org/example-repo/pull/12")
++        self.assertEqual(gh["kind"], "github")
++        self.assertEqual(gh["project"], "example-org/example-repo")
++        self.assertEqual(gh["iid"], 12)
++
++    def test_change_name_and_priority(self) -> None:
++        self.assertEqual(
++            rc.change_name(repo_basename="service", mode="mr", mr_iid=88, title="Fix timeout"),
++            "service-mr-88-fix-timeout",
++        )
++        self.assertEqual(rc.classify_priority("SQL injection in query builder"), "P0")
++        self.assertEqual(rc.classify_priority("nil deref on empty payload"), "P1")
++        self.assertEqual(rc.classify_priority("missing test for retry path"), "P2")
++        self.assertEqual(rc.classify_priority("rename helper for clarity"), "P3")
++
++    def test_write_review_sorted_summary(self) -> None:
++        ocr = {
++            "status": "success",
++            "session_id": "abc",
++            "summary": {"files_reviewed": 2, "comments": 2, "elapsed": "1s"},
++            "comments": [
++                {"path": "b.go", "content": "rename helper for clarity", "start_line": 3, "end_line": 3},
++                {
++                    "path": "a.go",
++                    "content": "SQL injection in query builder",
++                    "start_line": 10,
++                    "end_line": 12,
++                    "existing_code": "db.Exec(q)",
++                    "suggestion_code": "db.Exec(q, args)",
++                    "thinking": "user input concatenated",
++                },
++            ],
++        }
++        meta = {
++            "repo": "group/service",
++            "mode": "default-branch",
++            "date": "2026-08-13",
++            "change_name": "service-feat-x",
++            "branch": "feat-x",
++            "from": "origin/main",
++            "to": "HEAD",
++        }
++        result = rc.write_review(self.tmp, ocr, meta)
++        review = (self.tmp / result["review"]).read_text(encoding="utf-8")
++        self.assertIn("### P0", review)
++        self.assertIn("### P3", review)
++        self.assertLess(review.index("### P0"), review.index("### P3"))
++        summary = result["summary"]
++        self.assertIn("P0=1", summary)
++        self.assertIn("[P0] SQL injection", summary)
++        self.assertTrue(summary.index("### P0") < summary.index("### P3"))
++        self.assertTrue((self.tmp / "docs/reviews/INDEX.md").exists())
++        printed = rc.render_summary(meta, [], result["review"])
++        self.assertIn("No findings.", printed)
++
++
++if __name__ == "__main__":
++    unittest.main()
