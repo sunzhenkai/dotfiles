@@ -1,0 +1,99 @@
+# base16-cupertino
+# Source: https://github.com/Defman21/base16-cupertino
+# Author: Defman21
+
+scheme: cupertino
+slug: base16-cupertino
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 27.09
+
+author: Defman21
+description: >-
+  Cupertino - Defman21 出品的 base16 light 变体，致敬经典 Mac OS
+  "Platinum" 风格 UI：纯白底 + 中性灰阶 (#c0c0c0 / #808080 / #404040)
+  三档像素完美的灰度，强调色还原老 macOS 的 Pure Blue / HyperCard
+  蓝 / 红 / 橄榄黄，整体走"中性、克制、像素级"路线。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (pure white)
+  base01: "#c0c0c0"  # lighter background (status bar, line highlight)
+  base02: "#c0c0c0"  # selection background
+  base03: "#808080"  # comments, invisibles, line numbers
+  base04: "#808080"  # dark foreground (status bar)
+  base05: "#404040"  # default foreground / body text
+  base06: "#404040"  # light foreground (rare)
+  base07: "#5e5e5e"  # light background (rare, embeds)
+
+  # --- Accents ---
+  base08: "#c41a15"  # red    - variables, deletions, errors (classic macOS red)
+  base09: "#eb8500"  # orange - integers, constants, IDs
+  base0A: "#826b28"  # yellow - classes, search highlights, types (olive)
+  base0B: "#007400"  # green  - strings, inheritance, success (deep green)
+  base0C: "#318495"  # cyan   - support, regex, escape chars (teal)
+  base0D: "#0000ff"  # blue   - functions, methods, headings (pure blue / HyperCard)
+  base0E: "#a90d91"  # purple - keywords, storage, selectors (magenta-purple)
+  base0F: "#826b28"  # magenta- deprecated, embedded tags, markups (olive)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background" }
+    - { token: base01, hex: "#c0c0c0", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#c0c0c0", role: "selection background [DUP of base01]" }
+    - { token: base03, hex: "#808080", role: "comments / invisibles" }
+    - { token: base04, hex: "#808080", role: "dark foreground (status bar) [DUP of base03]" }
+    - { token: base05, hex: "#404040", role: "default foreground / body text" }
+    - { token: base06, hex: "#404040", role: "light foreground (rare) [DUP of base05]" }
+    - { token: base07, hex: "#5e5e5e", role: "light background (rare, embeds) [BRIGHTNESS JUMP]" }
+  accents:
+    - { token: base08, hex: "#c41a15", role: "variables / deletions",    hue: "classic macOS red" }
+    - { token: base09, hex: "#eb8500", role: "integers / constants",     hue: "pumpkin orange" }
+    - { token: base0A, hex: "#826b28", role: "classes / types",          hue: "olive [DUP of base0F]" }
+    - { token: base0B, hex: "#007400", role: "strings / success",        hue: "deep kelly green" }
+    - { token: base0C, hex: "#318495", role: "regex / escape chars",     hue: "dark teal" }
+    - { token: base0D, hex: "#0000ff", role: "functions / headings",     hue: "pure blue (HyperCard)" }
+    - { token: base0E, hex: "#a90d91", role: "keywords / selectors",     hue: "magenta-purple" }
+    - { token: base0F, hex: "#826b28", role: "deprecated / markup tags", hue: "olive [DUP of base0A]" }
+
+notes:
+  tone: >-
+    背景纯白 (#ffffff, L*=100.00)，前景中性深灰 (#404040, L*~27.09)。
+    L* 跨度约 73，与 chinoiserie 同档最大对比。纯白 + 中性灰是
+    "macOS Platinum 1990s" 的视觉签名，与前两份的青绿/暖棕灰阶
+    形成明显对照。
+  greyscale_neutrality: >-
+    base01-base06 全是纯灰 (#c0c0c0 / #808080 / #404040)，无任何
+    色相偏移——是三份方案里最"像素级中性"的一档。base03 (#808080)
+    处是经典的"半灰点"，正好对应系统 50% gray UI 色。
+  duplicates: >-
+    本方案存在 3 对重复槽：base01==base02, base03==base04,
+    base05==base06；强调色里 base0A==base0F (同为橄榄 #826b28)。
+    推测是 Defman21 沿用旧版 macOS 系统色板的"占位"映射，部分
+    UI 槽 (selection / status bar / deprecated) 实际未独立配色。
+    使用时建议保留原值，不要"为不同而不同"地强行改色——会破坏
+    与原版 base16-cupertino 主题族的兼容性。
+  base07_brightness_jump: >-
+    base07 (#5e5e5e) 比 base05/06 (#404040) 还亮，亮度排序违反
+    base00->base07 常规递增约定。如果按常规语义使用 base07
+    (最深嵌入式背景)，视觉上会"淡"，需在使用方显式调暗或
+    接受这个反常。
+  base0D_pure_blue: >-
+    #0000ff 是 base16 全家族里少见的纯 100% blue，对应老 HyperCard
+    / classic Mac OS 的 link 蓝。在白底上视觉极强，但与现代编辑器
+    普遍走低饱和蓝的审美相反；若需要可考虑替换为 #2b56ff 一类
+    "现代感"蓝。
+  base0E_magenta: >-
+    #a90d91 走 magenta-purple 系，比 chinoiserie 的 #c08eaf 粉、
+    chicago-day 的 #e27ea6 粉都更"紫"，是四份方案里紫色槽最浓
+    的一档，紫粉爱好者会喜欢。
+  base0F_olive_reuse: >-
+    #826b28 同时用作 base0A (yellow) 与 base0F (deprecated)——
+    这是为了让"弃用色"不抢眼 (复用同一橄榄)，但代价是
+    syntax highlight 里 classes / types 与 deprecated / embed
+    无法靠颜色区分，只能靠粗体/下划线等字形差异区分。

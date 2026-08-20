@@ -1,0 +1,90 @@
+# base16-chinoiserie
+# Source: https://github.com/gaelicWizard/base16-chinoiserie
+# Author: Di Wang (https://cs.cmu.edu/~diw3)
+
+scheme: chinoiserie
+slug: base16-chinoiserie
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 27.79
+
+author: Di Wang (https://cs.cmu.edu/~diw3)
+description: >-
+  Chinoiserie - Di Wang (CMU) 出品的 base16 light 变体。Chinoiserie 是
+  17-18 世纪欧洲对东亚（尤其中国）艺术的诠释流派，本方案借"中国色"
+  思路：背景纯白 (L*=100)，前景与灰阶走低饱和暖棕，强调色对应
+  朱砂、赭石、帝王黄、松石、孔雀蓝、紫晶、牡丹粉、肉桂等传统色谱。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (pure white)
+  base01: "#e0e0e0"  # lighter background (status bar, line highlight)
+  base02: "#d6d6d6"  # selection background
+  base03: "#80766e"  # comments, invisibles, line numbers
+  base04: "#918072"  # dark foreground (status bar)
+  base05: "#4a4035"  # default foreground / body text
+  base06: "#2f2f35"  # light foreground (rare)
+  base07: "#131124"  # light background (rare, embeds)
+
+  # --- Accents (中国色谱) ---
+  base08: "#c04851"  # red    - variables, deletions, errors (朱砂 zhusha)
+  base09: "#fb8b05"  # orange - integers, constants, IDs (赭石 zheshi)
+  base0A: "#d6a01d"  # yellow - classes, search highlights, types (帝王黄 diwanghuang)
+  base0B: "#428675"  # green  - strings, inheritance, success (松石 songshi)
+  base0C: "#2b73af"  # cyan   - support, regex, escape chars (孔雀蓝 kongquelan)
+  base0D: "#815c94"  # blue   - functions, methods, headings (紫晶 zijing)
+  base0E: "#c08eaf"  # purple - keywords, storage, selectors (牡丹粉 mudanfen)
+  base0F: "#945833"  # magenta- deprecated, embedded tags, markups (肉桂 rougui)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background" }
+    - { token: base01, hex: "#e0e0e0", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#d6d6d6", role: "selection background" }
+    - { token: base03, hex: "#80766e", role: "comments / invisibles" }
+    - { token: base04, hex: "#918072", role: "dark foreground (status bar)" }
+    - { token: base05, hex: "#4a4035", role: "default foreground / body text" }
+    - { token: base06, hex: "#2f2f35", role: "light foreground (rare)" }
+    - { token: base07, hex: "#131124", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#c04851", role: "variables / deletions",    hue: "vermillion (朱砂)" }
+    - { token: base09, hex: "#fb8b05", role: "integers / constants",     hue: "ochre (赭石)" }
+    - { token: base0A, hex: "#d6a01d", role: "classes / types",          hue: "imperial yellow (帝王黄)" }
+    - { token: base0B, hex: "#428675", role: "strings / success",        hue: "turquoise / jade (松石)" }
+    - { token: base0C, hex: "#2b73af", role: "regex / escape chars",     hue: "peacock blue (孔雀蓝)" }
+    - { token: base0D, hex: "#815c94", role: "functions / headings",     hue: "amethyst (紫晶)" }
+    - { token: base0E, hex: "#c08eaf", role: "keywords / selectors",     hue: "peony pink (牡丹粉)" }
+    - { token: base0F, hex: "#945833", role: "deprecated / markup tags", hue: "cinnamon / russet (肉桂)" }
+
+notes:
+  tone: >-
+    背景纯白 (#ffffff, L*=100.00)，前景深暖棕 (#4a4035, L*~27.79)。
+    L* 跨度约 72，是迄今三份 light 主题里对比度最大的，纯白底 +
+    深色正文锐利度极高，长时间阅读需注意屏幕亮度。
+  greyscale_warmth: >-
+    base03 (#80766e) 起灰阶全部偏暖棕，是本方案的签名——与
+    atelier-seaside (青绿)、chicago-day (冷绿) 形成鲜明对比。
+    base01/02 仍是中性灰 (e0e0e0/d6d6d6)，仅在 base03+ 才"变暖"，
+    保证浅背景区不显脏。
+  chinoiserie_palette: >-
+    8 个强调色可逐一对到传统色谱：朱砂 / 赭石 / 帝王黄 / 松石 /
+    孔雀蓝 / 紫晶 / 牡丹粉 / 肉桂。"中国色"流派里少见的完整覆盖，
+    也是本主题相对 atelier/chicago 的核心差异点。
+  base0E_role_swap: >-
+    本方案紫色槽放的是粉 (#c08eaf)，蓝色槽 (#2b73af) 才是
+    高饱和蓝。这与 atelier/chicago 习惯相反 (它们蓝->函数、
+    紫->关键字)，切换主题时若编辑器硬绑 base0D=函数，需要在
+    主题层做映射。
+  base08_vs_base09: >-
+    朱砂 #c04851 与赭石 #fb8b05 跨越红->橙，色相距离大，区分度
+    优于前两份 (前两份靠亮度差)。但 base09 亮度极高，在白底上
+    接近"安全橙"，长时间盯看相对刺眼。
+  base0F_muted_brown: >-
+    #945833 肉桂是三份方案里最克制的"弃用色"——无饱和，
+    与背景同色相区间 (暖棕)，让 deprecated / embed 自然后退，
+    比 chicago-day 的栗棕更暖、比 atelier-seaside 的品红更静。

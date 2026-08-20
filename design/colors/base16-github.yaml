@@ -1,0 +1,105 @@
+# base16-github
+# Source: https://github.com/tinted-theming/base16-github
+# Author: Tinted Theming (https://github.com/tinted-theming)
+
+scheme: github
+slug: base16-github
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 31.07
+
+author: Tinted Theming (https://github.com/tinted-theming)
+description: >-
+  GitHub Light - Tinted Theming 出品的官方 base16 light 变体，
+  严格映射 GitHub Primer 设计系统的色板：背景纯白 + 蓝灰
+  canvas (#f6f8fa) + GitHub Accent Blue (#0550ae) +
+  GitHub Danger Red (#cf222e) + Done Purple (#8250df) +
+  Success Green (#116329) 等。色相忠实复刻 GitHub.com
+  网页与 VSCode 插件的观感。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (pure white / canvas.base)
+  base01: "#f6f8fa"  # lighter background (canvas.subtle)
+  base02: "#afb8c1"  # selection background (border.default)
+  base03: "#8c959f"  # comments, invisibles, line numbers (fg.muted)
+  base04: "#6e7781"  # dark foreground (fg.subtle / status bar)
+  base05: "#424a53"  # default foreground / body text (fg.default light area)
+  base06: "#32383f"  # light foreground (rare)
+  base07: "#1f2328"  # light background (rare, embeds / header.dark)
+
+  # --- Accents (Primer 语义色映射) ---
+  base08: "#953800"  # red    - variables, deletions, errors (rust / attention)
+  base09: "#0550ae"  # orange - integers, constants, IDs (accent.fg / link)
+  base0A: "#bf8700"  # yellow - classes, search highlights, types (mustard / attention.fg)
+  base0B: "#0a3069"  # green  - strings, inheritance, success (deep navy / heading)
+  base0C: "#116329"  # cyan   - support, regex, escape chars (success.fg)
+  base0D: "#8250df"  # blue   - functions, methods, headings (done.fg / purple)
+  base0E: "#cf222e"  # purple - keywords, storage, selectors (danger.fg)
+  base0F: "#82071e"  # magenta- deprecated, embedded tags, markups (severe.fg / dark red)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background (canvas.base)" }
+    - { token: base01, hex: "#f6f8fa", role: "lighter background (canvas.subtle)" }
+    - { token: base02, hex: "#afb8c1", role: "selection background (border.default)" }
+    - { token: base03, hex: "#8c959f", role: "comments / invisibles (fg.muted)" }
+    - { token: base04, hex: "#6e7781", role: "secondary foreground (fg.subtle)" }
+    - { token: base05, hex: "#424a53", role: "primary foreground / body text" }
+    - { token: base06, hex: "#32383f", role: "light foreground (rare)" }
+    - { token: base07, hex: "#1f2328", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#953800", role: "variables / deletions",    hue: "rust / brown [NON-STD slot]" }
+    - { token: base09, hex: "#0550ae", role: "integers / constants",     hue: "GitHub accent blue [NON-STD slot]" }
+    - { token: base0A, hex: "#bf8700", role: "classes / types",          hue: "mustard / attention.fg" }
+    - { token: base0B, hex: "#0a3069", role: "strings / success",        hue: "deep navy [NON-STD slot]" }
+    - { token: base0C, hex: "#116329", role: "regex / escape chars",     hue: "success green [NON-STD slot]" }
+    - { token: base0D, hex: "#8250df", role: "functions / headings",     hue: "done purple [NON-STD slot]" }
+    - { token: base0E, hex: "#cf222e", role: "keywords / selectors",     hue: "danger red [NON-STD slot]" }
+    - { token: base0F, hex: "#82071e", role: "deprecated / markup tags", hue: "severe dark red" }
+
+notes:
+  tone: >-
+    背景纯白 (#ffffff, L*=100.00)，前景中性深灰蓝 (#424a53, L*~31.07)。
+    L* 跨度约 69，是典型 base16 light 高对比档。整体观感"白底
+    蓝灰文字"，与日常 GitHub 网页 / 文档站 / VSCode 完全一致。
+  primer_fidelity: >-
+    本方案是 base16 家族里对源产品 (GitHub Primer) 还原度最高的
+    一档：base00/01 对应 canvas.base / canvas.subtle，base02/03
+    对应 border.default / fg.muted——直接复用 Primer 的 CSS
+    变量值。accent 段也完全对应 accent.fg / success.fg / done.fg
+    / danger.fg / severe.fg / attention.fg / header.dark 等
+    Primer 语义色 token。
+  non_standard_mapping: >-
+    重要：与其它 base16 主题相比，本方案的槽位映射"反直觉"——
+    base08 是 rust/棕而非红 (红给了 base0E #cf222e)，
+    base09 是 accent blue 而非橙 (橙给了 base0A 芥末黄)，
+    base0B 是深蓝 navy 而非绿 (绿给了 base0C)，
+    base0D 是 done 紫而非常规蓝。
+    这是 tinted-theming 故意保留 Primer 原本的"红在 danger、
+    蓝在 accent"语义，避免和网页本身冲突。切换主题时若编辑器
+    硬绑 base08=红 / base0B=绿，需要在主题层做映射。
+  base05_vs_typical: >-
+    #424a53 是带轻微蓝调的灰，比 cupertino 纯灰 #404040 略冷，
+    比 flexoki 暖灰 #403e3c 略冷，处于"中性偏冷"位置。
+    这是 Primer 实际正文色的色相——与网页源码阅读一致。
+  base08_rust_role: >-
+    #953800 在 Primer 里对应 attention / muted 类的"非红警示色"，
+    被塞进 base08 (通常的红色槽) 是为了在大量 danger 红 (#cf222e)
+    出现时不冲突。若做 syntax highlight，"删除/错误"会显示为
+    暗橙棕而非红——在 GitHub 网页里 review diff 的删除行恰好
+    也是这个色调，视觉一致。
+  base0E_danger_red: >-
+    #cf222e 是 GitHub 实际 danger.fg 的精确值，在 base16 槽位里
+    落在 purple 槽 (base0E)。这是与其它 base16 主题最大的语义
+    偏移，使用时心里要把 base0E 当成"红"看。
+  base0F_severe: >-
+    #82071e 是 severe.fg (深红/暗红)，色相与 base0E 同但明度
+    更低，让"严重程度递进" (severity.fg -> danger.fg -> severe.fg)
+    在 base16 槽位上能完整保留——比 cupertino 把 base0F 复用成
+    橄榄的设计更"语义正确"。

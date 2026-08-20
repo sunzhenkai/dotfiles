@@ -1,0 +1,102 @@
+# base16-google-light
+# Source: https://github.com/Defman21/base16-google-schemes (Seth Wright)
+# Author: Seth Wright (http://sethawright.com)
+
+scheme: google-light
+slug: base16-google-light
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 24.71
+
+author: Seth Wright (http://sethawright.com)
+description: >-
+  Google Light - Seth Wright 出品的 base16 light 变体，灵感取自
+  Google Material Design 调色板：背景纯白 + 略带冷绿的灰阶
+  (#c5c8c6 等) + Material Red 700 (#cc342b) + Deep Orange 400
+  (#f96a38) + Amber 600 (#fba922) + Green 800 (#198844) 等强调色，
+  整体观感"白底、谷歌蓝主导、强调红橙"。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (pure white)
+  base01: "#e0e0e0"  # lighter background (status bar, line highlight)
+  base02: "#c5c8c6"  # selection background (slight cool-green tint)
+  base03: "#b4b7b4"  # comments, invisibles, line numbers
+  base04: "#969896"  # dark foreground (status bar)
+  base05: "#373b41"  # default foreground / body text (slight blue tint)
+  base06: "#282a2e"  # light foreground (rare)
+  base07: "#1d1f21"  # light background (rare, embeds) [near-black]
+
+  # --- Accents (Material Design) ---
+  base08: "#cc342b"  # red    - variables, deletions, errors (Material Red 700)
+  base09: "#f96a38"  # orange - integers, constants, IDs (Material Deep Orange 400)
+  base0A: "#fba922"  # yellow - classes, search highlights, types (Material Amber 600)
+  base0B: "#198844"  # green  - strings, inheritance, success (Material Green 800)
+  base0C: "#3971ed"  # cyan   - support, regex, escape chars (Google Blue)
+  base0D: "#a36ac7"  # blue   - functions, methods, headings (Material Deep Purple 200)
+  base0E: "#3971ed"  # purple - keywords, storage, selectors (Google Blue [DUP])
+  base0F: "#3971ed"  # magenta- deprecated, embedded tags, markups (Google Blue [DUP])
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background" }
+    - { token: base01, hex: "#e0e0e0", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#c5c8c6", role: "selection background" }
+    - { token: base03, hex: "#b4b7b4", role: "comments / invisibles" }
+    - { token: base04, hex: "#969896", role: "secondary foreground" }
+    - { token: base05, hex: "#373b41", role: "primary foreground / body text" }
+    - { token: base06, hex: "#282a2e", role: "light foreground (rare)" }
+    - { token: base07, hex: "#1d1f21", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#cc342b", role: "variables / deletions",    hue: "Material Red 700" }
+    - { token: base09, hex: "#f96a38", role: "integers / constants",     hue: "Material Deep Orange 400" }
+    - { token: base0A, hex: "#fba922", role: "classes / types",          hue: "Material Amber 600" }
+    - { token: base0B, hex: "#198844", role: "strings / success",        hue: "Material Green 800" }
+    - { token: base0C, hex: "#3971ed", role: "regex / escape chars",     hue: "Google Blue [NON-STD slot]" }
+    - { token: base0D, hex: "#a36ac7", role: "functions / headings",     hue: "Material Deep Purple 200 [NON-STD slot]" }
+    - { token: base0E, hex: "#3971ed", role: "keywords / selectors",     hue: "Google Blue [DUP of base0C]" }
+    - { token: base0F, hex: "#3971ed", role: "deprecated / markup tags", hue: "Google Blue [DUP of base0C/E]" }
+
+notes:
+  tone: >-
+    背景纯白 (#ffffff, L*=100.00)，前景深冷灰 (#373b41, L*~24.71)。
+    L* 跨度约 75，是迄今六份方案里对比度最大的一档。正文色
+    #373b41 带轻微蓝色调，是 Tomorrow / Chrome DevTools 默认色
+    的近亲——观感"冷峻、商务"。
+  greyscale_cast: >-
+    base02 (#c5c8c6) / base03 (#b4b7b4) / base04 (#969896) 的 R/G/B
+    不是完全相等——G 略 > R 略 > B，呈现极淡的冷绿调。这是 base16
+    "Tomorrow" 系列常见的色温，与 cupertino 纯中性灰、flexoki
+    暖奶灰、chicago-day 冷绿、chinoiserie 暖棕都不同。
+  base05_vs_typical: >-
+    #373b41 比 cupertino (#404040) 略深、略冷；比 chicago-day
+    (#364c40) 偏中性 (后者更绿)；比 flexoki (#403e3c) 偏冷。
+    整体处于 base16 light 主题里"最冷"的一档之一。
+  non_standard_mapping: >-
+    重要：base0C (cyan 槽) 放的是 Google Blue #3971ed，
+    base0D (blue 槽) 放的是 Material Deep Purple #a36ac7，
+    base0E/base0F 又复用 Google Blue。这是和 cupertino (重复槽)
+    与 github (语义重排) 都不一样的第三种"非标映射"。
+    编辑器硬绑 base0C=青 / base0D=蓝 时需要做映射层。
+  triplicate_blue: >-
+    #3971ed 在 base0C / base0E / base0F 三槽出现，是 base16
+    家族里重复最严重的一份。推测 Seth Wright 沿用 Google
+    Chrome DevTools 主题 (该主题大量复用同一个蓝色作为
+    link / function / variable) 的"占位"映射。使用时建议
+    保留原值；若想增强区分度可手动给 base0F 换成深紫/暗红。
+  material_design_origin: >-
+    强调色全部来自 Material Design 调色板 (red 700 / deep
+    orange 400 / amber 600 / green 800)，色相、亮度、饱和度
+    与 Material 官方 color palette 对应一致。可直接用作
+    "Material 主题"演示，适合前端开发在白底上展示 Google
+    产品级配色。
+  base08_contrast: >-
+    #cc342b 是 Material Red 700，在白底上对比度足够 (WCAG AA
+    达标)，是 base16 家族里最"可读的红"之一——比 atelier-seaside
+    的 #e6193c 偏砖，比 chicago-day 的 #c60c30 偏红橙，比
+    github 的 #cf222e 略红。

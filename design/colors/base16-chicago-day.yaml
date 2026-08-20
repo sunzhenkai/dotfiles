@@ -1,0 +1,82 @@
+# base16-chicago-day
+# Source: https://github.com/gaelicWizard/base16-chicago (Wendell, Ryan)
+# Author: Wendell, Ryan <ryanjwendell@gmail.com>
+
+scheme: chicago-day
+slug: base16-chicago-day
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 94.06
+fg_l: 30.21
+
+author: Wendell, Ryan <ryanjwendell@gmail.com>
+description: >-
+  Chicago Day — Wendell/Ryan 出品的 base16 light 变体，灵感来自芝加哥市
+  旗（白底 + 浅蓝条 + 红色六角星），整体灰阶偏冷绿，强调色以
+  鲜红、亮青、深紫、粉为主，色相对比强烈。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#e8f0ea"  # default background (lightest)
+  base01: "#d1e0d7"  # lighter background (status bar, line highlight)
+  base02: "#b9d0c3"  # selection background
+  base03: "#8a9a91"  # comments, invisibles, line numbers
+  base04: "#4b5a51"  # dark foreground (status bar)
+  base05: "#364c40"  # default foreground / body text
+  base06: "#2a3b32"  # light foreground (rare)
+  base07: "#1e2a24"  # light background (rare, embeds)
+
+  # --- Accents ---
+  base08: "#c60c30"  # red    — variables, deletions, errors
+  base09: "#f9461c"  # orange — integers, constants, IDs
+  base0A: "#968400"  # yellow — classes, search highlights, types
+  base0B: "#009b3a"  # green  — strings, inheritance, success
+  base0C: "#00a1de"  # cyan   — support, regex, escape chars
+  base0D: "#522398"  # blue   — functions, methods, headings
+  base0E: "#e27ea6"  # purple — keywords, storage, selectors
+  base0F: "#62361b"  # magenta— deprecated, embedded tags, markups
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#e8f0ea", role: "main background" }
+    - { token: base01, hex: "#d1e0d7", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#b9d0c3", role: "selection background" }
+    - { token: base03, hex: "#8a9a91", role: "comments / invisibles" }
+    - { token: base04, hex: "#4b5a51", role: "dark foreground (status bar)" }
+    - { token: base05, hex: "#364c40", role: "default foreground / body text" }
+    - { token: base06, hex: "#2a3b32", role: "light foreground (rare)" }
+    - { token: base07, hex: "#1e2a24", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#c60c30", role: "variables / deletions",    hue: chicago crimson }
+    - { token: base09, hex: "#f9461c", role: "integers / constants",     hue: vermilion }
+    - { token: base0A, hex: "#968400", role: "classes / types",          hue: olive }
+    - { token: base0B, hex: "#009b3a", role: "strings / success",        hue: kelly green }
+    - { token: base0C, hex: "#00a1de", role: "regex / escape chars",     hue: chicago sky blue }
+    - { token: base0D, hex: "#522398", role: "functions / headings",     hue: deep violet }
+    - { token: base0E, hex: "#e27ea6", role: "keywords / selectors",     hue: rose pink }
+    - { token: base0F, hex: "#62361b", role: "deprecated / markup tags", hue: chestnut brown }
+
+notes:
+  tone: >-
+    背景极浅绿 (#e8f0ea, L*≈94.06)，前景深森林绿 (#364c40, L*≈30.21)，
+    L* 跨度约 64，对比比 atelier-seaside-light 更强，正文阅读更"硬"。
+  chicago_flag_echo: >-
+    base08 #c60c30 (红) 与 base0C #00a1de (浅蓝) 构成芝加哥市旗的
+    "白底 / 红星 / 蓝条" 核心色对，是本方案的视觉签名。
+  greyscale_cast: >-
+    base01-base05 的色相集中在 140-160° 冷绿区间，但比 atelier-seaside
+    更深、更"森林"；整体偏中性而非海风。
+  accents_saturation: >-
+    红 #c60c30 / 橙 #f9461c / 青 #00a1de / 紫 #522398 都走纯饱和路线，
+    在浅底上识别度极强，但深紫 #522398 与深绿背景对比偏弱，需注意
+    syntax highlight 的"函数"色在远距离观察时会糊在一起。
+  base08_vs_base09: >-
+    红 #c60c30 与 橙 #f9461c 同色相（红橙系）但亮度差大，区分度
+    靠亮度而非色相；与 atelier-seaside 相同的设计取舍。
+  base0F: >-
+    #62361b 是唯一非鲜艳色——暖棕，作为 "deprecated / 嵌入标记" 的
+    去强调色很合适，让"删除/弃用"在视觉上自然退后。

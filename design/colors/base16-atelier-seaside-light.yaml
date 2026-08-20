@@ -1,0 +1,75 @@
+# base16-atelier-seaside-light
+# Source: https://github.com/atelierbram/base16-atelier-schemes
+# Author: Bram de Haan (http://atelierbramdehaan.nl)
+
+scheme: atelier-seaside-light
+slug: base16-atelier-seaside-light
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 97.94
+fg_l: 44.72
+
+author: Bram de Haan
+description: >-
+  Atelier Seaside Light - atelierbramdehaan.nl 推出的 base16 light 变体，
+  源自 Atelier Seaside 主题，色相以海风绿为主，配以高饱和强调色。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#f4fbf4"  # default background (lightest)
+  base01: "#cfe8cf"  # lighter background (status bar, line highlight)
+  base02: "#8ca68c"  # selection background
+  base03: "#809980"  # comments, invisibles, line numbers
+  base04: "#687d68"  # dark foreground (status bar)
+  base05: "#5e6e5e"  # default foreground / body text
+  base06: "#242924"  # light foreground (rare)
+  base07: "#131513"  # light background (rare, embeds)
+
+  # --- Accents ---
+  base08: "#e6193c"  # red     - variables, deletions, errors
+  base09: "#87711d"  # orange  - integers, constants, IDs
+  base0A: "#98981b"  # yellow  - classes, search highlights, types
+  base0B: "#29a329"  # green   - strings, inheritance, success
+  base0C: "#1999b3"  # cyan    - support, regex, escape chars
+  base0D: "#3d62f5"  # blue    - functions, methods, headings
+  base0E: "#ad2bee"  # purple  - keywords, storage, selectors
+  base0F: "#e619c3"  # magenta - deprecated, embedded tags, markups
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#f4fbf4", role: "main background" }
+    - { token: base01, hex: "#cfe8cf", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#8ca68c", role: "selection background" }
+    - { token: base03, hex: "#809980", role: "comments / invisibles" }
+    - { token: base04, hex: "#687d68", role: "dark foreground (status bar)" }
+    - { token: base05, hex: "#5e6e5e", role: "default foreground / body text" }
+    - { token: base06, hex: "#242924", role: "light foreground (rare)" }
+    - { token: base07, hex: "#131513", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#e6193c", role: "variables / deletions",    hue: crimson }
+    - { token: base09, hex: "#87711d", role: "integers / constants",     hue: dark goldenrod }
+    - { token: base0A, hex: "#98981b", role: "classes / types",          hue: olive }
+    - { token: base0B, hex: "#29a329", role: "strings / success",        hue: forest green }
+    - { token: base0C, hex: "#1999b3", role: "regex / escape chars",     hue: cerulean }
+    - { token: base0D, hex: "#3d62f5", role: "functions / headings",     hue: royal blue }
+    - { token: base0E, hex: "#ad2bee", role: "keywords / selectors",     hue: electric purple }
+    - { token: base0F, hex: "#e619c3", role: "deprecated / markup tags", hue: magenta }
+
+notes:
+  tone: >-
+    背景极浅 (#f4fbf4, L*≈97.94)，前景中深绿 (#5e6e5e, L*≈44.72)，
+    对比度足够，正文阅读不刺眼。
+  greyscale_cast: >-
+    base01-base05 的色相都落在 100-140° 的青绿区间，是典型的
+    "Atelier Seaside" 气质。
+  accents_saturation: >-
+    红 #e6193c、品红 #e619c3、紫 #ad2bee、蓝 #3d62f5 都偏鲜艳，
+    在浅底上识别度强，但长时间编辑可能略"吵"，建议结合编辑器降低
+    syntax highlight 透明度。
+  base09_vs_base0A: >-
+    两者都是橄榄黄系 (#87711d / #98981b)，区分度依赖亮度而非色相；
+    自定义时建议拉大其中之一的色相。

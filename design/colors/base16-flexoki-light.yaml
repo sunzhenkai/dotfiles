@@ -1,0 +1,103 @@
+# base16-flexoki-light
+# Source: https://github.com/kepano/flexoki
+# Author: Steph Ango (https://github.com/kepano/flexoki)
+
+scheme: flexoki-light
+slug: base16-flexoki-light
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 98.90
+fg_l: 26.34
+
+author: Steph Ango (https://github.com/kepano/flexoki)
+description: >-
+  Flexoki Light - Steph Ango (kepano) 设计的 base16 light 变体。
+  Flexoki 同时面向屏幕与印刷，灵感取自和纸 (washi) 与墨
+  (sumi)，强调色走低饱和"墨彩"路线——红、橙、黄、绿、青、
+  蓝、紫、品红都做了 desaturate 处理，整体走"可长读、低疲劳、
+  印刷友好"路线。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#fffcf0"  # default background (warm cream, "paper")
+  base01: "#f2f0e5"  # lighter background (status bar, line highlight)
+  base02: "#e6e4d9"  # selection background
+  base03: "#cecdc3"  # comments, invisibles, line numbers
+  base04: "#9f9d96"  # dark foreground (status bar) [secondary fg, light]
+  base05: "#403e3c"  # default foreground / body text [primary fg, dark]
+  base06: "#282726"  # light foreground (rare)
+  base07: "#100f0f"  # light background (rare, embeds) [near-black]
+
+  # --- Accents (墨彩 sumizome / 10 hues × 12 steps) ---
+  base08: "#af3029"  # red    - variables, deletions, errors (墨红)
+  base09: "#bc5215"  # orange - integers, constants, IDs (墨橙)
+  base0A: "#ad8301"  # yellow - classes, search highlights, types (墨黄 mustard)
+  base0B: "#66800b"  # green  - strings, inheritance, success (墨绿 olive)
+  base0C: "#24837b"  # cyan   - support, regex, escape chars (墨青 teal)
+  base0D: "#205ea6"  # blue   - functions, methods, headings (墨蓝 ink-blue)
+  base0E: "#5e409d"  # purple - keywords, storage, selectors (墨紫 violet)
+  base0F: "#a02f6f"  # magenta- deprecated, embedded tags, markups (墨绯 dusty rose)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#fffcf0", role: "main background (paper)" }
+    - { token: base01, hex: "#f2f0e5", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#e6e4d9", role: "selection background" }
+    - { token: base03, hex: "#cecdc3", role: "comments / invisibles" }
+    - { token: base04, hex: "#9f9d96", role: "secondary foreground (dim text)" }
+    - { token: base05, hex: "#403e3c", role: "primary foreground / body text" }
+    - { token: base06, hex: "#282726", role: "light foreground (rare)" }
+    - { token: base07, hex: "#100f0f", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#af3029", role: "variables / deletions",    hue: "ink-red (muted vermillion)" }
+    - { token: base09, hex: "#bc5215", role: "integers / constants",     hue: "burnt orange" }
+    - { token: base0A, hex: "#ad8301", role: "classes / types",          hue: "mustard / dijon" }
+    - { token: base0B, hex: "#66800b", role: "strings / success",        hue: "olive green" }
+    - { token: base0C, hex: "#24837b", role: "regex / escape chars",     hue: "muted teal" }
+    - { token: base0D, hex: "#205ea6", role: "functions / headings",     hue: "ink-blue" }
+    - { token: base0E, hex: "#5e409d", role: "keywords / selectors",     hue: "muted violet" }
+    - { token: base0F, hex: "#a02f6f", role: "deprecated / markup tags", hue: "dusty rose / magenta" }
+
+notes:
+  tone: >-
+    背景奶白纸色 (#fffcf0, L*~98.90)，前景近黑 (#403e3c, L*~26.34)。
+    L* 跨度约 73，但因 base00 偏奶色、base05 偏暖，实际观感对比
+    比 cupertino / chinoiserie 略柔，不刺眼。
+  paper_ink_metaphor: >-
+    Flexoki 的设计目标与传统 base16 不同——它宣称"为屏幕与印刷
+    同时设计"。base00 / base05 分别对应和纸 (washi) 与墨 (sumi)，
+    8 个强调色则取自水墨画颜料 (墨彩 sumizome)，全部低饱和。
+    kepano 在原始文档里给出 10 色 × 12 级共 120 个 token，本 base16
+    实现仅取每个色相的"中段"档。
+  greyscale_warmth: >-
+    base00/01/02/03/04 全部偏暖灰 (R≥G≥B 且差距微小)，与
+    cupertino 的纯中性灰对比明显，更接近 chinoiserie 的暖棕但
+    没那么黄。base04 (#9f9d96) 是 secondary fg，base05 (#403e3c)
+    是 primary fg——Flexoki 在这两档之间故意拉开巨大 L* 跨度
+    (约 63->26)，让字阶层级靠灰度而非字形区分。
+  base04_base05_jump: >-
+    base04 (#9f9d96, L*~63) -> base05 (#403e3c, L*~26) 是 base16
+    全家族里 secondary/primary fg 跨度最大的一档。常规 scheme
+    这里只差 10-20 L*，Flexoki 差了约 37。如果编辑器把 base04
+    当作"次级文本"使用，会显得过亮；建议在主题层把它再压暗
+    一些或仅用于状态栏。
+  accents_desaturation: >-
+    8 个强调色全部去饱和：红 #af3029 偏砖、橙 #bc5215 偏焦、
+    黄 #ad8301 偏芥末、绿 #66800b 偏橄榄、青 #24837b 偏沉、
+    蓝 #205ea6 偏墨、紫 #5e409d 偏灰紫、粉 #a02f6f 偏玫灰。
+    没有任何纯色 (无 #ff0000 / #0000ff 一类)——这是与 cupertino
+    (纯蓝 #0000ff) 最显眼的差异。
+  long_read_friendly: >-
+    低饱和 + 大跨度灰阶 + 暖奶底 = 长读首选。Flexoki 是目前
+    base16 light 主题里"屏读耐力"评分最高的一档；chinoiserie
+    (高饱和强调色) 与 cupertino (纯蓝) 长时间盯看相对更"吵"。
+    如果是 Markdown / 长文 / 写作场景，Flexoki 优于前几份。
+  base0F_role: >-
+    #a02f6f 是墨绯——既不是纯品红也不是纯玫粉，去饱和处理后
+    与 base0E (灰紫 #5e409d) 形成"紫粉对"，让关键字与弃用色
+    在视觉上自然区分，优于 chinoiserie (粉紫同槽) 与 cupertino
+    (弃用色复用 base0A 橄榄) 的处理。

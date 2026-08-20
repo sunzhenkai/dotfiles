@@ -1,0 +1,135 @@
+# base24-terminal-basic
+# Source: https://github.com/FredHappyface/Base24-Theme-Switcher-Generator
+# Author: FredHappyface (https://github.com/fredHappyface)
+
+scheme: terminal-basic
+slug: base24-terminal-basic
+system: base24
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 68.87
+
+author: FredHappyface (https://github.com/fredHappyface)
+description: >-
+  Terminal Basic - FredHappyface 出品的 base24 light 变体，复刻经典
+  16 色 ANSI / xterm 终端调色板：白底 + 6 对 (深/亮) 原色 (red、
+  yellow、blue、green、cyan、magenta) + 中性灰阶。前景故意取中灰
+  (#a8a8a8) 而非深色，模拟旧式终端对弱对比前景的依赖。整体观感
+  "白底 + DOS 16 色高饱和强调"。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (pure white)
+  base01: "#000000"  # "lighter background" [ANOMALY: 实际是纯黑，非预期浅色]
+  base02: "#666666"  # selection background (mid grey)
+  base03: "#7c7c7c"  # comments, invisibles, line numbers
+  base04: "#929292"  # secondary foreground
+  base05: "#a8a8a8"  # primary foreground / body text [MID-GREY, not dark]
+  base06: "#bfbfbf"  # light foreground (rare)
+  base07: "#e5e5e5"  # lightest background (rare, embeds)
+
+  # --- Main accents (深色 / dark 档) ---
+  base08: "#990000"  # red    - variables, deletions, errors (dark red)
+  base09: "#999900"  # orange - integers, constants, IDs (olive / dark yellow)
+  base0A: "#0000ff"  # yellow - classes, search highlights, types (PURE BLUE)
+  base0B: "#00a600"  # green  - strings, inheritance, success (green)
+  base0C: "#00a6b2"  # cyan   - support, regex, escape chars (cyan/teal)
+  base0D: "#0000b2"  # blue   - functions, methods, headings (dark blue)
+  base0E: "#b200b2"  # purple - keywords, storage, selectors (magenta)
+  base0F: "#4c0000"  # magenta- deprecated, embedded tags, markups (very dark red)
+
+  # --- Extended accents (亮色 / bright 档) ---
+  base10: "#444444"  # dark grey panel
+  base11: "#222222"  # very dark grey panel
+  base12: "#e50000"  # bright red (light variant of base08)
+  base13: "#e5e500"  # bright yellow (light variant of base09)
+  base14: "#00d900"  # bright green (light variant of base0B)
+  base15: "#00e5e5"  # bright cyan (light variant of base0C)
+  base16: "#0000ff"  # bright blue [DUP of base0A]
+  base17: "#e500e5"  # bright magenta (light variant of base0E)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background (white)" }
+    - { token: base01, hex: "#000000", role: "alt panel bg [BLACK ANOMALY]" }
+    - { token: base02, hex: "#666666", role: "selection background (mid grey)" }
+    - { token: base03, hex: "#7c7c7c", role: "comments / invisibles" }
+    - { token: base04, hex: "#929292", role: "secondary foreground" }
+    - { token: base05, hex: "#a8a8a8", role: "primary foreground [MID-GREY]" }
+    - { token: base06, hex: "#bfbfbf", role: "light foreground (rare)" }
+    - { token: base07, hex: "#e5e5e5", role: "lightest background (rare, embeds)" }
+  main_accents:
+    - { token: base08, hex: "#990000", role: "variables / deletions",    hue: "dark red" }
+    - { token: base09, hex: "#999900", role: "integers / constants",     hue: "olive / dark yellow" }
+    - { token: base0A, hex: "#0000ff", role: "classes / types",          hue: "PURE BLUE [NON-STD slot]" }
+    - { token: base0B, hex: "#00a600", role: "strings / success",        hue: "green" }
+    - { token: base0C, hex: "#00a6b2", role: "regex / escape chars",     hue: "cyan / teal" }
+    - { token: base0D, hex: "#0000b2", role: "functions / headings",     hue: "dark blue [NON-STD slot]" }
+    - { token: base0E, hex: "#b200b2", role: "keywords / selectors",     hue: "magenta" }
+    - { token: base0F, hex: "#4c0000", role: "deprecated / markup tags", hue: "very dark red / maroon" }
+  extended_accents:
+    - { token: base10, hex: "#444444", role: "dark grey panel" }
+    - { token: base11, hex: "#222222", role: "very dark grey panel" }
+    - { token: base12, hex: "#e50000", role: "bright red (light)" }
+    - { token: base13, hex: "#e5e500", role: "bright yellow (light)" }
+    - { token: base14, hex: "#00d900", role: "bright green (light)" }
+    - { token: base15, hex: "#00e5e5", role: "bright cyan (light)" }
+    - { token: base16, hex: "#0000ff", role: "bright blue [DUP of base0A]" }
+    - { token: base17, hex: "#e500e5", role: "bright magenta (light)" }
+
+notes:
+  system_change: >-
+    system 是 base24，提供 24 个 token (base00-base17)。本目录第二份
+    base24 (第一份是 github-light-colorblind)，文件名前缀为 "base24-"
+    与 base16-*.yaml 区分。
+  tone_contrast: >-
+    背景纯白 (#ffffff, L*=100.00)，前景中灰 (#a8a8a8, L*~68.87)——
+    fg_l=68.87 是迄今所有 light 主题里最高的！常规 base16 light 的
+    fg_l 在 24-31 之间 (深色)，本方案刻意把前景压到中灰，模拟旧
+    终端"白底淡字"风格 (类似 Windows Console 高对比主题)。对比度
+    仅 ~31 L*，比其它 light 主题低得多，长时间阅读会更"温吞"。
+  ansi_16_color_origin: >-
+    强调色严格复刻 ANSI / xterm 经典 16 色：
+    - base08/0F/12 深红/暗红/亮红 (red 系 3 档)
+    - base09/0A/13 橄榄/纯蓝/亮黄 (注意 yellow/blue 槽倒置！)
+    - base0B/14 绿/亮绿 (green 系)
+    - base0C/15 青/亮青 (cyan 系)
+    - base0D/16 深蓝/纯蓝 (blue 系)
+    - base0E/17 紫/亮紫 (magenta 系)
+    6 个色系各 2-3 档，共 16 色——是 base24 家族里最贴近
+    "终端模拟器配色"的一份。
+  base01_anomaly: >-
+    重要：base01 (#000000, L*=0) 比 base00 (#ffffff, L*=100) 还暗，
+    完全违反 base16/base24 约定——按规范 base01 应是 "lighter
+    background"。推测 FredHappyface 把 base01 用作"暗色 panel /
+    反色背景" (与 base00 白底形成强对比)，不是常规浅色面板背景。
+    使用时建议把 base01 显式理解成"alternate dark bg"而非"light bg"。
+  non_standard_mapping: >-
+    强调色槽位映射与 base16 规范有重大偏差：
+    - base0A (yellow 槽) 放的是纯蓝 #0000ff
+    - base0D (blue 槽) 放的是深蓝 #0000b2
+    - base09 (orange 槽) 放的是橄榄黄 #999900
+    - base0E (purple 槽) 放的是 magenta #b200b2
+    - base0F (magenta 槽) 放的是暗红 #4c0000
+    这是 ANSI 16 色"按 RGB 通道亮度排序"的语义，不是 base16 标准
+    的色相轮映射。编辑器硬绑 base0A=黄 / base0B=绿 时需要做映射层。
+  duplicate_blue: >-
+    #0000ff 同时出现在 base0A 与 base16——是设计意图 (ANSI 16 色
+    里 blue 只有一个) 还是占位槽待补，文档未明示。从效果看，
+    base0A (黄槽) 与 base16 (扩展槽) 都被定义为"纯蓝"，建议
+    保留原值；若要拆开可把 base16 换成浅蓝 (#54aeff 一类)。
+  fg_l_high: >-
+    fg_l=68.87 是 base16/base24 light 主题里非常罕见的"高 L* 前
+    景"。设计上更接近"高对比主题" (Windows High Contrast White)，
+    而非传统"白底深字"。若用于代码编辑器，正文锐利度会比
+    one-light / flexoki 低一档，适合"低光环境"或"想降低视觉
+    刺激"的场景。
+  ansi_pair_structure: >-
+    base08-base0F (8 深色) 与 base12-base17 (6 亮色) 共同构成
+    "6 色 × (深+亮) = 12 槽"的 ANSI 调色板，配上 base0A/0D/16
+    三个纯蓝槽共 15 色，恰好填满 ANSI 16 色的可选范围 (ANSI
+    还差一个亮蓝 #8787ffff，未在本主题体现)。

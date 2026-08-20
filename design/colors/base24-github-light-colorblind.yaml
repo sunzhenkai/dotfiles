@@ -1,0 +1,138 @@
+# base24-github-light-colorblind
+# Source: https://github.com/tinted-theming/base24-github
+# Author: Tinted Theming (https://github.com/tinted-theming)
+
+scheme: github-light-colorblind
+slug: base24-github-light-colorblind
+system: base24
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 100.00
+fg_l: 31.07
+
+author: Tinted Theming (https://github.com/tinted-theming)
+description: >-
+  GitHub Light - Colorblind - Tinted Theming 出品的 base24 light
+  变体，是 base16-github 的色盲友好 (deuteranopia / protanopia
+  双色盲适配) 版本：把原版"红 (base0E/0F)"与"绿 (base0C)"替换为
+  "橙/棕"与"蓝/青"，避免红绿混淆。系统为 base24 (而非 base16)，
+  提供 24 色：base00-base07 灰阶 + base08-base0F 主强调色 +
+  base10-base17 扩展强调色 (含 light/dark 变体与背景色)。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#ffffff"  # default background (canvas.base)
+  base01: "#f6f8fa"  # lighter background (canvas.subtle)
+  base02: "#afb8c1"  # selection background (border.default)
+  base03: "#8c959f"  # comments, invisibles, line numbers (fg.muted)
+  base04: "#6e7781"  # secondary foreground (fg.subtle)
+  base05: "#424a53"  # primary foreground / body text
+  base06: "#32383f"  # light foreground (rare)
+  base07: "#24292f"  # header.dark / light foreground (rare)
+
+  # --- Main accents (colorblind-safe 8) ---
+  base08: "#8a4600"  # red    -> ORANGE-BROWN (variables / deletions, CB-safe)
+  base09: "#0550ae"  # orange -> GitHub accent blue (integers / constants)
+  base0A: "#bf8700"  # yellow -> mustard / attention.fg (classes / types)
+  base0B: "#0a3069"  # green  -> deep navy (strings / success, CB-safe)
+  base0C: "#0550ae"  # cyan   -> GitHub blue (regex / escape chars, CB-safe)
+  base0D: "#8250df"  # blue   -> done purple (functions / headings)
+  base0E: "#b35900"  # purple -> ORANGE (keywords / selectors, CB-safe)
+  base0F: "#6f3800"  # magenta-> DARK BROWN (deprecated / markup, CB-safe)
+
+  # --- Extended accents (base24 additions) ---
+  base10: "#24292f"  # header.bg / deep navy
+  base11: "#000000"  # pure black (rare, embeds)
+  base12: "#f79939"  # orange-yellow (CB variant of danger)
+  base13: "#d4a72c"  # gold / dark mustard
+  base14: "#54aeff"  # light accent blue
+  base15: "#49bcb7"  # teal (CB variant of success)
+  base16: "#54aeff"  # light accent blue [DUP of base14]
+  base17: "#c297ff"  # light purple / lavender (CB variant of done)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#ffffff", role: "main background (canvas.base)" }
+    - { token: base01, hex: "#f6f8fa", role: "lighter background (canvas.subtle)" }
+    - { token: base02, hex: "#afb8c1", role: "selection background (border.default)" }
+    - { token: base03, hex: "#8c959f", role: "comments / invisibles (fg.muted)" }
+    - { token: base04, hex: "#6e7781", role: "secondary foreground (fg.subtle)" }
+    - { token: base05, hex: "#424a53", role: "primary foreground / body text" }
+    - { token: base06, hex: "#32383f", role: "light foreground (rare)" }
+    - { token: base07, hex: "#24292f", role: "header.dark / light foreground" }
+  main_accents:
+    - { token: base08, hex: "#8a4600", role: "variables / deletions",    hue: "orange-brown (CB-safe red)" }
+    - { token: base09, hex: "#0550ae", role: "integers / constants",     hue: "GitHub accent blue" }
+    - { token: base0A, hex: "#bf8700", role: "classes / types",          hue: "mustard / attention.fg" }
+    - { token: base0B, hex: "#0a3069", role: "strings / success",        hue: "deep navy (CB-safe green)" }
+    - { token: base0C, hex: "#0550ae", role: "regex / escape chars",     hue: "blue (CB-safe cyan)" }
+    - { token: base0D, hex: "#8250df", role: "functions / headings",     hue: "done purple" }
+    - { token: base0E, hex: "#b35900", role: "keywords / selectors",     hue: "orange (CB-safe danger)" }
+    - { token: base0F, hex: "#6f3800", role: "deprecated / markup tags", hue: "dark brown (CB-safe severe)" }
+  extended_accents:
+    - { token: base10, hex: "#24292f", role: "header.bg / deep panel" }
+    - { token: base11, hex: "#000000", role: "pure black (rare embeds)" }
+    - { token: base12, hex: "#f79939", role: "CB-safe danger (light)" }
+    - { token: base13, hex: "#d4a72c", role: "gold (highlight)" }
+    - { token: base14, hex: "#54aeff", role: "accent blue (light)" }
+    - { token: base15, hex: "#49bcb7", role: "CB-safe success (teal)" }
+    - { token: base16, hex: "#54aeff", role: "accent blue (light) [DUP of base14]" }
+    - { token: base17, hex: "#c297ff", role: "CB-safe done (lavender)" }
+
+notes:
+  system_change: >-
+    重要：本主题 system 是 base24 (不是 base16)，提供 24 个 token
+    (base00-base17)，比 base16 多 8 个扩展槽 (base10-base17)。
+    这是 design/colors/ 下第一份 base24，命名与结构都按 base24
+    规范：base08-base0F 是主强调色 (8 个)，base10-base17 是扩展
+    强调色 (8 个，常用于强调色的浅/深变体、面板背景、链接色等)。
+    文件名按 base24 规范带 "base24-" 前缀，与 base16-*.yaml 区分。
+  tone: >-
+    背景纯白 (#ffffff, L*=100.00)，前景中性深灰蓝 (#424a53, L*~31.07)，
+    与 base16-github 完全一致 (L* 跨度 ~69)。
+  colorblind_strategy: >-
+    适配 deuteranopia (绿盲) 与 protanopia (红盲) 双色盲——两种
+    最常见色盲形式。核心策略：
+    1. 红 -> 橙/棕 (base08 #8a4600, base0E #b35900, base0F #6f3800)
+    2. 绿 -> 蓝/青 (base0B #0a3069 深蓝替代绿, base0C #0550ae 蓝替代青绿)
+    3. 扩展色保留类似调整 (base15 #49bcb7 teal, base12 #f79939 浅橙)
+    红绿混淆被消除，但蓝/黄/紫三轴区分不受影响。
+  cb_red_mapping: >-
+    原 base16-github 三个"红系"槽：
+    - base08 #953800 (rust) -> #8a4600 (更深、更棕)
+    - base0E #cf222e (danger red) -> #b35900 (橙色，CB 友好的 danger)
+    - base0F #82071e (severe) -> #6f3800 (深棕替代)
+    在色盲视角下，红/橙/棕仍可凭亮度阶梯区分 (3 个色明度
+    38 / 53 / 32)，无障碍要求达标。
+  cb_green_mapping: >-
+    原 base16-github 两个"绿系"槽：
+    - base0B #116329 (success green) -> #0a3069 (深蓝，CB 友好)
+    - base0C #116329 (cyan) -> #0550ae (GitHub 蓝，原 base0E 槽)
+    绿盲视角下，原 base0C 与 base0E 的"红绿混淆"被彻底消除——
+    base0E 现在是橙 (替代原红)，base0C 现在是蓝 (替代原绿)。
+  non_standard_mapping: >-
+    槽位映射与 base16-github 同样"反直觉"：base09 是 accent blue
+    (而非橙)，base0E 是橙 (而非紫)，base0B 是深蓝 (而非绿)。
+    编辑器硬绑 base08=红 / base0B=绿 时需要做映射层。
+  base10_to_base17_role: >-
+    base24 扩展槽 (base10-base17) 的语义与 base16 不同——它们
+    通常不是新颜色而是原色系的"亮/暗变体"：
+    - base10 #24292f 接近 base07 的更深档 (header.dark 背景)
+    - base11 #000000 是 base06 的纯黑变体 (强对比)
+    - base12 #f79939 是 base0E (橙) 的亮变体
+    - base13 #d4a72c 是 base0A (芥末黄) 的亮变体
+    - base14 #54aeff 是 base09 (蓝) 的亮变体
+    - base15 #49bcb7 是 base0B (深蓝) 的青绿变体
+    - base17 #c297ff 是 base0D (紫) 的亮变体
+    适合"hover / focus / link underline"等需要"主色但更亮"的场景。
+  base16_dup: >-
+    base16 #54aeff 与 base14 #54aeff 重复——这是 base24 家族里
+    偶发的"占位"槽，使用时建议保留原值；若想拉开可考虑给 base16
+    换成更深蓝 (#0550ae 或 #1f6feb)。
+  primer_alignment: >-
+    与 base16-github 同源，但 base24 多了 Primer 在 issue / PR
+    hover / status badge 上用到的"亮变体"色，是 GitHub 网页
+    实际色板的更完整复刻 (base16 只取了一半)。

@@ -1,0 +1,105 @@
+# base16-one-light
+# Source: https://github.com/chriskempson/base16-one-schemes (Daniel Pfeifer)
+# Author: Daniel Pfeifer (http://github.com/purpleKarrot)
+# Original theme: Atom "One Light" by Gerry Lehmann
+
+scheme: one-light
+slug: base16-one-light
+system: base16
+variant: light
+appearance: light
+
+# CIELAB lightness for the two main tones
+bg_l: 98.27
+fg_l: 24.51
+
+author: Daniel Pfeifer (http://github.com/purpleKarrot)
+description: >-
+  One Light - Daniel Pfeifer 出品的 base16 light 变体，原型是
+  Atom 编辑器的官方 "One Light" 主题 (Gerry Lehmann 设计)。
+  背景取 Atom 默认 #fafafa (而非纯白)，灰阶走中性偏冷，强调色
+  8 个全部互不重复、色相亮度双维度分离，是 base16 light 家族
+  里最"标配"也最受欢迎的一档。
+
+palette:
+  # --- Greyscale (background -> foreground) ---
+  base00: "#fafafa"  # default background (off-white, Atom default)
+  base01: "#f0f0f1"  # lighter background (status bar, line highlight)
+  base02: "#e5e5e6"  # selection background
+  base03: "#a0a1a7"  # comments, invisibles, line numbers
+  base04: "#696c77"  # dark foreground (status bar)
+  base05: "#383a42"  # default foreground / body text
+  base06: "#202227"  # light foreground (rare)
+  base07: "#090a0b"  # light background (rare, embeds) [near-black]
+
+  # --- Accents (Atom One Light 原色) ---
+  base08: "#ca1243"  # red    - variables, deletions, errors (rose / Atom red)
+  base09: "#d75f00"  # orange - integers, constants, IDs (Atom orange)
+  base0A: "#c18401"  # yellow - classes, search highlights, types (gold / dark mustard)
+  base0B: "#50a14f"  # green  - strings, inheritance, success (Atom green)
+  base0C: "#0184bc"  # cyan   - support, regex, escape chars (Atom cyan)
+  base0D: "#4078f2"  # blue   - functions, methods, headings (Atom blue / github blue)
+  base0E: "#a626a4"  # purple - keywords, storage, selectors (magenta-purple)
+  base0F: "#986801"  # magenta- deprecated, embedded tags, markups (mustard / olive)
+
+# Quick reference
+swatches:
+  greyscale:
+    - { token: base00, hex: "#fafafa", role: "main background (off-white)" }
+    - { token: base01, hex: "#f0f0f1", role: "lighter background / line highlight" }
+    - { token: base02, hex: "#e5e5e6", role: "selection background" }
+    - { token: base03, hex: "#a0a1a7", role: "comments / invisibles" }
+    - { token: base04, hex: "#696c77", role: "secondary foreground" }
+    - { token: base05, hex: "#383a42", role: "primary foreground / body text" }
+    - { token: base06, hex: "#202227", role: "light foreground (rare)" }
+    - { token: base07, hex: "#090a0b", role: "light background (rare, embeds)" }
+  accents:
+    - { token: base08, hex: "#ca1243", role: "variables / deletions",    hue: "rose / crimson" }
+    - { token: base09, hex: "#d75f00", role: "integers / constants",     hue: "burnt orange" }
+    - { token: base0A, hex: "#c18401", role: "classes / types",          hue: "gold / dark mustard" }
+    - { token: base0B, hex: "#50a14f", role: "strings / success",        hue: "leaf green" }
+    - { token: base0C, hex: "#0184bc", role: "regex / escape chars",     hue: "cyan" }
+    - { token: base0D, hex: "#4078f2", role: "functions / headings",     hue: "Atom blue" }
+    - { token: base0E, hex: "#a626a4", role: "keywords / selectors",     hue: "magenta-purple" }
+    - { token: base0F, hex: "#986801", role: "deprecated / markup tags", hue: "mustard / olive" }
+
+notes:
+  tone: >-
+    背景微偏灰 (#fafafa, L*~98.27)，前景深冷灰 (#383a42, L*~24.51)。
+    L* 跨度约 74，是迄今七份方案里对比度第二高 (仅次于 google-light
+    的 75)。Atom 选 #fafafa 而非纯白是有意为之——纯白 #ffffff 在
+    Retina 屏上会"过亮、闪烁"，轻微的灰色让长时间阅读更舒适。
+  greyscale_neutrality: >-
+    base01 (#f0f0f1) / base02 (#e5e5e6) / base03 (#a0a1a7) 三档浅
+    灰阶极淡，base04 (#696c77) 起才进入中灰，整体观感"白底冷字"。
+    与 cupertino 像素纯灰、flexoki 暖奶、chicago-day 冷绿、
+    google-light 冷峻都不同——是 base16 light 里"最干净"的一档。
+  accent_balance: >-
+    8 个强调色互不重复，色相/亮度双维度都有分离：
+    - 红 (#ca1243, L*~45) vs 橙 (#d75f00, L*~57)：色相差 30°
+    - 黄 (#c18401, L*~67) vs 绿 (#50a14f, L*~62)：色相差 80°
+    - 青 (#0184bc, L*~48) vs 蓝 (#4078f2, L*~52)：色相差 30°
+    - 紫 (#a626a4, L*~44) vs 橄榄 (#986801, L*~53)：色相差大
+    这种均匀分布是 base16 light 家族里区分度最好的一档，
+    syntax highlight 时 8 类元素一目了然。
+  popularity: >-
+    One Light / One Dark 是 base16 全家族使用率最高的 theme pair
+    (与 One Dark 配对使用)，原因是：
+    - Helix 编辑器默认主题之一
+    - 大量 Neovim / VSCode 插件原生支持
+    - 灰阶/强调色平衡度高，适合大多数编程语言
+    - 跨 light/dark 切换时"零"认知负担 (只需镜像灰阶)
+  base08_rose: >-
+    #ca1243 介于 crimson 与 magenta 之间，比 chicago-day 的
+    #c60c30 更偏紫、比 atelier-seaside 的 #e6193c 更暗——是
+    "温和的红"，删除/错误色不会刺眼。
+  base0D_atom_blue: >-
+    #4078f2 是 GitHub link blue 的近亲 (#0366d6 比它深一档)，
+    是 web 开发者熟悉的"链接蓝"。在浅底上比纯蓝 #0000ff
+    (cupertino) 友好得多。
+  base0F_mustard_role: >-
+    #986801 是橄榄/芥末，与 base0A (#c18401, 同色相但更亮)
+    形成"亮/暗"对：base0A 给 classes/types，base0F 给
+    deprecated/embed，让"强调/去强调"靠亮度而非色相区分。
+    这种设计比 cupertino (base0A/F 复用) 略好，但比
+    flexoki (用 dusty rose 区分) 仍嫌同色相单调。
