@@ -1,77 +1,80 @@
 ---
 id: pretty-view-html
 name: pretty-view-html
-description: 将已有文档、知识、报告、方案或 code review 做成 HTML 阅读页，并判断单页、扁平多页或层级多页。仅在用户点名 pretty-view-html，或明确要求把已有内容做成网页、HTML、浏览器阅读页、漂亮的 HTML 文档或将现有 Markdown 转成 HTML 时使用。
+description: 将已有上下文、文件、文档、报告、方案或评审内容整理为适合浏览器阅读的 HTML 文档。用于用户要求生成 HTML、网页阅读页、漂亮的 HTML 文档，或把现有内容做成单页或多页 HTML 时。
 ---
 
-# pretty-view-html（HTML 阅读页）
+# Pretty View HTML
 
-面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
+把用户提供的上下文或文件转成美观、简洁、优雅且适合阅读的 HTML 文档。保留原内容的事实、术语和层次；可以重组信息以改善阅读，但不虚构缺失内容。
 
-本 skill 只把已有内容做成 HTML 阅读页，不替用户写第一稿。固定流程：
+默认输出到 `docs/pretty-view-html/`。用户指定其他路径时，以用户要求为准。
+
+## 工作流
+
+1. 阅读全部输入，确认主题、读者、内容边界与主要阅读任务。
+2. 判断单页或多页。默认单页；只有内容由多个可独立阅读、分享或维护的主题组成，或用户明确要求时才拆成多页。篇幅长本身不是拆页理由。
+3. 生成前读取 [references/frontend-design/SKILL.md](references/frontend-design/SKILL.md)，据此确定与主题相符的色彩、字体、版式和一个克制的视觉特征。避免套用与内容无关的通用模板。
+4. 直接生成可在浏览器打开的 `.html`；输入 Markdown 只是内容来源，不需要另建 Markdown 副本。
+5. 更新内容入口与根聚合页，随后检查视觉、导航、响应式和链接。
+
+## 文件组织
+
+名称使用简短、可辨识的 kebab-case slug。
+
+### 单页
 
 ```text
-确认已有内容 → 判断页面架构 → 直写 HTML → 维护索引
+docs/pretty-view-html/
+├── index.html
+└── <slug>.html
 ```
 
-## 使用合同
+单页文档本身是完整阅读入口，并提供返回根 `index.html` 的链接。
 
-1. 只 Read `references/html-page.md`、`references/frontend-design/SKILL.md` 与 `references/minimalist-ui/SKILL.md`。
-2. `html-page` 决定单页/多页文件组织；`frontend-design` 决定本次视觉方向；`minimalist-ui` 约束阅读页的编辑气质与禁区。与 `frontend-design` 冲突时遵守 `minimalist-ui` 禁区，把个性放在允许的轴上。
-3. 直接生成 `.html`。现有 `.md` 只是输入，不另建或改写 Markdown 副本，也不调用通用 Markdown 转换器。
-4. 禁止写入 `references/`；第三方快照只按 `README.md` 的升级流程维护。
-5. 用户只说“展示一下”“做得好看”但没有指定网页或 HTML 时，先确认输出格式。
+### 多页
 
-## 页面架构
-
-按 `references/html-page.md` 判断单页、扁平多页或层级多页。默认单页；篇幅长、标题多、含表格、代码或图解都不足以拆页。
-
-多页包以 `_site.json` 作为页面清单和导航一致性的规范依据。修改后必须检查本地链接、页面清单与导航一致性。自动推断后用一句话告知页面架构。
-
-## 落盘（默认 `docs/pretty-view-html/`）
-
-用户明确只要对话里看时不写文件。否则：
-
-1. 用户指定路径就使用；未指定则默认 `docs/pretty-view-html/<kind>/<slug>`。
-2. 目标路径或默认根已存在则直接写；不存在则先确认将创建的目录与文件名，确认前不 mkdir、不写文件。
-3. 写入默认根时维护 `INDEX.md`，并用脚本生成根 `index.html`。
-4. 根下只放 `INDEX.md`、`index.html` 与可选 `_assets/`。
-
-| kind | 用于 |
-|------|------|
-| `articles` | 长文阅读页 |
-| `knowledge` | 知识整理 |
-| `reports` | 报告 |
-| `proposals` | 方案 |
-| `reviews` | code review |
-
-`<slug>` 使用 kebab-case。同名已存在时换 slug 或先问，禁止静默覆盖。
-
-- 单文件：`docs/pretty-view-html/<kind>/YYYY-MM-DD-<slug>.html`
-- 多文件包：`docs/pretty-view-html/<kind>/YYYY-MM-DD-<slug>/`，包含 `index.html`、`_site.json`、内容页与可选 `assets/`
-- 根索引每个单文件或包只登记一行；包内附属页由主文件链接
-
-### 维护索引
-
-1. 先更新 `INDEX.md`，每个包或单文件一行。
-2. 运行：
-
-```bash
-python3 <this-skill>/scripts/update-catalog.py docs/pretty-view-html
+```text
+docs/pretty-view-html/
+├── index.html
+└── <slug>/
+    ├── index.html
+    ├── <topic-a>.html
+    ├── <topic-b>.html
+    └── assets/            # 可选，共享样式、脚本或图片
 ```
 
-3. 交付时首先告诉用户 `docs/pretty-view-html/index.html`，可附单篇入口，但不要罗列包内页面。
+- 包内 `index.html` 是该内容集的聚合页：说明主题、范围并列出全部页面。
+- 内容页使用一致导航，至少能返回包首页；适合顺序阅读时再提供上一篇/下一篇。
+- 所有 `href` 和 `src` 使用相对路径。禁止孤儿页、绝对磁盘路径和 `file://` 链接。
+- 页面较多且存在真实、稳定的父子分类时才增加分组目录；每个分组目录必须有自己的 `index.html`。默认不超过两级内容层次。
+- 多页共享的样式和脚本放进包内 `assets/`，不要复制出容易漂移的多份资源。
 
-`<this-skill>` 是包含本 `SKILL.md` 的目录。脚本按 `INDEX.md` 与磁盘入口生成 catalog，并给入口页注入「← 目录」回链。退出码 1 表示存在死链，修复后重跑。禁止手写根 `index.html` 或正文回链。
+## 根聚合页
 
-`INDEX.md` 示例：
+`docs/pretty-view-html/index.html` 是所有生成内容的总入口，必须持续维护：
 
-```markdown
-# pretty-view-html
+- 每个单页或多页内容集只登记一个入口；多页指向包内 `index.html`。
+- 展示清晰的标题、简短说明和必要的日期或类型信息，不暴露实现细节。
+- 新增、移动、重命名或删除内容时同步更新，避免死链和重复条目。
+- 已存在时保留原有内容与视觉语言，在其基础上增量更新；不存在时创建简洁的响应式索引页。
 
-浏览器入口：[index.html](index.html)。
+写入前检查目标路径。若同名内容已存在且用户没有明确要求覆盖，选择不冲突的 slug，或在无法合理判断时询问用户；禁止静默覆盖。
 
-| 日期 | 标题 | 类型 | 介质 | 路径 |
-|------|------|------|------|------|
-| 2026-08-14 | 鉴权方案 | proposals | HTML | [proposals/2026-08-14-auth.html](proposals/2026-08-14-auth.html) |
-```
+## 阅读与视觉要求
+
+- 内容优先：用清晰的信息层级、适宜行宽、稳定节奏和充足留白支持连续阅读。
+- 视觉必须源于主题。控制色彩、字体和装饰数量；只保留能帮助理解或建立辨识度的元素。
+- 正文、表格、代码、引用、提示和图片都要在桌面与窄屏上易读；宽表格允许横向滚动，不能撑破页面。
+- 使用语义化 HTML，保持标题层级连续，并提供明确的页面标题、语言属性和 viewport。
+- 链接和控件具有清晰文本、可见键盘焦点与足够对比度。不要只靠颜色传达含义。
+- 动效必须服务阅读，默认克制，并尊重 `prefers-reduced-motion`。纯阅读页不为“高级感”强行动画。
+- 优先生成可独立打开的静态页面。除非确有必要，不依赖构建步骤、前端框架或必须联网加载的资源。
+
+## 完成检查
+
+- 输入中的核心事实、代码、表格、术语和结论没有遗漏或篡改。
+- 页面没有溢出、遮挡、过小文字、失效资源或明显的模板化装饰。
+- 单页可返回根聚合页；多页具有包首页、完整页面地图和一致导航。
+- 根 `index.html` 已包含本次内容的唯一入口。
+- 所有本地链接与资源路径有效，页面可直接在浏览器中打开。
