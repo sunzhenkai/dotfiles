@@ -1,7 +1,7 @@
 ---
 id: pretty-view-html
 name: pretty-view-html
-description: 将已有文档、知识、报告、方案或 code review 做成有明确视觉方向的 HTML 阅读页，并判断单页、扁平多页或层级多页。仅在用户点名 pretty-view-html，或明确要求把已有内容做成网页、HTML、浏览器阅读页、漂亮的 HTML 文档或将现有 Markdown 转成 HTML 时使用。
+description: 将已有文档、知识、报告、方案或 code review 做成 HTML 阅读页，并判断单页、扁平多页或层级多页。仅在用户点名 pretty-view-html，或明确要求把已有内容做成网页、HTML、浏览器阅读页、漂亮的 HTML 文档或将现有 Markdown 转成 HTML 时使用。
 ---
 
 # pretty-view-html（HTML 阅读页）
@@ -11,14 +11,13 @@ description: 将已有文档、知识、报告、方案或 code review 做成有
 本 skill 只把已有内容做成 HTML 阅读页，不替用户写第一稿。固定流程：
 
 ```text
-确认已有内容与受众 → 判断页面架构 → 建立内容与视觉 brief
-→ 直写 HTML → 视觉与链接验收 → 维护索引
+确认已有内容 → 判断页面架构 → 直写 HTML → 维护索引
 ```
 
 ## 使用合同
 
-1. 只 Read `references/html-page.md` 与 `references/frontend-design/SKILL.md`。
-2. `html-page` 决定内容模式、信息架构、页面关系和工程底线；`frontend-design` 决定本次视觉方向。
+1. 只 Read `references/html-page.md`、`references/frontend-design/SKILL.md` 与 `references/minimalist-ui/SKILL.md`。
+2. `html-page` 决定单页/多页文件组织；`frontend-design` 决定本次视觉方向；`minimalist-ui` 约束阅读页的编辑气质与禁区。与 `frontend-design` 冲突时遵守 `minimalist-ui` 禁区，把个性放在允许的轴上。
 3. 直接生成 `.html`。现有 `.md` 只是输入，不另建或改写 Markdown 副本，也不调用通用 Markdown 转换器。
 4. 禁止写入 `references/`；第三方快照只按 `README.md` 的升级流程维护。
 5. 用户只说“展示一下”“做得好看”但没有指定网页或 HTML 时，先确认输出格式。
@@ -28,10 +27,6 @@ description: 将已有文档、知识、报告、方案或 code review 做成有
 按 `references/html-page.md` 判断单页、扁平多页或层级多页。默认单页；篇幅长、标题多、含表格、代码或图解都不足以拆页。
 
 多页包以 `_site.json` 作为页面清单和导航一致性的规范依据。修改后必须检查本地链接、页面清单与导航一致性。自动推断后用一句话告知页面架构。
-
-## 视觉方向
-
-写代码前按内容建立 Subject、Audience、Page job、Direction、Tokens、Layout、Signature brief。颜色、字体和正文版式从内容语义、阅读环境、对比度与可读性推导，不预设冷暖色系。站点导航、页内目录和 hub 页地图与正文共用同一套 token，但**位置固定**：站点导航在页面顶部横向栏，页内目录在左侧且必须可隐藏。导航与目录不得做成整栏深色底板或大面积色块。普通请求无需让用户先选主题；同一多页包固定一套 token、组件和交互语言，不使用固定皮肤。
 
 ## 落盘（默认 `docs/pretty-view-html/`）
 
@@ -80,15 +75,3 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view-html
 |------|------|------|------|------|
 | 2026-08-14 | 鉴权方案 | proposals | HTML | [proposals/2026-08-14-auth.html](proposals/2026-08-14-auth.html) |
 ```
-
-## 最低要求
-
-- 完整文档包含 doctype、准确 `lang`、charset、viewport 与 title。
-- 可通过 `file://` 打开；本地资源只用产物目录内相对路径。
-- 一个 H1，标题层级连续；需要非线性查找的长文有可点击目录。目录在左侧，支持键盘可操作的视觉隐藏，隐藏后释放侧栏空间并保留恢复入口。多页的站点导航在顶部。
-- 连续正文保持可读行宽；宽表、代码、图和网格使用受限宽内容区。
-- Mermaid、PlantUML、Graphviz/DOT、D2 等文本定义图保留源码并渲染为本地图片；查看时支持图片/代码切换，默认显示图片。
-- 响应式、打印、减少动效和 JS 失败降级可用。
-- 生成后检查桌面与移动端视觉、本地链接和可访问性；发现问题就修正并复核。
-- 不修改第三方快照，不把密钥、内部 URL、公司代码贴进可公开产物。
-- 大改已有展示页前，先说明会动哪些文件。
