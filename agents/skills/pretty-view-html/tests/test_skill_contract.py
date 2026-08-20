@@ -50,7 +50,7 @@ class PrettyViewHtmlContractTest(unittest.TestCase):
         self.assertIn("连续正文保持可读行宽", self.skill)
         self.assertNotIn("pretty-view-width", self.skill)
 
-    def test_core_rules_and_collapsible_toc_are_explicit(self) -> None:
+    def test_core_rules_and_navigation_toc_duties_are_explicit(self) -> None:
         self.assertIn("## 七条核心规则", self.reading_page)
         for rule in (
             "**结构真实**",
@@ -64,24 +64,52 @@ class PrettyViewHtmlContractTest(unittest.TestCase):
             with self.subTest(rule=rule):
                 self.assertIn(rule, self.reading_page)
 
-        self.assertIn("## 页内目录合同", self.reading_page)
+        self.assertIn("## 导航与目录合同", self.reading_page)
         for text in (
-            '<nav aria-label="本页目录">',
-            "默认收录 H2",
+            "hub 页",
+            "站点导航在上部",
+            "页内目录在左侧",
             "必须支持视觉隐藏",
+            "隐藏后释放侧栏空间",
             "不得继续占据原栏宽",
+            "整栏深色底板",
+            "读者的问题",
+            "面包屑",
+            "站点导航",
+            "使用真实 `<nav>`",
+            "本页目录",
+            "默认收录 H2",
+            "frontend-design",
             "<details>",
-            "<summary>",
-            ":has()",
             "aria-expanded",
+            'aria-current="page"',
             'aria-current="location"',
-            "视觉层级低于标题和正文",
-            "打印时展开目录内容",
+            "需要非线性查找的长文有可点击目录",
+            "目录在左侧",
+            "支持键盘可操作的视觉隐藏",
         ):
             with self.subTest(text=text):
-                self.assertIn(text, self.reading_page)
-        self.assertIn("目录栏支持键盘可操作的视觉隐藏", self.skill)
-        self.assertIn("隐藏后释放侧栏空间", self.skill)
+                target = self.skill if text in (
+                    "需要非线性查找的长文有可点击目录",
+                    "目录在左侧",
+                    "支持键盘可操作的视觉隐藏",
+                ) else self.reading_page
+                self.assertIn(text, target)
+        for retired in (
+            "不套固定侧栏",
+            "不套固定侧栏或折叠控件",
+            "第二次 thesis",
+            "## 页内目录合同",
+        ):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, self.reading_page)
+                self.assertNotIn(retired, self.skill)
+
+    def test_navigation_and_hub_pages_share_visual_brief(self) -> None:
+        self.assertIn("hub 页", self.skill)
+        self.assertIn("整栏深色底板", self.skill)
+        self.assertIn("站点导航在页面顶部横向栏", self.skill)
+        self.assertIn("地图的设计服从「导航与目录合同」", self.reading_page)
 
     def test_text_diagrams_default_to_images_and_keep_source_toggle(self) -> None:
         self.assertIn("## 文本定义图", self.reading_page)

@@ -77,7 +77,7 @@ class BeaconTtlFixtureTest(unittest.TestCase):
                 self.assertIn('aria-label="本页目录"', html)
                 self.assertIn("<details", html)
                 self.assertIn("<summary", html)
-                self.assertIn(".shell:has(.site-nav details:not([open]))", html)
+                self.assertIn(".shell:has(.toc details:not([open]))", html)
                 self.assertIn("跳到正文", html)
                 self.assertNotIn('aria-label="阅读宽度"', html)
                 self.assertNotIn("data-measure", html)

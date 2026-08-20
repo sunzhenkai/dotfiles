@@ -31,7 +31,7 @@ description: 将已有文档、知识、报告、方案或 code review 做成有
 
 ## 视觉方向
 
-写代码前按内容建立 Subject、Audience、Page job、Direction、Tokens、Layout、Signature brief。颜色、字体和布局从内容语义、阅读环境、对比度与可读性推导，不预设冷暖色系。普通请求无需让用户先选主题；同一多页包固定一套 token、组件和交互语言，不使用固定皮肤。
+写代码前按内容建立 Subject、Audience、Page job、Direction、Tokens、Layout、Signature brief。颜色、字体和正文版式从内容语义、阅读环境、对比度与可读性推导，不预设冷暖色系。站点导航、页内目录和 hub 页地图与正文共用同一套 token，但**位置固定**：站点导航在页面顶部横向栏，页内目录在左侧且必须可隐藏。导航与目录不得做成整栏深色底板或大面积色块。普通请求无需让用户先选主题；同一多页包固定一套 token、组件和交互语言，不使用固定皮肤。
 
 ## 落盘（默认 `docs/pretty-view-html/`）
 
@@ -85,7 +85,7 @@ python3 <this-skill>/scripts/update-catalog.py docs/pretty-view-html
 
 - 完整文档包含 doctype、准确 `lang`、charset、viewport 与 title。
 - 可通过 `file://` 打开；本地资源只用产物目录内相对路径。
-- 一个 H1，标题层级连续；需要非线性查找的长文有可点击目录，目录栏支持键盘可操作的视觉隐藏，隐藏后释放侧栏空间并保留恢复入口。
+- 一个 H1，标题层级连续；需要非线性查找的长文有可点击目录。目录在左侧，支持键盘可操作的视觉隐藏，隐藏后释放侧栏空间并保留恢复入口。多页的站点导航在顶部。
 - 连续正文保持可读行宽；宽表、代码、图和网格使用受限宽内容区。
 - Mermaid、PlantUML、Graphviz/DOT、D2 等文本定义图保留源码并渲染为本地图片；查看时支持图片/代码切换，默认显示图片。
 - 响应式、打印、减少动效和 JS 失败降级可用。

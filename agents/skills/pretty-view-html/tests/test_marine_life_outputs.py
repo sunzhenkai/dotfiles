@@ -69,7 +69,7 @@ class MarineLifeFixtureTest(unittest.TestCase):
         self.assertIn('aria-label="本页目录"', html)
         self.assertIn("<details", html)
         self.assertIn("<summary", html)
-        self.assertIn(".shell:has(.site-nav details:not([open]))", html)
+        self.assertIn(".shell:has(.toc details:not([open]))", html)
         self.assertIn('href="#zones-intertidal"', html)
         self.assertIn('href="#why"', html)
         self.assertIn("跳到正文", html)
@@ -157,6 +157,8 @@ class MarineLifeSiteNavTest(unittest.TestCase):
         self.assertNotIn("max-width: none", css_text)
         self.assertNotIn("pretty-view-width", css_text)
         self.assertNotIn(".measure", css_text)
+        self.assertNotIn("depth-rail", css_text)
+        self.assertIn(".shell:has(.toc details:not([open]))", css_text)
         for path, html in self.html.items():
             with self.subTest(path=path):
                 self.assertIn('rel="stylesheet"', html)

@@ -57,12 +57,12 @@
       grid-template-columns: 220px minmax(0, 1fr);
       min-height: 100vh;
     }
-    .shell:has(.site-nav details:not([open])) {
-      grid-template-columns: 48px minmax(0, 1fr);
+    .shell:has(.toc details:not([open])) {
+      grid-template-columns: 44px minmax(0, 1fr);
     }
-    .site-nav {
-      background: var(--graphite);
-      color: #D5E0E6;
+    .toc {
+      background: var(--pad);
+      color: var(--graphite);
       position: sticky;
       top: 0;
       height: 100vh;
@@ -70,28 +70,31 @@
       padding: 20px 14px 32px;
       font-size: 13px;
       line-height: 1.45;
+      border-right: 1px solid var(--grid);
     }
-    .site-nav .nav-kicker {
+    .toc .nav-kicker {
       font-family: var(--data);
       font-size: 10px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--highlighter);
+      color: var(--minor);
       margin: 0 0 12px;
       cursor: pointer;
+      list-style: none;
     }
-    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 3px; }
-    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
-    .site-nav details:not([open]) .nav-kicker {
+    .toc .nav-kicker::-webkit-details-marker { display: none; }
+    .toc .nav-kicker:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 3px; }
+    .toc:has(details:not([open])) { padding-inline: 10px; overflow: hidden; }
+    .toc details:not([open]) .nav-kicker {
       writing-mode: vertical-rl;
       white-space: nowrap;
       margin: 0 auto;
     }
-    .site-nav ol { margin: 0; padding-left: 1.1em; }
-    .site-nav li { margin: 0 0 8px; }
-    .site-nav a { color: #F7FBFC; text-decoration: none; }
-    .site-nav a:hover { text-decoration: underline; }
-    .site-nav a:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 2px; }
+    .toc ol { margin: 0; padding-left: 1.1em; }
+    .toc li { margin: 0 0 8px; }
+    .toc a { color: var(--graphite); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .toc a:focus-visible { outline: 2px solid var(--highlighter); outline-offset: 2px; }
     .sev-dot {
       display: inline-block;
       width: 8px;
@@ -200,10 +203,16 @@
     }
     ul, ol { margin: 0 0 1rem; padding-left: 1.3em; }
     @media (max-width: 720px) {
-      .shell { grid-template-columns: 1fr; }
-      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
-      .site-nav { height: auto; position: static; max-height: none; }
-      .site-nav details:not([open]) .nav-kicker {
+      .shell,
+      .shell:has(.toc details:not([open])) { grid-template-columns: 1fr; }
+      .toc {
+        height: auto;
+        position: static;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid var(--grid);
+      }
+      .toc details:not([open]) .nav-kicker {
         writing-mode: horizontal-tb;
         margin: 0;
       }
@@ -214,15 +223,15 @@
     }
     @media print {
       .skip { display: none; }
-      .site-nav {
+      .toc {
         position: static;
         height: auto;
         color: #111;
         background: #fff;
         padding: 0 0 16px;
       }
-      .site-nav a, .site-nav .nav-kicker { color: #111; }
-      .site-nav details > * { display: block !important; }
+      .toc a, .toc .nav-kicker { color: #111; }
+      .toc details > * { display: block !important; }
       .shell { display: block; }
       body { background: #fff; }
       pre { color: #111; background: #f3f3f3; }
@@ -232,7 +241,7 @@
 <body>
   <a class="skip" href="#content">跳到正文</a>
   <div class="shell">
-    <nav class="site-nav" aria-label="本页目录">
+    <nav class="toc" aria-label="本页目录">
       <details open>
         <summary class="nav-kicker">评审目录</summary>
         <ol>

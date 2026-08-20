@@ -53,12 +53,12 @@
       grid-template-columns: 220px minmax(0, 1fr);
       min-height: 100vh;
     }
-    .shell:has(.site-nav details:not([open])) {
-      grid-template-columns: 48px minmax(0, 1fr);
+    .shell:has(.toc details:not([open])) {
+      grid-template-columns: 44px minmax(0, 1fr);
     }
-    .site-nav {
-      background: var(--harbor);
-      color: #C9D6DE;
+    .toc {
+      background: var(--glass);
+      color: var(--ink);
       position: sticky;
       top: 0;
       height: 100vh;
@@ -67,36 +67,38 @@
       font-family: var(--data);
       font-size: 12px;
       line-height: 1.4;
-      border-right: 4px solid var(--sodium);
+      border-right: 1px solid var(--line);
     }
-    .site-nav .nav-kicker {
+    .toc .nav-kicker {
       font-size: 10px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--sodium);
+      color: var(--brass);
       margin: 0 0 12px;
       cursor: pointer;
+      list-style: none;
     }
-    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--sodium); outline-offset: 3px; }
-    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
-    .site-nav details:not([open]) .nav-kicker {
+    .toc .nav-kicker::-webkit-details-marker { display: none; }
+    .toc .nav-kicker:focus-visible { outline: 2px solid var(--sodium); outline-offset: 3px; }
+    .toc:has(details:not([open])) { padding-inline: 10px; overflow: hidden; }
+    .toc details:not([open]) .nav-kicker {
       writing-mode: vertical-rl;
       white-space: nowrap;
       margin: 0 auto;
     }
-    .site-nav ol { list-style: none; margin: 0; padding: 0; }
-    .site-nav li { margin: 0 0 10px; padding: 0 0 10px; border-bottom: 1px dashed rgba(201, 214, 222, 0.2); }
-    .site-nav time {
+    .toc ol { list-style: none; margin: 0; padding: 0; }
+    .toc li { margin: 0 0 10px; padding: 0 0 10px; border-bottom: 1px dashed var(--line); }
+    .toc time {
       display: block;
       color: var(--brass);
       font-size: 11px;
     }
-    .site-nav a {
-      color: #E8EEF2;
+    .toc a {
+      color: var(--harbor);
       text-decoration: none;
     }
-    .site-nav a:hover { color: #fff; }
-    .site-nav a:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+    .toc a:hover { color: var(--sodium); }
+    .toc a:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
     .page {
       width: 100%;
       padding: 28px 32px 72px;
@@ -209,16 +211,16 @@
     }
     ul, ol { margin: 0 0 1rem; padding-left: 1.3em; }
     @media (max-width: 720px) {
-      .shell { grid-template-columns: 1fr; }
-      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
-      .site-nav {
+      .shell,
+      .shell:has(.toc details:not([open])) { grid-template-columns: 1fr; }
+      .toc {
         height: auto;
         position: static;
         max-height: none;
         border-right: 0;
-        border-bottom: 4px solid var(--sodium);
+        border-bottom: 1px solid var(--line);
       }
-      .site-nav details:not([open]) .nav-kicker {
+      .toc details:not([open]) .nav-kicker {
         writing-mode: horizontal-tb;
         margin: 0;
       }
@@ -229,7 +231,7 @@
     }
     @media print {
       .skip { display: none; }
-      .site-nav {
+      .toc {
         position: static;
         height: auto;
         color: #111;
@@ -237,8 +239,8 @@
         padding: 0 0 16px;
         border: 0;
       }
-      .site-nav a, .site-nav .nav-kicker, .site-nav time { color: #111; }
-      .site-nav details > * { display: block !important; }
+      .toc a, .toc .nav-kicker, .toc time { color: #111; }
+      .toc details > * { display: block !important; }
       .shell { display: block; }
       body { background: #fff; }
       pre { color: #111; background: #f3f3f3; }
@@ -248,7 +250,7 @@
 <body>
   <a class="skip" href="#content">跳到正文</a>
   <div class="shell">
-    <nav class="site-nav" aria-label="本页目录">
+    <nav class="toc" aria-label="本页目录">
       <details open>
         <summary class="nav-kicker">值班带 · UTC+8</summary>
         <ol>

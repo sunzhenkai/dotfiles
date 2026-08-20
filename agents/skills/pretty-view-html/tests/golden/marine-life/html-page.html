@@ -10,7 +10,7 @@
        Audience: 科普入门，浏览器连续阅读
        Page job: 建立「深度 → 生境 → 代表种 → 数据」心智模型
        Direction: 潮间带观测站的湿盐标本日志
-       Signature: 左侧可点击的深度目录
+       Signature: 左侧可隐藏的浅色目录，不是深色侧栏
        Tokens: abyss #07151C / kelp #1A4A3C / foam #E6EEE9 / barnacle #C9BBA4 / rust #B5523A / tide #3A7A78
     */
     :root {
@@ -50,15 +50,15 @@
     .skip:focus { left: 8px; z-index: 20; }
     .shell {
       display: grid;
-      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-columns: 220px minmax(0, 1fr);
       min-height: 100vh;
     }
-    .shell:has(.site-nav details:not([open])) {
-      grid-template-columns: 48px minmax(0, 1fr);
+    .shell:has(.toc details:not([open])) {
+      grid-template-columns: 44px minmax(0, 1fr);
     }
-    .site-nav {
-      background: var(--abyss);
-      color: var(--barnacle);
+    .toc {
+      background: var(--foam);
+      color: var(--ink);
       position: sticky;
       top: 0;
       height: 100vh;
@@ -66,8 +66,9 @@
       padding: 22px 16px 32px;
       font-size: 13px;
       line-height: 1.45;
+      border-right: 1px solid var(--line);
     }
-    .site-nav .nav-kicker {
+    .toc .nav-kicker {
       font-family: var(--data);
       font-size: 11px;
       letter-spacing: 0.14em;
@@ -75,38 +76,40 @@
       color: var(--tide);
       margin: 0 0 14px;
       cursor: pointer;
+      list-style: none;
     }
-    .site-nav .nav-kicker:focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
-    .site-nav:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
-    .site-nav details:not([open]) .nav-kicker {
+    .toc .nav-kicker::-webkit-details-marker { display: none; }
+    .toc .nav-kicker:focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
+    .toc:has(details:not([open])) { padding-inline: 12px; overflow: hidden; }
+    .toc details:not([open]) .nav-kicker {
       writing-mode: vertical-rl;
       white-space: nowrap;
       margin: 0 auto;
     }
-    .site-nav a {
-      color: #E6EEE9;
+    .toc a {
+      color: var(--ink);
       text-decoration: none;
     }
-    .site-nav a:hover { color: #fff; }
-    .site-nav a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
-    .site-nav ol {
+    .toc a:hover { color: var(--kelp); }
+    .toc a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+    .toc ol {
       margin: 0;
       padding: 0;
       list-style: none;
     }
-    .site-nav details > ol > li { margin: 0 0 10px; }
-    .site-nav details > ol > li > a { font-weight: 600; }
-    .site-nav ol ol {
+    .toc details > ol > li { margin: 0 0 10px; }
+    .toc details > ol > li > a { font-weight: 600; }
+    .toc ol ol {
       margin: 6px 0 0;
       padding-left: 10px;
-      border-left: 1px solid rgba(196, 184, 164, 0.28);
+      border-left: 1px solid var(--line);
     }
-    .site-nav ol ol li { margin: 0 0 6px; }
-    .site-nav .m {
+    .toc ol ol li { margin: 0 0 6px; }
+    .toc .m {
       font-family: var(--data);
       font-size: 10px;
       letter-spacing: 0.06em;
-      color: var(--barnacle);
+      color: var(--muted);
       margin-left: 6px;
     }
     .page {
@@ -259,14 +262,16 @@
       font-size: 0.9rem;
     }
     @media (max-width: 720px) {
-      .shell { grid-template-columns: 1fr; }
-      .shell:has(.site-nav details:not([open])) { grid-template-columns: 1fr; }
-      .site-nav {
+      .shell,
+      .shell:has(.toc details:not([open])) { grid-template-columns: 1fr; }
+      .toc {
         height: auto;
         position: static;
         max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
       }
-      .site-nav details:not([open]) .nav-kicker {
+      .toc details:not([open]) .nav-kicker {
         writing-mode: horizontal-tb;
         margin: 0;
       }
@@ -278,15 +283,16 @@
     }
     @media print {
       .skip { display: none; }
-      .site-nav {
+      .toc {
         position: static;
         height: auto;
         color: #111;
         background: #fff;
         padding: 0 0 16px;
+        border: 0;
       }
-      .site-nav a, .site-nav .nav-kicker { color: #111; }
-      .site-nav details > * { display: block !important; }
+      .toc a, .toc .nav-kicker { color: #111; }
+      .toc details > * { display: block !important; }
       .shell { display: block; }
       body { background: #fff; }
     }
@@ -295,7 +301,7 @@
 <body>
   <a class="skip" href="#content">跳到正文</a>
   <div class="shell">
-    <nav class="site-nav" aria-label="本页目录">
+    <nav class="toc" aria-label="本页目录">
       <details open>
         <summary class="nav-kicker">本页目录</summary>
         <ol>
