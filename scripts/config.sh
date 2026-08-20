@@ -222,10 +222,24 @@ install_codex() {
   } > "$target"
   echo "已安装: ~/.codex/config.toml（base + local 合并生成）"
 
-  # 模型能力目录（model catalog，只读，仍用软链）
+  # 模型能力目录（model catalog，只读，仍用软链；custom=MiniMax 默认，
+  # nativex=公司网关，由 nativex profile 的 model_catalog_json 引用）
   mkdir -p "$HOME/.codex/model-catalogs"
-  link_file "agents/vendors/codex/model-catalogs/custom-catalog.json" "$HOME/.codex/model-catalogs/custom-catalog.json"
-  echo "已安装: ~/.codex/model-catalogs/custom-catalog.json"
+  local c
+  for c in "$DOTFILES_ROOT"/agents/vendors/codex/model-catalogs/*.json; do
+    [ -f "$c" ] || continue
+    link_file "agents/vendors/codex/model-catalogs/$(basename "$c")" "$HOME/.codex/model-catalogs/$(basename "$c")"
+    echo "已安装: ~/.codex/model-catalogs/$(basename "$c")"
+  done
+
+  # profile 层（codex 0.134+ 独立文件机制，只读，用软链）
+  # 如 nativex.config.toml → codex --profile nativex
+  local p
+  for p in "$DOTFILES_ROOT"/agents/vendors/codex/*.config.toml; do
+    [ -f "$p" ] || continue
+    link_file "agents/vendors/codex/$(basename "$p")" "$HOME/.codex/$(basename "$p")"
+    echo "已安装: ~/.codex/$(basename "$p")"
+  done
   # skills/MCP：dotf agents -c [--tool codex] 或 sync.sh codex
 }
 

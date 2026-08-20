@@ -1,0 +1,10 @@
+# MiniMax profile（codex --profile minimax 激活）
+#
+# 默认 provider 已切到 NativeX 公司网关（见主配置 [model_providers.nativex]），
+# 需要直连 MiniMax 时用本 profile 覆盖回 MiniMax-M3 的 model / context / catalog。
+# codex 0.134+ 的 profile 是独立文件 ~/.codex/<name>.config.toml（顶层键，
+# 不嵌 [profiles.<name>]），叠加在 ~/.codex/config.toml 之上。
+model = "MiniMax-M3"
+model_provider = "minimax"
+model_context_window = 1000000
+model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"

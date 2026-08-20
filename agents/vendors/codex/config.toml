@@ -1,11 +1,10 @@
-# Codex 配置 - 接入 MiniMax（MiniMax-M3），无需 OpenAI 登录
+# Codex 配置 - 默认接入 NativeX 公司网关（gpt-5.3-codex），备用 MiniMax（--profile minimax）
 # 文档: https://developers.openai.com/codex/config-reference
-#       https://platform.minimaxi.com/document/Code%20Companion
 #
-# 本配置使用自定义 provider（MiniMax），不依赖 OpenAI 账号：
+# 两者均为自定义 provider，不依赖 OpenAI 账号：
 #   - 启动 `codex` 时不会弹出 ChatGPT 登录选择器
 #     （provider 的 requires_openai_auth = false，见下方）
-#   - 只需设置 MINIMAX_API_KEY 环境变量即可使用
+#   - 默认网关密钥 NATIVEX_API_KEY（senv ai 组）；备用 MINIMAX_API_KEY
 #
 # 注意: codex 0.130+ 已移除 wire_api = "chat" 支持（仅支持 Responses API）。
 #       智谱 GLM Coding Plan 目前仅提供 Chat / Anthropic 协议，暂不兼容新版 codex，
@@ -14,13 +13,14 @@
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
 # ============================================================
-model = "MiniMax-M3"
-model_provider = "minimax"
-model_context_window = 1000000
-# 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
-# 安装后位于 ~/.codex/model-catalogs/custom-catalog.json（symlink 到本仓库文件）。
-# 生效后在 Codex 中输入 /model 可看到 MiniMax-M3 及其可选 reasoning level。
-model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"
+model = "gpt-5.3-codex"
+model_provider = "nativex"
+# model_context_window 取保守值 400k（网关不透出真实窗口，宁可提前压缩别超限）。
+model_context_window = 400000
+# 模型能力目录：声明 gpt-5.3-codex 的多模态输入、reasoning level、工具类型等。
+# 安装后位于 ~/.codex/model-catalogs/nativex-catalog.json（symlink 到本仓库文件）。
+# 切回 MiniMax 时由 minimax profile 覆盖为 custom-catalog.json。
+model_catalog_json = "~/.codex/model-catalogs/nativex-catalog.json"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
@@ -32,7 +32,21 @@ hide_agent_reasoning = true
 model_reasoning_effort = "high"
 
 # ============================================================
-# 自定义模型提供商 - MiniMax
+# 自定义模型提供商 - NativeX（公司 newapi 网关，默认）
+# ============================================================
+# ailink.nativex.com 是 newapi 网关，/v1/responses 端点已验证可用。
+# 认证通过 env_key 从 NATIVEX_API_KEY 环境变量读取（senv ai 组）。
+# 注意：验证网关模型必须用 codex 真跑（codex exec -m <model>），裸 curl 简单请求
+# 不会触发网关的 Responses→chat 协议转换，会误判"不可用"（2026-08-20 踩坑）。
+[model_providers.nativex]
+name = "NativeX"
+base_url = "https://ailink.nativex.com/v1"
+env_key = "NATIVEX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
+# ============================================================
+# 自定义模型提供商 - MiniMax（备用，--profile minimax 激活）
 # ============================================================
 # 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
 # wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
@@ -44,6 +58,10 @@ base_url = "https://api.minimaxi.com/v1"
 env_key = "MINIMAX_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
+
+# profile 层不在本文件（codex 0.134+ 已废弃 [profiles.<name>] 表），
+# 而是独立文件 minimax.config.toml，安装到 ~/.codex/minimax.config.toml，
+# 用 codex --profile minimax 切回 MiniMax 直连。
 
 # ============================================================
 # 子进程环境变量策略

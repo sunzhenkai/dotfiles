@@ -25,3 +25,4 @@ __pycache__
 **/trace.zip
 
 .zcode
+.pytest_cache

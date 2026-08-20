@@ -1,0 +1,140 @@
+{
+  "models": [
+    {
+      "slug": "gpt-5.3-codex",
+      "display_name": "GPT-5.3 Codex",
+      "description": "codex 调优模型，日常默认",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" },
+        { "effort": "xhigh", "description": "Deepest" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 0,
+      "base_instructions": "You are Codex, a coding agent based on GPT-5.3 Codex via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text", "image"]
+    },
+    {
+      "slug": "gpt-5.6-sol",
+      "display_name": "GPT-5.6 Sol",
+      "description": "GPT-5.6 旗舰档",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" },
+        { "effort": "xhigh", "description": "Deepest" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 1,
+      "base_instructions": "You are Codex, a coding agent based on GPT-5.6 Sol via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text", "image"]
+    },
+    {
+      "slug": "gpt-5.6-terra",
+      "display_name": "GPT-5.6 Terra",
+      "description": "GPT-5.6 均衡档",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" },
+        { "effort": "xhigh", "description": "Deepest" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 2,
+      "base_instructions": "You are Codex, a coding agent based on GPT-5.6 Terra via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text", "image"]
+    },
+    {
+      "slug": "gpt-5.6-luna",
+      "display_name": "GPT-5.6 Luna",
+      "description": "GPT-5.6 轻快档",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" },
+        { "effort": "xhigh", "description": "Deepest" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 3,
+      "base_instructions": "You are Codex, a coding agent based on GPT-5.6 Luna via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text", "image"]
+    },
+    {
+      "slug": "deepseek-v4-flash-0731",
+      "display_name": "DeepSeek V4 Flash 0731",
+      "description": "DeepSeek 轻快档",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 4,
+      "base_instructions": "You are Codex, a coding agent based on DeepSeek V4 Flash via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text"]
+    },
+    {
+      "slug": "deepseek-v4-pro-0813",
+      "display_name": "DeepSeek V4 Pro 0813",
+      "description": "DeepSeek 旗舰档",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 5,
+      "base_instructions": "You are Codex, a coding agent based on DeepSeek V4 Pro via NativeX gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text"]
+    }
+  ]
+}
