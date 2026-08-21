@@ -82,5 +82,6 @@ Directly modify SKILL.md
 实际更新生产 `SKILL.md` 时：
 
 1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
-2. 若当前环境有 `skill-evolver`，委托它走候选 patch → 验证 → 晋升，不要本 Skill 自己改生产稿。
-3. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
+2. 若改动来自**真实执行经验**：优先委托 `skill-evolver`（`evolutions/` → 验证 → 晋升），不要本 Skill 自己改生产稿。
+3. 若只是结构/规则的显式修订且环境有 `skill-upgrader`：走其 `update` 模式（`<skill-dir>/patches/`），仍须先提案再应用。
+4. 未展示 Proposal 并获得用户确认前，不改生产 Skill。

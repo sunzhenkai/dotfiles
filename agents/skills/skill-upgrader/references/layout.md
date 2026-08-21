@@ -1,6 +1,6 @@
 # 目录组装
 
-把下列文件复制到目标 Skill（已存在且非空则跳过）。骨架文件只作日后写入格式参考，**不要**拷进目标目录冒充真实案例。
+`self-upgrade` 时把下列变更编入目标 Skill 的本轮 `change.patch` 再应用；**禁止**先直接写生产目录再补 patch。已存在且非空则跳过对应文件。骨架文件只作日后写入格式参考，**不要**拷进目标目录冒充真实案例。
 
 | 源（本 skill 的 `references/`） | 目标 |
 |--------------------------------|------|
@@ -15,5 +15,7 @@
 - `experience/failures/`
 - `experience/successes/`
 - `experience/patterns/`
+
+本轮审计目录由 `skill-upgrader` 创建在 `<skill>/patches/<patch-id>/`，不要把 `patches/` 写进「复制清单」当业务内容。
 
 日后写案例用 `example-case.md` / `experience-entry.md` 的字段，不要在升级时生成假条目。

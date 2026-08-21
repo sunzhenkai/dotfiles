@@ -1,0 +1,604 @@
+diff --git a/agents/skills/skill-upgrader/SKILL.md b/agents/skills/skill-upgrader/SKILL.md
+index a99a2c9..d93da9e 100644
+--- a/agents/skills/skill-upgrader/SKILL.md
++++ b/agents/skills/skill-upgrader/SKILL.md
+@@ -1,284 +1,247 @@
+ ---
+ id: skill-upgrader
+ name: skill-upgrader
+-description: "Upgrade an existing SKILL.md into a self-evolving skill with examples, evals, and experience tracking. 用户点名 skill-upgrader、要求把已有 Skill 升级为自进化（加 examples/evals/experience）时使用。不要在从零写 Skill、或用 skill-evolver 进化正文时自动套用。"
++description: "以可审计 patch 更新任意已有 Skill，或将其升级为自进化（examples/evals/experience）。用户点名 skill-upgrader、要求改 Skill 正文、或升级为自更新时使用；入口先做模式门禁。不要在从零写 Skill、或用 skill-evolver 按经验进化时自动套用。"
+ ---
+ 
+ # Skill Upgrader
+ 
+ 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
+ 
+-将一个普通 Skill 升级为具备**经验积累、评估和持续进化能力**的 Skill。
++本 Skill 是**公用**工具：可对任意含 `SKILL.md` 的目录做可审计更新，或做一次性自进化结构升级。所有生产改动必须先写入目标 Skill 的 `patches/`，禁止先改生产文件、事后补 patch。
+ 
+-最终目标：把一个静态 `SKILL.md` 升级成一个能够从真实执行中积累经验，并通过 Eval 驱动持续改进的 Skill。
+-
+-## 与 skill-evolver 的关系
++## 与相关 Skill 的关系
+ 
+ | Skill | 职责 |
+ |-------|------|
+-| **本 skill** | 一次性结构升级：给已有 Skill 加上 `examples/` `evals/` `experience/`，并写入自进化指令 |
+-| `skill-evolver` | 基于多次真实执行：提案 → 候选 patch → eval → 晋升生产稿 |
++| **本 skill** | 任意 Skill：模式门禁后，`update`（改正文/配套）或 `self-upgrade`（加 examples/evals/experience）；二者都走 `<skill-dir>/patches/` |
++| `pwd-skill-manager` | **本仓库套壳**：只维护 `agents/skills/<name>/`；实现上应委托本 skill 的 `update`（外加本仓库公开性/镜像边界），不另搞一套 patch 语义 |
++| `skill-evolver` | 基于多次真实执行：提案 → `evolutions/` 候选 → eval → 晋升生产稿 |
+ 
+-本 skill **不**根据经验改目标 Skill 的核心行为。那是 `skill-evolver` 的事。目标 Skill 尚未具备自进化目录时，先走本 skill。
++- 用户明确选择 `skill-evolver` 或要求按**执行经验**进化时：停止本流程，交给 `skill-evolver`（用 `evolutions/`，不写本 skill 的 `patches/`）。
++- 用户明确选择 `pwd-skill-manager` 且目标在本仓库 `agents/skills/`：可走该套壳；套壳仍应落到与本 skill 相同的 `<skill-dir>/patches/` 协议。
++- 本 skill **不**根据经验改目标 Skill 的核心行为（那是 `skill-evolver`）。目标尚未具备自进化目录且用户要自更新时，走 `self-upgrade`。
+ 
+-## 门禁
++## 模式门禁（强制）
+ 
+-未过门禁不得改目标 Skill。
++未判定模式前，不得写 patch、不得改生产文件。
+ 
+-1. **仅显式触发**：用户点名本 skill / `{{slash:skill-upgrader}}`，或明确要求把已有 Skill 升级为自进化（加 examples / evals / experience）。
+-2. **必须有目标**：给出 skill 名、id 或含 `SKILL.md` 的目录。未指定先问，不猜。
+-3. **禁止从零创建**：没有现成 `SKILL.md` 就停止。
+-4. **禁止伪造历史**：没有真实成功案例就不要编 examples；没有真实执行就不要写 experience 条目。
++根据用户表述判定 **唯一** 模式：
+ 
+-**不算触发**：从零写 Skill、安装 Skill、根据一次失败改 Skill 正文。分别走写作/安装类 skill 或 `skill-evolver`。
++| 模式 | 何时选用 | 做什么 |
++|------|----------|--------|
++| `update` | 修改已有行为、流程、门禁、references/scripts、修 bug、澄清规则等，**不**以「变成自进化」为目的 | 对生产内容做最小可审计 patch |
++| `self-upgrade` | 明确要把已有 Skill **切换/升级为自更新**（加 examples / evals / experience，并注入自进化指令） | 按布局模板补目录与注入段落；改动仍打包进 patch 再应用 |
+ 
+-## Input
++判定规则：
+ 
+-输入一个已有 Skill：
++1. **只说「改 / 修 / 更新 / 重构 Skill」**且未提自进化 → `update`。
++2. **点名自进化 / 自更新 / 加 examples·evals·experience / 升级为可进化** → `self-upgrade`。
++3. **两者都像或都不像**：先问一句二选一，不猜。笼统的「优化一下这个 Skill」不算已选定模式。
++4. **按真实执行经验进化正文** → 不是本 skill；导向 `skill-evolver`。
++5. **从零创建 Skill** → 停止；走写作/安装类流程。
+ 
+-```text
+-my-skill/
+-└── SKILL.md
+-```
++一次会话只处理 **一个** 目标 Skill、**一种** 模式、**一轮** patch。
+ 
+-生产稿定位：
++## 门禁（通用）
+ 
+-- 本仓库：`agents/skills/<id>/`。**不要**改 sync 生成的 `.claude/skills/`、`.cursor/skills/`、`~/.claude/skills/` 等镜像。
+-- 其它仓库 / 个人 skill：以含 `SKILL.md` 的目录为准。
++1. **仅显式触发**：用户点名本 skill / `{{slash:skill-upgrader}}`，或明确要求更新已有 Skill / 升级为自进化。
++2. **必须有目标**：给出 skill 名、id 或含 `SKILL.md` 的目录。未指定先问，不猜。
++3. **禁止从零创建**：没有现成 `SKILL.md` 就停止。
++4. **禁止伪造历史**：`self-upgrade` 时没有真实成功案例就不要编 examples；没有真实执行就不要写 experience 条目。
++5. **先 patch 后应用**：任何生产改动必须先有本轮 `proposal.md` + `change.patch`，校验通过并按风险门禁确认后再 `git apply`。
+ 
+-## Output
++**不算触发**：安装外部 Skill、根据一次失败直接改正文（无模式门禁）、自动进化。
+ 
+-将其升级为：
++## 强制前置判断
+ 
+-```text
+-my-skill/
+-├── SKILL.md
+-├── examples/
+-├── evals/
+-└── experience/
+-```
++确定改动前，完整读取目标 `SKILL.md` 及与请求直接相关的配套文件，并明确判断：
+ 
+-目录模板、Eval schema、注入正文见（均只读一层）：
++1. **意图**：要新增、删除或改变什么行为？模式是否已由门禁锁定？
++2. **冲突**：是否与现有 frontmatter、门禁、流程、脚本、测试或其他 Skill 职责冲突？
++3. **合理性**：改动是否通用、可执行、可验证？`self-upgrade` 是否真的需要自进化结构？
+ 
+-- [layout.md](references/layout.md) — 复制清单
+-- [evals.md](references/evals.md) — 抽取规则与 schema
+-- [skill-injection.md](references/skill-injection.md) — 追加到目标 SKILL.md 的原文
+-- [examples-README.md](references/examples-README.md) / [evals-README.md](references/evals-README.md) / [experience-README.md](references/experience-README.md) / [cases.template.yaml](references/cases.template.yaml) — 复制源
++任一项不明确或存在多种会显著改变结果的解释时，先向用户提出聚焦问题，不写 patch。发现请求不合理或冲突时，说明依据并给出最小替代方案；不得机械执行。
+ 
+----
++## 公开性与隐私
+ 
+-## 工作流
++写入目标 Skill 的内容须可随该 Skill 分发：
+ 
+-复制并勾选：
++- 不写入个人姓名、账号、主机名、绝对家目录、凭据、密钥、内部 URL、公司信息或私有仓库内容。
++- 路径使用相对路径或语义占位符（如 `<skill-dir>`、`<skill-name>`）。
++- 示例使用虚构、通用数据。
++- 机器特例留在本地配置，不进入共享 Skill。
++
++## Patch 目录协议
++
++每轮在**目标 Skill 目录**下创建新目录（不是本 skill 自己的目录，除非目标就是本 skill）：
+ 
+ ```text
+-Upgrade Progress:
+-- [ ] 定位并完整读取现有 SKILL.md
+-- [ ] 幂等检查（已有目录/段落不覆盖）
+-- [ ] 创建 examples/
+-- [ ] 创建 evals/
+-- [ ] 创建 experience/
+-- [ ] 升级 SKILL.md（追加，不破坏原行为）
+-- [ ] Final Validation
++<skill-dir>/patches/<YYYYMMDD-HHMMSS>-<slug>/
++├── proposal.md
++├── change.patch
++└── result.md
+ ```
+ 
+-### 1. Preserve the original Skill
+-
+-首先完整读取现有 `SKILL.md`（及其声明要读的 `references/` / `scripts/`）。
++- `<slug>`：小写英文、数字和连字符，概括单一改动目的。
++- 目录必须全新；不得覆盖、改写或删除历史 patch 目录。
++- `change.patch` 为 unified diff；路径相对**包含该 Skill 的 Git 仓库根**，且只触及该 `<skill-dir>/` 下生产内容。
++- patch 可增删改 `SKILL.md`、`references/`、`scripts/`、`assets/`、测试及 `self-upgrade` 所需的 `examples/` `evals/` `experience/`，但**不得**修改任何已有 `patches/` 历史记录。
++- 字段与模板见 [patch-protocol.md](references/patch-protocol.md)。
+ 
+-保留其：
++定位仓库根：从 `<skill-dir>` 向上找 Git 根。找不到 Git 根则停止并说明无法安全 `git apply`，不要改用直接写文件绕过。
+ 
+-- 核心目标
+-- 工作流程
+-- 工具使用方式
+-- 输出要求
+-- 约束
+-- 已有最佳实践
++生产稿定位补充：
+ 
+-不要为了增加自进化能力而破坏原有行为。不要重写无关段落、不要扩 scope、不要「顺手润色」。
++- 本仓库共享 Skill：`agents/skills/<id>/`。**不要**改 sync 生成的 `.claude/skills/`、`.cursor/skills/`、`~/.claude/skills/` 等镜像。
++- 其它仓库 / 个人 skill：以含 `SKILL.md` 的目录为准。
+ 
+-幂等：若 `examples/` `evals/` `experience/` 已存在，保留已有文件；只补缺失的 README / 空目录 / 注入段落。已有 `evals/cases.yaml` 不覆盖，只追加从原文抽出且尚未覆盖的 case。
++---
+ 
+-### 2. Create examples/
++## 工作流（两模式共用）
+ 
+-创建：
++复制并勾选：
+ 
+ ```text
+-examples/
+-└── README.md
++Progress:
++- [ ] 模式门禁（update | self-upgrade | abort→evolver/create）
++- [ ] 定位并完整读取现有 SKILL.md
++- [ ] 前置判断（意图 / 冲突 / 合理性）
++- [ ] 写 proposal.md（尚未改生产文件）
++- [ ] 判定风险并准备 change.patch
++- [ ] git apply --check
++- [ ] 风险门禁确认（medium/high）
++- [ ] git apply + 验证
++- [ ] 写 result.md
+ ```
+ 
+-用于保存经过验证的优秀执行案例。
++### 1. 模式门禁与定位
+ 
+-案例应该包含：
++锁定模式与 `<skill-dir>`。目标不存在或名称不唯一时先询问。
+ 
+-- Task
+-- Approach
+-- Result
+-- Why it was good
+-- Reusable lessons
++### 2. 提案
+ 
+-如果当前没有真实成功案例，不要编造案例。只建 README 与目录约定（见 [layout.md](references/layout.md)）。
++先完成前置判断，再写本轮 `proposal.md`。一次 patch 只解决一个内聚问题；`self-upgrade` 可将「补齐三目录 + 注入」视为同一内聚问题，但不要夹带无关正文重写。
+ 
+-### 3. Create evals/
++### 3. 风险
+ 
+-创建：
++| 风险 | 典型改动 | 应用门禁 |
++|------|----------|----------|
++| `low` | 错别字、链接、示例、不改变行为的澄清；幂等补齐空 README/`.gitkeep` | patch 校验通过后可直接应用 |
++| `medium` | 工作流、输出契约、多文件行为；标准 `self-upgrade`（追加注入 + 建目录） | 展示摘要与 diff，获得用户明确确认 |
++| `high` | 触发条件、权限、副作用、安全门禁、删除能力、大范围重写 | 展示风险与 diff，获得用户明确确认 |
+ 
+-```text
+-evals/
+-├── README.md
+-└── cases.yaml
+-```
++不确定时提高一级。用户已明确批准**具体改动内容**可视为已通过对应门禁；笼统的「优化一下」不算批准中高风险 diff。标准 `self-upgrade` 默认至少 `medium`。
+ 
+-从现有 Skill 中提取可验证的成功标准，建立 Eval Cases。覆盖：
++### 4. 先写 patch
+ 
+-- 基础能力
+-- 核心能力
+-- 常见失败
+-- 边界情况
+-- Regression Cases
++创建本轮 patch 目录与 `proposal.md`，再编写 `change.patch`。此时不得编辑目标生产文件。
+ 
+-优先使用确定性 Eval。无法确定性判断时，再使用 LLM Judge。
++patch 必须：只含 proposal 声明的改动；上下文足以精确应用；新文件用 `/dev/null`；不含 patch 目录自身、临时文件或同步镜像。
+ 
+-不要发明 Skill 里没有依据的 case。抽取方法与 schema 见 [evals.md](references/evals.md)。
++### 5. 校验与门禁
+ 
+-### 4. Create experience/
++在 Git 仓库根执行：
+ 
+-创建：
+-
+-```text
+-experience/
+-├── README.md
+-├── failures/
+-├── successes/
+-└── patterns/
+-```
+-
+-用途：
+-
+-```text
+-failures/  → 失败案例
+-successes/ → 成功案例
+-patterns/  → 从多个案例中提炼出的可复用规律
++```bash
++git apply --check --recount "<skill-dir>/patches/<patch-id>/change.patch"
+ ```
+ 
+-空目录放 `.gitkeep`。不要伪造历史 Experience。
++校验失败时只修 `change.patch`，不得绕过或直接改生产文件。通过后按风险等级执行确认门禁。
+ 
+-### 5. Upgrade SKILL.md
++### 6. 应用与验证
+ 
+-在原 Skill **末尾追加**自进化能力，不要覆盖原内容。注入正文必须与 [skill-injection.md](references/skill-injection.md) 一致（只把 `<skill-dir>` 换成实际目录）。不要改写语气或删减门禁。若原文已有同等「Self-evolution」段落，不要再贴一份，只补缺失子节。
+-
+-追加内容覆盖：
++```bash
++git apply --recount "<skill-dir>/patches/<patch-id>/change.patch"
++git diff --check -- "<skill-dir>"
++```
+ 
+-#### Examples
++核对：实际 diff 与 proposal/`change.patch` 一致；`SKILL.md` frontmatter 合法且 `name` 与目录名一致；引用路径存在；无隐私泄露；未改镜像目录或历史 `patches/`。
+ 
+-执行复杂任务前：
++`self-upgrade` 另跑下方「Final Validation」。`update` 则跑目标 Skill 自带的相关测试或确定性检查（若有）。
+ 
+-1. 检查 `examples/`
+-2. 找到与当前任务相关的成功案例
+-3. 优先复用已经验证的方法
++### 7. 写结果
+ 
+-#### Evaluation
++写 `result.md`。失败则 `status: failed`，保留证据并停止；修复必须**新** patch 目录。
+ 
+-任务完成前：
++不要自动 sync、commit 或 push。本仓库目标升级后可提醒 `scripts/agents/sync.sh` / `dotf agents -c`。
+ 
+-1. 检查相关 `evals/`
+-2. 验证关键输出
+-3. 检查是否违反 Skill 约束
+-4. 尽可能运行相关 Eval Cases
++---
+ 
+-#### Experience
++## 模式：update
+ 
+-任务完成后，如果出现以下情况，记录 Experience：
++最小改动满足意图。保留原目标、流程、工具用法、输出与约束；不扩 scope、不顺手润色、不为「以后方便」塞自进化目录。
+ 
+-- 失败
+-- 用户纠正
+-- 明显成功
+-- 新的有效执行方法
+-- 可复用的经验
++若用户其实要自进化结构，切回模式门禁，改走 `self-upgrade`，不要在 `update` 里偷偷加 `examples/` `evals/` `experience/`。
+ 
+-不要记录 trivial information。
++---
+ 
+-#### Evolution
++## 模式：self-upgrade
+ 
+-只有当 Experience 暴露出**可复用、稳定的问题或模式**时，才考虑修改 Skill。
++最终目标：把静态 `SKILL.md` 升级成能从真实执行积累经验、并以 Eval 驱动改进的 Skill。**升级本身的文件写入也必须经 patch 应用**，不要直接 `mkdir`/写生产文件。
+ 
+-遵循：
++输入：
+ 
+ ```text
+-Experience
+-    ↓
+-Repeated Pattern
+-    ↓
+-Improvement Proposal
+-    ↓
+-Eval
+-    ↓
+-Pass
+-    ↓
+-Update Skill
++my-skill/
++└── SKILL.md
+ ```
+ 
+-禁止：
++升级后：
+ 
+ ```text
+-Single Failure
+-    ↓
+-Directly modify SKILL.md
++my-skill/
++├── SKILL.md
++├── examples/
++├── evals/
++├── experience/
++└── patches/          # 本轮与后续审计记录（本模式创建的首轮 patch 即在此）
+ ```
+ 
+-实际改生产 `SKILL.md` 时：若环境里有 `skill-evolver`，**委托它**（候选目录 → 验证 → 晋升），不要让目标 Skill 自己直接覆盖生产稿。
++目录模板、Eval schema、注入正文见（均只读一层）：
+ 
+----
++- [layout.md](references/layout.md) — 复制清单
++- [evals.md](references/evals.md) — 抽取规则与 schema
++- [skill-injection.md](references/skill-injection.md) — 追加到目标 SKILL.md 的原文
++- [examples-README.md](references/examples-README.md) / [evals-README.md](references/evals-README.md) / [experience-README.md](references/experience-README.md) / [cases.template.yaml](references/cases.template.yaml) — 复制源
++- [patch-protocol.md](references/patch-protocol.md) — 本轮 patch 记录格式
+ 
+-## Evolution Criteria
++### Preserve the original Skill
+ 
+-一个 Experience 只有满足以下条件才应该进入 Skill：
++完整读取现有 `SKILL.md`（及其声明要读的 `references/` / `scripts/`）。不要为了自进化破坏原有行为；不要重写无关段落。
+ 
+-- 可以复用于多个类似任务
+-- 有足够证据支持
+-- 能明确改善执行结果
+-- 不会破坏已有能力
+-- 可以通过 Eval 验证
++幂等：若 `examples/` `evals/` `experience/` 已存在，保留已有文件；只补缺失的 README / 空目录 / 注入段落。已有 `evals/cases.yaml` 不覆盖，只追加从原文抽出且尚未覆盖的 case。已有同等「Self-evolution」段落则不要再贴一份。
+ 
+-如果只是一次性特殊情况：
++若三目录与注入均已齐全 → `decision: already-upgraded`，不写无意义空 patch。
+ 
+-```text
+-Experience only
+-```
++### 组装内容（写入 change.patch）
+ 
+-不要修改 Skill。
++1. **examples/** — 仅 README 与约定；无真实成功案例不编造。
++2. **evals/** — `README.md` + `cases.yaml`；从原文抽可验证标准；优先确定性 Eval。
++3. **experience/** — README + `failures/` `successes/` `patterns/`（空目录 `.gitkeep`）；不伪造历史。
++4. **SKILL.md** — 末尾追加与 [skill-injection.md](references/skill-injection.md) 一致的正文（只替换 `<skill-dir>`）；不改写语气或删减门禁。
+ 
+----
++细节清单见 [layout.md](references/layout.md)。
+ 
+-## Versioning
++### Evolution Criteria（写入目标后的行为约束）
+ 
+-修改 Skill 时不要直接覆盖原内容。
++Experience 进入 Skill 正文前须：可复用、有证据、能改善结果、不破坏已有能力、可通过 Eval。一次性特例只留 Experience。
+ 
+-记录：
++实际改生产正文：若环境有 `skill-evolver`，**委托它**；否则可用本 skill 的 `update` 模式走 `patches/`。禁止单次失败直接改 `SKILL.md`。
+ 
+-```text
+-version
+-change
+-reason
+-evidence
+-evaluation
+-```
++---
+ 
+-如果项目使用 Git，优先通过 Git diff 保留变更历史。本 skill 的升级本身就是一次追加：不要改写原段落来「腾地方」。
++## Versioning
+ 
+-若目标 Skill 在本仓库：升级后提醒用户跑 `scripts/agents/sync.sh` / `dotf agents -c`，**不要擅自 sync 或 commit**。
++修改 Skill 时不要直接覆盖原意而不留记录。本 skill 以 `patches/<id>/` 作为审计与版本线索；有 Git 时同时依赖 Git 历史。
+ 
+ ## 安全约束
+ 
+-- 不把密钥、内部 URL、公司代码、个人凭据写进 examples / evals / experience / SKILL.md
+-- 不删除仍在生效的安全/门禁规则
+-- 一次会话最多升级 **一个** 目标 Skill
+-- `evals/cases.yaml` 只写可验证的期望，不写攻击步骤、exploit、凭据
++- 不把密钥、内部 URL、公司代码、个人凭据写进 examples / evals / experience / SKILL.md / patches 正文
++- 不删除仍在生效的安全/门禁规则（除非 `update` 且用户确认该规则本身有害）
++- `evals/cases.yaml` 只写可验证期望，不写攻击步骤、exploit、凭据
+ 
+-## Final Validation
+-
+-升级完成后确认：
++## Final Validation（self-upgrade）
+ 
+ ```text
+ [ ] 原始 Skill 能力未丢失
+@@ -291,19 +254,21 @@ evaluation
+ [ ] Skill 知道如何运行/参考 evals
+ [ ] Skill 知道什么时候记录 experience
+ [ ] Skill 不会因为单次失败修改自己
++[ ] 本轮改动经由 patches/ 应用且 result 已写
+ ```
+ 
+-任一项未完成则补齐后再交付，不要声称已升级。
++任一项未完成则补齐或 `failed`，不要声称已升级。
+ 
+ ## 交付
+ 
+-用简短结构汇报，不要贴整份 Skill：
+-
+ ```text
+ skill: <name>
+ path: <skill-dir>
+-decision: upgraded | already-upgraded | aborted
+-added: examples | evals | experience | skill-injection
+-eval_cases: <N> deterministic / <M> llm
+-next: <sync 提醒，或停止原因>
++mode: update | self-upgrade
++patch: <patch-id>
++risk: low | medium | high
++status: proposed | applied | failed | already-upgraded | aborted
++change: <一句话>
++validation: <通过项或失败原因>
++next: <需要确认、sync 提醒、转 skill-evolver，或无>
+ ```
+diff --git a/agents/skills/skill-upgrader/references/layout.md b/agents/skills/skill-upgrader/references/layout.md
+index 74d55b5..4f6f554 100644
+--- a/agents/skills/skill-upgrader/references/layout.md
++++ b/agents/skills/skill-upgrader/references/layout.md
+@@ -1,6 +1,6 @@
+ # 目录组装
+ 
+-把下列文件复制到目标 Skill（已存在且非空则跳过）。骨架文件只作日后写入格式参考，**不要**拷进目标目录冒充真实案例。
++`self-upgrade` 时把下列变更编入目标 Skill 的本轮 `change.patch` 再应用；**禁止**先直接写生产目录再补 patch。已存在且非空则跳过对应文件。骨架文件只作日后写入格式参考，**不要**拷进目标目录冒充真实案例。
+ 
+ | 源（本 skill 的 `references/`） | 目标 |
+ |--------------------------------|------|
+@@ -16,4 +16,6 @@
+ - `experience/successes/`
+ - `experience/patterns/`
+ 
++本轮审计目录由 `skill-upgrader` 创建在 `<skill>/patches/<patch-id>/`，不要把 `patches/` 写进「复制清单」当业务内容。
++
+ 日后写案例用 `example-case.md` / `experience-entry.md` 的字段，不要在升级时生成假条目。
+diff --git a/agents/skills/skill-upgrader/references/skill-injection.md b/agents/skills/skill-upgrader/references/skill-injection.md
+index 566249e..94d0cca 100644
+--- a/agents/skills/skill-upgrader/references/skill-injection.md
++++ b/agents/skills/skill-upgrader/references/skill-injection.md
+@@ -82,5 +82,6 @@ Directly modify SKILL.md
+ 实际更新生产 `SKILL.md` 时：
+ 
+ 1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
+-2. 若当前环境有 `skill-evolver`，委托它走候选 patch → 验证 → 晋升，不要本 Skill 自己改生产稿。
+-3. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
++2. 若改动来自**真实执行经验**：优先委托 `skill-evolver`（`evolutions/` → 验证 → 晋升），不要本 Skill 自己改生产稿。
++3. 若只是结构/规则的显式修订且环境有 `skill-upgrader`：走其 `update` 模式（`<skill-dir>/patches/`），仍须先提案再应用。
++4. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
+diff --git a/agents/skills/skill-upgrader/references/patch-protocol.md b/agents/skills/skill-upgrader/references/patch-protocol.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/skill-upgrader/references/patch-protocol.md
+@@ -0,0 +1,105 @@
++# Patch Protocol
++
++本协议定义 `skill-upgrader` 生成的更新记录。所有 diff 路径相对**包含目标 Skill 的 Git 仓库根**；记录目录落在目标 Skill 内。
++
++## 目录
++
++```text
++<skill-dir>/patches/<YYYYMMDD-HHMMSS>-<slug>/
++├── proposal.md
++├── change.patch
++└── result.md
++```
++
++`<skill-dir>` 是含有待改 `SKILL.md` 的目录（任意仓库中的任意 Skill）。本仓库共享 Skill 通常为 `agents/skills/<skill-name>`。
++
++## proposal.md
++
++```markdown
++# <简短标题>
++
++- target: <skill-dir>
++- mode: update | self-upgrade
++- patch: <YYYYMMDD-HHMMSS>-<slug>
++- risk: low | medium | high
++- status: proposed
++
++## Intent
++
++<要改变的模型行为、触发场景和非目标；须与 mode 一致>
++
++## Conflict check
++
++<与现有内容及其他 Skill 职责的冲突；没有则写 none>
++
++## Rationale
++
++<为什么该更新合理且可验证>
++
++## Files
++
++- <将修改的、相对仓库根的路径及原因>
++
++## Validation
++
++- <应用前检查>
++- <应用后测试或确定性检查>
++```
++
++`status` 在 proposal 中保持 `proposed`，最终状态写入 `result.md`，不要回写历史提案。
++
++## change.patch
++
++使用 Git 可接受的 unified diff。示例：
++
++```diff
++diff --git a/agents/skills/example/SKILL.md b/agents/skills/example/SKILL.md
++index 1111111..2222222 100644
++--- a/agents/skills/example/SKILL.md
+++++ b/agents/skills/example/SKILL.md
++@@ -10,3 +10,4 @@
++ Existing instruction.
+++New general instruction.
++```
++
++要求：
++
++1. 在包含目标 Skill 的仓库根可被 `git apply --check --recount` 校验。
++2. `a/`、`b/` 后使用相对该仓库根的完整路径，且前缀为该 `<skill-dir>/`。
++3. 只修改同一目标 Skill 的生产内容（含 `self-upgrade` 新增的 examples/evals/experience）。
++4. 不包含 `patches/` 历史记录、agent 镜像目录、绝对路径或临时文件。
++5. 不依赖已应用但未记录的手工编辑。
++6. 找不到 Git 仓库根时不得伪造 apply；停止并交由用户处理。
++
++## result.md
++
++```markdown
++# Result
++
++- target: <skill-dir>
++- mode: update | self-upgrade
++- patch: <YYYYMMDD-HHMMSS>-<slug>
++- risk: low | medium | high
++- status: applied | failed
++- applied-at: <ISO 8601 timestamp or n/a>
++
++## Validation
++
++- `git apply --check --recount`: pass | fail
++- `git diff --check`: pass | fail | not-run
++- target tests: <命令与结果，或 not-available>
++- privacy check: pass | fail
++- mode check: pass | fail
++
++## Notes
++
++<实际结果、失败原因或与 proposal 的偏差；没有则写 none>
++```
++
++## 状态规则
++
++- `proposed`：patch 已生成，尚未应用或正在等待确认。
++- `applied`：patch 已成功应用且验证通过。
++- `failed`：应用或验证失败；停止继续修改生产内容。
++
++已生成的 patch 目录是审计记录。若 proposed patch 尚未应用，可以在同一目录修正 `change.patch`；一旦应用尝试已经发生，不再改写该目录，后续修复创建新 patch。
