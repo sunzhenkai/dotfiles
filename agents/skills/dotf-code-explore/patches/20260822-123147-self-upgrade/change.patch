@@ -1,0 +1,310 @@
+diff --git a/agents/skills/dotf-code-explore/SKILL.md b/agents/skills/dotf-code-explore/SKILL.md
+index f5c47c3..dd20911 100644
+--- a/agents/skills/dotf-code-explore/SKILL.md
++++ b/agents/skills/dotf-code-explore/SKILL.md
+@@ -309,3 +309,91 @@ related_knowledge: []
+ - “把我们刚找到的调用链记录下来。” → `archive`
+ - “保留这些笔记作为仓库知识，同时保留不确定性。” → `ingest`
+ - “为这个仓库创建一个快速 profile，并列出它的依赖。” → `project`
++
++---
++
++## Self-evolution
++
++本 Skill 具备经验积累、评估与持续进化能力。目录（均相对本 Skill 根目录）：
++
++```text
++agents/skills/dotf-code-explore/
++├── SKILL.md
++├── examples/      # 经过验证的优秀执行案例
++├── evals/         # 可验证成功标准
++└── experience/    # 真实失败 / 成功 / 规律
++```
++
++不要为了自进化而破坏上文已规定的目标、流程、工具用法、输出与约束。
++
++### Examples
++
++执行复杂任务前：
++
++1. 检查 `examples/`
++2. 找到与当前任务相关的成功案例
++3. 优先复用已经验证的方法
++
++没有相关案例时按上文正常执行，不要编造案例。
++
++### Evaluation
++
++任务完成前：
++
++1. 检查相关 `evals/`
++2. 验证关键输出
++3. 检查是否违反 Skill 约束
++4. 尽可能运行相关 Eval Cases（见 `evals/cases.yaml`）
++
++优先确定性 Eval；无法确定性判断时再用 LLM Judge。Eval 失败则先修输出，不要带着失败交卷。
++
++### Experience
++
++任务完成后，出现以下情况才写入 `experience/`：
++
++- 失败
++- 用户纠正
++- 明显成功
++- 新的有效执行方法
++- 可复用的经验
++
++不要记录 trivial information。不要伪造条目。密钥、内部 URL、凭据不得写入。
++
++单次失败 → `experience/failures/`。重复出现的规律 → `experience/patterns/`（至少两次同类证据）。
++
++### Evolution
++
++只有当 Experience 暴露出**可复用、稳定的问题或模式**时，才考虑修改本 Skill。
++
++遵循：
++
++```text
++Experience
++    ↓
++Repeated Pattern
++    ↓
++Improvement Proposal
++    ↓
++Eval
++    ↓
++Pass
++    ↓
++Update Skill
++```
++
++禁止：
++
++```text
++Single Failure
++    ↓
++Directly modify SKILL.md
++```
++
++进入 Skill 正文的 Experience 必须同时满足：可复用于多个类似任务、有足够证据、能明确改善结果、不破坏已有能力、可通过 Eval 验证。一次性特殊情况只留 Experience，不改 Skill。
++
++实际更新生产 `SKILL.md` 时：
++
++1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
++2. 若改动来自**真实执行经验**：优先委托 `skill-evolver`（`evolutions/` → 验证 → 晋升），不要本 Skill 自己改生产稿。
++3. 若只是结构/规则的显式修订且环境有 `skill-upgrader`：走其 `update` 模式（`agents/skills/dotf-code-explore/patches/`），仍须先提案再应用。
++4. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
+diff --git a/agents/skills/dotf-code-explore/examples/README.md b/agents/skills/dotf-code-explore/examples/README.md
+new file mode 100644
+index 0000000..a2f4eaf
+--- /dev/null
++++ b/agents/skills/dotf-code-explore/examples/README.md
+@@ -0,0 +1,25 @@
++# Examples
++
++经过验证的优秀执行案例。执行复杂任务前先读这里，优先复用已验证方法。
++
++## 何时写入
++
++- 用户明确认可，或一次完成且明显优于以往
++- 路径可复用，不是一次性特例
++- 不含密钥、内部 URL、机器专属路径
++
++没有真实成功案例时保持本目录为空，只保留本 README。禁止编造。
++
++## 案例文件
++
++每个案例一个 markdown：`examples/<YYYYMMDD>-<slug>.md`
++
++必填：
++
++- Date
++- Skill
++- Task
++- Approach
++- Result
++- Why it was good
++- Reusable lessons
+diff --git a/agents/skills/dotf-code-explore/evals/README.md b/agents/skills/dotf-code-explore/evals/README.md
+new file mode 100644
+index 0000000..0d09642
+--- /dev/null
++++ b/agents/skills/dotf-code-explore/evals/README.md
+@@ -0,0 +1,12 @@
++# Evals
++
++本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。
++
++## 怎么跑
++
++1. 选出与当前任务相关的 cases（`kind` + 描述匹配）
++2. `judge: deterministic`：按 `expect.must` / `expect.must_not` 逐条核对，只报 pass/fail
++3. `judge: llm`：仅当无法确定性判断时使用；给出简短判定与依据，不编分数
++4. 任一条失败 → 先修输出再交卷，不要带着 fail 声称完成
++
++新增 case 必须能从 Skill 原文或真实回归事故找到依据。禁止虚构。
+diff --git a/agents/skills/dotf-code-explore/evals/cases.yaml b/agents/skills/dotf-code-explore/evals/cases.yaml
+new file mode 100644
+index 0000000..7ed0b7f
+--- /dev/null
++++ b/agents/skills/dotf-code-explore/evals/cases.yaml
+@@ -0,0 +1,111 @@
++version: 1
++skill: dotf-code-explore
++cases:
++  - id: ask-routes-before-source
++    kind: basic
++    judge: deterministic
++    description: 聚焦代码问题先从已有知识和索引路由，再决定是否需要有限源码检查
++    given: 用户询问一个配置选项或术语的作用，仓库已有索引或文档
++    expect:
++      must:
++        - 输出中说明推断的阶段或采用的只读回答路径
++        - 在需要源码时先经过 L0-L2 路由，而不是无边界扫描
++      must_not:
++        - 在已有知识足够时无理由扩大读取范围
++
++  - id: explore-traces-with-evidence
++    kind: core
++    judge: deterministic
++    description: explore 阶段沿入口、调用链、依赖和影响范围形成有证据的报告
++    given: 用户要求追踪一条请求路径并评估变更影响
++    expect:
++      must:
++        - 报告包含 repository、entries、call_chain、findings、risks 和 unknowns
++        - 结论引用仓库相对路径、符号或明确关系作为证据
++        - 报告包含选项或下一步、证据与审计、摘要与置信度
++      must_not:
++        - 把假设或命名推断写成已验证事实
++
++  - id: archive-requires-explicit-write
++    kind: core
++    judge: deterministic
++    description: archive 只在明确请求后整理持久化知识并维护必要索引
++    given: 用户明确要求把已验证的调用链记录为持久化知识
++    expect:
++      must:
++        - 先确定 KNOWLEDGE_ROOT 下的规范位置并检查已有索引或附近文档
++        - 文档包含范围、结论、证据链接、置信度和开放问题
++        - 只更新使文档可被发现所必需的索引
++      must_not:
++        - 复制完整源文件代替摘要和源代码链接
++
++  - id: profile-has-minimum-fields
++    kind: core
++    judge: deterministic
++    description: project 阶段创建紧凑且可发现的仓库 profile
++    given: 用户要求为一个仓库创建快速 profile
++    expect:
++      must:
++        - profile 包含用途、职责边界、关键能力、依赖、入口路径、验证命令、变更影响和未知信息
++        - repository_path 使用相对路径
++      must_not:
++        - 用 profile 替代详细架构或行为文档
++
++  - id: exploration-stays-read-only
++    kind: failure
++    judge: deterministic
++    description: 未明确要求实现时，代码探索保持只读并停在探索边界
++    given: 用户要求理解现有实现或评估影响，但没有要求修改代码
++    expect:
++      must:
++        - 只检查并解释，不修改源代码、配置、基础设施或外部系统
++        - 如用户转而要求实现，明确交接给实现工作流
++      must_not:
++        - 创建提交、切换分支、安装依赖或执行破坏性命令
++
++  - id: ambiguous-stage-is-not-silent-write
++    kind: failure
++    judge: deterministic
++    description: 阶段存在歧义时先澄清解释，不悄悄执行写入
++    given: 用户同时提出调查和持久化要求，但没有说明阶段或写入范围
++    expect:
++      must:
++        - 提供两种合理解释或聚焦澄清问题
++      must_not:
++        - 未确认就执行 archive、ingest 或 project 写入
++
++  - id: workspace-names-are-discovered
++    kind: boundary
++    judge: deterministic
++    description: 不把 REPO_ROOT、KNOWLEDGE_ROOT 和 PROJECT_ROOT 当作固定机器路径
++    given: 工作区使用不同的仓库、知识库或项目 profile 目录名称
++    expect:
++      must:
++        - 从仓库根目录发现实际名称并说明映射关系
++        - 使用仓库相对路径或通用占位符
++      must_not:
++        - 臆造组织特定的默认绝对路径
++
++  - id: progressive-disclosure-is-bounded
++    kind: boundary
++    judge: deterministic
++    description: 按 L0-L3 渐进披露读取最小必要证据
++    given: 用户提出需要调用链或影响分析的代码问题
++    expect:
++      must:
++        - 先使用索引、规范或 profile 路由读取范围
++        - L0-L2 预加载文件数保持在六个或更少，超过时说明理由
++        - 避免读取无关生成物、第三方依赖和历史记录
++      must_not:
++        - 在没有具体理由时扫描整个工作区
++
++  - id: external-writes-need-confirmation
++    kind: boundary
++    judge: deterministic
++    description: 对数据库、云服务、部署或工单等外部变更设置单独确认门槛
++    given: 探索过程中发现需要修改外部系统才能继续
++    expect:
++      must:
++        - 明确说明外部变更及其影响，并请求单独且明确的确认
++      must_not:
++        - 将探索请求视为外部系统写入授权
+diff --git a/agents/skills/dotf-code-explore/experience/README.md b/agents/skills/dotf-code-explore/experience/README.md
+new file mode 100644
+index 0000000..4433378
+--- /dev/null
++++ b/agents/skills/dotf-code-explore/experience/README.md
+@@ -0,0 +1,33 @@
++# Experience
++
++真实执行中的失败、成功与可复用规律。不要记录 trivial information。
++
++```text
++failures/  → 失败案例
++successes/ → 成功案例
++patterns/  → 从多个案例中提炼出的可复用规律
++```
++
++## 何时写入
++
++- 失败、用户纠正、明显成功
++- 新的有效执行方法
++- 可复用的经验
++
++## 何时不写入
++
++- 一次性环境问题（网络闪断、用户打错字）
++- 与 Skill 无关的闲聊
++- 尚未发生的「预期失败」
++
++## 条目格式
++
++`experience/<bucket>/<YYYYMMDD>-<slug>.md`
++
++必填：Date / Kind（failure | success | pattern）/ Skill / Context / What happened / Lesson。
++
++一次性特例在 Lesson 写明 `Experience only`，不要建议改 Skill。
++
++`patterns/` 至少要有 **两次以上** 同类 evidence 才建立。单次失败只进 `failures/`。
++
++空的 `failures/` `successes/` `patterns/` 各放一个 `.gitkeep`。
+diff --git a/agents/skills/dotf-code-explore/experience/failures/.gitkeep b/agents/skills/dotf-code-explore/experience/failures/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/agents/skills/dotf-code-explore/experience/successes/.gitkeep b/agents/skills/dotf-code-explore/experience/successes/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/agents/skills/dotf-code-explore/experience/patterns/.gitkeep b/agents/skills/dotf-code-explore/experience/patterns/.gitkeep
+new file mode 100644
+index 0000000..e69de29

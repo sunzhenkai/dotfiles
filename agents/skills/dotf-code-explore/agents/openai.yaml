@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Exploration"
+  short_description: "Explore code paths and repository impact"
+  default_prompt: "Use $dotf-code-explore to answer code questions, trace call chains, assess change impact, or capture repository knowledge without modifying implementation code."
