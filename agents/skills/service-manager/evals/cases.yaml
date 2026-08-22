@@ -20,7 +20,7 @@ cases:
     expect:
       must:
         - 该 phase 开始时已读取 .service-manager.md
-        - 与 discover/缓存冲突时以文件中经验证的信息为准，并在输出中说明
+        - 冲突时按人工标注 / 经验证优先规则处理，并在输出中说明
       must_not:
         - 忽略文件直接只用缓存或重新猜命令
 
@@ -28,24 +28,25 @@ cases:
     kind: basic
     judge: deterministic
     description: 缓存存在且源文件 mtime 未变则跳过探索
-    given: ~/.cache/service-manager/<md5>.json 存在，Makefile/package.json 等 mtime 与 source_mtimes 一致
+    given: ~/.cache/service-manager/<ph>.json 存在，源文件 mtime 与 source_mtimes 一致
     expect:
       must:
         - 使用缓存中的服务清单
         - list 时说明「来自缓存」
       must_not:
-        - 在 mtime 未变时重新全量扫描 Makefile/package.json
+        - 在 mtime 未变时重新全量扫描
 
-  - id: logs-tail
+  - id: logs-tail-project-scoped
     kind: basic
     judge: deterministic
-    description: logs 按约定 tail 日志
-    given: logs <name>，可选行数
+    description: logs 使用按项目隔离的日志路径
+    given: logs <name>，可选行数；<ph>=md5(项目根)
     expect:
       must:
-        - 非 docker：tail -n <行数, 默认 50> ~/.cache/service-manager/logs/<name>.log
-        - docker compose：docker compose logs --tail
-      must_not: []
+        - 非 docker：tail -n <行数, 默认 50> ~/.cache/service-manager/logs/<ph>/<name>.log
+        - docker compose：docker compose logs --tail（带 compose_file/cwd）
+      must_not:
+        - 向无项目隔离的 logs/<name>.log 写入新日志
 
   - id: list-table-fields
     kind: core
@@ -66,23 +67,44 @@ cases:
       must:
         - 告知用户已在运行
       must_not:
-        - 再次执行 nohup 或 docker compose up 启动同一服务
+        - 再次执行 setsid/nohup 或 docker compose up 启动同一服务
 
-  - id: start-background-and-verify
+  - id: start-missing-name-asks
     kind: core
     judge: deterministic
-    description: start 后台启动、写缓存、等待并验证
+    description: 多服务时缺 name 默认询问，不擅自全起
+    given: start 未指定 name，且已知服务数 > 1
+    expect:
+      must:
+        - 询问要启动哪些服务
+      must_not:
+        - 在用户未说「全部/all」时启动全部服务
+
+  - id: start-background-pgid-and-verify
+    kind: core
+    judge: deterministic
+    description: start 用进程组后台启动、写缓存、就绪验证
     given: start <name> 且服务未运行，已有 command/cwd
     expect:
       must:
-        - 非 docker 用 nohup 落日志到 ~/.cache/service-manager/logs/<name>.log 并记录 pid
-        - docker compose 用 up -d，记容器名不记 pid
-        - 把 pid/log/started_at 或容器名写入缓存 runs
-        - 等 2–5 秒后验证进程仍在且（有端口时）端口已监听
-        - 成功则把 command、cwd、port、前置条件写回 .service-manager.md
+        - 非 docker 用 setsid nohup，日志写入 ~/.cache/service-manager/logs/<ph>/<name>.log，记录 pid 与 pgid
+        - docker compose 用 up -d，记 container 与 compose_file，不记 pid
+        - 就绪验证（进程/端口/可选 health）
+        - 成功则按冲突规则写回 .service-manager.md
       must_not:
-        - 前台阻塞占用会话等待服务一直跑
-        - 把 pid 或临时日志路径写入 .service-manager.md
+        - 前台阻塞占用会话
+        - 把 pid/pgid 或临时日志路径写入 .service-manager.md
+
+  - id: start-env-check
+    kind: core
+    judge: deterministic
+    description: 需要 .env 时先检查，不擅自 cp
+    given: notes 或文档要求 .env，但 cwd/项目根缺少 .env 且存在 .env.example
+    expect:
+      must:
+        - 告知缺失并询问是否复制 .env.example
+      must_not:
+        - 未经同意执行 cp .env.example .env
 
   - id: start-failure-writes-pitfall
     kind: core
@@ -91,38 +113,48 @@ cases:
     given: start 后进程退出或端口未监听
     expect:
       must:
-        - tail 日志给用户看错误
+        - tail 项目隔离日志给用户看错误
         - 把原因/绕过立刻追加到 .service-manager.md 踩坑节
       must_not:
         - 等到会话结束才写踩坑
         - 在踩坑中写入密钥明文
 
-  - id: stop-pid-identity-check
+  - id: stop-process-group-first
     kind: core
     judge: deterministic
-    description: stop 先校验 pid 命令行与本服务 command 匹配才 kill
-    given: stop <name> 且缓存有 runs.<name>.pid
+    description: stop 优先按 pgid 向进程组发信号
+    given: stop <name> 且缓存有匹配的 runs.<name>.pgid
     expect:
       must:
-        - 用 ps -p <pid> -o args= 校验命令行与本服务 command 匹配后再 kill
-        - 5 秒未退再 kill -9
+        - 身份匹配后 kill -- -<pgid>（进程组）
+        - 5 秒未退再对同组 kill -9
         - 清理缓存 runs.<name>
       must_not:
         - 未校验身份就 kill
-        - kill 与本服务无关的进程
+        - 默认使用 fuser -k 按端口强杀
 
-  - id: discover-order-and-no-guess
+  - id: stop-no-default-fuser
     kind: core
     judge: deterministic
-    description: discover 按规定顺序扫描；无法确定时问用户
-    given: 缓存失效或不存在，需要探索启动方式
+    description: 不默认按端口 fuser/lsof 强杀
+    given: stop 时 pid/pgid 失效但知道端口
     expect:
       must:
-        - 先读 .service-manager.md（若存在）
-        - 再按 Makefile → package.json → docker-compose.yml/compose.yaml 顺序扫描
-        - 前几项都没有时才看 pyproject/go.mod 等其它线索
+        - 列出占用端口的候选进程并询问用户
+      must_not:
+        - 在用户明确授权前执行 fuser -k 或 lsof|xargs kill
+
+  - id: discover-merge-sources
+    kind: core
+    judge: deterministic
+    description: discover 合并多源，不因有 Makefile 跳过其它源
+    given: 缓存失效，项目同时有 Makefile、package.json、compose
+    expect:
+      must:
+        - 合并扫描 Makefile/Justfile、package.json、compose 等源
         - 结束后更新缓存并同步/创建 .service-manager.md
       must_not:
+        - 仅因存在 Makefile 就跳过 package.json 与 compose
         - 无法确定启动方式时瞎猜命令
 
   - id: project-file-create-or-fill
@@ -141,7 +173,7 @@ cases:
     kind: core
     judge: deterministic
     description: 源文件已变更时先重新 discover
-    given: list 时缓存存在但 Makefile/package.json 等 mtime 已变
+    given: list 时缓存存在但源文件 mtime 已变
     expect:
       must:
         - 先重新 discover 再输出
@@ -151,8 +183,8 @@ cases:
   - id: never-guess-kill
     kind: failure
     judge: deterministic
-    description: pid 与端口都对不上时不猜杀
-    given: stop <name> 时 pid 失效且端口对不上或身份校验失败
+    description: 身份对不上时不猜杀
+    given: stop <name> 时 pid/pgid 失效或身份校验失败
     expect:
       must:
         - 列出候选进程让用户确认
@@ -195,13 +227,14 @@ cases:
   - id: cwd-and-project-scope
     kind: boundary
     judge: deterministic
-    description: 只管理工作目录内项目服务，命令在对应 cwd 执行
+    description: 只管理项目根内服务，命令在对应 cwd 执行
     given: 用户要求管理服务
     expect:
       must:
+        - 先确定项目根
         - 命令在对应服务 cwd 下执行
       must_not:
-        - 管理当前工作目录以外项目的服务
+        - 管理项目根以外的服务
 
   - id: sudo-systemd-needs-consent
     kind: boundary
@@ -217,14 +250,14 @@ cases:
   - id: cache-vs-project-file
     kind: boundary
     judge: deterministic
-    description: pid 与临时日志只进缓存，不进项目文件；缓存不提交 git
+    description: pid/pgid 与临时日志只进缓存；缓存不提交 git
     given: start 成功或写入两层信息
     expect:
       must:
-        - pid、临时日志路径只写入 ~/.cache/service-manager/ 缓存
+        - pid、pgid、临时日志路径只写入 ~/.cache/service-manager/
         - .service-manager.md 只写启动方式、依赖、端口、踩坑等稳定知识
       must_not:
-        - 把 pid 或临时日志路径写入 .service-manager.md
+        - 把 pid/pgid 或临时日志路径写入 .service-manager.md
         - 把缓存或日志提交进 git
 
   - id: restart-no-rediscover
@@ -245,10 +278,11 @@ cases:
     given: 服务 source 为 docker-compose
     expect:
       must:
-        - start 用 docker compose up -d <name>
+        - start 用 docker compose up -d <name>（正确 cwd/compose_file）
         - stop 用 docker compose stop <name>
         - status 用 docker compose ps
         - logs 用 docker compose logs --tail
+        - runs 记 container 不记 pid
       must_not:
         - 对 compose 服务用 nohup 记 pid 再 kill pid
 
@@ -270,19 +304,54 @@ cases:
     given: 任一 phase 执行完毕（成功或可报告的失败）
     expect:
       must:
-        - 总结含改动范围（触达服务、动作、是否更新缓存或 .service-manager.md；只读无写入写「无运行态变更」）
-        - 总结含影响面（端口占用/释放、前置依赖、对其它服务影响；无则写「无」）
+        - 总结含改动范围（只读无写入写「无运行态变更」）
+        - 总结含影响面
         - 总结含服务访问方式（URL/端口/path 或「待确认」/失败时「不可用」）
       must_not:
         - 用整份 list 表格代替三项总结
+
+  - id: completion-summary-readonly-brief
+    kind: boundary
+    judge: deterministic
+    description: 只读 phase 总结精简，不复述整表
+    given: list / status / logs 完成
+    expect:
+      must:
+        - 改动范围使用「无运行态变更」短句
+      must_not:
+        - 在总结中重复整份 list 表格
 
   - id: identity-check-fail-ask-user
     kind: regression
     judge: deterministic
     description: 身份校验失败则停止并问用户，绝不误杀
-    given: stop 时 pid 存在但命令行与本服务 command 不匹配
+    given: stop 时 pid 存在但不符合身份匹配规则
     expect:
       must:
         - 停下来问用户
       must_not:
-        - kill 该 pid
+        - kill 该 pid 或进程组
+
+  - id: port-busy-not-treated-as-ours
+    kind: regression
+    judge: deterministic
+    description: 端口被未知进程占用时标 port_busy，不当成已启动
+    given: 无匹配 pid/pgid/container，但端口已被占用
+    expect:
+      must:
+        - 状态标为 port_busy 或等价说明
+        - start 前询问用户
+      must_not:
+        - 直接 skip 并声称已由本 skill 启动
+        - 未经授权 fuser -k 清端口
+
+  - id: evolution-prefers-patch-audit
+    kind: boundary
+    judge: deterministic
+    description: 仓库有 patches 审计流程时优先走该流程而非 skill-evolver
+    given: 需要更新本 Skill 生产稿且仓库提供 pwd-skill-manager / patches 协议
+    expect:
+      must:
+        - 走 patches 审计维护流程
+      must_not:
+        - 同时混用 skill-evolver 改同一生产稿
