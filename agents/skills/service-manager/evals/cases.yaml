@@ -119,6 +119,33 @@ cases:
         - 等到会话结束才写踩坑
         - 在踩坑中写入密钥明文
 
+
+  - id: start-dev-prefer-hot-reload
+    kind: core
+    judge: deterministic
+    description: 开发/测试服务多候选时优先热更新入口
+    given: start 或 discover 某原生开发服务，同时存在 dev/watch 与普通 start/serve
+    expect:
+      must:
+        - 选用热更新入口（如 dev、watch、--reload）作为 command
+      must_not:
+        - 在存在热更新候选时默认选用无 watch 的生产向 start/serve
+        - 把 build+preview 当作首选开发启动（除非用户指定或仅此可起）
+
+  - id: start-dev-bind-all-interfaces
+    kind: core
+    judge: deterministic
+    description: 开发/测试原生服务绑定 0.0.0.0
+    given: start/restart 开发或测试原生服务，command 未宽绑定且可按常见栈补 host
+    expect:
+      must:
+        - 以 0.0.0.0 监听（环境变量或官方 host 参数），且保持热更新
+        - 成功后可按冲突规则写回 bind / 热更新信息
+      must_not:
+        - 在可安全补绑时仍默认只绑 127.0.0.1
+        - 覆盖人工标注或用户本会话指定的 command
+        - 臆造少见 flag；无法推断时应原样启动并询问
+
   - id: stop-process-group-first
     kind: core
     judge: deterministic
@@ -306,7 +333,7 @@ cases:
       must:
         - 总结含改动范围（只读无写入写「无运行态变更」）
         - 总结含影响面
-        - 总结含服务访问方式（URL/端口/path 或「待确认」/失败时「不可用」）
+        - 总结含服务访问方式（本机 URL/端口/path；若绑 0.0.0.0 可补局域网入口；或「待确认」/失败时「不可用」）
       must_not:
         - 用整份 list 表格代替三项总结
 

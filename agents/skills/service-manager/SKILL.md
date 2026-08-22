@@ -91,7 +91,7 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 - **cwd**: `.` 或子目录
 - **port**: 8080（未知则写「待确认」）
 - **source**: Makefile / package.json / docker-compose / ...
-- **notes**: 环境变量、需先 `cp .env.example .env` 等
+- **notes**: 环境变量、需先 `cp .env.example .env` 等；开发/测试服务注明 bind（如 `0.0.0.0`）与是否热更新
 
 ## 踩坑
 
@@ -104,6 +104,39 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 - 不要把 pid、pgid、临时日志路径写进此文件。
 - 用户若明确要求不提交该文件，提醒可加入 `.gitignore`，但仍在本地维护。
 
+## 开发/测试启动约定
+
+适用于本地 **开发 / 测试** 原生服务（`source` 为 Makefile / package.json / 语言入口等，或 notes 标明 dev/test）。**不**强制改写：人工标注或用户本会话指定的 command、生产向无 watch 的 `start`/`serve`（且无热更新候选时）、compose 依赖类服务（db/redis 等）。
+
+### 优先热更新方式
+
+discover 与选定 `command` 时，同一服务有多候选则按优先级：
+
+1. 显式 watch/reload：脚本或 target 名为 `dev`、`watch`、`serve:dev`，或命令含 `--reload` / `nodemon` / `air` / `watchexec` / `cargo watch` 等。
+2. 框架默认开发入口：如 `npm run dev`、`vite`、`uvicorn --reload`、带 debug/reload 的语言服务器。
+3. 仅当无热更新候选时，才用普通 `start`/`serve`/`preview`，并在输出说明「无热更新入口」。
+
+不要把「先 `build` 再静态 `preview`」当作首选开发启动，除非用户指定或仅此可起。
+
+### 绑定 0.0.0.0
+
+start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**（全网卡），不要默认只绑 `127.0.0.1`。
+
+1. 先看 command / notes / 环境是否已宽绑定（已含 `0.0.0.0`、`--host 0.0.0.0`、`HOST=0.0.0.0` 等）→ 不再追加。
+2. 若仍只绑本机或未指定 host，按栈用**可逆、常见**方式补绑定（优先环境变量，其次该工具官方 host 参数），且不得关掉热更新：
+
+| 栈 / 线索 | 优先补法（示例） |
+|-----------|------------------|
+| Vite / webpack-dev-server | `--host 0.0.0.0` 或 `HOST=0.0.0.0` |
+| Next.js | `-H 0.0.0.0` |
+| uvicorn / gunicorn | `--host 0.0.0.0` |
+| Flask | `--host 0.0.0.0` |
+| Django `runserver` | `0.0.0.0:<port>` |
+| 读取 `HOST` 的 Node 脚本 | `HOST=0.0.0.0` |
+
+3. 无法安全推断补法 → 仍用原 command 启动，在输出与踩坑注明「可能仅本机可达」，并询问期望的 host 参数；不要臆造少见 flag。
+4. 成功后按冲突规则，可将实际生效的 bind（`0.0.0.0`）与「热更新：是/否」写入该服务 notes。
+
 ## 探索启动方式（discover）
 
 在项目根及明显子目录（如 `frontend/`、`server/`、各 package）**合并多源**结果，不要因已有 Makefile 就跳过 package.json / compose。
@@ -111,8 +144,8 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 扫描顺序（后源可追加服务；同名服务保留更具体者：子目录 package 脚本 > 根 Makefile 泛化 target，并在输出说明）：
 
 1. **先读** `.service-manager.md`（若存在）。
-2. **Makefile** / **Justfile** / **Taskfile.yml**：关注 `run`、`start`、`dev`、`serve`、`up`、`server` 类任务；读内容确认实际命令。
-3. **package.json**（含 workspace 子包）：`scripts` 中的 `dev`、`start`、`serve`、`preview`；注意 pnpm/npm/yarn。
+2. **Makefile** / **Justfile** / **Taskfile.yml**：关注 `run`、`start`、`dev`、`serve`、`up`、`server`、`watch` 类任务；读内容确认实际命令；同服务多候选时按「优先热更新方式」选取。
+3. **package.json**（含 workspace 子包）：`scripts` 中的 `dev`、`watch`、`start`、`serve`、`preview`；注意 pnpm/npm/yarn；同包多脚本时优先 `dev`/`watch` 等热更新入口。
 4. **docker-compose.yml / compose.yaml**（及 `-f` 常见覆盖文件）：服务名即单元；记录 `compose_file` 与 compose 所在 `cwd`；区分 `docker compose` 与 `docker-compose`。
 5. **其他线索**（补充，非「前几项全空才看」）：`pyproject.toml` / `manage.py` / `app.py`、`go.mod`+`cmd/`、`Cargo.toml`、`Procfile`、`mise.toml` tasks、README 启动段落。
 6. 推断端口；推不出留空，start 后从日志或 `ss -tlnp` 补。
@@ -162,20 +195,21 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 1. 查 `.service-manager.md` / 缓存；没有则先 discover。
 2. 已在运行（见「运行状态判定」）→ 告知并跳过。
 3. **环境**：若 notes/文档要求 `.env`，检查 `<cwd>/.env`（或项目根）；缺且存在 `.env.example` → 先告知并询问是否 `cp`，未经同意不擅自复制；缺依赖运行时则写入踩坑并停下。
-4. 后台启动（原生）——**新进程组**，便于整组停止：
+4. **开发/测试约定**：若属开发/测试原生服务，按「开发/测试启动约定」确认 command 为热更新优先入口，并在需要时补 `0.0.0.0` 绑定；得到实际执行用的 command（可与缓存原文不同，成功后按冲突规则写回）。
+5. 后台启动（原生）——**新进程组**，便于整组停止：
    ```bash
    mkdir -p ~/.cache/service-manager/logs/<ph>
    cd <cwd> && setsid nohup <command> >> ~/.cache/service-manager/logs/<ph>/<name>.log 2>&1 & echo $!
    ```
    记录 `pid`、`pgid`（`ps -p <pid> -o pgid=`）、`log`、`started_at`。
    compose：在 compose 文件所在目录执行 `docker compose -f <compose_file> up -d <name>`（必要时加 project 名）；记 `container` 与 `compose_file`，不记 pid。
-5. 写回缓存 `runs`。
-6. **就绪验证**（默认 2–5s，慢服务可延长到 ~30s，或看 `.service-manager.md` 的 health/notes）：
+6. 写回缓存 `runs`。
+7. **就绪验证**（默认 2–5s，慢服务可延长到 ~30s，或看 `.service-manager.md` 的 health/notes）：
    - 进程/容器仍在；
-   - 有端口则已监听；
+   - 有端口则已监听（开发服务期望绑在 `0.0.0.0` 或全网卡；若实际仅 `127.0.0.1` 且本应宽绑定，记入踩坑）；
    - 若配置了 HTTP health / 日志就绪关键字，一并满足。
    失败 → tail 项目隔离日志，写踩坑。
-7. 成功 → 按冲突规则同步 `.service-manager.md`。
+8. 成功 → 按冲突规则同步 `.service-manager.md`（含实际 bind / 是否热更新，若适用）。
 
 ### stop `<name>`
 
@@ -205,7 +239,7 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 
 1. **改动范围**：触达服务、动作、是否更新缓存或 `.service-manager.md`。只读无写入 →「无运行态变更」。
 2. **影响面**：端口占用/释放、前置依赖、对其它服务影响；无则「无」。
-3. **服务访问方式**：对 running/starting 给出入口。优先 `http://127.0.0.1:<port>`（或文档中的 path/HTTPS）；若确认监听非本机可达地址，如实写；未知 →「待确认」；失败 →「不可用」并指日志。
+3. **服务访问方式**：对 running/starting 给出入口。本机优先 `http://127.0.0.1:<port>`（或文档中的 path/HTTPS）；若已确认监听 `0.0.0.0`，可补充局域网可用 `http://<主机IP>:<port>`；仅绑本机则如实写；未知 →「待确认」；失败 →「不可用」并指日志。
 
 **只读 phase**（`list` / `status` / `logs`）：三项仍要出现，但改动范围用固定短句「无运行态变更」，影响面无则「无」，避免复述整表；访问方式只列已知入口。突变 phase（`start` / `stop` / `restart`）写满具体服务名与端口变化。
 
