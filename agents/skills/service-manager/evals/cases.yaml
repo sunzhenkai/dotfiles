@@ -263,6 +263,19 @@ cases:
       must_not:
         - 让用户手工修缓存
 
+  - id: completion-summary
+    kind: core
+    judge: deterministic
+    description: phase 完成后给出改动范围、影响面、服务访问方式总结
+    given: 任一 phase 执行完毕（成功或可报告的失败）
+    expect:
+      must:
+        - 总结含改动范围（触达服务、动作、是否更新缓存或 .service-manager.md；只读无写入写「无运行态变更」）
+        - 总结含影响面（端口占用/释放、前置依赖、对其它服务影响；无则写「无」）
+        - 总结含服务访问方式（URL/端口/path 或「待确认」/失败时「不可用」）
+      must_not:
+        - 用整份 list 表格代替三项总结
+
   - id: identity-check-fail-ask-user
     kind: regression
     judge: deterministic

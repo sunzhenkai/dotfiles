@@ -1,7 +1,7 @@
 ---
 id: service-manager
 name: service-manager
-description: 项目服务管理：从 Makefile、package.json、docker-compose 等探索服务启动方式，统一执行 list / start / stop / restart / status / logs。缓存服务清单与运行信息以加速后续启动；把启动相关信息与踩坑写入项目根 .service-manager.md。在启动、停止、查看项目服务时使用。
+description: 项目服务管理：从 Makefile、package.json、docker-compose 等探索服务启动方式，统一执行 list / start / stop / restart / status / logs。缓存服务清单与运行信息以加速后续启动；把启动相关信息与踩坑写入项目根 .service-manager.md。完成后给出改动范围、影响面与服务访问方式总结。在启动、停止、查看项目服务时使用。
 ---
 
 # 服务管理
@@ -144,6 +144,16 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 ### logs `<name>` `[行数]`
 
 `tail -n <行数, 默认 50> ~/.cache/service-manager/logs/<name>.log`；docker compose 用 `docker compose logs --tail`。
+
+## 完成后总结
+
+任一 phase 执行完毕（成功或可报告的失败）后，在主输出之后给出简短总结，至少覆盖以下三项：
+
+1. **改动范围**：本轮实际触达了哪些服务、执行了哪些动作（`list` / `start` / `stop` / `restart` / `status` / `logs`），以及是否更新了缓存或 `.service-manager.md`。只读且无写入时写「无运行态变更」。
+2. **影响面**：占用或释放的端口、依赖的前置服务、是否波及同项目其他服务；无则写「无」。
+3. **服务访问方式**：对仍在运行或刚启动的服务给出可访问入口（如 `http://localhost:<port>`、已知 path、compose 端口映射）；未知则标明「待确认」，并提示可从日志或 `ss -tlnp` 补全。
+
+总结用简洁分点，不要重复整份 list 表格。失败收尾时同样给出这三项（访问方式可写「不可用」并指向日志）。
 
 ## 安全与边界
 
