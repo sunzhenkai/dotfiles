@@ -9,6 +9,10 @@ dotf_handler_init() {
   source "$DOTFILES_ROOT/scripts/modules.sh"
   # shellcheck source=/dev/null
   source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
+  if ! type dotf_result_changed >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    source "$DOTFILES_ROOT/scripts/lib/result.sh"
+  fi
 }
 
 # 若 bin 已在 PATH 或 ~/.local/bin，返回 unchanged

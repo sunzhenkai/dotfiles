@@ -48,9 +48,11 @@
 - **WHEN** 旧配置被备份
 - **THEN** 输出包含 "Backed up <name> to <backup_path>" 格式的信息
 
-#### Scenario: Logseq 配置备份时的输出
-- **WHEN** `~/.logseq` 已存在且需要备份
-- **THEN** 输出包含 "Backed up logseq to ~/.config/backups/logseq-<timestamp>" 格式的信息
+#### Scenario: Logseq 旧目标为非目录时备份
+- **WHEN** `~/.logseq` 已存在且既不是目录也不是符号链接
+- **THEN** 将旧目标备份到 `~/.config/backups/` 后再创建真实目录
+- **WHEN** `~/.logseq` 是指向仓库的整目录符号链接
+- **THEN** 只删除该符号链接（不跟随删除仓库），不把 graphs/plugins 备份进 git
 
 ### Requirement: logseq 注册为可用配置项
 
