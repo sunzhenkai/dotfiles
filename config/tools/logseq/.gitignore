@@ -1,10 +1,10 @@
-# 忽略所有
+# 默认忽略运行时；只跟踪声明式配置
 *
 
-# 添加跟踪白名单
 !.gitignore
 !config/
 !config/**
+!preferences.json
 !preferences.json
 !settings/
 !settings/**

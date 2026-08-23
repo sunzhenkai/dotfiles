@@ -167,3 +167,38 @@ dotf_ensure_symlink() {
   fi
   return 0
 }
+
+# 将整目录软链换成真实目录（只删 link，不跟随删除仓库内容）。
+# 已是目录则不动；普通文件先备份再 mkdir。
+# 用法: dotf_ensure_real_dir <path>
+dotf_ensure_real_dir() {
+  local target="$1"
+  target=$(dotf_expand_path "$target")
+  if [ -L "$target" ]; then
+    rm "$target"
+    mkdir -p "$target"
+    return 0
+  fi
+  if [ -d "$target" ]; then
+    return 0
+  fi
+  if [ -e "$target" ]; then
+    dotf_backup_to "$target" >/dev/null
+  fi
+  mkdir -p "$target"
+}
+
+# 把仓库里误放的运行时迁到 home 真实目录；目标已存在则丢掉仓库副本。
+# 用法: dotf_migrate_runtime <src> <dest>
+dotf_migrate_runtime() {
+  local src="$1"
+  local dest="$2"
+  if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+    return 0
+  fi
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    rm -rf "$src"
+    return 0
+  fi
+  mv "$src" "$dest"
+}

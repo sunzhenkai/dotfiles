@@ -27,7 +27,7 @@
 - **THEN** 顶层 SHALL NOT 再并列存放已迁入 `config/` 的 app 配置目录（如顶层 `nvim/`、`kitty/`）
 
 ### Requirement: 安装目标路径不变
-分类迁移只改变仓库内源路径；symlink 安装目标（如 `~/.config/nvim`、`~/.logseq`）SHALL 保持既有约定，除非某模块单独变更需求另有规定。
+分类迁移只改变仓库内源路径；安装目标（如 `~/.config/nvim`、`~/.logseq`）SHALL 保持既有约定，除非某模块单独变更需求另有规定。`~/.logseq` SHALL 为真实目录（按文件链接声明式配置），不得整目录软链进仓库。
 
 #### Scenario: nvim 目标不变
 - **WHEN** 执行 `nvim` 的配置安装

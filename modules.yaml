@@ -476,7 +476,7 @@ modules:
       target: ~/.config/shell_gpt
 
   - name: logseq
-    desc: Logseq 笔记配置
+    desc: Logseq 笔记配置（~/.logseq 为真实目录，禁止整树软链）
     group: utils
     doctor: true
     config:

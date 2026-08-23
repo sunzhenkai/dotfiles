@@ -23,7 +23,8 @@ dotf_skip_if_bin() {
   return 1
 }
 
-# 按注册表 source/target 做通用 symlink 配置
+# 按注册表 source/target 做通用 symlink 配置。
+# 禁止用于应用数据根目录（如 ~/.logseq）：应用会把缓存/密钥写进仓库。
 dotf_registry_symlink_config() {
   local mod="${1:-${DOTF_MODULE:?}}"
   local src tgt

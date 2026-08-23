@@ -28,3 +28,13 @@ __pycache__
 .pytest_cache
 
 docs/pretty-view-html
+
+# 应用运行时，禁止进仓（即使误用整目录软链）
+config/tools/logseq/graphs/
+config/tools/logseq/graphs.edn
+config/tools/logseq/plugins/
+config/multiplexers/tmux/plugins/
+config/multiplexers/tmux/resurrect/
+config/tools/k9s/screen-dumps/
+config/tools/k9s/snapshots/
+config/tools/k9s/clusters/

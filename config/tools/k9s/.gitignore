@@ -1,0 +1,4 @@
+# k9s 可能写入 ~/.config/k9s 的运行时（整目录软链时会落到仓库）
+screen-dumps/
+snapshots/
+clusters/
