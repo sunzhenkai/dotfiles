@@ -6,5 +6,6 @@ mcp_servers:
   - web-search-prime
   - web-reader
   - zread
+  - zai-vision
   - playwright
 modules: [mcp, browser, tools, env, security, agents]

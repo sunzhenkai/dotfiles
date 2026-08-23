@@ -81,6 +81,11 @@ The system SHALL make generated or managed agent environment configuration audit
 - **THEN** sync SHALL warn before writing
 - **THEN** the written file SHALL be treated as user-level private state, not repository content
 
+#### Scenario: ZCode requires expanded ZHIPU_API_KEY
+- **WHEN** sync writes ZCode MCP configuration
+- **THEN** `${ZHIPU_API_KEY}` SHALL be expanded in the home config because ZCode has no placeholder interpolation
+- **THEN** the committed vendor template SHALL still contain only the placeholder
+
 ### Requirement: Repository scans catch obvious sensitive leakage
 The system SHALL provide checks that catch obvious sensitive data patterns in `agents/env` source files and generated repository files.
 

@@ -406,10 +406,19 @@ def sync_zcode(
     dry_run: bool,
     also_repo: bool,
 ) -> str:
-    """Merge mcp.servers into ~/.zcode/cli/config.json（保留其它本机字段）。"""
+    """Merge mcp.servers into ~/.zcode/cli/config.json（保留其它本机字段）。
+
+    ZCode 不展开配置里的 ${VAR}。HTTP Authorization 和 stdio env 必须在
+    写入本机 config 时展开，否则连接会 401。仓库模板仍只保留占位符。
+    """
     servers = cat.selected_servers("zcode", profile)
     rendered = {
         sid: render_server_for_tool(sid, srv, "zcode") for sid, srv in servers.items()
+    }
+    # 缺密钥时在写盘前失败，避免留下无法连接的占位符配置
+    home_rendered = {
+        sid: render_server_for_tool(sid, srv, "zcode", expand_secrets=True)
+        for sid, srv in servers.items()
     }
     target = Path.home() / ".zcode" / "cli" / "config.json"
     existing: Dict[str, Any] = {}
@@ -422,13 +431,18 @@ def sync_zcode(
     block = mcp_block.get("servers") or {}
     if not isinstance(block, dict):
         block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
+    merged = merge_mcp_servers(block, home_rendered, cat.managed_server_ids())
     data = dict(existing)
     data["mcp"] = {**mcp_block, "servers": merged}
 
     status = f"zcode: {len(rendered)} managed servers → {target} (mcp.servers)"
+    warn = (
+        "⚠️  ZCode 不展开 ${} 占位符，已将 ZHIPU_API_KEY 等密钥展开写入本机 "
+        "config（不写入仓库模板）"
+    )
     if dry_run:
         print(f"[dry-run] {status}")
+        print(warn)
         print(json.dumps({"mcp": {"servers": rendered}}, indent=2, ensure_ascii=False))
         return "ok"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -436,6 +450,7 @@ def sync_zcode(
         backup_file(target, Path.home() / ".config" / "backups")
     atomic_write_json(target, data, dry_run=False)
     print(f"已同步: {status}")
+    print(warn)
 
     if also_repo:
         repo_tpl = cat.root / "agents" / "vendors" / "zcode" / "mcp.json"

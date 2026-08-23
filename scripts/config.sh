@@ -307,6 +307,43 @@ install_zcode_config() {
   mkdir -p "$HOME/.zcode/skills" "$HOME/.zcode/commands" "$HOME/.zcode/cli"
   echo "ZCode 目录已就绪（~/.zcode/{skills,commands,cli}）"
   echo "skills/MCP：dotf agents -c --tool zcode 或 sync.sh zcode"
+
+  # 注入 zcode MCP 依赖的环境变量到 launchctl GUI 域。
+  # ZCode 是 GUI 应用，进程继承的是 GUI launchd 域的环境变量（~/.zshrc 注入的
+  # ZHIPU_API_KEY 等不会自动出现在 GUI 进程里）。
+  # MCP 同步会把 ${ZHIPU_API_KEY} 展开进 ~/.zcode/cli/config.json；
+  # launchctl 仍注入一份，供 ZCode 自身或其它仍读环境变量的路径使用。
+  install_zcode_mcp_env
+}
+
+# ZCode MCP 需要的环境变量：注入到 launchctl GUI 域（domain gui/$uid）。
+# 仅注入 zcode 实际依赖的变量（ZHIPU_API_KEY；Z_AI_API_KEY 是兼容手动
+# export 的同名变量），避免把不相关的敏感 secret 推到 GUI 域。
+# 本机 MCP 鉴权以 sync 展开进 ~/.zcode/cli/config.json 为准。
+install_zcode_mcp_env() {
+  local var value injected=0 skipped=0
+  for var in ZHIPU_API_KEY Z_AI_API_KEY; do
+    # 1) 优先从当前 shell 取
+    value="$(eval "printf '%s' \"\${$var:-}\"")"
+    # 2) 兜底从 senv 取
+    if [ -z "$value" ] && command -v senv >/dev/null 2>&1; then
+      value="$(senv env get "$var" 2>/dev/null || true)"
+    fi
+    if [ -z "$value" ]; then
+      echo "  ⚠️  跳过 $var（未在当前环境或 senv 中找到）"
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if launchctl setenv "$var" "$value" 2>/dev/null; then
+      echo "  ✓ launchctl setenv $var (前 8 字符: ${value:0:8}...)"
+      injected=$((injected + 1))
+    else
+      echo "  ✗ launchctl setenv $var 失败"
+    fi
+  done
+  if [ "$injected" -gt 0 ]; then
+    echo "  → 重启 ZCode 桌面端让新值生效"
+  fi
 }
 
 # 特殊配置：minimax

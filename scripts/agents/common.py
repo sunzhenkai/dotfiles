@@ -326,10 +326,139 @@ def auth_header(env_name: str, style: str) -> str:
     return f"Bearer ${{{env_name}}}"
 
 
-def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str, Any]:
+def lookup_env_value(name: str) -> str:
+    """读取环境变量；当前进程没有时再尝试 senv。不打印值。"""
+    val = os.environ.get(name) or ""
+    if val:
+        return val
+    return _senv_get(name)
+
+
+def _senv_get(name: str) -> str:
+    import shutil
+    import subprocess
+
+    if not shutil.which("senv"):
+        return ""
+    try:
+        proc = subprocess.run(
+            ["senv", "env", "get", name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if proc.returncode != 0:
+        return ""
+    return (proc.stdout or "").strip()
+
+
+def _placeholder_var(token: str) -> str:
+    if token.startswith("${") and token.endswith("}"):
+        return token[2:-1]
+    if token.startswith("{env:") and token.endswith("}"):
+        return token[len("{env:") : -1]
+    return token
+
+
+def expand_env_placeholders(obj: Any) -> Any:
+    """把 ${VAR} / {env:VAR} 展开为 lookup_env_value(VAR)；缺值则失败。"""
+    missing: List[str] = []
+
+    def walk(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: walk(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [walk(v) for v in value]
+        if isinstance(value, str):
+
+            def repl(match: re.Match) -> str:
+                var = _placeholder_var(match.group(0))
+                found = lookup_env_value(var)
+                if not found:
+                    missing.append(var)
+                    return match.group(0)
+                return found
+
+            return PLACEHOLDER_OK.sub(repl, value)
+        return value
+
+    out = walk(obj)
+    if missing:
+        names = ", ".join(f"${{{n}}}" for n in sorted(set(missing)))
+        die(f"无法展开环境变量占位符: {names}（请 export 或通过 senv 提供）")
+    return out
+
+
+def collect_placeholders(obj: Any) -> List[str]:
+    """收集对象中的 ${VAR} / {env:VAR} 占位符（去重、保序）。"""
+    found: List[str] = []
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            for v in value.values():
+                walk(v)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v)
+        elif isinstance(value, str):
+            found.extend(PLACEHOLDER_OK.findall(value))
+
+    walk(obj)
+    seen: Set[str] = set()
+    out: List[str] = []
+    for tok in found:
+        if tok not in seen:
+            seen.add(tok)
+            out.append(tok)
+    return out
+
+
+def entries_equivalent(expected: Any, actual: Any) -> bool:
+    """比较 MCP 条目：expected 中的占位符可匹配 actual 里已展开的值。"""
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if expected.keys() != actual.keys():
+            return False
+        return all(entries_equivalent(expected[k], actual[k]) for k in expected)
+    if isinstance(expected, list) and isinstance(actual, list):
+        if len(expected) != len(actual):
+            return False
+        return all(entries_equivalent(a, b) for a, b in zip(expected, actual))
+    if isinstance(expected, str) and isinstance(actual, str):
+        if expected == actual:
+            return True
+        if not PLACEHOLDER_OK.search(expected):
+            return False
+        parts: List[str] = []
+        pos = 0
+        for match in PLACEHOLDER_OK.finditer(expected):
+            parts.append(re.escape(expected[pos : match.start()]))
+            parts.append(r".+")
+            pos = match.end()
+        parts.append(re.escape(expected[pos:]))
+        try:
+            return re.fullmatch("".join(parts), actual) is not None
+        except re.error:
+            return False
+    return expected == actual
+
+
+def render_server_for_tool(
+    sid: str,
+    srv: Dict[str, Any],
+    tool: str,
+    *,
+    expand_secrets: bool = False,
+) -> Dict[str, Any]:
     transport = srv.get("transport")
     auth = srv.get("auth") or {}
     env_name = auth.get("env")
+
+    def finish(entry: Dict[str, Any]) -> Dict[str, Any]:
+        if expand_secrets:
+            return expand_env_placeholders(entry)
+        return entry
 
     if tool == "kimi-code":
         # Kimi 不展开 headers 里的 ${ENV}；HTTP/SSE 用 bearerTokenEnvVar
@@ -358,7 +487,7 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
                 entry = {"type": "stdio", **entry}
             if srv.get("env"):
                 entry["env"] = srv["env"]
-            return entry
+            return finish(entry) if tool == "zcode" else entry
         # HTTP：cursor 用 streamable-http；kiro 文档无 type 字段；其余用 http
         if tool == "kiro":
             entry = {"url": srv["url"]}
@@ -380,7 +509,7 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
             entry["headers"] = {
                 "Authorization": auth_header(env_name, style)
             }
-        return entry
+        return finish(entry) if tool == "zcode" else entry
 
     if tool == "opencode":
         if transport == "stdio":
@@ -389,7 +518,8 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
                 "command": [srv["command"], *list(srv.get("args") or [])],
             }
             if srv.get("env"):
-                entry["environment"] = srv["env"]
+                # OpenCode 只识别 {env:VAR} 占位符（见 opencode.ai/docs/mcp-servers）
+                entry["environment"] = _to_opencode_env(srv["env"])
             return entry
         entry = {
             "type": "remote",
@@ -402,6 +532,16 @@ def render_server_for_tool(sid: str, srv: Dict[str, Any], tool: str) -> Dict[str
         return entry
 
     die(f"无法为工具渲染 MCP: {tool}")
+
+
+def _to_opencode_env(env: Dict[str, Any]) -> Dict[str, Any]:
+    """OpenCode 只识别 {env:VAR} 占位符；把 env 值里的 ${VAR} 转成 {env:VAR}。"""
+    out: Dict[str, Any] = {}
+    for k, v in env.items():
+        if isinstance(v, str):
+            v = re.sub(r"\$\{([A-Z][A-Z0-9_]*)\}", r"{env:\1}", v)
+        out[k] = v
+    return out
 
 
 def check_no_unresolved(obj: Any, path: str = "$") -> None:

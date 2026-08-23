@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from common import (
     TOOLS,
     Catalog,
+    collect_placeholders,
+    entries_equivalent,
     render_server_for_tool,
     repo_root_from,
 )
@@ -365,16 +367,27 @@ def check_mcp(
         drift = _mcp_drift(cat, t, profile, servers)
         if drift is None:
             report.add("mcp", f"{t}-drift", STATUS_SKIP, f"{t}: 目标配置不存在，跳过漂移检查")
-        elif drift:
-            report.add(
-                "mcp",
-                f"{t}-drift",
-                STATUS_WARN,
-                f"{t}: 托管 MCP 与 agents/env 不一致: {', '.join(drift)}",
-                hint="运行 scripts/agents/sync.sh --env-only " + t,
-            )
         else:
-            report.add("mcp", f"{t}-drift", STATUS_PASS, f"{t}: 托管 MCP 与源一致")
+            unexpanded = [d for d in drift if d.startswith("unexpanded:")]
+            shape = [d for d in drift if not d.startswith("unexpanded:")]
+            if unexpanded:
+                report.add(
+                    "mcp",
+                    f"{t}-unexpanded",
+                    STATUS_FAIL,
+                    f"{t}: 本机 MCP 仍含未展开占位符（连接会失败）: {', '.join(unexpanded)}",
+                    hint="运行 scripts/agents/sync.sh --env-only " + t,
+                )
+            if shape:
+                report.add(
+                    "mcp",
+                    f"{t}-drift",
+                    STATUS_WARN,
+                    f"{t}: 托管 MCP 与 agents/env 不一致: {', '.join(shape)}",
+                    hint="运行 scripts/agents/sync.sh --env-only " + t,
+                )
+            elif not unexpanded:
+                report.add("mcp", f"{t}-drift", STATUS_PASS, f"{t}: 托管 MCP 与源一致")
 
         if deep:
             for sid, srv in servers.items():
@@ -470,8 +483,11 @@ def _mcp_drift(
     for sid, exp in expected.items():
         if sid not in actual:
             drift.append(f"missing:{sid}")
-        elif actual[sid] != exp:
+        elif not entries_equivalent(exp, actual[sid]):
             drift.append(f"changed:{sid}")
+        elif tool == "zcode":
+            for tok in collect_placeholders(actual[sid]):
+                drift.append(f"unexpanded:{sid}:{tok}")
     for sid in cat.managed_server_ids():
         if sid in actual and sid not in expected:
             # 目标里仍有已禁用的托管 server

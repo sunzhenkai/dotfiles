@@ -45,3 +45,19 @@ servers:
     required_tools: [node, npx]
     # 默认追加参数由 sync 根据 browser.yaml / local override 生成
     browser_provider: playwright
+
+  # 智谱视觉理解 MCP（@z_ai/mcp-server）
+  # stdio 启动，需要 Z_AI_API_KEY；token 从 ZHIPU_API_KEY 读取。
+  # 多数客户端会展开 ${ZHIPU_API_KEY}；ZCode 不会，sync 写入 ~/.zcode/cli/config.json
+  # 时会把占位符展开成真实值（仓库模板仍保留占位符，不入库密钥）。
+  zai-vision:
+    transport: stdio
+    command: npx
+    args: ["-y", "@z_ai/mcp-server@latest"]
+    env:
+      Z_AI_API_KEY: ${ZHIPU_API_KEY}
+      Z_AI_MODE: ZHIPU
+    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    profiles: [research, browser, full]
+    risk: low
+    required_tools: [node, npx]

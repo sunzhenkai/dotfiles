@@ -34,6 +34,15 @@ The system SHALL adapt shared MCP declarations into the configuration format use
 - **THEN** enabled MCP servers SHALL be written or merged into the `mcp` section of `~/.config/opencode/opencode.json`
 - **THEN** the generated configuration SHALL use OpenCode-compatible remote or local server syntax
 
+#### Scenario: ZCode MCP configuration expands secrets locally
+- **WHEN** sync runs for `zcode`
+- **THEN** enabled MCP servers SHALL be merged into `~/.zcode/cli/config.json` under `mcp.servers`
+- **THEN** HTTP `Authorization` and stdio `env` placeholders such as `${ZHIPU_API_KEY}` SHALL be expanded from the process environment or `senv` into that home config
+- **THEN** sync SHALL warn that secret values are written only to user-level private state
+- **THEN** repository templates SHALL retain placeholders and MUST NOT contain expanded secret values
+- **WHEN** `ZHIPU_API_KEY` is missing
+- **THEN** sync SHALL fail before writing a ZCode config that still contains the unresolved placeholder
+
 #### Scenario: Codex MCP configuration is unsupported
 - **WHEN** sync runs for `codex` and the current Codex configuration format lacks stable MCP support
 - **THEN** sync SHALL skip MCP generation for Codex

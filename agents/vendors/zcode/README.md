@@ -60,4 +60,6 @@ scripts/agents/sync.sh zcode
 | MCP | merge → `~/.zcode/cli/config.json` 的 `mcp.servers` | 保留非托管 server 与其它本机字段 |
 | Hooks / Plugins | — | 不由 agents sync 管理 |
 
-`agents/vendors/zcode/mcp.json` 为 **agents/env 生成物**（`{"mcp":{"servers":...}}` 片段）；请改 `agents/env/mcp/` 后重新 sync。
+`agents/vendors/zcode/mcp.json` 为 **agents/env 生成物**（`{"mcp":{"servers":...}}` 片段，只含占位符）；请改 `agents/env/mcp/` 后重新 sync。
+
+ZCode **不展开** `${ZHIPU_API_KEY}`。同步本机 MCP 时会把密钥写入 `~/.zcode/cli/config.json`，否则 HTTP MCP 会鉴权失败。仓库模板不会写入真实密钥。
