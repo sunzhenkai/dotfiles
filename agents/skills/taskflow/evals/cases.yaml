@@ -114,6 +114,21 @@ cases:
         - 用按 change 汇总的剩余数量代替逐条说明
         - 因一项卡住整轮停下
 
+  - id: parallel-independent-units
+    kind: core
+    judge: deterministic
+    description: 有多 agent 时对独立 task / 子 change 并行，依赖项与收尾串行
+    given: apply {task}-driver 且实施段有多个互不依赖的子 change，或某子 change 内有互不依赖的 checkbox
+    expect:
+      must:
+        - 有多 agent 能力时对无依赖、范围不重叠的 task 或子 change 并行委派
+        - 每个子代理绑定 planning root 与 change name，只改自己范围
+        - 主会话汇总，并在子 change 全勾且 validate --strict 通过后才勾 driver 编排项
+      must_not:
+        - 对有依赖、同范围重叠、准备切分支或收尾段条目并行
+        - 另建第二份进度账本
+        - 因子代理失败而整轮结束
+
   - id: no-invented-openspec-commands
     kind: failure
     judge: deterministic

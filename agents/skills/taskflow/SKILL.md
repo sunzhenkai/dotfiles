@@ -1,7 +1,7 @@
 ---
 id: taskflow
 name: taskflow
-description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。与 `task-workflow`（taskctl + `tasks/` 台账）并存但互斥，同一任务只用一套。
+description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。与 `task-workflow`（taskctl + `tasks/` 台账）并存但互斥，同一任务只用一套。
 ---
 
 # taskflow
@@ -126,6 +126,26 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 只有三种情况允许结束一轮：**checkbox 全勾**、**需要用户决策**、**本轮预算耗尽**。
 
 单项做不了（依赖、环境或授权）就保持未勾，在验证记录写一行原因，继续处理不依赖它的其余条目——不要因为一项卡住就整轮停下，也不要把未完成项勾成完成。结束时逐条列出未勾条目与原因，不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
+
+### 并行执行
+
+有多 agent / 子代理能力时，对**无未完成依赖、范围不重叠**的单位优先并行；没有该能力则主会话串行，其余纪律不变。并行只改变执行方式，完成度仍只认 checkbox，不另建账本。
+
+两层都可以并行：
+
+| 层 | 单位 | 可以并行 | 必须串行 |
+|----|------|----------|----------|
+| change | 子 change `{task}-<slice>` | 落在不同必须仓，或主会话已确认实现范围不重叠 | 同一工作树且可能改同一批文件或互相依赖契约；准备段切分支；收尾段回归 / 回填 / 提交 / 归档 |
+| task | 同一 change 的 checkbox | 互不依赖且文件范围不重叠 | 有先后依赖、共享同一文件、或需要用户决策 |
+
+每个子代理只领一个单位（一个子 change，或同一 change 内一组已声明不重叠的 checkbox），并同时满足：
+
+- 在该单位的 planning root 下执行，且显式给出 change name
+- 只改自己范围内的代码与自己的 `tasks.md` checkbox
+- 不勾 driver 编排项（仍由主会话在子 change 全勾且 `validate --strict` 通过后勾）
+- 不发明等价命令，不扩大到 `建议` / `排除` 仓的写入
+
+主会话负责派发、汇总、处理冲突与未勾原因。子代理失败或超时不是整轮结束理由，按「一轮结束」继续其余独立项。
 
 ---
 
