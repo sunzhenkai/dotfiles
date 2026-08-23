@@ -1,6 +1,6 @@
 # Shared agent skills & commands
 
-跨 Claude Code / Cursor / Kiro / OpenCode / Codex / Kimi Code / Pi / ZCode / Qoder / CodeBuddy 的 **skills / commands 唯一真相源**。
+跨 Claude Code / Cursor / Kiro / OpenCode / Codex / Kimi Code / Pi / ZCode / Qoder / CodeBuddy / DeepSeek Harness（dsh）的 **skills / commands 唯一真相源**。
 
 ## 统一入口（推荐）
 
@@ -128,6 +128,7 @@ scripts/agents/sync.sh pi
 scripts/agents/sync.sh zcode
 scripts/agents/sync.sh qoder
 scripts/agents/sync.sh codebuddy-code
+scripts/agents/sync.sh dsh
 
 # 也可用配置入口
 scripts/config.sh agents
@@ -136,6 +137,7 @@ scripts/config.sh agents
 共享 sync：`dotf agents -c [--tool <name>]`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `codebuddy-code` 为 **opt-in**（`enabled: false`）：不随 `dotf agents -i` / `--all` 安装，但参与 sync/doctor。
 `minimax`（MiniMax CLI，bin: `mmx`）随 `dotf agents -i` 安装并参与 doctor；无 skills/commands/MCP 布局，**不参与 sync**（env_sync 为 skip stub）。
+`dsh`（DeepSeek Harness CLI，bin: `dsh`）：skills 同步到 `~/.dsh/skills`（DSH 原生扫描该目录）；无 commands 布局（skip），MCP client 配置在 profile 内，不参与 agents/env 聚合（env_sync 为 skip stub）。安装走 `dotf dsh -i`。
 
 ## 安装目标
 
@@ -151,6 +153,7 @@ scripts/config.sh agents
 | zcode | `~/.zcode/skills/` | `~/.zcode/commands/`（MCP：`~/.zcode/cli/config.json` → `mcp.servers`） |
 | qoder | `~/.qoder-cn/skills/` | `~/.qoder-cn/commands/` |
 | codebuddy-code | `~/.codebuddy/skills/` | `~/.codebuddy/commands/` |
+| dsh | `~/.dsh/skills/`（DSH 原生扫描） | skip（无 commands 布局） |
 | minimax | 不同步（mmx 无此布局） | 不同步（mmx 无此布局；MCP 亦 skip） |
 
 **不要手改** `.claude/`、`.cursor/`、`~/.config/opencode/skills|commands` 里由本系统生成的文件；请改 `agents/skills|commands` 后重新 sync。

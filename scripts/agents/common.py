@@ -30,6 +30,7 @@ TOOLS = (
     "zcode",
     "qoder",
     "codebuddy-code",
+    "dsh",
     "minimax",
 )
 KNOWN_PROFILES = ("coding", "research", "browser", "full")

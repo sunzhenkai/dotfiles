@@ -136,6 +136,14 @@ modules:
     install: true
     doctor: true
 
+  - name: dsh
+    desc: 安装 DeepSeek Harness CLI（dsh，npm @deepseek-ai/dsh）
+    group: agents
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: dsh
+
   - name: codebuddy-code
     desc: CodeBuddy Code CLI + 配置（默认跳过，显式点名可装）
     group: agents

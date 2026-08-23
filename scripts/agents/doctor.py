@@ -107,6 +107,11 @@ def check_skills_drift(
             Path.home() / ".codebuddy" / "commands",
             "dir",
         ),
+        "dsh": (
+            Path.home() / ".dsh" / "skills",
+            None,  # commands skip（无 commands 布局）
+            "dir",
+        ),
         "minimax": (
             None,  # no skills layout
             None,

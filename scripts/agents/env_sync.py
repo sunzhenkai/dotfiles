@@ -489,6 +489,23 @@ def sync_minimax(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     return "skip"
 
 
+def sync_dsh(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    # DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>/cordis.patch.yml），
+    # 不参与 agents/env 聚合 MCP 同步；skills 由 sync.py 分发到 ~/.dsh/skills。
+    reason = (
+        (cat.manifest.get("unsupported") or {})
+        .get("dsh", {})
+        .get("reason")
+        or "dsh MCP unsupported (profile-level config)"
+    )
+    msg = f"dsh: skip MCP sync ({reason})"
+    if dry_run:
+        print(f"[dry-run] {msg}")
+    else:
+        print(msg)
+    return "skip"
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     root = args.root or repo_root_from(Path(__file__))
@@ -567,6 +584,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         elif tool == "minimax":
             results.append((tool, sync_minimax(cat, profile, args.dry_run)))
+        elif tool == "dsh":
+            results.append((tool, sync_dsh(cat, profile, args.dry_run)))
         else:
             die(f"未知工具: {tool}")
 

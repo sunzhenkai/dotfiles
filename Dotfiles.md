@@ -159,6 +159,24 @@ dotf claude cursor codex -ic   # 按实际使用的工具
 
 `dotf agents -c` 会把本仓 `agents/skills` / commands 同步到各工具目录；确认目标在用户 HOME 下。
 
+#### dsh（DeepSeek Harness）
+
+DeepSeek Harness CLI（`dsh`）：启动 web / headless 等 agent profile。只装 CLI：
+
+```bash
+dotf dsh -i
+# 或: npm install -g @deepseek-ai/dsh
+```
+
+共享 skills/commands 同步进 DSH（DSH 原生扫描 `~/.dsh/skills`）：
+
+```bash
+dotf agents -c                 # 全量（含 dsh）
+dotf agents -c --tool dsh      # 仅 dsh
+```
+
+`dsh plugin` 管理 profile 插件需 `pnpm`；DSH 的 MCP client 配置在 profile 内，不参与 agents/env 聚合同步。
+
 ### 7. utils — 杂项
 
 ```bash

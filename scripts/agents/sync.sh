@@ -24,7 +24,7 @@ EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  claude | cursor | kiro | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | minimax | all)
+  claude | cursor | kiro | opencode | codex | kimi-code | pi | zcode | qoder | codebuddy-code | dsh | minimax | all)
     TOOL="$1"
     ;;
   --skills-only)

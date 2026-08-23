@@ -23,6 +23,7 @@ TOOLS = (
     "zcode",
     "qoder",
     "codebuddy-code",
+    "dsh",
 )
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
@@ -372,6 +373,9 @@ def targets_for_tool(tool: str, root: Path) -> List[Path]:
         return [home / ".qoder-cn"]
     if tool == "codebuddy-code":
         return [home / ".codebuddy"]
+    if tool == "dsh":
+        # DeepSeek Harness 从 ~/.dsh/skills 扫描 skill（user-dsh root，rank 400）
+        return [home / ".dsh"]
     die(f"unknown tool: {tool}")
     return []
 
@@ -419,9 +423,9 @@ def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
             written += w
             skipped += s
 
-    # Commands（kimi-code 无稳定 commands 布局 → skip，不阻断 skills）
-    if tool == "kimi-code":
-        print("  skip commands for kimi-code (no stable commands layout)")
+    # Commands（kimi-code / dsh 无 commands 布局 → skip，不阻断 skills）
+    if tool in ("kimi-code", "dsh"):
+        print(f"  skip commands for {tool} (no commands layout)")
     elif cmds_root.is_dir():
         for cmd_file in sorted(cmds_root.glob("*.md")):
             cmd_id = cmd_file.stem
@@ -490,7 +494,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|kiro|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|all",
+        help="claude|cursor|kiro|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|dsh|all",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
