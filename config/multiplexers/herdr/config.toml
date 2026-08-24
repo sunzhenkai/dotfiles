@@ -1,0 +1,54 @@
+onboarding = false
+# Herdr configuration with tmux-compatible shortcuts.
+# Existing tmux uses Ctrl-Space as its prefix; keep the same prefix here.
+
+[keys]
+prefix = "ctrl+space"
+
+# Session / workspace
+help = "prefix+?"
+settings = "prefix+s"
+workspace_picker = "prefix+w"
+goto = "prefix+g"
+# Keep arrow navigation and add tmux/vim-style j/k in workspace navigation mode.
+navigate_workspace_up = ["up", "k"]
+navigate_workspace_down = ["down", "j"]
+new_workspace = "prefix+shift+n"
+rename_workspace = "prefix+shift+w"
+close_workspace = "prefix+shift+d"
+detach = "prefix+d"
+reload_config = "prefix+shift+r"
+
+# Tabs / tmux windows
+new_tab = "prefix+c"
+next_tab = "prefix+n"
+previous_tab = "prefix+p"
+switch_tab = "prefix+1..9"
+rename_tab = "prefix+comma"
+close_tab = "prefix+ampersand"
+
+# Panes
+split_horizontal = "prefix+minus"
+split_vertical = "prefix+backslash"
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+j"
+focus_pane_up = "prefix+k"
+focus_pane_right = "prefix+l"
+close_pane = "prefix+x"
+zoom = "prefix+z"
+
+# Match tmux's prefix + Shift-H/J/K/L pane resizing.
+resize_pane_left = "prefix+shift+h"
+resize_pane_down = "prefix+shift+j"
+resize_pane_up = "prefix+shift+k"
+resize_pane_right = "prefix+shift+l"
+
+# Match this repository's tmux copy-mode entry point.
+copy_mode = "prefix+enter"
+
+# Keep the familiar tmux prefix+b slot for Herdr's sidebar toggle.
+toggle_sidebar = "prefix+b"
+
+[theme]
+name = "solarized"
+auto_switch = false

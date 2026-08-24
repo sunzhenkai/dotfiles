@@ -96,7 +96,7 @@ Examples:
   - zsh + Starship
   - Neovim
 - Remote
-  - Tmux / Zellij
+  - Tmux / Herdr / Zellij
   - Neovim
 
 ## Agents（统一入口）

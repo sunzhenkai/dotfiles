@@ -410,7 +410,7 @@ modules:
       target: ~/.config/iterm2
     os: [darwin]
 
-  # ---------- config-only: multiplexers ----------
+  # ---------- multiplexers ----------
   - name: tmux
     desc: Tmux 终端复用器配置
     group: multiplexers
@@ -428,6 +428,16 @@ modules:
     config:
       source: config/multiplexers/zellij
       target: ~/.config/zellij
+
+  - name: herdr
+    desc: Herdr 终端复用器安装与 tmux 风格配置
+    group: multiplexers
+    install: true
+    doctor: true
+    bin: herdr
+    config:
+      source: config/multiplexers/herdr
+      target: ~/.config/herdr
 
   # ---------- config-only: desktop ----------
   - name: hypr

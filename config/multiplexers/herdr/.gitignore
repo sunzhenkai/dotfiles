@@ -1,0 +1,6 @@
+# Herdr runtime state must stay outside the dotfiles source tree.
+herdr.sock
+herdr-client.sock
+*.log
+session.json
+.plugins.lock
