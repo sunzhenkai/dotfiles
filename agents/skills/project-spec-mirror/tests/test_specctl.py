@@ -102,6 +102,102 @@ class DetectTest(unittest.TestCase):
             self.assertEqual(payload["placement"], "external")
             self.assertEqual(payload["spec_root"], str(notes / "spec" / "example-api"))
 
+    def test_foreign_source_from_workspace_git_root(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            workspace = Path(raw) / "workspace"
+            workspace.mkdir()
+            git(workspace, "init", "-q")
+            git(workspace, "config", "user.email", "dev@example.com")
+            git(workspace, "config", "user.name", "example")
+            git(workspace, "config", "commit.gpgsign", "false")
+            (workspace / "Makefile").write_text("all:\n\ttrue\n", encoding="utf-8")
+            git(workspace, "add", ".")
+            git(workspace, "commit", "-q", "-m", "workspace")
+            git(workspace, "branch", "-M", "main")
+            other = make_repo(Path(raw) / "other-lib")
+            code, payload = run(
+                "detect",
+                "--cwd",
+                str(workspace),
+                "--project",
+                "other-lib",
+                "--source",
+                str(other),
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["placement"], "external")
+            self.assertEqual(payload["spec_root"], str(workspace / "spec" / "other-lib"))
+            self.assertEqual(payload["source"], str(other.resolve()))
+
+    def test_foreign_project_flag_without_source(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            workspace = Path(raw) / "workspace"
+            workspace.mkdir()
+            git(workspace, "init", "-q")
+            git(workspace, "config", "user.email", "dev@example.com")
+            git(workspace, "config", "user.name", "example")
+            git(workspace, "config", "commit.gpgsign", "false")
+            (workspace / "Makefile").write_text("all:\n\ttrue\n", encoding="utf-8")
+            git(workspace, "add", ".")
+            git(workspace, "commit", "-q", "-m", "workspace")
+            git(workspace, "branch", "-M", "main")
+            code, payload = run(
+                "detect", "--cwd", str(workspace), "--project", "other-lib"
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["placement"], "external")
+            self.assertEqual(payload["spec_root"], str(workspace / "spec" / "other-lib"))
+            self.assertIsNone(payload["source"])
+
+    def test_matching_project_name_stays_in_project(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            code, payload = run(
+                "detect", "--cwd", str(root), "--project", "example-api"
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["placement"], "in-project")
+            self.assertEqual(payload["spec_root"], str(root / "spec"))
+
+    def test_init_foreign_source_creates_named_spec(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            workspace = Path(raw) / "workspace"
+            workspace.mkdir()
+            git(workspace, "init", "-q")
+            git(workspace, "config", "user.email", "dev@example.com")
+            git(workspace, "config", "user.name", "example")
+            git(workspace, "config", "commit.gpgsign", "false")
+            (workspace / "Makefile").write_text("all:\n\ttrue\n", encoding="utf-8")
+            git(workspace, "add", ".")
+            git(workspace, "commit", "-q", "-m", "workspace")
+            git(workspace, "branch", "-M", "main")
+            other = make_repo(Path(raw) / "other-lib")
+            code, payload = run(
+                "init",
+                "--cwd",
+                str(workspace),
+                "--project",
+                "other-lib",
+                "--source",
+                str(other),
+                "--confirm",
+            )
+            self.assertEqual(code, 0, payload)
+            spec = workspace / "spec" / "other-lib"
+            self.assertTrue((spec / ".mirror.json").is_file())
+            self.assertFalse((workspace / "spec" / ".mirror.json").exists())
+            state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))
+            self.assertEqual(state["placement"], "external")
+            self.assertEqual(state["project"], "other-lib")
+
 
 class InitTest(unittest.TestCase):
     def test_init_without_confirm_exits_2(self) -> None:
@@ -126,6 +222,8 @@ class InitTest(unittest.TestCase):
             self.assertTrue((spec / ".mirror.json").is_file())
             self.assertTrue((spec / "README.md").is_file())
             self.assertTrue((spec / "concepts" / "INDEX.md").is_file())
+            self.assertTrue((spec / "facets" / "INDEX.md").is_file())
+            self.assertTrue((spec / "diagrams" / "INDEX.md").is_file())
             state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))
             self.assertEqual(state["placement"], "in-project")
             self.assertEqual(state["source"], "..")

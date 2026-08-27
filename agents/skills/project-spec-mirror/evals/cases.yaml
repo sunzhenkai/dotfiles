@@ -43,14 +43,16 @@ cases:
   - id: placement-in-vs-external
     kind: core
     judge: deterministic
-    description: cwd 是 project 根则 spec/，否则 spec/<project>/
+    description: 仅当目标就是当前仓时用 spec/，否则 spec/<project>/
     given: 首次 init，或 detect 报告 placement
     expect:
       must:
-        - project 根 → <cwd>/spec/
-        - 非工程目录 → <cwd>/spec/<project>/，且能确定 project 名与 source
-        - 仓库子目录要用仓库根 spec/ 时加 --in-project
+        - 目标就是 cwd 所在仓（cwd 为仓根，或 --in-project 且目标仍是该仓）→ <host>/spec/
+        - --source 指向另一仓，或 --project 与当前仓名不同 → <cwd>/spec/<project>/
+        - 非工程目录且未 --in-project → <cwd>/spec/<project>/，且能确定 project 名
+        - 外来仓 init 必须有 --source
       must_not:
+        - 在当前仓根把外来 project 写成 spec/（占用当前仓镜像位）
         - 把镜像写进 openspec/ 或其他规格目录
 
   - id: git-default-branch-commit
@@ -73,12 +75,29 @@ cases:
     given: 骨架已在，开始 build
     expect:
       must:
-        - 先读 references/layout.md、modes.md、knowledge.md
-        - 从上往下写 README / overview / concepts / entities / flows / modules
+        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md
+        - 从上往下写 README / overview / facets / concepts / entities / flows / modules
+        - 切片不必等全部契约写完
         - 粒度与 .mirror.json 的 mode 一致
       must_not:
-        - CLI 代写概述或编造流程
+        - CLI 代写概述或编造流程、契约、灰度方案
         - 下层重复上层已经说清的论点
+        - 用手绘 SVG/Mermaid 冒充 archify 产物
+
+  - id: facets-and-archify
+    kind: core
+    judge: deterministic
+    description: 维护五层切面；图表委托 archify，产物在 diagrams/
+    given: build 或需要模块地图/切片路径/状态机图
+    expect:
+      must:
+        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现则 VERIFY/TRAFFIC 标明不适用）
+        - 切片生命周期从 identified 起写，不跳步假装 migrated
+        - 需要图时加载 archify，HTML 写入 diagrams/
+      must_not:
+        - 把 archify schema 或渲染器拷进本 Skill
+        - 未安装 archify 时声称已交付 HTML 图
+        - 把 PHP/Go 写死为唯一对照语言对
 
   - id: delivery-summary-fields
     kind: core

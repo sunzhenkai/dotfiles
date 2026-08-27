@@ -218,6 +218,18 @@ def nearest_project_root(start: Path) -> Path | None:
     return None
 
 
+def project_identity(path: Path) -> Path:
+    """Canonical root used to decide whether two paths are the same project."""
+    path = path.resolve()
+    git_root = find_git_root(path)
+    if git_root is not None:
+        return git_root
+    if is_project_root(path):
+        return path
+    found = nearest_project_root(path)
+    return found.resolve() if found is not None else path
+
+
 def find_git_root(start: Path) -> Path | None:
     cur = start.resolve()
     if not cur.is_dir():
@@ -357,39 +369,49 @@ def detect_layout(
     cwd = cwd.resolve()
     nearest = nearest_project_root(cwd)
     cwd_is_root = is_project_root(cwd)
-    placement_root = cwd
-    placement = "external"
+    source_path = source.resolve() if source is not None else None
+    name = validate_project_name(project) if project else None
+
     if in_project:
         if nearest is None:
             raise SpecError(
                 " --in-project requires a project root at or above cwd",
                 reason="project_root_not_found",
             )
-        placement_root = nearest
-        placement = "in-project"
+        host = nearest
     elif cwd_is_root:
-        placement_root = cwd
-        placement = "in-project"
+        host = cwd
+    else:
+        host = nearest
 
-    source_path = source.resolve() if source is not None else None
-    if source_path is None:
-        if placement == "in-project":
-            source_path = placement_root
-        elif nearest is not None:
+    foreign = False
+    if source_path is not None and host is not None:
+        foreign = project_identity(source_path) != project_identity(host)
+    elif name is not None and host is not None:
+        foreign = name != project_name_of(host)
+
+    if source_path is None and not foreign:
+        if in_project:
+            source_path = nearest
+        elif cwd_is_root:
+            source_path = cwd
+        elif nearest is not None and name is None:
             source_path = nearest
 
-    name = project
-    if not name:
-        if source_path is not None:
-            name = project_name_of(source_path)
-        elif placement == "in-project":
-            name = project_name_of(placement_root)
-    if name:
-        name = validate_project_name(name)
+    if name is None and source_path is not None:
+        name = project_name_of(source_path)
 
-    if placement == "in-project":
+    if in_project and not foreign:
+        placement = "in-project"
+        placement_root = nearest
+        spec_root = placement_root / "spec"
+    elif cwd_is_root and not foreign:
+        placement = "in-project"
+        placement_root = cwd
         spec_root = placement_root / "spec"
     else:
+        placement = "external"
+        placement_root = cwd
         if not name:
             raise SpecError(
                 "non-project directory requires --project (or --source)",
@@ -428,13 +450,19 @@ def find_spec_root(cwd: Path, spec: Path | None, project: str | None) -> Path:
             raise SpecError(f"spec root does not exist: {path}", reason="spec_missing")
         return path
     cwd = cwd.resolve()
+    slug = validate_project_name(project) if project else None
+    named = cwd / "spec" / slug if slug else None
+    if named is not None and mirror_path(named).is_file():
+        return named
     in_place = cwd / "spec"
     if mirror_path(in_place).is_file():
-        return in_place
-    if project:
-        named = cwd / "spec" / validate_project_name(project)
-        if mirror_path(named).is_file():
-            return named
+        if slug is None:
+            return in_place
+        state = load_state(in_place)
+        if state.get("project") == slug:
+            return in_place
+        raise SpecError(f"spec not initialized: {named}", reason="not_initialized")
+    if named is not None:
         raise SpecError(f"spec not initialized: {named}", reason="not_initialized")
     external_dir = cwd / "spec"
     if external_dir.is_dir():
@@ -654,18 +682,20 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
 ## 怎么读
 
 1. [overview.md](overview.md)
-2. [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
-3. 需要看代码承载时再进 [模块](modules/INDEX.md)
+2. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+3. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
 
 ## 地图
 
 | 层 | 路径 | 回答什么 |
 |----|------|----------|
 | 总览 | overview.md | 这是什么、边界在哪 |
+| 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
 | 概念 | concepts/ | 领域用语 |
 | 实体 | entities/ | 关键对象及其关系 |
 | 处理线 | flows/ | 一次业务怎么走完 |
 | 模块 | modules/ | 代码如何落地 |
+| 图 | diagrams/ | 结构 / 流程 / 时序 / 数据流 / 状态 |
 """
 
 
@@ -689,6 +719,10 @@ def skeleton_overview(project: str) -> str:
 
 （链到 `flows/`。）
 
+## 主切片
+
+（链到 `facets/slices/`。）
+
 ## 关键概念与实体
 
 （链到 `concepts/` 与 `entities/`。）
@@ -707,6 +741,26 @@ def skeleton_changelog() -> str:
     return """# 镜像同步
 
 尚未同步。
+"""
+
+
+def skeleton_facets_index() -> str:
+    return """# 工程切面
+
+| 切面 | 一句话 | 页 |
+|------|--------|-----|
+| SOURCE | 现状事实从哪来 | [source.md](source.md) |
+| CONTRACT | 必须保持为真的约定 | [contracts/INDEX.md](contracts/INDEX.md) |
+| SLICE | 可独立交付的垂直切口 | [slices/INDEX.md](slices/INDEX.md) |
+| VERIFY | 如何对照验证 | [verify.md](verify.md) |
+| TRAFFIC | 影子 / 灰度 / 切换 / 回滚 | [traffic.md](traffic.md) |
+"""
+
+
+def skeleton_facet_stub(title: str, hint: str) -> str:
+    return f"""# {title}
+
+（待 build：{hint}）
 """
 
 
@@ -741,6 +795,22 @@ def create_skeleton(
     write_text(spec_root / "entities" / "INDEX.md", skeleton_index("实体"))
     write_text(spec_root / "flows" / "INDEX.md", skeleton_index("业务处理线"))
     write_text(spec_root / "modules" / "INDEX.md", skeleton_index("模块"))
+    write_text(spec_root / "facets" / "INDEX.md", skeleton_facets_index())
+    write_text(
+        spec_root / "facets" / "source.md",
+        skeleton_facet_stub("现状来源", "代码、配置、测试、脱敏样本。"),
+    )
+    write_text(spec_root / "facets" / "contracts" / "INDEX.md", skeleton_index("契约"))
+    write_text(spec_root / "facets" / "slices" / "INDEX.md", skeleton_index("垂直切片"))
+    write_text(
+        spec_root / "facets" / "verify.md",
+        skeleton_facet_stub("对照验证", "接口 / 数据 / 外部调用如何差分；单实现则写不适用。"),
+    )
+    write_text(
+        spec_root / "facets" / "traffic.md",
+        skeleton_facet_stub("流量控制", "影子 / 灰度 / 切换 / 回滚；无放量则写无。"),
+    )
+    write_text(spec_root / "diagrams" / "INDEX.md", skeleton_index("图表"))
 
 
 def parse_name_status(text: str) -> list[dict[str, str]]:
@@ -1111,6 +1181,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
         "entities/INDEX.md",
         "flows/INDEX.md",
         "modules/INDEX.md",
+        "facets/INDEX.md",
+        "facets/source.md",
+        "facets/contracts/INDEX.md",
+        "facets/slices/INDEX.md",
+        "facets/verify.md",
+        "facets/traffic.md",
+        "diagrams/INDEX.md",
     ]
     missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
     issues: list[str] = []

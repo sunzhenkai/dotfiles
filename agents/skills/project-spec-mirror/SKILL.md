@@ -2,17 +2,17 @@
 id: project-spec-mirror
 name: project-spec-mirror
 description: >-
-  为项目维护给人读的 spec 孪生目录：金字塔组织、简约/详尽两种粒度、概念/实体/业务处理线，
-  并用 git commit 做增量更新。在用户要求创建或更新 project spec 镜像、spec 孪生、
-  可读规格目录，或点名 project-spec-mirror 时使用。不要用于 OpenSpec change、
-  实现代码或只读问答。
+  为项目维护给人读的 spec 孪生目录：金字塔组织、工程切面（来源/契约/切片/验证/流量）、
+  简约/详尽两种粒度，并用 git commit 做增量更新。图表委托 archify。在用户要求创建或更新
+  project spec 镜像、spec 孪生、可读规格目录、工程切面，或点名 project-spec-mirror 时使用。
+  不要用于 OpenSpec change、实现代码或只读问答。
 ---
 
 # Project Spec Mirror
 
 面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
 
-为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔正文、概念/实体/处理线由 Agent 撰写。
+为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、切面正文由 Agent 撰写。需要结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
 
 ```bash
 SPECCTL=$(command -v specctl || echo "python3 <this-skill>/scripts/specctl.py")
@@ -30,18 +30,21 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ## 放置规则
 
-只根据**当前工作目录**决定镜像落点（可用 `--cwd` 覆盖）：
+落点由 **cwd 是不是当前仓** 和 **目标 source/`--project` 是不是这个仓** 一起决定（可用 `--cwd` 覆盖）：
 
 | 判定 | 镜像根 |
 |------|--------|
-| cwd 是 project 根 | `<cwd>/spec/` |
-| cwd 不是 project 根 | `<cwd>/spec/<project>/` |
+| 目标就是 cwd 所在仓（cwd 为该仓根，或 `--in-project` 且目标仍是该仓） | `<host>/spec/` |
+| 目标不是当前仓：`--source` 指向另一仓，或 `--project` 与当前仓名不同 | `<cwd>/spec/<project>/` |
+| cwd 不是 project 根，且未加 `--in-project` | `<cwd>/spec/<project>/` |
 
+- **当前仓 / host**：cwd 为 project 根时即 cwd；`--in-project` 时为向上找到的 project 根。身份优先用 git 根比较，否则用 project 根路径。
 - project 根：目录含 `.git`，或含 `go.mod` / `package.json` / `pyproject.toml` / `Cargo.toml` 等语言清单（完整列表见 `specctl detect`）。
-- 若 cwd 只是某仓库的子目录，默认仍按「非工程目录」放到 `spec/<project>/`。要用仓库根的 `spec/` 时，init 加 `--in-project`。
-- `<project>` 来自 `--project`；未给时用 `--source` 的目录名。非工程目录首次 init 必须能确定 project 名和 `--source`。
+- `--in-project` 只在目标仍是 host 时把镜像放到仓库根 `spec/`。目标是外来仓时忽略该旗标，走 `spec/<project>/`，避免占掉当前仓自己的镜像位。
+- `<project>` 来自 `--project`；未给时用 `--source` 的目录名。外来仓或非工程目录首次 init 必须能确定 project 名；外来仓还必须有 `--source`。
 - `spec/`（或 `spec/<project>/`）不存在时：**先确认再创建**。`init` 无 `--confirm` 时退出码 2。
 - 目录已存在但没有 `.mirror.json`：视为占用，退出码 2，禁止覆盖。
+- 已有镜像：`--project` 时优先 `spec/<project>/`，不要被当前仓根上遗留的 `spec/.mirror.json` 抢走。
 
 状态文件是 `.mirror.json`（机械真相）。源路径尽量写成相对镜像根的相对路径。
 
@@ -52,9 +55,9 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | 阶段 | 做什么 | 先读 |
 |------|--------|------|
 | `init` | 探测、确认、写骨架 | 本文件 |
-| `build` | 按粒度生成金字塔全文 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md) |
+| `build` | 按粒度生成金字塔 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md) |
 | `update` | 用 git diff 增量更新 | 同上，只加载受影响层 |
-| `maintain` | 改概念/实体/流/模块中的指定条目 | [knowledge.md](references/knowledge.md) 或 [layout.md](references/layout.md) |
+| `maintain` | 改概念/实体/流/模块/切面/图中的指定条目 | 对应 reference |
 | `status` | 只读同步状态 | 本文件 |
 
 一次会话只服务**一个** target project。
@@ -71,7 +74,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `git-info` | 是否 git、默认分支、指定分支的 commit |
 | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
 | `set-sync` | 正文写完后回写 commit / branch / mode / 时间 |
-| `validate` | 金字塔目录与 `.mirror.json` 完整性 |
+| `validate` | 金字塔、切面骨架与 `.mirror.json` 完整性 |
 
 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
 
@@ -98,21 +101,24 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对范围内文件跑 `symbols`）
 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
 3. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
-4. 详尽模式且 `inventory` 的 `file_count` 大于 80、又没有路径范围时：先问用户是缩小范围还是继续，得到同意前不要铺开每文件详页
-5. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`，再 `$SPECCTL validate`
-6. 向用户给出镜像根路径、怎么读（先 overview 再下钻）、同步 commit
+4. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified
+5. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+6. 详尽模式且 `inventory` 的 `file_count` 大于 80、又没有路径范围时：先问用户是缩小范围还是继续，得到同意前不要铺开每文件详页
+7. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`，再 `$SPECCTL validate`
+8. 向用户给出镜像根路径、怎么读（先 overview 再切面/金字塔）、同步 commit
 
 ### update
 
 1. `$SPECCTL status` 与 `$SPECCTL diff`（git：`synced_commit..目标分支 commit`；可加 `--from` / `--to`）
-2. 只根据变更文件更新受影响的模块页、概念、实体、处理线；上层概述若结论变了才改
-3. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
-4. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
-5. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
+2. 只根据变更文件更新受影响的模块页、概念、实体、处理线、切面与相关图；上层概述若结论变了才改
+3. 若缺 `facets/` 或 `diagrams/` 骨架，先补 INDEX（及切面短页），再改正文；不删已有金字塔
+4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+6. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
 
 ### maintain
 
-用户点名改某一概念/实体/流/模块时：只改对应文件与相关 INDEX/链接，不触发全量重写。若代码已变，先 `diff` 再改，避免规格落后。
+用户点名改某一概念/实体/流/模块/切面/图时：只改对应文件与相关 INDEX/链接，不触发全量重写。若代码已变，先 `diff` 再改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
 
 ### status
 

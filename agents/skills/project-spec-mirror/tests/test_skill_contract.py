@@ -39,5 +39,11 @@ class ContractTest(unittest.TestCase):
         self.assertIn("id: project-spec-mirror", text)
 
     def test_reference_files_exist(self) -> None:
-        for rel in ("references/layout.md", "references/modes.md", "references/knowledge.md"):
+        for rel in (
+            "references/layout.md",
+            "references/modes.md",
+            "references/knowledge.md",
+            "references/facets.md",
+            "references/diagrams.md",
+        ):
             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)

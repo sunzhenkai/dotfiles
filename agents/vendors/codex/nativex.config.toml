@@ -1,0 +1,10 @@
+# NativeX profile（codex --profile nativex 激活）
+#
+# 默认 provider 已切到 MiniMax 直连（见主配置 [model_providers.minimax]），
+# 需要走公司 newapi 网关时用本 profile 覆盖回 gpt-5.3-codex 的 model / context / catalog。
+# codex 0.134+ 的 profile 是独立文件 ~/.codex/<name>.config.toml（顶层键，
+# 不嵌 [profiles.<name>]），叠加在 ~/.codex/config.toml 之上。
+model = "gpt-5.3-codex"
+model_provider = "nativex"
+model_context_window = 400000
+model_catalog_json = "~/.codex/model-catalogs/nativex-catalog.json"
