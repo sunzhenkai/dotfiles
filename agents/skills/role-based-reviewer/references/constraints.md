@@ -16,7 +16,7 @@
 | | engineer | algo | data | sre | ops | biz | product | design | qa |
 |---|---|---|---|---|---|---|---|---|---|
 | 视角 | 在线实现、性能、调用链 | 模型/策略/实验 | 管道、数仓、口径 | 集群、监控、发布 | 业务配置、灰度、运营流程 | 对外对接、多租户 | 需求与 spec | 视觉与交互 | 可测性与回归 |
-| 典型下游 | `task-design`、`task-workflow`、`service-manager` | `task-design`、`task-workflow` | `task-design`、`task-workflow` | `service-manager`、部署/CI 相关约定 | 运营手册 / 配置变更流程 | 协议/对接文档 | `task-design`、`task-workflow`、OpenSpec（若项目有） | `dotf-ui-design`（仅用户点名时） | 测试与回归计划 |
+| 典型下游 | `task-design`、`task-workflow`、`service-manager` | `task-design`、`task-workflow` | `task-design`、`task-workflow` | `service-manager`、部署/CI 相关约定 | 运营手册 / 配置变更流程 | 协议/对接文档 | `task-design`、`task-workflow`、OpenSpec（若项目有） | 按项目 UI 设计规范执行 | 测试与回归计划 |
 | 运行态上下文 | 按需 | 否 | 否 | 按需 | 按需 | 否 | 否 | 否 | 否 |
 | 输出 | RoleBrief / 审查报告 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 |
 
