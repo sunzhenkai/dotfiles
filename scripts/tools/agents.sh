@@ -2,8 +2,8 @@
 # agents 安装包：编排 agent 相关 CLI（不写 MCP/skills）
 # 由 install.sh source。
 
-# Bundle 成员 ⊂ agents sync TOOLS（opt-in：codebuddy-code 仅在 TOOLS，不进默认安装包）
-AGENTS_BUNDLE_MODULES=(claude cursor kiro opencode codex kimi-code pi zcode qoder)
+# Bundle 成员 ⊂ agents sync TOOLS
+AGENTS_BUNDLE_MODULES=(cursor kiro opencode codex kimi-code pi zcode)
 
 install_agents_bundle() {
   echo "========================================"
@@ -20,25 +20,6 @@ install_agents_bundle() {
     local detail=""
 
     case "$mod" in
-    claude)
-      if command -v claude &>/dev/null; then
-        status="skip"
-        detail="已安装: $(command -v claude)"
-      else
-        if install_claude_cli; then
-          if command -v claude &>/dev/null; then
-            status="ok"
-            detail="新装完成"
-          else
-            status="skip"
-            detail="用户跳过或未在 PATH"
-          fi
-        else
-          status="fail"
-          detail="安装失败"
-        fi
-      fi
-      ;;
     cursor)
       if command -v cursor-agent &>/dev/null; then
         status="skip"
@@ -187,25 +168,6 @@ install_agents_bundle() {
       else
         if install_zcode; then
           if command -v zcode &>/dev/null; then
-            status="ok"
-            detail="新装完成"
-          else
-            status="skip"
-            detail="用户跳过或未在 PATH"
-          fi
-        else
-          status="fail"
-          detail="安装失败"
-        fi
-      fi
-      ;;
-    qoder)
-      if command -v qoderclicn &>/dev/null; then
-        status="skip"
-        detail="已安装: $(command -v qoderclicn)"
-      else
-        if install_qoder; then
-          if command -v qoderclicn &>/dev/null; then
             status="ok"
             detail="新装完成"
           else

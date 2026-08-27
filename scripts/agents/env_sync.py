@@ -147,68 +147,6 @@ def sync_kiro(
     return "ok"
 
 
-def sync_claude(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    servers = cat.selected_servers("claude", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "claude") for sid, srv in servers.items()
-    }
-    mcp_target = Path.home() / ".claude" / ".mcp.json"
-    payload = {"mcpServers": rendered}
-
-    status = f"claude: {len(rendered)} managed servers → {mcp_target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
-        return "ok"
-
-    if mcp_target.exists():
-        backup_file(mcp_target, Path.home() / ".config" / "backups")
-    # 合并用户级 .mcp.json 中的非托管项
-    existing: Dict[str, Any] = {}
-    if mcp_target.is_file():
-        try:
-            existing = json.loads(mcp_target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            existing = {}
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    atomic_write_json(mcp_target, {"mcpServers": merged}, dry_run=False)
-    print(f"已同步: {status}")
-
-    # 合并到 ~/.claude.json
-    state = Path.home() / ".claude.json"
-    if state.is_symlink() and not state.exists():
-        print("⚠️  跳过 ~/.claude.json 合并：损坏的 symlink")
-    else:
-        data: Dict[str, Any] = {}
-        if state.is_file():
-            try:
-                data = json.loads(state.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as exc:
-                die(f"无法解析 {state}: {exc}")
-        cur = data.get("mcpServers") or {}
-        if not isinstance(cur, dict):
-            cur = {}
-        data["mcpServers"] = merge_mcp_servers(cur, rendered, cat.managed_server_ids())
-        if state.exists():
-            backup_file(state, Path.home() / ".config" / "backups")
-        atomic_write_json(state, data, dry_run=False)
-        print("已合并 MCP 到 ~/.claude.json")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "claude" / ".mcp.json"
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
 def sync_opencode(
     cat: Catalog,
     profile: Optional[str],
@@ -313,93 +251,6 @@ def sync_kimi_code(
     return "ok"
 
 
-def sync_qoder(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    """Merge mcpServers into ~/.qoder-cn/settings.json（保留其它本机字段）。"""
-    servers = cat.selected_servers("qoder", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "qoder") for sid, srv in servers.items()
-    }
-    target = Path.home() / ".qoder-cn" / "settings.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcpServers"] = merged
-
-    status = f"qoder: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "qoder" / "settings.json"
-        # 仓库模板只写托管 mcpServers，避免把本机 trustedDirectories 写回仓库
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
-def sync_codebuddy_code(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    servers = cat.selected_servers("codebuddy-code", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "codebuddy-code")
-        for sid, srv in servers.items()
-    }
-    target = Path.home() / ".codebuddy" / ".mcp.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcpServers"] = merged
-
-    status = f"codebuddy-code: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json"
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
 def sync_zcode(
     cat: Catalog,
     profile: Optional[str],
@@ -489,24 +340,9 @@ def sync_pi(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     return "skip"
 
 
-def sync_minimax(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
-    reason = (
-        (cat.manifest.get("unsupported") or {})
-        .get("minimax", {})
-        .get("reason")
-        or "MiniMax MCP unsupported"
-    )
-    msg = f"minimax: skip MCP sync ({reason})"
-    if dry_run:
-        print(f"[dry-run] {msg}")
-    else:
-        print(msg)
-    return "skip"
-
-
 def sync_dsh(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
     # DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>/cordis.patch.yml），
-    # 不参与 agents/env 聚合 MCP 同步；skills 由 sync.py 分发到 ~/.dsh/skills。
+    # 不参与 agents/env 聚合 MCP 同步；skills 由 sync.py 分发到 ~/.agents/skills。
     reason = (
         (cat.manifest.get("unsupported") or {})
         .get("dsh", {})
@@ -549,13 +385,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                     sync_kiro(cat, profile, args.dry_run, args.also_repo_templates),
                 )
             )
-        elif tool == "claude":
-            results.append(
-                (
-                    tool,
-                    sync_claude(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
         elif tool == "opencode":
             results.append(
                 (
@@ -581,24 +410,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                     sync_zcode(cat, profile, args.dry_run, args.also_repo_templates),
                 )
             )
-        elif tool == "qoder":
-            results.append(
-                (
-                    tool,
-                    sync_qoder(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "codebuddy-code":
-            results.append(
-                (
-                    tool,
-                    sync_codebuddy_code(
-                        cat, profile, args.dry_run, args.also_repo_templates
-                    ),
-                )
-            )
-        elif tool == "minimax":
-            results.append((tool, sync_minimax(cat, profile, args.dry_run)))
         elif tool == "dsh":
             results.append((tool, sync_dsh(cat, profile, args.dry_run)))
         else:

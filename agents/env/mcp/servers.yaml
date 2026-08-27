@@ -8,7 +8,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -19,7 +19,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -30,7 +30,7 @@ servers:
     auth:
       type: bearer-env
       env: ZHIPU_API_KEY
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [research, browser, full]
     risk: low
     required_tools: []
@@ -39,7 +39,7 @@ servers:
     transport: stdio
     command: npx
     args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [browser, full]
     risk: high
     required_tools: [node, npx]
@@ -57,7 +57,7 @@ servers:
     env:
       Z_AI_API_KEY: ${ZHIPU_API_KEY}
       Z_AI_MODE: ZHIPU
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [research, browser, full]
     risk: low
     required_tools: [node, npx]

@@ -155,7 +155,7 @@ risk:
 4. 过拟合禁止：不要把一次任务的路径、文件名、密钥、机器专属环境写进 Skill。
 5. 正文保持精简。细节放 `references/`，确定性操作放 `scripts/`。脚本只做确定性事，不解析自然语言意图。
 
-若目标 Skill 在本仓库：生产稿是 `agents/skills/<id>/`，**不要**改 sync 生成的 `.claude/skills/`、`.cursor/skills/`、`~/.claude/skills/` 等镜像。
+若目标 Skill 在本仓库：生产稿是 `agents/skills/<id>/`，**不要**改 sync 生成的 `~/.agents/skills/` 镜像。
 
 ---
 

@@ -18,7 +18,7 @@ import modules  # noqa: E402
 ACTION_ORDER = ("install", "config", "doctor")
 
 # agents -i 展开为独立单工具 install 动作（不污染 agents -c）
-AGENTS_INSTALL_BUNDLE = ("claude", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax")
+AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")
 
 
 @dataclass

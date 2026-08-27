@@ -34,24 +34,24 @@ def test_agents_install_plan_expands_tools() -> None:
     )
     assert r.returncode == 0, r.stderr + r.stdout
     assert "PLAN_OK" in r.stdout
-    for tool in ("claude", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax"):
+    for tool in ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode"):
         assert f"install\t{tool}" in r.stdout.replace(" ", "\t") or (
             f"\tinstall\t{tool}\t" in r.stdout
         )
-    # opt-in：不进 AGENTS_INSTALL_BUNDLE
+    # 已移除的 vendor 不进安装计划
+    assert "\tinstall\tclaude\t" not in r.stdout
     assert "\tinstall\tqoder\t" not in r.stdout
     assert "\tinstall\tcodebuddy-code\t" not in r.stdout
 
 
-def test_opt_in_agents_in_tools_not_bundle() -> None:
-    assert "qoder" in TOOLS
-    assert "codebuddy-code" in TOOLS
+def test_removed_vendors_not_in_tools_or_bundle() -> None:
+    for removed in ("claude", "qoder", "codebuddy-code"):
+        assert removed not in TOOLS
     assert "zcode" in TOOLS
-    assert "minimax" in TOOLS
     assert "kiro" in TOOLS
     bundle = (ROOT / "scripts" / "planner.py").read_text(encoding="utf-8")
     assert (
-        'AGENTS_INSTALL_BUNDLE = ("claude", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "minimax")'
+        'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")'
         in bundle
     )
 
@@ -82,7 +82,7 @@ def test_agents_config_plan_does_not_pull_tool_configs() -> None:
     assert "\tconfig\tcursor\t" not in r.stdout
 
 
-def test_claude_install_plan_is_solo() -> None:
+def test_cursor_install_plan_is_solo() -> None:
     r = subprocess.run(
         [
             "python3",
@@ -91,7 +91,7 @@ def test_claude_install_plan_is_solo() -> None:
             "--actions",
             "install",
             "--modules",
-            "claude",
+            "cursor",
             "--os",
             "ubuntu",
             "--format",
@@ -103,14 +103,14 @@ def test_claude_install_plan_is_solo() -> None:
         check=False,
     )
     assert r.returncode == 0, r.stdout
-    assert "\tinstall\tclaude\t" in r.stdout
-    assert "\tinstall\tcursor\t" not in r.stdout
+    assert "\tinstall\tcursor\t" in r.stdout
+    assert "\tinstall\tkiro\t" not in r.stdout
     assert "\tinstall\tagents\t" not in r.stdout
 
 
 def test_single_tool_config_source_has_no_sync_call() -> None:
     text = (ROOT / "scripts" / "config.sh").read_text(encoding="utf-8")
-    # install_claude / install_cursor 等函数体内不应再调用 sync
+    # install_cursor 等函数体内不应再调用 sync
     assert "sync_agents cursor" not in text
     assert "sync_agents kiro" not in text
     assert "sync_agents codex" not in text
@@ -118,10 +118,6 @@ def test_single_tool_config_source_has_no_sync_call() -> None:
     assert "sync_agents kimi-code" not in text
     assert "sync_agents pi" not in text
     assert "sync_agents zcode" not in text
-    assert "sync_agents minimax" not in text
-    assert "sync_agents qoder" not in text
-    assert "sync_agents codebuddy" not in text
-    assert 'sync.sh" claude' not in text
     # 聚合入口仍保留
     assert "sync_agents all" in text or "sync_agents()" in text
 
@@ -144,10 +140,10 @@ def test_sync_tool_filter_dry_run_idempotent(tmp_home: Path) -> None:
     assert r1.stdout == r2.stdout
 
 
-def test_sync_opt_in_tools_dry_run(tmp_home: Path) -> None:
+def test_sync_removed_tools_rejected(tmp_home: Path) -> None:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
-    for tool in ("qoder", "codebuddy-code"):
+    for tool in ("claude", "qoder", "codebuddy-code"):
         r = subprocess.run(
             [
                 "bash",
@@ -161,5 +157,31 @@ def test_sync_opt_in_tools_dry_run(tmp_home: Path) -> None:
             env=env,
             cwd=str(ROOT),
         )
-        assert r.returncode == 0, r.stderr + r.stdout
-        assert f"tool={tool}" in r.stdout
+        assert r.returncode != 0
+        assert "未知参数" in r.stderr
+
+
+def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
+    """skills 同步与 tool 无关：只写 ~/.agents/skills 与 shims。"""
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_home)
+    r = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "scripts" / "agents" / "sync.sh"),
+            "cursor",
+            "--skills-only",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(ROOT),
+    )
+    assert r.returncode == 0, r.stderr + r.stdout
+    written = [line[4:] for line in r.stdout.splitlines() if line.startswith("  + ")]
+    assert written, r.stdout
+    for dest in written:
+        assert dest.startswith(str(tmp_home / ".agents" / "skills")) or dest.startswith(
+            str(tmp_home / ".local" / "bin")
+        ), dest

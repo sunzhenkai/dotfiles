@@ -35,10 +35,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def check_skills_drift(
-    cat: Catalog, report: DoctorReport, tool: Optional[str]
-) -> None:
-    """增强 skills/commands 漂移：按源条目比对目标是否存在。"""
+def check_skills_drift(cat: Catalog, report: DoctorReport) -> None:
+    """增强 skills 漂移：按源条目比对共享目标 ~/.agents/skills 是否存在。"""
     sync_sh = cat.root / "scripts" / "agents" / "sync.sh"
     if not sync_sh.is_file():
         report.add("skills", "sync-script", STATUS_FAIL, "找不到 scripts/agents/sync.sh")
@@ -46,7 +44,6 @@ def check_skills_drift(
     report.add("skills", "sync-script", STATUS_PASS, "统一 agents sync 脚本存在")
 
     skills_src = cat.root / "agents" / "skills"
-    cmds_src = cat.root / "agents" / "commands"
     if not skills_src.is_dir():
         report.add("skills", "source", STATUS_FAIL, "agents/skills 不存在")
         return
@@ -54,170 +51,33 @@ def check_skills_drift(
     skill_ids = sorted(
         p.name for p in skills_src.iterdir() if p.is_dir() and (p / "SKILL.md").is_file()
     )
-    cmd_ids = sorted(p.stem for p in cmds_src.glob("*.md")) if cmds_src.is_dir() else []
 
-    dest_map = {
-        "cursor": (
-            Path.home() / ".cursor" / "skills",
-            Path.home() / ".cursor" / "commands",
-            "dir",
-        ),
-        "kiro": (
-            Path.home() / ".kiro" / "skills",
-            Path.home() / ".kiro" / "skills",
-            "dir",
-        ),
-        "opencode": (
-            Path.home() / ".config" / "opencode" / "skills",
-            Path.home() / ".config" / "opencode" / "commands",
-            "dir",
-        ),
-        "claude": (
-            Path.home() / ".claude" / "skills",
-            Path.home() / ".claude" / "commands",
-            "dir",
-        ),
-        "codex": (
-            Path.home() / ".codex" / "skills",
-            Path.home() / ".codex" / "prompts",
-            "dir",
-        ),
-        "kimi-code": (
-            Path.home() / ".kimi-code" / "skills",
-            None,  # commands skip
-            "dir",
-        ),
-        "pi": (
-            Path.home() / ".pi" / "agent" / "skills",
-            Path.home() / ".pi" / "agent" / "prompts",
-            "dir",
-        ),
-        "zcode": (
-            Path.home() / ".zcode" / "skills",
-            Path.home() / ".zcode" / "commands",
-            "dir",
-        ),
-        "qoder": (
-            Path.home() / ".qoder-cn" / "skills",
-            Path.home() / ".qoder-cn" / "commands",
-            "dir",
-        ),
-        "codebuddy-code": (
-            Path.home() / ".codebuddy" / "skills",
-            Path.home() / ".codebuddy" / "commands",
-            "dir",
-        ),
-        "dsh": (
-            Path.home() / ".dsh" / "skills",
-            None,  # commands skip（无 commands 布局）
-            "dir",
-        ),
-        "minimax": (
-            None,  # no skills layout
-            None,
-            "dir",
-        ),
-    }
-
-    targets = [tool] if tool else list(TOOLS)
-    for t in targets:
-        if t not in dest_map:
-            report.add(
-                "skills",
-                f"{t}-unknown",
-                STATUS_WARN,
-                f"未知工具 skills 目标: {t}",
-            )
-            continue
-        skill_dest, cmd_dest, _ = dest_map[t]
-        if skill_dest is None:
-            report.add(
-                "skills",
-                f"{t}-skills-drift",
-                STATUS_SKIP,
-                f"{t} skills 无稳定布局，已 skip",
-            )
-            report.add(
-                "skills",
-                f"{t}-commands-drift",
-                STATUS_SKIP,
-                f"{t} commands 无稳定布局，已 skip",
-            )
-            continue
-        missing_skills = []
-        if not skill_dest.is_dir():
-            report.add(
-                "skills",
-                f"{t}-skills-dir",
-                STATUS_WARN,
-                f"{t} skills 目录不存在: {skill_dest}",
-                hint=f"运行 scripts/agents/sync.sh {t}",
-            )
-            continue
-        for sid in skill_ids:
-            # exclude 文件可跳过
-            excl = skills_src / sid / "exclude"
-            if excl.is_file() and t in {
-                x.strip() for x in excl.read_text(encoding="utf-8").splitlines() if x.strip()
-            }:
-                continue
-            marker = skill_dest / sid
-            if not marker.exists():
-                missing_skills.append(sid)
-        if missing_skills:
-            report.add(
-                "skills",
-                f"{t}-skills-drift",
-                STATUS_WARN,
-                f"{t} 缺少 {len(missing_skills)} 个 skill（例: {', '.join(missing_skills[:3])}）",
-                hint=f"运行 scripts/agents/sync.sh {t}",
-            )
-        else:
-            report.add(
-                "skills",
-                f"{t}-skills-drift",
-                STATUS_PASS,
-                f"{t} skills 与源一致（{len(skill_ids)} 项）",
-            )
-
-        if cmd_dest is None:
-            report.add(
-                "skills",
-                f"{t}-commands-drift",
-                STATUS_SKIP,
-                f"{t} commands 无稳定布局，已 skip",
-            )
-        elif cmd_ids and cmd_dest:
-            missing_cmds = []
-            if not cmd_dest.is_dir():
-                report.add(
-                    "skills",
-                    f"{t}-commands-dir",
-                    STATUS_WARN,
-                    f"{t} commands 目录不存在: {cmd_dest}",
-                    hint=f"运行 scripts/agents/sync.sh {t}",
-                )
-            else:
-                for cid in cmd_ids:
-                    # 目标文件名因工具而异，做宽松存在检查
-                    hits = list(cmd_dest.glob(f"*{cid}*"))
-                    if not hits:
-                        missing_cmds.append(cid)
-                if missing_cmds:
-                    report.add(
-                        "skills",
-                        f"{t}-commands-drift",
-                        STATUS_WARN,
-                        f"{t} 缺少 {len(missing_cmds)} 个 command",
-                        hint=f"运行 scripts/agents/sync.sh {t}",
-                    )
-                else:
-                    report.add(
-                        "skills",
-                        f"{t}-commands-drift",
-                        STATUS_PASS,
-                        f"{t} commands 看起来已同步（{len(cmd_ids)} 项）",
-                    )
+    skill_dest = Path.home() / ".agents" / "skills"
+    if not skill_dest.is_dir():
+        report.add(
+            "skills",
+            "skills-dir",
+            STATUS_WARN,
+            f"skills 目录不存在: {skill_dest}",
+            hint="运行 scripts/agents/sync.sh --skills-only",
+        )
+        return
+    missing_skills = [sid for sid in skill_ids if not (skill_dest / sid).exists()]
+    if missing_skills:
+        report.add(
+            "skills",
+            "skills-drift",
+            STATUS_WARN,
+            f"~/.agents/skills 缺少 {len(missing_skills)} 个 skill（例: {', '.join(missing_skills[:3])}）",
+            hint="运行 scripts/agents/sync.sh --skills-only",
+        )
+    else:
+        report.add(
+            "skills",
+            "skills-drift",
+            STATUS_PASS,
+            f"~/.agents/skills 与源一致（{len(skill_ids)} 项）",
+        )
 
 
 def build_next_steps(items: List[CheckItem]) -> List[str]:
@@ -397,11 +257,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     env_doctor.check_env(cat, report, profile)
     env_doctor.check_tools(cat, report, profile)
     env_doctor.check_mcp(cat, report, profile, args.tool, args.deep)
-    check_skills_drift(cat, report, args.tool)
+    check_skills_drift(cat, report)
     env_doctor.check_browser(cat, report, profile, args.deep)
     env_doctor.check_security(cat, report)
     # 保留轻量 agents 兼容检查（脚本存在性），详细漂移已在 skills
-    env_doctor.check_agents(cat, report, args.tool)
+    env_doctor.check_agents(cat, report)
 
     if args.json:
         sys.stdout.write(format_json(report))

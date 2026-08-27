@@ -20,7 +20,6 @@ from ensure_pyyaml import ensure_yaml  # noqa: E402
 yaml = ensure_yaml()
 
 TOOLS = (
-    "claude",
     "cursor",
     "kiro",
     "opencode",
@@ -28,10 +27,7 @@ TOOLS = (
     "kimi-code",
     "pi",
     "zcode",
-    "qoder",
-    "codebuddy-code",
     "dsh",
-    "minimax",
 )
 KNOWN_PROFILES = ("coding", "research", "browser", "full")
 SERVER_ALLOWED_KEYS = {
@@ -319,8 +315,6 @@ class Catalog:
 
 
 def auth_header(env_name: str, style: str) -> str:
-    if style in ("cursor", "claude"):
-        return f"Bearer ${{{env_name}}}"
     if style == "opencode":
         return f"Bearer {{env:{env_name}}}"
     return f"Bearer ${{{env_name}}}"
@@ -476,7 +470,7 @@ def render_server_for_tool(
             entry["bearerTokenEnvVar"] = env_name
         return entry
 
-    if tool in ("cursor", "claude", "qoder", "codebuddy-code", "zcode", "kiro"):
+    if tool in ("cursor", "zcode", "kiro"):
         if transport == "stdio":
             entry = {
                 "command": srv["command"],
@@ -493,7 +487,7 @@ def render_server_for_tool(
             entry = {"url": srv["url"]}
             if env_name:
                 entry["headers"] = {
-                    "Authorization": auth_header(env_name, "claude")
+                    "Authorization": auth_header(env_name, "kiro")
                 }
             return entry
         tname = "streamable-http" if tool == "cursor" else "http"
@@ -504,10 +498,8 @@ def render_server_for_tool(
             "url": srv["url"],
         }
         if env_name:
-            # Authorization 占位符风格与 cursor/claude 相同
-            style = "cursor" if tool == "cursor" else "claude"
             entry["headers"] = {
-                "Authorization": auth_header(env_name, style)
+                "Authorization": auth_header(env_name, tool)
             }
         return finish(entry) if tool == "zcode" else entry
 

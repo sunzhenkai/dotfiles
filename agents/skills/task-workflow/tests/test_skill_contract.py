@@ -14,7 +14,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 SKILL_ROOT = ROOT / "agents/skills/task-workflow"
-COMMAND_ROOT = ROOT / "agents/commands"
 TASKCTL_PATH = SKILL_ROOT / "scripts/taskctl.py"
 
 EXPECTED_COMMANDS = {
@@ -41,16 +40,6 @@ REMOVED_COMMANDS = {
     "scope-repos",
     "git-summary",
 }
-
-PHASE_COMMANDS = {
-    "task-new": "planning.md",
-    "task-explore": "planning.md",
-    "task-design": "planning.md",
-    "task-propose": "planning.md",
-    "task-apply": "apply.md",
-    "task-archive": "archive.md",
-}
-
 
 def load_taskctl():
     spec = importlib.util.spec_from_file_location("taskctl_contract", TASKCTL_PATH)
@@ -85,17 +74,6 @@ class SkillContractTest(unittest.TestCase):
             len(body.splitlines()) for body in self.refs.values()
         )
         self.assertLess(total, 320, f"instruction surface grew to {total} lines")
-
-    def test_every_phase_command_routes_to_one_reference(self) -> None:
-        for command, reference in PHASE_COMMANDS.items():
-            path = COMMAND_ROOT / f"{command}.md"
-            self.assertTrue(path.is_file(), f"missing command shell {path}")
-            body = read(path)
-            self.assertIn("task-workflow", body)
-            # command shell 只传阶段身份，不复制门禁算法。
-            self.assertNotIn("| ID |", body)
-            self.assertLess(len(body.splitlines()), 30, f"{command}.md is too long")
-            self.assertIn(reference, self.skill)
 
     # ---- CLI 与文档一致 -------------------------------------------------- #
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Adapt agents/ skills & commands into per-tool layouts and install them."""
+"""Install agents/ skills into the shared ~/.agents/skills layout."""
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import shutil
 import sys
@@ -12,19 +11,6 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-TOOLS = (
-    "claude",
-    "cursor",
-    "kiro",
-    "opencode",
-    "codex",
-    "kimi-code",
-    "pi",
-    "zcode",
-    "qoder",
-    "codebuddy-code",
-    "dsh",
-)
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 
@@ -44,6 +30,10 @@ def backup_dir() -> Path:
 
 def timestamp() -> str:
     return str(int(time.time()))
+
+
+def skills_target() -> Path:
+    return Path.home() / ".agents" / "skills"
 
 
 def _is_indented(line: str) -> bool:
@@ -116,49 +106,13 @@ def yaml_quote(s: str) -> str:
         return f'"{escaped}"'
     return s
 
-def resolve_slash(tool: str, cmd_id: str) -> str:
-    if tool == "claude" and cmd_id.startswith("opsx-"):
-        return "/opsx:" + cmd_id[len("opsx-") :]
-    return "/" + cmd_id
+
+def replace_slashes(body: str) -> str:
+    """共享目标下 slash 命令统一渲染为 /xxx。"""
+    return SLASH_RE.sub(lambda m: "/" + m.group(1), body)
 
 
-def replace_slashes(body: str, tool: str) -> str:
-    def repl(m: re.Match) -> str:
-        return resolve_slash(tool, m.group(1))
-
-    return SLASH_RE.sub(repl, body)
-
-
-def inject_kiro_arguments(body: str, tool: str) -> str:
-    """Kiro skills only receive slash arguments through explicit placeholders."""
-    if tool != "kiro" or "$ARGUMENTS" in body or re.search(r"\$\{\d+\}", body):
-        return body
-    return body.rstrip() + "\n\n$ARGUMENTS\n"
-
-
-def read_exclude(path: Path) -> set:
-    if not path.is_file():
-        return set()
-    tools = set()
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        tools.add(line.lower())
-    return tools
-
-
-def skill_excluded(skill_dir: Path, tool: str) -> bool:
-    return tool in read_exclude(skill_dir / "exclude")
-
-
-def command_excluded(cmd_file: Path, tool: str) -> bool:
-    return tool in read_exclude(cmd_file.with_suffix(cmd_file.suffix + ".exclude")) or tool in read_exclude(
-        cmd_file.parent / f"{cmd_file.stem}.exclude"
-    )
-
-
-def render_skill_frontmatter(tool: str, meta: Dict[str, str], skill_id: str) -> str:
+def render_skill_frontmatter(meta: Dict[str, str], skill_id: str) -> str:
     name = unquote(fm_get(meta, "name", skill_id))
     desc = unquote(fm_get(meta, "description"))
     if not desc:
@@ -178,85 +132,6 @@ def render_skill_frontmatter(tool: str, meta: Dict[str, str], skill_id: str) -> 
         lines.append(meta["_metadata_block"])
     return "---\n" + "\n".join(lines) + "\n---\n"
 
-def render_command_frontmatter(tool: str, meta: Dict[str, str], cmd_id: str) -> str:
-    title = unquote(fm_get(meta, "title", cmd_id))
-    desc = fm_get(meta, "description")
-    # preserve quotes if description has special chars
-    if desc and not (desc.startswith('"') or desc.startswith("'")):
-        if ":" in desc or desc.startswith(" ") or "#" in desc:
-            desc_out = f'"{desc}"'
-        else:
-            desc_out = desc
-    else:
-        desc_out = desc
-    category = unquote(fm_get(meta, "category", "Workflow"))
-    tags = fm_get(meta, "tags", "[workflow]")
-
-    if tool == "kiro":
-        return (
-            "---\n"
-            f"name: {cmd_id}\n"
-            f"description: {yaml_quote(unquote(desc))}\n"
-            "---\n"
-        )
-    if tool == "claude":
-        return (
-            "---\n"
-            f'name: "{title}"\n'
-            f"description: {desc_out}\n"
-            f"category: {category}\n"
-            f"tags: {tags}\n"
-            "---\n"
-        )
-    if tool == "zcode":
-        # 命令名取自文件名；frontmatter 仅 description / argument-hint
-        if desc_out:
-            return "---\n" f"description: {desc_out}\n" "---\n"
-        return ""
-    if tool == "cursor":
-        return (
-            "---\n"
-            f"name: /{cmd_id}\n"
-            f"id: {cmd_id}\n"
-            f"category: {category}\n"
-            f"description: {desc_out}\n"
-            "---\n"
-        )
-    if tool == "opencode":
-        lines = [f"description: {desc_out}"]
-        # OpenCode-only：若存在对应 persona，注入 agent 字段（不出现在共享源）
-        agent = unquote(fm_get(meta, "agent"))
-        if not agent and cmd_id:
-            # 约定：command id 与 persona 同名时可注入（如 en-chat）
-            persona = repo_root() / "agents" / "vendors" / "opencode" / "agents" / f"{cmd_id}.md"
-            if persona.is_file():
-                agent = cmd_id
-        if agent:
-            lines.append(f"agent: {agent}")
-        return "---\n" + "\n".join(lines) + "\n---\n"
-    if tool == "kimi-code":
-        # commands 对 kimi 整体 skip；此分支仅作防御
-        return "---\n" f"description: {desc_out}\n" "---\n"
-    # codex prompts: minimal
-    return "---\n" f"description: {desc_out}\n" "---\n"
-
-
-def command_relpath(tool: str, cmd_id: str) -> str:
-    if tool == "claude":
-        if cmd_id.startswith("opsx-"):
-            action = cmd_id[len("opsx-") :]
-            return f"commands/opsx/{action}.md"
-        return f"commands/{cmd_id}.md"
-    if tool == "kiro":
-        return f"skills/{cmd_id}/SKILL.md"
-    if tool in ("codex", "pi"):
-        return f"prompts/{cmd_id}.md"
-    return f"commands/{cmd_id}.md"
-
-
-def skill_relpath(skill_id: str) -> str:
-    return f"skills/{skill_id}/SKILL.md"
-
 
 def _skip_sidecar_file(path: Path) -> bool:
     if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
@@ -267,7 +142,7 @@ def _skip_sidecar_file(path: Path) -> bool:
 def install_skill_sidecars(
     skill_dir: Path,
     skill_id: str,
-    bases: List[Path],
+    base: Path,
     dry_run: bool,
 ) -> Tuple[int, int]:
     """Copy references/ and scripts/ as-is (no frontmatter render, no slash replace)."""
@@ -280,39 +155,19 @@ def install_skill_sidecars(
         for src_file in sorted(p for p in src_root.rglob("*") if p.is_file()):
             if _skip_sidecar_file(src_file):
                 continue
-            rel = f"skills/{skill_id}/{name}/{src_file.relative_to(src_root)}"
+            dest = (base / f"{skill_id}/{name}/{src_file.relative_to(src_root)}").expanduser()
             data = src_file.read_bytes()
-            for base in bases:
-                dest = (base / rel).expanduser()
-                if dest.is_file() and dest.read_bytes() == data:
-                    skipped += 1
-                    print(f"  = {dest}")
-                    continue
-                written += 1
-                print(f"  + {dest}")
-                if dry_run:
-                    continue
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(data)
+            if dest.is_file() and dest.read_bytes() == data:
+                skipped += 1
+                print(f"  = {dest}")
+                continue
+            written += 1
+            print(f"  + {dest}")
+            if dry_run:
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
     return written, skipped
-
-
-def retire_legacy_file(path: Path, dry_run: bool = False) -> bool:
-    """Move a formerly managed file out of its active location."""
-    path = path.expanduser()
-    if not path.exists() and not path.is_symlink():
-        return False
-    bdir = backup_dir()
-    backup_path = bdir / f"{path.name}-{timestamp()}"
-    n = 0
-    while backup_path.exists():
-        n += 1
-        backup_path = bdir / f"{path.name}-{timestamp()}-{n}"
-    print(f"  retire {path} → {backup_path}")
-    if not dry_run:
-        bdir.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(path), str(backup_path))
-    return True
 
 
 def install_file(content: str, dest: Path, dry_run: bool = False) -> str:
@@ -333,10 +188,7 @@ def install_file(content: str, dest: Path, dry_run: bool = False) -> str:
         while backup_path.exists():
             n += 1
             backup_path = bdir / f"{dest.name}-{timestamp()}-{n}"
-        if dest.is_dir() and not dest.is_symlink():
-            shutil.move(str(dest), str(backup_path))
-        else:
-            shutil.move(str(dest), str(backup_path))
+        shutil.move(str(dest), str(backup_path))
         print(f"  已备份 {dest} → {backup_path}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(content)
@@ -349,115 +201,41 @@ def validate_output(path: Path, content: str) -> None:
         die(f"{path}: residual placeholders: {leftovers}")
 
 
-def targets_for_tool(tool: str, root: Path) -> List[Path]:
-    """Base directories to install into (relative paths resolved under each)."""
-    home = Path.home()
-    if tool == "claude":
-        return [home / ".claude", root / ".claude"]
-    if tool == "cursor":
-        return [home / ".cursor", root / ".cursor"]
-    if tool == "kiro":
-        return [home / ".kiro"]
-    if tool == "opencode":
-        # 与其他 agent 一致：写入 home 真实目录（不再依赖整目录软链到 vendor）
-        return [Path.home() / ".config" / "opencode"]
-    if tool == "codex":
-        return [home / ".codex"]
-    if tool == "kimi-code":
-        return [home / ".kimi-code"]
-    if tool == "pi":
-        return [home / ".pi" / "agent"]
-    if tool == "zcode":
-        return [home / ".zcode"]
-    if tool == "qoder":
-        return [home / ".qoder-cn"]
-    if tool == "codebuddy-code":
-        return [home / ".codebuddy"]
-    if tool == "dsh":
-        # DeepSeek Harness 从 ~/.dsh/skills 扫描 skill（user-dsh root，rank 400）
-        return [home / ".dsh"]
-    die(f"unknown tool: {tool}")
-    return []
+def sync_skills(root: Path, dry_run: bool = False) -> int:
+    skills_root = root / "agents" / "skills"
+    if not skills_root.is_dir():
+        die(f"missing agents source under {root / 'agents'}")
 
-
-def sync_tool(tool: str, root: Path, dry_run: bool = False) -> int:
-    agents = root / "agents"
-    skills_root = agents / "skills"
-    cmds_root = agents / "commands"
-    if not skills_root.is_dir() and not cmds_root.is_dir():
-        die(f"missing agents source under {agents}")
-
-    bases = targets_for_tool(tool, root)
+    base = skills_target()
     written = 0
     skipped = 0
 
-    print(f"==> sync {tool}")
+    print(f"==> sync skills → {base}")
 
-    # Skills
-    if skills_root.is_dir():
-        for skill_dir in sorted(p for p in skills_root.iterdir() if p.is_dir()):
-            skill_id = skill_dir.name
-            src = skill_dir / "SKILL.md"
-            if not src.is_file():
-                continue
-            if skill_excluded(skill_dir, tool):
-                print(f"  skip skill {skill_id} (excluded for {tool})")
-                continue
-            meta, body = parse_frontmatter(src.read_text())
-            body = inject_kiro_arguments(replace_slashes(body, tool), tool)
-            content = render_skill_frontmatter(tool, meta, skill_id) + "\n" + body.lstrip("\n")
-            if not content.endswith("\n"):
-                content += "\n"
-            rel = skill_relpath(skill_id)
-            for base in bases:
-                dest = base / rel
-                validate_output(dest, content)
-                status = install_file(content, dest, dry_run=dry_run)
-                if status == "skip":
-                    skipped += 1
-                    print(f"  = {dest}")
-                else:
-                    written += 1
-                    print(f"  + {dest}")
-            w, s = install_skill_sidecars(skill_dir, skill_id, bases, dry_run)
-            written += w
-            skipped += s
+    for skill_dir in sorted(p for p in skills_root.iterdir() if p.is_dir()):
+        skill_id = skill_dir.name
+        src = skill_dir / "SKILL.md"
+        if not src.is_file():
+            continue
+        meta, body = parse_frontmatter(src.read_text())
+        body = replace_slashes(body)
+        content = render_skill_frontmatter(meta, skill_id) + "\n" + body.lstrip("\n")
+        if not content.endswith("\n"):
+            content += "\n"
+        dest = base / skill_id / "SKILL.md"
+        validate_output(dest, content)
+        status = install_file(content, dest, dry_run=dry_run)
+        if status == "skip":
+            skipped += 1
+            print(f"  = {dest}")
+        else:
+            written += 1
+            print(f"  + {dest}")
+        w, s = install_skill_sidecars(skill_dir, skill_id, base, dry_run)
+        written += w
+        skipped += s
 
-    # Commands（kimi-code / dsh 无 commands 布局 → skip，不阻断 skills）
-    if tool in ("kimi-code", "dsh"):
-        print(f"  skip commands for {tool} (no commands layout)")
-    elif cmds_root.is_dir():
-        for cmd_file in sorted(cmds_root.glob("*.md")):
-            cmd_id = cmd_file.stem
-            if command_excluded(cmd_file, tool):
-                print(f"  skip command {cmd_id} (excluded for {tool})")
-                continue
-            meta, body = parse_frontmatter(cmd_file.read_text())
-            body = inject_kiro_arguments(replace_slashes(body, tool), tool)
-            if tool == "kiro":
-                for base in bases:
-                    if retire_legacy_file(base / "prompts" / f"{cmd_id}.md", dry_run=dry_run):
-                        written += 1
-                # A same-named source skill already owns Kiro's slash command.
-                if (skills_root / cmd_id / "SKILL.md").is_file():
-                    print(f"  skip command {cmd_id} for kiro (same-name skill owns slash command)")
-                    continue
-            content = render_command_frontmatter(tool, meta, cmd_id) + "\n" + body.lstrip("\n")
-            if not content.endswith("\n"):
-                content += "\n"
-            rel = command_relpath(tool, cmd_id)
-            for base in bases:
-                dest = base / rel
-                validate_output(dest, content)
-                status = install_file(content, dest, dry_run=dry_run)
-                if status == "skip":
-                    skipped += 1
-                    print(f"  = {dest}")
-                else:
-                    written += 1
-                    print(f"  + {dest}")
-
-    print(f"  done {tool}: wrote={written} skipped={skipped}")
+    print(f"  done skills: wrote={written} skipped={skipped}")
     return 0
 
 
@@ -489,37 +267,32 @@ def install_shims(root: Path, dry_run: bool = False) -> None:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Sync shared agents skills/commands to tools")
+    parser = argparse.ArgumentParser(
+        description="Sync shared agents skills to ~/.agents/skills (tool 无关)"
+    )
     parser.add_argument(
         "tool",
         nargs="?",
         default="all",
-        help="claude|cursor|kiro|opencode|codex|kimi-code|pi|zcode|qoder|codebuddy-code|dsh|all",
+        help="仅兼容旧用法，必须省略或为 all（skills 同步已与 tool 无关）",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
 
+    if args.tool.lower() != "all":
+        die(f"skills 同步已与 tool 无关，请直接运行 sync.py（收到: '{args.tool}'）")
+
     root = args.root.resolve() if args.root else repo_root()
-    tool = args.tool.lower()
-    if tool == "all":
-        tools = list(TOOLS)
-    elif tool in TOOLS:
-        tools = [tool]
-    else:
-        die(f"unknown tool '{tool}'. Use: {'|'.join(TOOLS)}|all")
 
     rc = 0
-    for t in tools:
-        try:
-            sync_tool(t, root, dry_run=args.dry_run)
-        except SystemExit as e:
-            rc = int(e.code) if e.code else 1
-            break
-        except Exception as e:
-            print(f"error syncing {t}: {e}", file=sys.stderr)
-            rc = 1
-            break
+    try:
+        sync_skills(root, dry_run=args.dry_run)
+    except SystemExit as e:
+        rc = int(e.code) if e.code else 1
+    except Exception as e:
+        print(f"error syncing skills: {e}", file=sys.stderr)
+        rc = 1
     if rc == 0:
         print("==> shims")
         install_shims(root, dry_run=args.dry_run)

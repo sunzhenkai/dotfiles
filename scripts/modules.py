@@ -142,8 +142,6 @@ def module_group(mod: dict[str, Any]) -> str:
 
 
 def find_module(modules: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
-    if name == "codebuddy":
-        name = "codebuddy-code"
     for mod in modules:
         if mod.get("name") == name:
             return mod

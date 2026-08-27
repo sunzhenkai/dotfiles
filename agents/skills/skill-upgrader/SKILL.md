@@ -93,7 +93,7 @@ description: "以可审计 patch 更新任意已有 Skill，或将其升级为�
 
 生产稿定位补充：
 
-- 本仓库共享 Skill：`agents/skills/<id>/`。**不要**改 sync 生成的 `.claude/skills/`、`.cursor/skills/`、`~/.claude/skills/` 等镜像。
+- 本仓库共享 Skill：`agents/skills/<id>/`。**不要**改 sync 生成的 `~/.agents/skills/` 镜像。
 - 其它仓库 / 个人 skill：以含 `SKILL.md` 的目录为准。
 
 ---

@@ -154,10 +154,10 @@ dotf dws -i
 
 ```bash
 dotf agents -ic
-dotf claude cursor codex -ic   # 按实际使用的工具
+dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把本仓 `agents/skills` / commands 同步到各工具目录；确认目标在用户 HOME 下。
+`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`（tool 无关），并按工具写入 MCP/env 配置。
 
 #### dsh（DeepSeek Harness）
 
@@ -168,11 +168,10 @@ dotf dsh -i
 # 或: npm install -g @deepseek-ai/dsh
 ```
 
-共享 skills/commands 同步进 DSH（DSH 原生扫描 `~/.dsh/skills`）：
+共享 skills 由 `dotf agents -c` 同步到 `~/.agents/skills`（tool 无关）：
 
 ```bash
-dotf agents -c                 # 全量（含 dsh）
-dotf agents -c --tool dsh      # 仅 dsh
+dotf agents -c
 ```
 
 `dsh plugin` 管理 profile 插件需 `pnpm`；DSH 的 MCP client 配置在 profile 内，不参与 agents/env 聚合同步。

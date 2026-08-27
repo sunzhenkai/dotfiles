@@ -2,7 +2,6 @@
 version: 1
 
 tools:
-  - claude
   - cursor
   - kiro
   - opencode
@@ -10,46 +9,40 @@ tools:
   - kimi-code
   - pi
   - zcode
-  - qoder
-  - codebuddy-code
   - dsh
-  - minimax
 
 default_profile: browser
 
 modules:
   mcp:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
-    exclude: [codex, pi, minimax]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
+    exclude: [codex, pi]
   browser:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, kimi-code, zcode, qoder, codebuddy-code]
-    exclude: [codex, pi, minimax]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
+    exclude: [codex, pi]
   tools:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code, minimax]
+    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
   env:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code, minimax]
+    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
   security:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code, minimax]
+    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
   agents:
     enabled: true
-    tools: [claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, qoder, codebuddy-code, minimax]
+    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
 
-# Codex / Pi / MiniMax / DSH 当前无 agents/env 聚合 MCP 配置入口，显式降级
+# Codex / Pi / DSH 当前无 agents/env 聚合 MCP 配置入口，显式降级
 unsupported:
   codex:
     mcp: skip
-    reason: "Codex 当前无稳定 MCP 配置入口；skills/commands 仍由 agents/ 同步"
+    reason: "Codex 当前无稳定 MCP 配置入口；skills 仍由 agents/ 同步"
   pi:
     mcp: skip
-    reason: "Pi 无内置 MCP（可用 skills/extensions）；skills/prompts 仍由 agents/ 同步"
-  minimax:
-    mcp: skip
-    reason: "MiniMax CLI（mmx）无 MCP 配置入口；亦无 skills/commands 布局，不参与 agents/ 同步"
+    reason: "Pi 无内置 MCP（可用 skills/extensions）；skills 仍由 agents/ 同步"
   dsh:
     mcp: skip
-    reason: "DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>）；skills 由 agents/ 同步到 ~/.dsh/skills"
+    reason: "DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>）"

@@ -75,8 +75,6 @@ show_help() {
     printf "  %-12s %s\n" "$m" "$(get_module_desc "$m")"
   done < <(get_install_modules)
   echo ""
-  echo "别名: codebuddy -> codebuddy-code"
-  echo ""
   echo "选项:"
   echo "  --all, -a    安装所有模块（按当前 OS 过滤）"
   echo "  --help, -h   显示此帮助"
@@ -120,11 +118,7 @@ main() {
       exit 1
       ;;
     *)
-      if [[ "$1" == "codebuddy" ]]; then
-        modules+=("codebuddy-code")
-      else
-        modules+=("$1")
-      fi
+      modules+=("$1")
       ;;
     esac
     shift

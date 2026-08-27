@@ -445,11 +445,6 @@ def _mcp_drift(
         if data is None:
             return None
         actual = data.get("mcpServers") or {}
-    elif tool == "claude":
-        data = _read_json(Path.home() / ".claude" / ".mcp.json")
-        if data is None:
-            return None
-        actual = data.get("mcpServers") or {}
     elif tool == "opencode":
         data = _read_json(Path.home() / ".config" / "opencode" / "opencode.json")
         if data is None:
@@ -457,16 +452,6 @@ def _mcp_drift(
         actual = data.get("mcp") or {}
     elif tool == "kimi-code":
         data = _read_json(Path.home() / ".kimi-code" / "mcp.json")
-        if data is None:
-            return None
-        actual = data.get("mcpServers") or {}
-    elif tool == "qoder":
-        data = _read_json(Path.home() / ".qoder-cn" / "settings.json")
-        if data is None:
-            return None
-        actual = data.get("mcpServers") or {}
-    elif tool == "codebuddy-code":
-        data = _read_json(Path.home() / ".codebuddy" / ".mcp.json")
         if data is None:
             return None
         actual = data.get("mcpServers") or {}
@@ -639,15 +624,11 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
 
     scan_roots = [
         cat.env_dir,
-        cat.root / "agents" / "vendors" / "claude" / ".mcp.json",
         cat.root / "agents" / "vendors" / "cursor" / "mcp.json",
         cat.root / "agents" / "vendors" / "kiro" / "mcp.json",
         cat.root / "agents" / "vendors" / "opencode" / "opencode.json",
         cat.root / "agents" / "vendors" / "kimi-code" / "mcp.json",
         cat.root / "agents" / "vendors" / "zcode" / "mcp.json",
-        cat.root / "agents" / "vendors" / "qoder" / "settings.json",
-        cat.root / "agents" / "vendors" / "codebuddy-code" / ".mcp.json",
-        cat.root / "agents" / "vendors" / "minimax",
     ]
     # 跳过 local overrides（允许私有路径）
     skip_names = {"local.yaml"}
@@ -723,7 +704,7 @@ def check_security(cat: Catalog, report: DoctorReport) -> None:
         report.add("security", "scan", STATUS_PASS, "未发现明显密钥/内网 URL 或浏览器产物泄漏")
 
 
-def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> None:
+def check_agents(cat: Catalog, report: DoctorReport) -> None:
     sync_sh = cat.root / "scripts" / "agents" / "sync.sh"
     if not sync_sh.is_file():
         report.add(
@@ -735,200 +716,36 @@ def check_agents(cat: Catalog, report: DoctorReport, tool: Optional[str]) -> Non
         return
     report.add("agents", "sync-script", STATUS_PASS, "agents sync 脚本存在")
 
-    # 轻量漂移：比较 agents/skills 与工具生成目录是否存在
+    # 轻量漂移：skills 唯一目标是共享的 ~/.agents/skills（tool 无关）
     skills_src = cat.root / "agents" / "skills"
     if not skills_src.is_dir():
         report.add("agents", "source", STATUS_WARN, "agents/skills 不存在")
         return
 
-    targets = {
-        "claude": Path.home() / ".claude" / "skills",
-        "cursor": Path.home() / ".cursor" / "skills",
-        "kiro": Path.home() / ".kiro" / "skills",
-        "opencode": Path.home() / ".config" / "opencode" / "skills",
-        "codex": Path.home() / ".codex" / "skills",
-        "kimi-code": Path.home() / ".kimi-code" / "skills",
-        "pi": Path.home() / ".pi" / "agent" / "skills",
-        "zcode": Path.home() / ".zcode" / "skills",
-        "qoder": Path.home() / ".qoder-cn" / "skills",
-        "codebuddy-code": Path.home() / ".codebuddy" / "skills",
-    }
-    # 更可靠：对常用工具目录 skills 做存在性抽查（opt-in 工具仅在 --tool 时检查）
+    dest = Path.home() / ".agents" / "skills"
     sample = next(skills_src.iterdir(), None) if skills_src.is_dir() else None
-    check_tools = [tool] if tool else ["opencode", "cursor", "kiro", "kimi-code", "pi", "zcode"]
-    drifted = False
-    for t in check_tools:
-        if t == "opencode":
-            dest = Path.home() / ".config" / "opencode" / "skills"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint="运行 scripts/agents/sync.sh opencode",
-                    )
-                else:
-                    report.add("agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步")
-        elif t == "cursor":
-            dest = Path.home() / ".cursor" / "skills"
-            if not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    "Cursor skills 目录不存在",
-                    hint="运行 scripts/agents/sync.sh cursor",
-                )
-            else:
-                report.add("agents", f"{t}-drift", STATUS_PASS, "Cursor skills 目录存在")
-        elif t == "kiro":
-            dest = Path.home() / ".kiro" / "skills"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint="运行 scripts/agents/sync.sh kiro",
-                    )
-                else:
-                    report.add(
-                        "agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步"
-                    )
-            elif not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    "Kiro skills 目录不存在",
-                    hint="运行 scripts/agents/sync.sh kiro",
-                )
-            else:
-                report.add("agents", f"{t}-drift", STATUS_PASS, "Kiro skills 目录存在")
-        elif t == "kimi-code":
-            dest = Path.home() / ".kimi-code" / "skills"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint="运行 scripts/agents/sync.sh kimi-code",
-                    )
-                else:
-                    report.add("agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步")
-            elif not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    "Kimi skills 目录不存在",
-                    hint="运行 scripts/agents/sync.sh kimi-code",
-                )
-            else:
-                report.add("agents", f"{t}-drift", STATUS_PASS, "Kimi skills 目录存在")
-        elif t == "pi":
-            dest = Path.home() / ".pi" / "agent" / "skills"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint="运行 scripts/agents/sync.sh pi",
-                    )
-                else:
-                    report.add("agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步")
-            elif not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    "Pi skills 目录不存在",
-                    hint="运行 scripts/agents/sync.sh pi",
-                )
-            else:
-                report.add("agents", f"{t}-drift", STATUS_PASS, "Pi skills 目录存在")
-        elif t == "zcode":
-            dest = Path.home() / ".zcode" / "skills"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint="运行 scripts/agents/sync.sh zcode",
-                    )
-                else:
-                    report.add(
-                        "agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步"
-                    )
-            elif not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    "ZCode skills 目录不存在",
-                    hint="运行 scripts/agents/sync.sh zcode",
-                )
-            else:
-                report.add("agents", f"{t}-drift", STATUS_PASS, "ZCode skills 目录存在")
-        elif t in ("qoder", "codebuddy-code"):
-            dest = targets[t]
-            label = "Qoder" if t == "qoder" else "CodeBuddy"
-            if sample and sample.is_dir():
-                marker = dest / sample.name
-                if not dest.is_dir() or not marker.exists():
-                    drifted = True
-                    report.add(
-                        "agents",
-                        f"{t}-drift",
-                        STATUS_WARN,
-                        f"{t} skills 可能未同步（缺 {sample.name}）",
-                        hint=f"运行 scripts/agents/sync.sh {t}",
-                    )
-                else:
-                    report.add(
-                        "agents", f"{t}-drift", STATUS_PASS, f"{t} skills 看起来已同步"
-                    )
-            elif not dest.is_dir():
-                report.add(
-                    "agents",
-                    f"{t}-drift",
-                    STATUS_WARN,
-                    f"{label} skills 目录不存在",
-                    hint=f"运行 scripts/agents/sync.sh {t}",
-                )
-            else:
-                report.add(
-                    "agents", f"{t}-drift", STATUS_PASS, f"{label} skills 目录存在"
-                )
-        else:
+    if sample and sample.is_dir():
+        marker = dest / sample.name
+        if not dest.is_dir() or not marker.exists():
             report.add(
                 "agents",
-                f"{t}-check",
-                STATUS_SKIP,
-                f"{t}: 详细漂移检查请运行 scripts/agents/sync.sh {t}",
+                "skills-drift",
+                STATUS_WARN,
+                f"~/.agents/skills 可能未同步（缺 {sample.name}）",
+                hint="运行 scripts/agents/sync.sh --skills-only",
             )
-
-    if not drifted:
-        pass
+            return
+        report.add("agents", "skills-drift", STATUS_PASS, "~/.agents/skills 看起来已同步")
+    elif not dest.is_dir():
+        report.add(
+            "agents",
+            "skills-drift",
+            STATUS_WARN,
+            "~/.agents/skills 目录不存在",
+            hint="运行 scripts/agents/sync.sh --skills-only",
+        )
+    else:
+        report.add("agents", "skills-drift", STATUS_PASS, "~/.agents/skills 目录存在")
 
 
 def format_text(report: DoctorReport) -> str:
@@ -1012,7 +829,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     check_mcp(cat, report, profile, args.tool, args.deep)
     check_browser(cat, report, profile, args.deep)
     check_security(cat, report)
-    check_agents(cat, report, args.tool)
+    check_agents(cat, report)
 
     if args.json:
         sys.stdout.write(format_json(report))

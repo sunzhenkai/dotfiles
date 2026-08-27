@@ -49,9 +49,6 @@ dotf_doctor_l0() {
       fi
     else
       cmd="$mod"
-      if [ "$cmd" = "codebuddy-code" ]; then
-        cmd="codebuddy"
-      fi
       if command -v "$cmd" >/dev/null 2>&1; then
         echo "pass  install: PATH 中找到 '$cmd' ($(command -v "$cmd"))"
       else

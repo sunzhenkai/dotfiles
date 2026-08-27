@@ -42,7 +42,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 | tools | ossutil, aws, aliyun, gcp | 用户级二进制 | ✅ |
 | tools | vcpkg, d2 | 用户级 | ✅ |
 | 办公 | dws, lark-cli | 用户级（npm/npx） | ✅（需 sdk/Node） |
-| agents | agents, claude, cursor, kiro, opencode, codex, kimi-code, pi, zcode, minimax, qoder, trae-cli, codebuddy-code | 用户级 CLI + 配置 | ✅ |
+| agents | agents, cursor, kiro, opencode, codex, kimi-code, pi, zcode, trae-cli, dsh | 用户级 CLI + 配置 | ✅ |
 | shell | git, zsh, starship | git 用户级配置；**zsh 可能 chsh**；starship 用户级 | ⚠️ zsh 见下 |
 | editors | nvim, helix, zed | 用户级配置 + 可能装编辑器 | ✅（装编辑器时确认） |
 | terminals | kitty, alacritty, wezterm, ghostty, iterm2 | 用户级配置；装终端可能系统级 | ✅（装终端时确认） |
@@ -59,7 +59,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 ```
 sdk golang delta grepom senv mdserve ocr npm ossutil aws aliyun gcp vcpkg d2
 dws lark-cli
-agents claude cursor kiro opencode codex kimi-code pi zcode minimax qoder trae-cli
+agents cursor kiro opencode codex kimi-code pi zcode trae-cli dsh
 nvim helix tmux zellij yazi k9s shell_gpt
 git starship（仅配置，不 chsh）
 ```
@@ -108,11 +108,11 @@ dotf <mod> -i --yes         # 非交互（shared 下系统级动作仍会确认�
 ```bash
 dotf <mod> -c
 dotf <mod> -c --yes
-dotf agents -c              # 聚合同步 skills + MCP
-dotf agents -c --tool cursor  # 过滤同步目标
+dotf agents -c              # 聚合同步 skills（~/.agents/skills）+ MCP
+dotf agents -c --tool cursor  # 过滤 MCP 同步目标（skills 与 tool 无关）
 ```
 
-配置类基本是用户级文件软链，shared 下也安全。但 `dotf agents -c` 会写各工具的 skills/commands 目录——确认目标路径在用户 HOME 下（如 `~/.zcode`、`~/.claude`），不污染全局。
+配置类基本是用户级文件软链，shared 下也安全。但 `dotf agents -c` 会写 `~/.agents/skills` 与各工具的 MCP 配置——确认目标路径在用户 HOME 下（如 `~/.zcode`），不污染全局。
 
 ### all（全量补装）
 

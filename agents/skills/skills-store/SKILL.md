@@ -228,24 +228,21 @@ npx skills use <owner/repo> --skill <skill-name>
 | Agent | `--agent` |
 |-------|-----------|
 | Cursor | `cursor` |
-| Claude Code | `claude-code` |
 | Codex | `codex` |
 | OpenCode | `opencode` |
 | Kiro CLI | `kiro-cli` |
 | Pi | `pi` |
-| Qoder | `qoder` / `qoder-cn` |
 | ZCode | `zcode` |
-| CodeBuddy | `codebuddy` |
 
 完整列表见上游 README 或 `npx skills --help`。
 
 ## 与本仓库 agents 同步的关系
 
-本仓库共享 skills 真相源在 `agents/skills/`，由 `scripts/agents/sync.sh` / `dotf agents -c` 镜像到各工具。
+本仓库共享 skills 真相源在 `agents/skills/`，由 `scripts/agents/sync.sh` / `dotf agents -c` 同步到共享的 `~/.agents/skills/`。
 
 - **skills-store 安装的第三方 skill**：落在各 agent 的 project/global skills 目录，**不**自动进入 `agents/skills/`。
 - 若要把技能纳入本仓库统一真相源：先审计通过，再按需拷贝或改写到 `agents/skills/<id>/`，然后 sync。
-- 不要手改由 sync 生成的 `.cursor/skills`、`.claude/skills` 等镜像文件。
+- 不要手改由 sync 生成的 `~/.agents/skills/` 下的文件。
 
 ## 执行清单
 

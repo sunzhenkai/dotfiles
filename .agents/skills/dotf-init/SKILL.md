@@ -80,7 +80,7 @@ echo "$HOME"   # /home/dev /shared /workspace → 疑似共用 HOME
 | 公司共用账号/共用 HOME | shared-home | `minimal` | 仅用户级，绝不 chsh |
 | 仅想试一下 | 任意 | 先 `--dry-run` 看计划 | |
 
-profile 模块组成见 `profiles.yaml`：`minimal` = system/sdk/git/zsh/starship；`remote` = minimal + golang/nvim/tmux/delta/grepom/agents/claude；`full` = 当前 OS 全集。
+profile 模块组成见 `profiles.yaml`：`minimal` = system/sdk/git/zsh/starship；`remote` = minimal + golang/nvim/tmux/delta/grepom/agents；`full` = 当前 OS 全集。
 
 **注意**：即便 `minimal` 也含 `system`（会 sudo 装系统包）和 `zsh`（可能 chsh）。在 shared 场景下，要明确告知用户这两点，并准备好用户级绕过方案（见下「chsh 绕过」）。
 

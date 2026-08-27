@@ -156,7 +156,7 @@ cases:
         - 要纳入本仓库真相源须先审计再拷贝或改写到 agents/skills/<id>/
       must_not:
         - 把第三方安装结果当作 agents/skills/ 真相源
-        - 手改 sync 生成的 .cursor/skills、.claude/skills 等镜像
+        - 手改 sync 生成的 ~/.agents/skills 镜像
 
   - id: this-repo-sync-no-reaudit
     kind: boundary

@@ -70,47 +70,36 @@ def test_os_filter_config_modules() -> None:
 
 def test_disabled_modules_excluded_from_default_lists() -> None:
     mods = modules.load_registry()
-    qoder = modules.find_module(mods, "qoder")
-    codebuddy = modules.find_module(mods, "codebuddy-code")
+    cpp = modules.find_module(mods, "cpp-dev")
     zcode = modules.find_module(mods, "zcode")
-    minimax = modules.find_module(mods, "minimax")
     kiro = modules.find_module(mods, "kiro")
-    assert qoder and modules.is_enabled(qoder)
-    assert codebuddy and not modules.is_enabled(codebuddy)
+    # 已移除的 vendor 不再注册
+    for removed in ("claude", "qoder", "codebuddy-code", "minimax"):
+        assert modules.find_module(mods, removed) is None
+    assert cpp and not modules.is_enabled(cpp)
     assert zcode and modules.is_enabled(zcode)
-    assert minimax and modules.is_enabled(minimax)
     assert kiro and modules.is_enabled(kiro)
-    assert qoder.get("config")
-    assert codebuddy.get("config")
     assert zcode.get("config")
-    assert minimax.get("config")
     assert kiro.get("config")
-    assert qoder.get("bin") == "qoder"
-    assert codebuddy.get("bin") == "codebuddy"
+    assert cpp.get("bin") == "cmake"
     assert zcode.get("bin") == "zcode"
-    assert minimax.get("bin") == "mmx"
     assert kiro.get("bin") == "kiro-cli"
 
     install_names = {m["name"] for m in modules.filter_modules(mods, capability="install")}
-    assert "qoder" in install_names
-    assert "codebuddy-code" not in install_names
+    assert "cpp-dev" not in install_names
     assert "zcode" in install_names
-    assert "minimax" in install_names
     assert "kiro" in install_names
 
     config_names = {m["name"] for m in modules.filter_modules(mods, capability="config")}
-    assert "qoder" in config_names
-    assert "codebuddy-code" not in config_names
+    assert "cpp-dev" not in config_names
     assert "zcode" in config_names
-    assert "minimax" in config_names
     assert "kiro" in config_names
 
     with_disabled = {
         m["name"]
         for m in modules.filter_modules(mods, capability="install", include_disabled=True)
     }
-    assert "qoder" in with_disabled
-    assert "codebuddy-code" in with_disabled
+    assert "cpp-dev" in with_disabled
     assert "kiro" in with_disabled
 
 def test_matches_os_family() -> None:

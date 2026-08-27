@@ -13,7 +13,7 @@ description: "通过可审计 patch 管理和更新当前仓库 agents/skills/ �
 ## 边界
 
 - 可修改目标 Skill 整个目录中的生产内容：`SKILL.md`、`references/`、`scripts/`、`assets/` 及其已有测试。
-- 不修改 `.agents/skills/` 中除本 Skill 外的项目级 Skill，也不修改 `.claude/skills/`、`.cursor/skills/`、`.codex/skills/`、用户主目录等同步生成或安装位置。
+- 不修改 `.agents/skills/` 中除本 Skill 外的项目级 Skill，也不修改 `~/.agents/skills/`、用户主目录等同步生成或安装位置。
 - 不负责搜索、安装或升级外部 Skill；此类请求交给相应的 Skill 商店流程。
 - 不与 `skill-evolver` 混用。用户选择本 Skill 时，以本 Skill 的 `patches/` 协议为准，不创建 `evolutions/`；用户明确选择 `skill-evolver` 时停止本流程。
 - 从零创建公开 Skill 不属于“更新已有 Skill”；创建完成后的每轮修改必须遵守本协议。

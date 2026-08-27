@@ -101,21 +101,21 @@ Examples:
 
 ## Agents（统一入口）
 
-skills/commands、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
+skills、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
 
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
-dotf claude -i                 # 仅安装 Claude CLI
+dotf cursor -i                 # 仅安装 Cursor CLI
 dotf cursor -c                 # 仅 vendor 配置（不隐式 sync）
-dotf agents -c                 # 聚合同步 skills + MCP
-dotf agents -c --tool cursor   # 过滤同步
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ MCP
+dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/{skills,commands,vendors,env}`（skills/commands + 工具专属 vendors + MCP/env 真相源）
+- 源码：`agents/{skills,vendors,env}`（skills + 工具专属 vendors + MCP/env 真相源）
 - 脚本：单一包 `scripts/agents/`（`sync.sh` / `doctor.py` / `env_sync.py`）
-- 工具专属路径：`agents/vendors/{claude,cursor,kiro,opencode,codex,kimi-code,pi}/`
+- 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
 
 详见 `agents/README.md`、`agents/env/README.md`。
 

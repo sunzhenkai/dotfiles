@@ -233,8 +233,8 @@ def test_format_text_merges_actions_per_module() -> None:
 def test_disabled_skipped_in_select_all_and_profile() -> None:
     reg = _reg(
         {"name": "a", "install": True, "doctor": True},
-        {"name": "qoder", "install": True, "doctor": True, "enabled": False},
-        {"name": "codebuddy-code", "install": True, "doctor": True, "enabled": False},
+        {"name": "disabled-b", "install": True, "doctor": True, "enabled": False},
+        {"name": "disabled-c", "install": True, "doctor": True, "enabled": False},
     )
     plan_all = planner.build_plan(
         os_id="linux",
@@ -246,8 +246,8 @@ def test_disabled_skipped_in_select_all_and_profile() -> None:
     assert plan_all.ok, plan_all.errors
     names_all = {a.module for a in plan_all.actions}
     assert names_all == {"a"}
-    assert "qoder" not in names_all
-    assert "codebuddy-code" not in names_all
+    assert "disabled-b" not in names_all
+    assert "disabled-c" not in names_all
 
     plan_prof = planner.build_plan(
         os_id="linux",
@@ -255,7 +255,7 @@ def test_disabled_skipped_in_select_all_and_profile() -> None:
         actions=["install"],
         registry=reg,
         profiles_data=_profiles(
-            with_disabled={"modules": ["a", "qoder"], "includes": []},
+            with_disabled={"modules": ["a", "disabled-b"], "includes": []},
         ),
     )
     assert plan_prof.ok, plan_prof.errors
@@ -264,14 +264,14 @@ def test_disabled_skipped_in_select_all_and_profile() -> None:
 
 def test_disabled_still_runs_when_explicit() -> None:
     reg = _reg(
-        {"name": "qoder", "install": True, "doctor": True, "enabled": False},
+        {"name": "disabled-b", "install": True, "doctor": True, "enabled": False},
     )
     plan = planner.build_plan(
         os_id="linux",
-        modules_explicit=["qoder"],
+        modules_explicit=["disabled-b"],
         actions=["install"],
         registry=reg,
         profiles_data=_profiles(),
     )
     assert plan.ok, plan.errors
-    assert [a.module for a in plan.actions] == ["qoder"]
+    assert [a.module for a in plan.actions] == ["disabled-b"]

@@ -32,7 +32,6 @@ profiles:
       - delta
       - grepom
       - agents
-      - claude
 
   desktop:
     desc: 桌面环境（模块仍按 OS 过滤）

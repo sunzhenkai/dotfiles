@@ -21,7 +21,7 @@ providers:
     headless_arg: "--headless"
     # 隔离 user data（避免读取主浏览器 profile）
     user_data_arg: "--user-data-dir"
-    tools: [claude, cursor, opencode]
+    tools: [cursor, opencode]
     profiles: [browser, full]
     required_tools: [node, npx]
     checks:
@@ -47,7 +47,7 @@ providers:
     risk: high
     enabled_by_default: false
     opt_in: true
-    tools: [claude, cursor, opencode]
+    tools: [cursor, opencode]
     profiles: [browser, full]
     notes: "连接真实 Chrome 调试端口可能暴露登录态与个人浏览数据；仅在 local override 显式启用"
     checks:

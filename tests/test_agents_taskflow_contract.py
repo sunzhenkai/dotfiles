@@ -1,4 +1,4 @@
-"""taskflow 的边界契约：零脚本、只增一个 command、不新增 shim、旧工作流资产仍在。"""
+"""taskflow 的边界契约：零脚本、不新增 shim、旧工作流资产仍在。"""
 
 from __future__ import annotations
 
@@ -28,24 +28,11 @@ def test_sync_shims_unchanged_by_taskflow() -> None:
     assert set(_load_sync_module().SHIMS) == {"taskctl"}
 
 
-def test_taskflow_adds_a_single_command() -> None:
-    commands = {p.name for p in (AGENTS / "commands").glob("taskflow-*.md")}
-    assert commands == {"taskflow-new.md"}
-
+def test_taskflow_skill_frontmatter() -> None:
     skill = (TASKFLOW / "SKILL.md").read_text(encoding="utf-8")
     for field in ("id: taskflow", "name: taskflow", "description:"):
         assert field in skill, f"SKILL.md frontmatter 缺字段: {field}"
 
-    command = (AGENTS / "commands" / "taskflow-new.md").read_text(encoding="utf-8")
-    for field in ("id: taskflow-new", "title:", "description:"):
-        assert field in command, f"taskflow-new.md frontmatter 缺字段: {field}"
-
 
 def test_legacy_task_workflow_assets_survive() -> None:
     assert (AGENTS / "skills" / "task-workflow" / "SKILL.md").is_file()
-    legacy = {p.name for p in (AGENTS / "commands").glob("task-*.md")}
-    expected = {
-        f"task-{name}.md"
-        for name in ("new", "explore", "design", "propose", "apply", "archive")
-    }
-    assert expected <= legacy
