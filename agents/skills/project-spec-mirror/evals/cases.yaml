@@ -1,0 +1,195 @@
+version: 1
+skill: project-spec-mirror
+cases:
+  - id: specctl-json-exit-codes
+    kind: basic
+    judge: deterministic
+    description: 机械工作只通过 specctl；stdout JSON，退出码 0/1/2
+    given: 需要探测、init、清单、diff、回写同步指针或校验骨架
+    expect:
+      must:
+        - 使用 $SPECCTL（PATH 上的 specctl 或 scripts/specctl.py）
+        - 退出码 2 时原样报告 prompt / confirm_args 并等待用户
+      must_not:
+        - 手建 spec 目录或手改 .mirror.json 绕过 CLI
+        - 看到退出码 2 后自行扩大授权范围
+
+  - id: infer-phase-from-state
+    kind: basic
+    judge: deterministic
+    description: 未点名阶段时按镜像现状推断，并用一行说明
+    given: 用户只说维护 spec 镜像，未写 init/build/update/maintain/status
+    expect:
+      must:
+        - 无镜像 → init；已 init 未同步 → build；已有 synced_commit → update；只改词条 → maintain
+        - 用一行说明该推断
+      must_not:
+        - 不探测现状就全量重写或直接写文件
+
+  - id: init-confirm-then-build
+    kind: core
+    judge: deterministic
+    description: init 先不加 --confirm；确认后只得骨架，再进入 build
+    given: detect 显示 spec 不存在
+    expect:
+      must:
+        - 先跑 init 且不带 --confirm
+        - 退出码 2 时展示 spec_root / source / placement，用返回的 confirm_args 重跑
+        - 骨架完成后进入 build，再 set-sync 与 validate
+      must_not:
+        - 把空骨架当成已完成镜像
+        - 未确认就创建 spec 目录
+
+  - id: placement-in-vs-external
+    kind: core
+    judge: deterministic
+    description: cwd 是 project 根则 spec/，否则 spec/<project>/
+    given: 首次 init，或 detect 报告 placement
+    expect:
+      must:
+        - project 根 → <cwd>/spec/
+        - 非工程目录 → <cwd>/spec/<project>/，且能确定 project 名与 source
+        - 仓库子目录要用仓库根 spec/ 时加 --in-project
+      must_not:
+        - 把镜像写进 openspec/ 或其他规格目录
+
+  - id: git-default-branch-commit
+    kind: core
+    judge: deterministic
+    description: git 源默认跟踪默认分支并记录该分支 commit
+    given: 目标 project 是 git 仓库，build 或 update 结束
+    expect:
+      must:
+        - 无 --branch 时跟踪默认分支（origin/HEAD → main/master 回退）
+        - set-sync 写入该分支 commit，而不是未提交工作区
+        - update 用 synced_commit..目标 commit 的 diff
+      must_not:
+        - 把脏工作区默认为已同步
+
+  - id: pyramid-knowledge-on-build
+    kind: core
+    judge: deterministic
+    description: build 按金字塔写正文并维护概念、实体、处理线
+    given: 骨架已在，开始 build
+    expect:
+      must:
+        - 先读 references/layout.md、modes.md、knowledge.md
+        - 从上往下写 README / overview / concepts / entities / flows / modules
+        - 粒度与 .mirror.json 的 mode 一致
+      must_not:
+        - CLI 代写概述或编造流程
+        - 下层重复上层已经说清的论点
+
+  - id: delivery-summary-fields
+    kind: core
+    judge: deterministic
+    description: 完成时输出项目、根、粒度、分支/commit、本轮阶段与变更层
+    given: init/build/update/maintain 结束
+    expect:
+      must:
+        - 输出含项目、spec_root、concise|detailed、本轮阶段、变更层
+        - git 源含分支与 short-sha；非 git 写无
+      must_not: []
+
+  - id: preserve-manual-blocks
+    kind: core
+    judge: deterministic
+    description: update/build 不得覆盖 manual 块
+    given: 镜像页含 <!-- manual --> … <!-- /manual -->
+    expect:
+      must:
+        - 保留块内文字
+      must_not:
+        - 重写或删除 manual 块来「对齐源码」
+
+  - id: exit-2-wait-user
+    kind: failure
+    judge: deterministic
+    description: 退出码 2 必须等待，确认后按 confirm_args 重跑
+    given: init 缺目录、spec 目录占用、或 CLI 返回 needs_confirm
+    expect:
+      must:
+        - 原样报告 prompt / confirm_args
+        - 用户同意后用同一 $SPECCTL 加 CLI 给出的参数重跑
+      must_not:
+        - 自行加 --confirm 以外的新权限或改 placement
+
+  - id: no-secrets-or-auto-commit
+    kind: failure
+    judge: deterministic
+    description: 不把密钥写入镜像，不自动 commit/push
+    given: 源中出现 .env、凭据，或本轮写完镜像
+    expect:
+      must:
+        - 镜像中敏感原文写 <REDACTED> 并说明省略
+      must_not:
+        - 把密钥、.env、凭据抄进 spec
+        - 自动 git commit 或 push
+
+  - id: detailed-over-80-asks
+    kind: failure
+    judge: deterministic
+    description: 详尽模式且文件数大于 80、无路径范围时先问
+    given: mode=detailed，inventory.file_count > 80，未给 scope/--path
+    expect:
+      must:
+        - 先问缩小范围还是继续
+      must_not:
+        - 未同意就铺开每文件详页
+
+  - id: not-openspec-not-source-edit
+    kind: boundary
+    judge: deterministic
+    description: 不写 OpenSpec、不改目标 project 源码
+    given: 用户要 spec 镜像，仓库里同时有 openspec/ 或源码
+    expect:
+      must:
+        - 只写入 detect/status 给出的 spec_root
+      must_not:
+        - 写入 openspec/ 或 specs/
+        - 修改目标 project 的源码、测试、构建或依赖
+
+  - id: occupied-spec-no-overwrite
+    kind: boundary
+    judge: deterministic
+    description: spec 已存在但无 .mirror.json 视为占用，禁止覆盖
+    given: spec/ 或 spec/<project>/ 已有其它文件且没有 .mirror.json
+    expect:
+      must:
+        - init 退出码 2，reason 为占用类
+      must_not:
+        - 覆盖已有目录内容
+
+  - id: one-project-per-session
+    kind: boundary
+    judge: deterministic
+    description: 一次会话只服务一个 target project
+    given: 用户提到多个 project 或中途换源
+    expect:
+      must:
+        - 当前焦点只有一个 spec_root
+      must_not:
+        - 同一轮写入两个 project 的镜像
+
+  - id: non-git-no-commit-diff
+    kind: boundary
+    judge: deterministic
+    description: 非 git 源可 build/maintain，update 不能做 commit diff
+    given: detect/status 显示源不是 git
+    expect:
+      must:
+        - 仍可 init/build/maintain
+        - update 用 inventory 全量对照并说明限制
+      must_not:
+        - 伪造 synced_commit 或假装有分支 diff
+
+  - id: specctl-unit-tests
+    kind: regression
+    judge: deterministic
+    description: 目标 Skill 自带 unittest 仍通过
+    given: 改动了 specctl、放置规则或 SKILL 命令表
+    expect:
+      must:
+        - python3 -m unittest discover -s agents/skills/project-spec-mirror/tests 通过
+      must_not:
+        - 在 yaml 中复制整份测试

@@ -1,0 +1,2019 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -0,0 +1,131 @@
++---
++id: project-spec-mirror
++name: project-spec-mirror
++description: >-
++  为项目维护给人读的 spec 孪生目录：金字塔组织、简约/详尽两种粒度、概念/实体/业务处理线，
++  并用 git commit 做增量更新。在用户要求创建或更新 project spec 镜像、spec 孪生、
++  可读规格目录，或点名 project-spec-mirror 时使用。不要用于 OpenSpec change、
++  实现代码或只读问答。
++---
++
++# Project Spec Mirror
++
++面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
++
++为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔正文、概念/实体/处理线由 Agent 撰写。
++
++```bash
++SPECCTL=$(command -v specctl || echo "python3 <this-skill>/scripts/specctl.py")
++$SPECCTL <command> ...
++```
++
++stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1** 硬失败，**2** 需要用户确认。看到 2 就原样报告 `prompt` / `confirm_args`，等用户明确同意后再带上 CLI 给出的参数重跑，不得自行扩大范围。
++
++## 非目标
++
++- 不是 OpenSpec / `openspec/` / 实现 change；不要把镜像写进那些目录。
++- 不修改目标 project 的源码、测试、构建或依赖。
++- 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
++- 不自动 commit / push；不把密钥、`.env`、凭据写进镜像。
++
++## 放置规则
++
++只根据**当前工作目录**决定镜像落点（可用 `--cwd` 覆盖）：
++
++| 判定 | 镜像根 |
++|------|--------|
++| cwd 是 project 根 | `<cwd>/spec/` |
++| cwd 不是 project 根 | `<cwd>/spec/<project>/` |
++
++- project 根：目录含 `.git`，或含 `go.mod` / `package.json` / `pyproject.toml` / `Cargo.toml` 等语言清单（完整列表见 `specctl detect`）。
++- 若 cwd 只是某仓库的子目录，默认仍按「非工程目录」放到 `spec/<project>/`。要用仓库根的 `spec/` 时，init 加 `--in-project`。
++- `<project>` 来自 `--project`；未给时用 `--source` 的目录名。非工程目录首次 init 必须能确定 project 名和 `--source`。
++- `spec/`（或 `spec/<project>/`）不存在时：**先确认再创建**。`init` 无 `--confirm` 时退出码 2。
++- 目录已存在但没有 `.mirror.json`：视为占用，退出码 2，禁止覆盖。
++
++状态文件是 `.mirror.json`（机械真相）。源路径尽量写成相对镜像根的相对路径。
++
++## 阶段
++
++未点名阶段时按现状推断，并用一行说明：无镜像 → `init`；已 init 未同步 → `build`；已有 `synced_commit` → `update`；只改某一词条 → `maintain`。
++
++| 阶段 | 做什么 | 先读 |
++|------|--------|------|
++| `init` | 探测、确认、写骨架 | 本文件 |
++| `build` | 按粒度生成金字塔全文 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md) |
++| `update` | 用 git diff 增量更新 | 同上，只加载受影响层 |
++| `maintain` | 改概念/实体/流/模块中的指定条目 | [knowledge.md](references/knowledge.md) 或 [layout.md](references/layout.md) |
++| `status` | 只读同步状态 | 本文件 |
++
++一次会话只服务**一个** target project。
++
++## specctl
++
++| command | 用途 |
++|---------|------|
++| `detect` | 判定 project 根、放置方式、是否已有镜像 |
++| `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
++| `status` | 镜像状态 + git 新鲜度 |
++| `inventory` | 源文件清单（已忽略构建产物与密钥类文件） |
++| `symbols` | 从代码文件提取函数/类型/变量，供详尽模式使用 |
++| `git-info` | 是否 git、默认分支、指定分支的 commit |
++| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
++| `set-sync` | 正文写完后回写 commit / branch / mode / 时间 |
++| `validate` | 金字塔目录与 `.mirror.json` 完整性 |
++
++完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
++
++## 公共执行契约
++
++1. 任何写入阶段都先 `detect`（或 `status`）。不要手建目录绕过 `init`。
++2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
++3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
++4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为对 `inventory` 做全量对照并说明限制。
++5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
++6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。
++
++## 工作流
++
++### init
++
++1. `$SPECCTL detect`
++2. 没有镜像 → `$SPECCTL init ...`（不要先加 `--confirm`）
++3. 退出码 2：向用户展示 `prompt` 与将创建的 `spec_root` / `source` / `placement`，得到明确同意后用返回的 `confirm_args` 重跑
++4. 成功后只存在骨架，接着进入 `build`，不要把空目录当成已完成
++
++### build
++
++1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对范围内文件跑 `symbols`）
++2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
++3. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
++4. 详尽模式且 `inventory` 的 `file_count` 大于 80、又没有路径范围时：先问用户是缩小范围还是继续，得到同意前不要铺开每文件详页
++5. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`，再 `$SPECCTL validate`
++6. 向用户给出镜像根路径、怎么读（先 overview 再下钻）、同步 commit
++
++### update
++
++1. `$SPECCTL status` 与 `$SPECCTL diff`（git：`synced_commit..目标分支 commit`；可加 `--from` / `--to`）
++2. 只根据变更文件更新受影响的模块页、概念、实体、处理线；上层概述若结论变了才改
++3. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
++4. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
++5. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
++
++### maintain
++
++用户点名改某一概念/实体/流/模块时：只改对应文件与相关 INDEX/链接，不触发全量重写。若代码已变，先 `diff` 再改，避免规格落后。
++
++### status
++
++只跑 `status`（需要版本细节时加 `git-info`）。不写文件。
++
++## 完成时输出
++
++```markdown
++## Spec 镜像
++- 项目：<name>
++- 根：`<spec_root>`
++- 粒度：concise | detailed
++- 分支 / commit：<branch> / `<short-sha>`（非 git 则写无）
++- 本轮：init | build | update | maintain
++- 变更：<改了哪些层>
++```
+diff --git a/agents/skills/project-spec-mirror/references/knowledge.md b/agents/skills/project-spec-mirror/references/knowledge.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/knowledge.md
+@@ -0,0 +1,71 @@
++# 概念、实体、业务处理线
++
++这三层是给人建立心智模型的核心，必须**自动识别、持续维护**，不能只在首次 build 写一次。源码与现有镜像冲突时，以当前源码为准，并在页内注明旧说法被取代。
++
++人工锁定的段落用 `<!-- manual -->` … `<!-- /manual -->` 包住，update/build 不得改其中文字。
++
++## 概念（concepts）
++
++领域里需要解释的词：计费口径、状态机名、角色、协议术语、内部黑话。
++
++**识别信号**（并存即可，不要求全中）：
++
++- README / docs 里被定义或反复出现的术语
++- 类型名、包名、配置键、枚举值
++- 注释与错误文案中的稳定说法
++
++**一页一个概念。** INDEX 是词表：
++
++```markdown
++| 概念 | 一句话 | 页 |
++|------|--------|-----|
++| Listing | 一次可被预订的房源快照 | [listing.md](listing.md) |
++```
++
++正文最少包含：定义、为什么存在、容易混淆的近义、出现在哪些实体/处理线/模块。没有依据时写「推断」并给路径。
++
++## 实体（entities）
++
++有身份、可被引用的对象：持久化记录、消息、聚合根、对外 DTO（仅当它就是领域语言时）。
++
++**识别信号**：schema / migration / protobuf / struct / 模型类；仓储或序列化边界上的名词。
++
++INDEX 用表格：实体 / 身份 / 生命周期 / 页。正文建议小节：
++
++1. 是什么（一句）
++2. 关键字段（名、含义、约束）— 详尽模式补全；简约只列标识与状态
++3. 与其他实体的关系
++4. 谁读写（模块、处理线）
++5. 不变式与常见错误状态
++
++不要把每个内部 DTO 都做成实体。胶水结构留在模块文件表即可。
++
++## 业务处理线（flows）
++
++一次对用户或系统有意义的完整路径，不是函数调用图。
++
++**识别信号**：HTTP/RPC 处理器、CLI 子命令、消费者/定时任务、README 中的「如何完成 X」。
++
++INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
++
++| 节 | 写什么 |
++|----|--------|
++| 背景 | 谁在什么场合发起 |
++| 目标 | 成功时世界变成什么样 |
++| 流程 | 有序步骤；每步对应模块或符号 |
++| 依赖 | 上游数据、服务、前置状态 |
++| 输出 | 返回值、持久化、消息、副作用 |
++| 失败 | 关键失败如何结束，是否可重试 |
++
++步骤用有序列表，复杂分叉用小表格。链到实体和概念，不在流程里重新下定义。
++
++## 维护
++
++| 动作 | 做法 |
++|------|------|
++| 新增 | 源码里稳定出现且能讲清的，补页并挂 INDEX、overview 地图 |
++| 更新 | `diff` 波及的符号/字段/步骤只改对应页；名称变更则改文件名或在旧页写跳转 |
++| 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
++| 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
++
++build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；孤页要么补链接要么删。
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -0,0 +1,141 @@
++# 金字塔布局与展示
++
++镜像根是 `detect` / `status` 给出的 `spec_root`（工程内为 `spec/`，否则为 `spec/<project>/`）。所有给人读的正文都在这里。
++
++## 目录
++
++```text
++<spec_root>/
++├── .mirror.json          # 机械状态，不给人读
++├── README.md             # 入口：怎么读、版本、地图
++├── overview.md           # 一层：项目是什么、为什么、模块与主路径
++├── changelog.md          # 镜像同步史，不是产品 changelog
++├── concepts/
++│   ├── INDEX.md
++│   └── <concept>.md
++├── entities/
++│   ├── INDEX.md
++│   └── <entity>.md
++├── flows/
++│   ├── INDEX.md
++│   └── <flow>.md
++└── modules/
++    ├── INDEX.md
++    └── <module>/
++        ├── README.md     # 模块职责、文件与核心功能
++        └── files/        # 仅详尽模式：每源文件一页
++            └── <file>.md
++```
++
++不要额外再造顶层分类。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线必须引用。
++
++## 阅读顺序（强制）
++
++从上往下写，也从上往下给人看：
++
++1. `README.md` — 30 秒：这是什么镜像、当前版本、四张地图入口
++2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线
++3. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
++4. `modules/` — 最后：代码如何承载上面三层
++
++下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
++
++## `.mirror.json`
++
++```json
++{
++  "version": 1,
++  "project": "example-api",
++  "placement": "in-project",
++  "source": "..",
++  "branch": "main",
++  "mode": "concise",
++  "scope": [],
++  "synced_commit": null,
++  "synced_at": null,
++  "updated_at": "2026-01-02T00:00:00Z"
++}
++```
++
++- `placement`：`in-project` | `external`
++- `source`：相对本镜像根；`in-project` 时为 `..`
++- `scope`：详尽模式的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）
++- `synced_commit`：已写入金字塔的那个 commit；未 build 则为 `null`
++
++只通过 `init` / `set-sync` 改这个文件。
++
++## README.md
++
++保持短。推荐结构：
++
++```markdown
++# Spec 镜像 — <project>
++
++给人读的孪生规格，不是源码、不是 OpenSpec。
++
++| 项 | 值 |
++|----|-----|
++| 粒度 | concise |
++| 分支 | main |
++| 同步 commit | `abc1234`（尚未同步则写「尚未同步」） |
++| 源 | git（或「非 git」） |
++
++## 怎么读
++
++1. [overview.md](overview.md)
++2. [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
++3. 需要看代码承载时再进 [模块](modules/INDEX.md)
++
++## 地图
++
++| 层 | 路径 | 回答什么 |
++|----|------|----------|
++| 总览 | overview.md | 这是什么、边界在哪 |
++| 概念 | concepts/ | 领域用语 |
++| 实体 | entities/ | 关键对象及其关系 |
++| 处理线 | flows/ | 一次业务怎么走完 |
++| 模块 | modules/ | 代码如何落地 |
++```
++
++## overview.md
++
++用短段和列表，不用大段散文：
++
++1. **一句话** — 这个项目做什么
++2. **背景与目标** — 谁用、解决什么、非目标
++3. **模块地图** — 表格：模块 / 职责 / 入口路径
++4. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
++5. **关键实体与概念** — 链到对应页面，不在这里下定义
++
++## 模块页
++
++`modules/<module>/README.md`：
++
++- 职责（相对 overview 只写本模块的）
++- 对外入口（命令、HTTP、消息、库 API）
++- 文件表：路径 / 一句话 / 核心符号（简约模式到此为止）
++- 依赖的其他模块、实体、处理线
++
++详尽模式的 `files/<file>.md` 见 [modes.md](modes.md)。文件路径中的 `/` 改成 `__` 作为页名，避免建深层目录，页内用源相对路径标明真身。
++
++## changelog.md
++
++只记录镜像同步，不抄 `git log` 全文：
++
++```markdown
++# 镜像同步
++
++## 2026-01-02 — `abc1234`
++
++- 模式：concise
++- 范围：全库（或列出路径）
++- 变更：新增 checkout 处理线；订单模块文件表更新
++```
++
++## 展示原则
++
++- 标题即论点；表格优先于段落。
++- 标识符、文件名、命令保持原文；叙述用中文。
++- 每页开头用 1–3 句让人决定要不要继续读。
++- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块能互相跳。
++- 不确定就写「未知 / 推断」，并标出来源路径；不要把命名猜测写成事实。
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -0,0 +1,51 @@
++# 简约与详尽
++
++`.mirror.json` 的 `mode` 是本镜像的粒度真相。切换模式等于该层重写，不是改几个标题。默认 **concise**。用户点名「详尽 / 每个函数 / 每个变量」时才用 detailed。
++
++## concise（简约）
++
++只回答「有哪些文件、各自核心能力是什么」。
++
++| 写 | 不写 |
++|----|------|
++| 模块职责、文件一览表 | `modules/*/files/` 详页 |
++| 每个文件 1 句职责 | 局部变量、逐行实现 |
++| 核心函数/类型：名字 + 一句职责 | 每个辅助函数的分支逻辑 |
++| 概念/实体/处理线的定义与关系 | 把函数体搬进规格 |
++
++「核心」指：对外入口、领域不变式、处理线必经符号。私有辅助、纯胶水、生成代码默认不列。
++
++文件表示例：
++
++```markdown
++| 文件 | 职责 | 核心 |
++|------|------|------|
++| `cmd/server/main.go` | 进程入口 | `main` |
++| `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
++```
++
++## detailed（详尽）
++
++在简约之上，为范围内**每个代码文件**建 `files/` 页，并记录该文件中的：
++
++- 包/模块级变量与常量（跳过密钥和明显测试噪声）
++- 类型/结构体字段（领域有意义的）
++- 函数/方法：参数、返回、副作用、实现要点（分支、锁、I/O、错误如何处理）
++- 非代码文件：该文件在构建或运行中的角色、关键键值（仍脱敏）
++
++实现要点写「怎么做」和「为什么这样」，不要贴大段源码。需要证据时引用符号名和相对路径。
++
++`symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。
++
++## 范围
++
++- 简约默认全库（仍走 inventory 忽略规则）。
++- 详尽应对 `scope` 或 `inventory --path` 收窄；`file_count` > 80 且未收窄时先问用户。
++- `set-sync --mode` 与实际写成的粒度必须一致。
++
++## 更新时
++
++- 简约：diff 里的文件只改模块文件表和被波及的知识页。
++- 详尽：变更文件重写对应 `files/` 页，并向上检查模块 README 与知识层是否仍成立。
++- 从 concise 升到 detailed：补 `files/`，不要删简约层已有叙述。
++- 从 detailed 降到 concise：停更 `files/`；除非用户要求删除，否则保留旧详页并在模块 README 注明「详尽页可能过期」。
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+new file mode 100755
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -0,0 +1,1276 @@
++#!/usr/bin/env python3
++"""specctl — project-spec-mirror 的机械管理工作。
++
++只做路径探测、目录骨架、git 版本、文件清单、符号提取与镜像状态。
++给人读的金字塔正文由 Agent 撰写。
++
++stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
++"""
++
++from __future__ import annotations
++
++import argparse
++import ast
++import json
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any
++
++PROJECT_FILE_MARKERS = frozenset(
++    {
++        "go.mod",
++        "package.json",
++        "pyproject.toml",
++        "Cargo.toml",
++        "pom.xml",
++        "build.gradle",
++        "build.gradle.kts",
++        "settings.gradle",
++        "CMakeLists.txt",
++        "Makefile",
++        "mix.exs",
++        "composer.json",
++        "Gemfile",
++    }
++)
++IGNORE_DIR_NAMES = frozenset(
++    {
++        ".git",
++        "node_modules",
++        "vendor",
++        "dist",
++        "build",
++        ".venv",
++        "venv",
++        "__pycache__",
++        "target",
++        ".tox",
++        ".idea",
++        ".vscode",
++        "coverage",
++        ".next",
++        "out",
++        "bin",
++        "obj",
++        ".cache",
++        ".gradle",
++        ".mypy_cache",
++        ".pytest_cache",
++        ".eggs",
++        "eggs",
++    }
++)
++LOCK_NAMES = frozenset(
++    {
++        "package-lock.json",
++        "yarn.lock",
++        "pnpm-lock.yaml",
++        "Cargo.lock",
++        "go.sum",
++        "poetry.lock",
++        "composer.lock",
++        "Gemfile.lock",
++        "bun.lock",
++        "bun.lockb",
++    }
++)
++SECRET_NAME_RE = re.compile(
++    r"(^\.env($|\.)|credentials|secrets|\.pem$|\.key$|"
++    r"id_rsa|id_ed25519|\.p12$|\.pfx$|\.keystore$)",
++    re.I,
++)
++BINARY_EXTS = frozenset(
++    {
++        ".png",
++        ".jpg",
++        ".jpeg",
++        ".gif",
++        ".webp",
++        ".ico",
++        ".pdf",
++        ".zip",
++        ".gz",
++        ".tgz",
++        ".woff",
++        ".woff2",
++        ".ttf",
++        ".eot",
++        ".so",
++        ".dylib",
++        ".dll",
++        ".exe",
++        ".bin",
++        ".class",
++        ".o",
++        ".a",
++        ".pyc",
++        ".pyo",
++        ".wasm",
++        ".mp3",
++        ".mp4",
++        ".jar",
++        ".whl",
++    }
++)
++CODE_EXTS = frozenset(
++    {
++        ".py",
++        ".go",
++        ".rs",
++        ".js",
++        ".ts",
++        ".tsx",
++        ".jsx",
++        ".java",
++        ".kt",
++        ".c",
++        ".h",
++        ".cpp",
++        ".cc",
++        ".hpp",
++        ".rb",
++        ".php",
++        ".cs",
++        ".swift",
++        ".scala",
++    }
++)
++MIRROR_VERSION = 1
++SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
++
++GO_FUNC = re.compile(r"^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(", re.M)
++GO_TYPE = re.compile(r"^type\s+(\w+)\s+", re.M)
++GO_VAR = re.compile(r"^(?:var|const)\s+(\w+)\b", re.M)
++JS_FN = re.compile(
++    r"^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(", re.M
++)
++JS_CLASS = re.compile(r"^(?:export\s+)?class\s+(\w+)\b", re.M)
++JS_CONST = re.compile(
++    r"^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=", re.M
++)
++RUST_FN = re.compile(r"^(?:pub(?:\([^)]+\))?\s+)?(?:async\s+)?fn\s+(\w+)\s*[<(]", re.M)
++RUST_TYPE = re.compile(
++    r"^(?:pub(?:\([^)]+\))?\s+)?(?:struct|enum|type|trait)\s+(\w+)\b", re.M
++)
++JAVA_TYPE = re.compile(
++    r"^(?:public|protected|private|static|final|\s)+class\s+(\w+)\b", re.M
++)
++JAVA_FN = re.compile(
++    r"^(?:public|protected|private|static|final|synchronized|\s)+"
++    r"[\w.<>,\[\]]+\s+(\w+)\s*\(",
++    re.M,
++)
++
++
++class SpecError(Exception):
++    def __init__(self, message: str, *, reason: str = "error", **details: Any) -> None:
++        super().__init__(message)
++        self.reason = reason
++        self.details = details
++
++
++def utc_now() -> str:
++    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
++        "+00:00", "Z"
++    )
++
++
++def emit(payload: dict[str, Any], *, code: int = 0, summary: str = "") -> int:
++    print(json.dumps(payload, ensure_ascii=False, indent=2))
++    if summary:
++        print(summary, file=sys.stderr)
++    return code
++
++
++def git(args: list[str], cwd: Path, check: bool = True) -> str:
++    proc = subprocess.run(
++        ["git", *args],
++        cwd=cwd,
++        capture_output=True,
++        text=True,
++        check=False,
++        env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "", "SSH_ASKPASS": ""},
++    )
++    if check and proc.returncode != 0:
++        err = (proc.stderr or proc.stdout or "").strip()
++        raise SpecError(f"git {' '.join(args)} failed: {err}", reason="git_failed")
++    return (proc.stdout or "").strip()
++
++
++def is_git_root(path: Path) -> bool:
++    return (path / ".git").exists()
++
++
++def is_project_root(path: Path) -> bool:
++    if is_git_root(path):
++        return True
++    return any((path / name).exists() for name in PROJECT_FILE_MARKERS)
++
++
++def nearest_project_root(start: Path) -> Path | None:
++    for candidate in (start, *start.parents):
++        if is_project_root(candidate):
++            return candidate
++    return None
++
++
++def find_git_root(start: Path) -> Path | None:
++    cur = start.resolve()
++    if not cur.is_dir():
++        cur = cur.parent
++    proc = subprocess.run(
++        ["git", "rev-parse", "--show-toplevel"],
++        cwd=cur,
++        capture_output=True,
++        text=True,
++        check=False,
++        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
++    )
++    if proc.returncode != 0:
++        return None
++    return Path(proc.stdout.strip()).resolve()
++
++
++def project_name_of(path: Path) -> str:
++    name = path.resolve().name.strip().lower().replace("_", "-")
++    name = re.sub(r"[^a-z0-9-]+", "-", name).strip("-")
++    return name or "project"
++
++
++def validate_project_name(name: str) -> str:
++    slug = name.strip().lower().replace("_", "-")
++    slug = re.sub(r"[^a-z0-9-]+", "-", slug).strip("-")
++    if not SLUG_RE.match(slug):
++        raise SpecError(
++            f"invalid project name: {name!r}; expected lowercase kebab-case",
++            reason="invalid_project",
++        )
++    return slug
++
++
++def rel_to(path: Path, start: Path) -> str:
++    return os.path.relpath(str(path.resolve()), str(start.resolve())).replace("\\", "/")
++
++
++def mirror_path(spec_root: Path) -> Path:
++    return spec_root / ".mirror.json"
++
++
++def load_state(spec_root: Path) -> dict[str, Any]:
++    path = mirror_path(spec_root)
++    if not path.is_file():
++        raise SpecError(f"missing .mirror.json under {spec_root}", reason="not_initialized")
++    try:
++        data = json.loads(path.read_text(encoding="utf-8"))
++    except json.JSONDecodeError as exc:
++        raise SpecError(f"invalid .mirror.json: {exc}", reason="invalid_state") from exc
++    if not isinstance(data, dict):
++        raise SpecError("invalid .mirror.json: expected object", reason="invalid_state")
++    return data
++
++
++def write_state(spec_root: Path, state: dict[str, Any]) -> None:
++    spec_root.mkdir(parents=True, exist_ok=True)
++    text = json.dumps(state, ensure_ascii=False, indent=2) + "\n"
++    mirror_path(spec_root).write_text(text, encoding="utf-8")
++
++
++def write_text(path: Path, text: str) -> None:
++    if not text.endswith("\n"):
++        text += "\n"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(text, encoding="utf-8")
++
++
++def resolve_source(spec_root: Path, state: dict[str, Any]) -> Path:
++    raw = state.get("source") or ".."
++    path = Path(raw)
++    if not path.is_absolute():
++        path = (spec_root / path).resolve()
++    else:
++        path = path.resolve()
++    if not path.exists():
++        raise SpecError(f"source does not exist: {path}", reason="source_missing")
++    return path
++
++
++def default_branch(source: Path) -> str | None:
++    if find_git_root(source) is None:
++        return None
++    sym = git(["symbolic-ref", "refs/remotes/origin/HEAD"], source, check=False)
++    if sym:
++        name = sym.rsplit("/", 1)[-1].strip()
++        if name:
++            return name
++    for candidate in ("main", "master", "trunk"):
++        out = git(["rev-parse", "--verify", candidate], source, check=False)
++        if out:
++            return candidate
++    current = git(["rev-parse", "--abbrev-ref", "HEAD"], source, check=False)
++    return current or None
++
++
++def commit_of(source: Path, ref: str) -> str:
++    sha = git(["rev-parse", "--verify", ref], source)
++    if not sha:
++        raise SpecError(f"unknown ref: {ref}", reason="unknown_ref")
++    return sha
++
++
++def git_info(source: Path, branch: str | None) -> dict[str, Any]:
++    root = find_git_root(source)
++    if root is None:
++        return {"is_git": False}
++    default = default_branch(source)
++    use = branch or default
++    head = git(["rev-parse", "--abbrev-ref", "HEAD"], source, check=False) or None
++    head_sha = git(["rev-parse", "HEAD"], source, check=False) or None
++    dirty = bool(git(["status", "--porcelain"], source, check=False))
++    info: dict[str, Any] = {
++        "is_git": True,
++        "git_root": str(root),
++        "default_branch": default,
++        "head_branch": head,
++        "head_commit": head_sha,
++        "dirty": dirty,
++    }
++    if use:
++        sha = git(["rev-parse", "--verify", use], source, check=False)
++        info["branch"] = use
++        info["commit"] = sha or None
++        if not sha:
++            info["branch_missing"] = True
++    return info
++
++
++def detect_layout(
++    cwd: Path,
++    *,
++    project: str | None = None,
++    source: Path | None = None,
++    in_project: bool = False,
++) -> dict[str, Any]:
++    cwd = cwd.resolve()
++    nearest = nearest_project_root(cwd)
++    cwd_is_root = is_project_root(cwd)
++    placement_root = cwd
++    placement = "external"
++    if in_project:
++        if nearest is None:
++            raise SpecError(
++                " --in-project requires a project root at or above cwd",
++                reason="project_root_not_found",
++            )
++        placement_root = nearest
++        placement = "in-project"
++    elif cwd_is_root:
++        placement_root = cwd
++        placement = "in-project"
++
++    source_path = source.resolve() if source is not None else None
++    if source_path is None:
++        if placement == "in-project":
++            source_path = placement_root
++        elif nearest is not None:
++            source_path = nearest
++
++    name = project
++    if not name:
++        if source_path is not None:
++            name = project_name_of(source_path)
++        elif placement == "in-project":
++            name = project_name_of(placement_root)
++    if name:
++        name = validate_project_name(name)
++
++    if placement == "in-project":
++        spec_root = placement_root / "spec"
++    else:
++        if not name:
++            raise SpecError(
++                "non-project directory requires --project (or --source)",
++                reason="project_required",
++            )
++        spec_root = cwd / "spec" / name
++
++    exists = spec_root.is_dir()
++    initialized = mirror_path(spec_root).is_file()
++    occupied = exists and not initialized and any(spec_root.iterdir())
++
++    result: dict[str, Any] = {
++        "cwd": str(cwd),
++        "is_project_root": cwd_is_root,
++        "nearest_project_root": str(nearest) if nearest else None,
++        "placement": placement,
++        "placement_root": str(placement_root),
++        "project": name,
++        "spec_root": str(spec_root),
++        "source": str(source_path) if source_path else None,
++        "spec_exists": exists,
++        "initialized": initialized,
++        "occupied": occupied,
++    }
++    if source_path is not None:
++        result["git"] = git_info(source_path, None)
++    else:
++        result["git"] = {"is_git": False}
++    return result
++
++
++def find_spec_root(cwd: Path, spec: Path | None, project: str | None) -> Path:
++    if spec is not None:
++        path = spec.resolve()
++        if not path.is_dir():
++            raise SpecError(f"spec root does not exist: {path}", reason="spec_missing")
++        return path
++    cwd = cwd.resolve()
++    in_place = cwd / "spec"
++    if mirror_path(in_place).is_file():
++        return in_place
++    if project:
++        named = cwd / "spec" / validate_project_name(project)
++        if mirror_path(named).is_file():
++            return named
++        raise SpecError(f"spec not initialized: {named}", reason="not_initialized")
++    external_dir = cwd / "spec"
++    if external_dir.is_dir():
++        found = [
++            child
++            for child in sorted(external_dir.iterdir())
++            if child.is_dir() and mirror_path(child).is_file()
++        ]
++        if len(found) == 1:
++            return found[0]
++        if len(found) > 1:
++            raise SpecError(
++                "multiple spec mirrors under spec/; pass --project",
++                reason="ambiguous_spec",
++                candidates=[p.name for p in found],
++            )
++    raise SpecError(
++        f"no spec mirror at or under {cwd}/spec",
++        reason="not_initialized",
++    )
++
++
++def is_secret_name(name: str) -> bool:
++    return bool(SECRET_NAME_RE.search(name))
++
++
++def should_skip_file(rel: str) -> bool:
++    parts = Path(rel).parts
++    if any(part in IGNORE_DIR_NAMES or part == "spec" for part in parts):
++        return True
++    name = Path(rel).name
++    if name in LOCK_NAMES or is_secret_name(name):
++        return True
++    if Path(rel).suffix.lower() in BINARY_EXTS:
++        return True
++    return False
++
++
++def looks_binary(path: Path) -> bool:
++    try:
++        chunk = path.read_bytes()[:8192]
++    except OSError:
++        return True
++    return b"\0" in chunk
++
++
++def list_git_files(source: Path) -> list[str]:
++    root = find_git_root(source)
++    if root is None:
++        return []
++    out = git(["ls-files", "-z"], source)
++    files: list[str] = []
++    prefix = ""
++    src = source.resolve()
++    if src != root:
++        try:
++            prefix = src.relative_to(root).as_posix().rstrip("/") + "/"
++        except ValueError:
++            prefix = ""
++    for raw in out.split("\0"):
++        if not raw:
++            continue
++        rel_root = raw.replace("\\", "/")
++        if prefix:
++            if not rel_root.startswith(prefix):
++                continue
++            rel = rel_root[len(prefix) :]
++        else:
++            rel = rel_root
++        if rel and not should_skip_file(rel):
++            files.append(rel)
++    return sorted(files)
++
++
++def walk_files(source: Path) -> list[str]:
++    files: list[str] = []
++    source = source.resolve()
++    for dirpath, dirnames, filenames in os.walk(source):
++        dirnames[:] = [
++            name
++            for name in dirnames
++            if name not in IGNORE_DIR_NAMES and name != "spec"
++        ]
++        base = Path(dirpath)
++        for name in filenames:
++            path = base / name
++            rel = path.relative_to(source).as_posix()
++            if should_skip_file(rel):
++                continue
++            files.append(rel)
++    return sorted(files)
++
++
++def inventory_files(source: Path, path_prefix: str | None = None) -> list[str]:
++    files = list_git_files(source) if find_git_root(source) else walk_files(source)
++    if path_prefix:
++        prefix = path_prefix.strip().lstrip("./")
++        files = [item for item in files if item == prefix or item.startswith(prefix.rstrip("/") + "/")]
++    return files
++
++
++def is_public_name(name: str) -> bool:
++    return not name.startswith("_")
++
++
++def extract_python(source: str, *, include_private: bool) -> list[dict[str, str]]:
++    try:
++        tree = ast.parse(source)
++    except SyntaxError:
++        return []
++    found: list[dict[str, str]] = []
++
++    def keep(name: str) -> bool:
++        return include_private or is_public_name(name)
++
++    for node in tree.body:
++        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and keep(node.name):
++            found.append(
++                {"kind": "function", "name": node.name, "line": str(node.lineno)}
++            )
++        elif isinstance(node, ast.ClassDef) and keep(node.name):
++            found.append({"kind": "class", "name": node.name, "line": str(node.lineno)})
++            for child in node.body:
++                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and keep(
++                    child.name
++                ):
++                    found.append(
++                        {
++                            "kind": "method",
++                            "name": f"{node.name}.{child.name}",
++                            "line": str(child.lineno),
++                        }
++                    )
++        elif isinstance(node, ast.Assign):
++            for target in node.targets:
++                if isinstance(target, ast.Name) and keep(target.id):
++                    found.append(
++                        {
++                            "kind": "variable",
++                            "name": target.id,
++                            "line": str(node.lineno),
++                        }
++                    )
++        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
++            if keep(node.target.id):
++                found.append(
++                    {
++                        "kind": "variable",
++                        "name": node.target.id,
++                        "line": str(node.lineno),
++                    }
++                )
++    return found
++
++
++def extract_regex(source: str, ext: str, *, include_private: bool) -> list[dict[str, str]]:
++    rules: list[tuple[str, re.Pattern[str]]] = []
++    if ext == ".go":
++        rules = [("function", GO_FUNC), ("type", GO_TYPE), ("variable", GO_VAR)]
++    elif ext in {".js", ".ts", ".tsx", ".jsx"}:
++        rules = [("function", JS_FN), ("class", JS_CLASS), ("variable", JS_CONST)]
++    elif ext == ".rs":
++        rules = [("function", RUST_FN), ("type", RUST_TYPE)]
++    elif ext in {".java", ".kt"}:
++        rules = [("class", JAVA_TYPE), ("function", JAVA_FN)]
++    found: list[dict[str, str]] = []
++    seen: set[tuple[str, str]] = set()
++    for kind, pattern in rules:
++        for match in pattern.finditer(source):
++            name = match.group(1)
++            if not include_private and not is_public_name(name):
++                continue
++            if kind == "function" and name in {
++                "if",
++                "for",
++                "while",
++                "switch",
++                "catch",
++                "return",
++            }:
++                continue
++            key = (kind, name)
++            if key in seen:
++                continue
++            seen.add(key)
++            line = source.count("\n", 0, match.start()) + 1
++            found.append({"kind": kind, "name": name, "line": str(line)})
++    return found
++
++
++def extract_symbols(path: Path, *, include_private: bool) -> list[dict[str, str]]:
++    ext = path.suffix.lower()
++    if ext not in CODE_EXTS:
++        return []
++    try:
++        text = path.read_text(encoding="utf-8")
++    except (OSError, UnicodeDecodeError):
++        return []
++    if ext == ".py":
++        return extract_python(text, include_private=include_private)
++    return extract_regex(text, ext, include_private=include_private)
++
++
++def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
++    branch_text = branch or "（无）"
++    return f"""# Spec 镜像 — {project}
++
++给人读的孪生规格，不是源码、不是 OpenSpec。
++
++| 项 | 值 |
++|----|-----|
++| 粒度 | {mode} |
++| 分支 | {branch_text} |
++| 同步 commit | 尚未同步 |
++| 源 | （见 `.mirror.json`） |
++
++## 怎么读
++
++1. [overview.md](overview.md)
++2. [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
++3. 需要看代码承载时再进 [模块](modules/INDEX.md)
++
++## 地图
++
++| 层 | 路径 | 回答什么 |
++|----|------|----------|
++| 总览 | overview.md | 这是什么、边界在哪 |
++| 概念 | concepts/ | 领域用语 |
++| 实体 | entities/ | 关键对象及其关系 |
++| 处理线 | flows/ | 一次业务怎么走完 |
++| 模块 | modules/ | 代码如何落地 |
++"""
++
++
++def skeleton_overview(project: str) -> str:
++    return f"""# {project}
++
++（待 build：一句话说明这个项目做什么。）
++
++## 背景与目标
++
++- 背景：
++- 目标：
++- 非目标：
++
++## 模块地图
++
++| 模块 | 职责 | 入口 |
++|------|------|------|
++
++## 主处理线
++
++（链到 `flows/`。）
++
++## 关键概念与实体
++
++（链到 `concepts/` 与 `entities/`。）
++"""
++
++
++def skeleton_index(title: str) -> str:
++    return f"""# {title}
++
++| 名称 | 一句话 | 页 |
++|------|--------|-----|
++"""
++
++
++def skeleton_changelog() -> str:
++    return """# 镜像同步
++
++尚未同步。
++"""
++
++
++def create_skeleton(
++    spec_root: Path,
++    *,
++    project: str,
++    placement: str,
++    source: Path,
++    branch: str | None,
++    mode: str,
++) -> None:
++    spec_root.mkdir(parents=True, exist_ok=True)
++    source_rel = rel_to(source, spec_root)
++    state = {
++        "version": MIRROR_VERSION,
++        "project": project,
++        "placement": placement,
++        "source": source_rel,
++        "branch": branch,
++        "mode": mode,
++        "scope": [],
++        "synced_commit": None,
++        "synced_at": None,
++        "updated_at": utc_now(),
++    }
++    write_state(spec_root, state)
++    write_text(spec_root / "README.md", skeleton_readme(project, mode, branch))
++    write_text(spec_root / "overview.md", skeleton_overview(project))
++    write_text(spec_root / "changelog.md", skeleton_changelog())
++    write_text(spec_root / "concepts" / "INDEX.md", skeleton_index("概念"))
++    write_text(spec_root / "entities" / "INDEX.md", skeleton_index("实体"))
++    write_text(spec_root / "flows" / "INDEX.md", skeleton_index("业务处理线"))
++    write_text(spec_root / "modules" / "INDEX.md", skeleton_index("模块"))
++
++
++def parse_name_status(text: str) -> list[dict[str, str]]:
++    files: list[dict[str, str]] = []
++    for line in text.splitlines():
++        if not line.strip():
++            continue
++        parts = line.split("\t")
++        status = parts[0]
++        if status.startswith("R") or status.startswith("C"):
++            path = parts[-1]
++            files.append({"status": status[0], "path": path, "from": parts[1]})
++        else:
++            files.append({"status": status[0], "path": parts[-1]})
++    return files
++
++
++# --------------------------------------------------------------------------- #
++# commands
++# --------------------------------------------------------------------------- #
++
++
++def cmd_detect(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    source = Path(args.source).expanduser().resolve() if args.source else None
++    layout = detect_layout(
++        cwd,
++        project=args.project,
++        source=source,
++        in_project=args.in_project,
++    )
++    return emit(
++        {"ok": True, "result": "detect", **layout},
++        summary=f"detect: {layout['placement']} -> {layout['spec_root']}",
++    )
++
++
++def cmd_init(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    source_arg = Path(args.source).expanduser().resolve() if args.source else None
++    layout = detect_layout(
++        cwd,
++        project=args.project,
++        source=source_arg,
++        in_project=args.in_project,
++    )
++    spec_root = Path(layout["spec_root"])
++    source = Path(layout["source"]) if layout["source"] else None
++    project = layout["project"]
++    if source is None or not project:
++        raise SpecError(
++            "init needs --source and --project (or a detectable project root)",
++            reason="project_required",
++        )
++    if layout["initialized"]:
++        return emit(
++            {
++                "ok": True,
++                "result": "init",
++                "already": True,
++                **layout,
++            },
++            summary=f"init: already initialized at {spec_root}",
++        )
++    if layout["occupied"]:
++        return emit(
++            {
++                "ok": False,
++                "result": "needs_confirm",
++                "reason": "spec_dir_occupied",
++                "spec_root": str(spec_root),
++                "prompt": (
++                    f"{spec_root} 已存在且没有 .mirror.json，可能不是本镜像目录。"
++                    "确认前不会覆盖。"
++                ),
++                "confirm_args": None,
++            },
++            code=2,
++            summary=f"init: occupied {spec_root}",
++        )
++    mode = args.mode
++    info = git_info(source, args.branch)
++    branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
++    if not args.confirm:
++        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
++        if args.project:
++            confirm_args.extend(["--project", args.project])
++        if args.source:
++            confirm_args.extend(["--source", str(source_arg)])
++        if args.in_project:
++            confirm_args.append("--in-project")
++        if args.branch:
++            confirm_args.extend(["--branch", args.branch])
++        return emit(
++            {
++                "ok": False,
++                "result": "needs_confirm",
++                "reason": "create_spec_dir",
++                "placement": layout["placement"],
++                "spec_root": str(spec_root),
++                "source": str(source),
++                "project": project,
++                "branch": branch,
++                "mode": mode,
++                "prompt": (
++                    f"将创建 spec 镜像目录 {spec_root} "
++                    f"（placement={layout['placement']}，source={source}）。"
++                    "确认后才会写入骨架。"
++                ),
++                "confirm_args": confirm_args,
++            },
++            code=2,
++            summary=f"init: confirm create {spec_root}",
++        )
++    create_skeleton(
++        spec_root,
++        project=project,
++        placement=layout["placement"],
++        source=source,
++        branch=branch,
++        mode=mode,
++    )
++    return emit(
++        {
++            "ok": True,
++            "result": "init",
++            "already": False,
++            "spec_root": str(spec_root),
++            "source": str(source),
++            "project": project,
++            "placement": layout["placement"],
++            "branch": branch,
++            "mode": mode,
++        },
++        summary=f"init: created {spec_root}",
++    )
++
++
++def cmd_status(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    branch = args.branch or state.get("branch")
++    info = git_info(source, branch)
++    synced = state.get("synced_commit")
++    freshness: dict[str, Any] = {"kind": "none"}
++    if info.get("is_git") and info.get("commit"):
++        freshness = {
++            "kind": "git",
++            "synced_commit": synced,
++            "target_commit": info["commit"],
++            "in_sync": bool(synced) and synced == info["commit"],
++        }
++        if synced:
++            proc = subprocess.run(
++                ["git", "merge-base", "--is-ancestor", synced, info["commit"]],
++                cwd=source,
++                capture_output=True,
++                check=False,
++            )
++            freshness["is_ancestor"] = proc.returncode == 0
++    elif not info.get("is_git"):
++        freshness = {"kind": "non-git", "note": "no commit diff; compare inventory"}
++    payload = {
++        "ok": True,
++        "result": "status",
++        "spec_root": str(spec_root),
++        "state": state,
++        "source": str(source),
++        "git": info,
++        "freshness": freshness,
++    }
++    return emit(
++        payload,
++        summary=f"status: {state.get('project')} {freshness.get('kind')}",
++    )
++
++
++def cmd_git_info(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    if args.source:
++        source = Path(args.source).expanduser().resolve()
++    else:
++        spec_root = find_spec_root(
++            cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++        )
++        source = resolve_source(spec_root, load_state(spec_root))
++    info = git_info(source, args.branch)
++    return emit(
++        {"ok": True, "result": "git-info", "source": str(source), **info},
++        summary=f"git-info: git={info.get('is_git')}",
++    )
++
++
++def cmd_inventory(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    prefix = args.path
++    files = inventory_files(source, prefix)
++    code_files = [item for item in files if Path(item).suffix.lower() in CODE_EXTS]
++    return emit(
++        {
++            "ok": True,
++            "result": "inventory",
++            "spec_root": str(spec_root),
++            "source": str(source),
++            "path": prefix,
++            "file_count": len(files),
++            "code_file_count": len(code_files),
++            "files": files,
++        },
++        summary=f"inventory: {len(files)} files",
++    )
++
++
++def cmd_symbols(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    targets = list(args.file)
++    if not targets:
++        raise SpecError("symbols requires one or more --file", reason="usage")
++    files_out: list[dict[str, Any]] = []
++    for rel in targets:
++        path = (source / rel).resolve()
++        try:
++            path.relative_to(source.resolve())
++        except ValueError as exc:
++            raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
++        if not path.is_file():
++            files_out.append({"path": rel, "missing": True, "symbols": []})
++            continue
++        files_out.append(
++            {
++                "path": rel,
++                "symbols": extract_symbols(
++                    path, include_private=args.private
++                ),
++            }
++        )
++    return emit(
++        {
++            "ok": True,
++            "result": "symbols",
++            "source": str(source),
++            "files": files_out,
++        },
++        summary=f"symbols: {len(files_out)} files",
++    )
++
++
++def cmd_diff(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    info = git_info(source, args.branch or state.get("branch"))
++    if not info.get("is_git"):
++        files = inventory_files(source, args.path)
++        return emit(
++            {
++                "ok": True,
++                "result": "diff",
++                "full": True,
++                "from": None,
++                "to": None,
++                "files": [{"status": "A", "path": item} for item in files],
++                "note": "non-git source; returning full inventory as added",
++            },
++            summary="diff: non-git full inventory",
++        )
++    target = args.to or info.get("commit")
++    if not target:
++        raise SpecError("cannot resolve target commit", reason="unknown_ref")
++    start = args.from_commit or state.get("synced_commit")
++    if not start:
++        files = inventory_files(source, args.path)
++        return emit(
++            {
++                "ok": True,
++                "result": "diff",
++                "full": True,
++                "from": None,
++                "to": target,
++                "files": [{"status": "A", "path": item} for item in files],
++            },
++            summary=f"diff: full to {target[:12]}",
++        )
++    name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
++    files = parse_name_status(name_status)
++    if args.path:
++        prefix = args.path.strip().lstrip("./")
++        files = [
++            item
++            for item in files
++            if item["path"] == prefix or item["path"].startswith(prefix.rstrip("/") + "/")
++        ]
++    return emit(
++        {
++            "ok": True,
++            "result": "diff",
++            "full": False,
++            "from": start,
++            "to": target,
++            "files": files,
++            "file_count": len(files),
++        },
++        summary=f"diff: {len(files)} files {start[:12]}..{target[:12]}",
++    )
++
++
++def cmd_set_sync(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    if args.mode:
++        if args.mode not in {"concise", "detailed"}:
++            raise SpecError("mode must be concise or detailed", reason="usage")
++        state["mode"] = args.mode
++    if args.branch:
++        state["branch"] = args.branch
++    if args.scope is not None:
++        state["scope"] = list(args.scope)
++    commit = args.commit
++    if commit:
++        info = git_info(source, state.get("branch"))
++        if info.get("is_git"):
++            commit = commit_of(source, commit)
++        state["synced_commit"] = commit
++        state["synced_at"] = utc_now()
++    elif args.commit == "":
++        state["synced_commit"] = None
++        state["synced_at"] = None
++    state["updated_at"] = utc_now()
++    write_state(spec_root, state)
++    return emit(
++        {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
++        summary=f"set-sync: {state.get('synced_commit') or 'none'}",
++    )
++
++
++def cmd_validate(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    required_files = [
++        "README.md",
++        "overview.md",
++        "changelog.md",
++        "concepts/INDEX.md",
++        "entities/INDEX.md",
++        "flows/INDEX.md",
++        "modules/INDEX.md",
++    ]
++    missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
++    issues: list[str] = []
++    if missing:
++        issues.append("missing: " + ", ".join(missing))
++    for key in ("version", "project", "placement", "source", "mode"):
++        if key not in state:
++            issues.append(f"state missing {key}")
++    if state.get("mode") not in {None, "concise", "detailed"}:
++        issues.append(f"invalid mode {state.get('mode')!r}")
++    source_ok = True
++    try:
++        source = resolve_source(spec_root, state)
++    except SpecError as exc:
++        source_ok = False
++        source = None
++        issues.append(str(exc))
++    ok = not issues
++    payload = {
++        "ok": ok,
++        "result": "validate",
++        "spec_root": str(spec_root),
++        "issues": issues,
++        "source_ok": source_ok,
++        "source": str(source) if source else None,
++        "mode": state.get("mode"),
++    }
++    return emit(
++        payload,
++        code=0 if ok else 1,
++        summary="validate: ok" if ok else "validate: issues",
++    )
++
++
++COMMANDS = {
++    "detect": cmd_detect,
++    "init": cmd_init,
++    "status": cmd_status,
++    "git-info": cmd_git_info,
++    "inventory": cmd_inventory,
++    "symbols": cmd_symbols,
++    "diff": cmd_diff,
++    "set-sync": cmd_set_sync,
++    "validate": cmd_validate,
++}
++
++
++class Parser(argparse.ArgumentParser):
++    def error(self, message: str) -> Any:  # noqa: ANN401
++        emit({"ok": False, "result": "error", "reason": "usage", "error": message}, code=1)
++        raise SystemExit(1)
++
++
++def build_parser() -> argparse.ArgumentParser:
++    common = argparse.ArgumentParser(add_help=False)
++    common.add_argument("--cwd", default=None, help="working directory; default process cwd")
++    common.add_argument("--spec", default=None, help="explicit spec root")
++    common.add_argument("--project", default=None, help="project slug")
++    common.add_argument("--source", default=None, help="path to the target project")
++    common.add_argument("--branch", default=None, help="git branch to track")
++
++    parser = Parser(prog="specctl", description=__doc__)
++    parser.add_argument("--cwd", dest="global_cwd", default=None)
++    parser.add_argument("--spec", dest="global_spec", default=None)
++    parser.add_argument("--project", dest="global_project", default=None)
++    parser.add_argument("--source", dest="global_source", default=None)
++    parser.add_argument("--branch", dest="global_branch", default=None)
++    subs = parser.add_subparsers(dest="command", required=True)
++
++    def add(name: str, **kwargs: Any) -> argparse.ArgumentParser:
++        return subs.add_parser(name, parents=[common], **kwargs)
++
++    detect = add("detect", help="判定 project 根与镜像落点")
++    detect.add_argument("--in-project", action="store_true")
++
++    init = add("init", help="创建镜像骨架；无 --confirm 时退出 2")
++    init.add_argument("--in-project", action="store_true")
++    init.add_argument("--confirm", action="store_true")
++    init.add_argument(
++        "--mode",
++        choices=("concise", "detailed"),
++        default="concise",
++    )
++
++    add("status", help="镜像状态与 git 新鲜度")
++    add("git-info", help="源仓库分支与 commit")
++
++    inventory = add("inventory", help="源文件清单")
++    inventory.add_argument("--path", default=None, help="仅列出此前缀下的文件")
++
++    symbols = add("symbols", help="提取代码符号")
++    symbols.add_argument("--file", action="append", default=[], help="相对 source 的路径，可重复")
++    symbols.add_argument("--private", action="store_true", help="包含 _ 前缀符号")
++
++    diff = add("diff", help="相对已同步 commit 的文件变更")
++    diff.add_argument("--from", dest="from_commit", default=None)
++    diff.add_argument("--to", dest="to", default=None)
++    diff.add_argument("--path", default=None)
++
++    set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
++    set_sync.add_argument("--commit", default=None)
++    set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
++    set_sync.add_argument("--scope", action="append", default=None)
++
++    add("validate", help="检查金字塔骨架与状态文件")
++    return parser
++
++
++def merge_globals(args: argparse.Namespace) -> None:
++    pairs = (
++        ("cwd", "global_cwd"),
++        ("spec", "global_spec"),
++        ("project", "global_project"),
++        ("source", "global_source"),
++        ("branch", "global_branch"),
++    )
++    for local, gname in pairs:
++        local_val = getattr(args, local, None)
++        global_val = getattr(args, gname, None)
++        if local_val and global_val and local_val != global_val:
++            raise SpecError(
++                f"conflicting --{local} values: {global_val!r} vs {local_val!r}",
++                reason="usage",
++            )
++        if local_val is None:
++            setattr(args, local, global_val)
++    if not getattr(args, "cwd", None):
++        args.cwd = str(Path.cwd())
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = build_parser()
++    args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
++    try:
++        merge_globals(args)
++        return COMMANDS[args.command](args)
++    except SpecError as exc:
++        return emit(
++            {
++                "ok": False,
++                "result": "error",
++                "reason": exc.reason,
++                "error": str(exc),
++                **exc.details,
++            },
++            code=1,
++            summary=f"{args.command}: {exc}",
++        )
++    except Exception as exc:  # noqa: BLE001
++        return emit(
++            {
++                "ok": False,
++                "result": "error",
++                "reason": "internal",
++                "error": f"{type(exc).__name__}: {exc}",
++            },
++            code=1,
++            summary=f"{args.command}: {type(exc).__name__}: {exc}",
++        )
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -0,0 +1,43 @@
++"""SKILL.md 与 specctl 命令表一致性。"""
++
++from __future__ import annotations
++
++import re
++import sys
++import unittest
++from pathlib import Path
++
++SKILL_ROOT = Path(__file__).resolve().parents[1]
++SCRIPT = SKILL_ROOT / "scripts" / "specctl.py"
++sys.path.insert(0, str(SCRIPT.parent))
++
++import specctl  # noqa: E402
++
++EXPECTED = {
++    "detect",
++    "init",
++    "status",
++    "git-info",
++    "inventory",
++    "symbols",
++    "diff",
++    "set-sync",
++    "validate",
++}
++
++
++class ContractTest(unittest.TestCase):
++    def test_commands_match_skill_table(self) -> None:
++        self.assertEqual(set(specctl.COMMANDS), EXPECTED)
++        text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        for name in EXPECTED:
++            self.assertRegex(text, rf"`{re.escape(name)}`")
++
++    def test_frontmatter_name(self) -> None:
++        text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("name: project-spec-mirror", text)
++        self.assertIn("id: project-spec-mirror", text)
++
++    def test_reference_files_exist(self) -> None:
++        for rel in ("references/layout.md", "references/modes.md", "references/knowledge.md"):
++            self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -0,0 +1,271 @@
++"""specctl 回归测试。
++
++覆盖放置判定、init 确认门、git 同步指针、清单忽略与符号提取。
++不测 JSON 排版与 stderr 措辞。
++"""
++
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++import unittest
++from pathlib import Path
++
++SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "specctl.py"
++sys.path.insert(0, str(SCRIPT.parent))
++
++import specctl  # noqa: E402
++
++
++def run(*args: str, cwd: Path | None = None) -> tuple[int, dict]:
++    proc = subprocess.run(
++        [sys.executable, str(SCRIPT), *args],
++        cwd=str(cwd) if cwd else None,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++        text=True,
++    )
++    payload = json.loads(proc.stdout) if proc.stdout.strip() else {}
++    return proc.returncode, payload
++
++
++def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
++    return subprocess.run(
++        ["git", "-C", str(repo), *args],
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++        text=True,
++        check=True,
++    )
++
++
++def make_repo(path: Path) -> Path:
++    path.mkdir(parents=True, exist_ok=True)
++    git(path, "init", "-q")
++    git(path, "config", "user.email", "dev@example.com")
++    git(path, "config", "user.name", "example")
++    git(path, "config", "commit.gpgsign", "false")
++    (path / "go.mod").write_text("module example.com/example-api\n", encoding="utf-8")
++    (path / "internal").mkdir()
++    (path / "internal" / "order.go").write_text(
++        "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n",
++        encoding="utf-8",
++    )
++    (path / "README.md").write_text("# example-api\n", encoding="utf-8")
++    git(path, "add", ".")
++    git(path, "commit", "-q", "-m", "init")
++    git(path, "branch", "-M", "main")
++    return path
++
++
++class DetectTest(unittest.TestCase):
++    def test_project_root_places_spec_here(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, payload = run("detect", "--cwd", str(root))
++            self.assertEqual(code, 0)
++            self.assertTrue(payload["is_project_root"])
++            self.assertEqual(payload["placement"], "in-project")
++            self.assertEqual(payload["spec_root"], str(root / "spec"))
++            self.assertEqual(payload["project"], "example-api")
++
++    def test_non_project_requires_project_or_source(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            notes = Path(raw) / "notes"
++            notes.mkdir()
++            code, payload = run("detect", "--cwd", str(notes))
++            self.assertEqual(code, 1)
++            self.assertEqual(payload["reason"], "project_required")
++
++    def test_external_placement_uses_project_slug(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            notes = Path(raw) / "notes"
++            notes.mkdir()
++            src = make_repo(Path(raw) / "example-api")
++            code, payload = run(
++                "detect",
++                "--cwd",
++                str(notes),
++                "--source",
++                str(src),
++                "--project",
++                "example-api",
++            )
++            self.assertEqual(code, 0)
++            self.assertEqual(payload["placement"], "external")
++            self.assertEqual(payload["spec_root"], str(notes / "spec" / "example-api"))
++
++
++class InitTest(unittest.TestCase):
++    def test_init_without_confirm_exits_2(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, payload = run("init", "--cwd", str(root))
++            self.assertEqual(code, 2)
++            self.assertEqual(payload["reason"], "create_spec_dir")
++            self.assertFalse((root / "spec").exists())
++            self.assertIn("--confirm", payload["confirm_args"])
++
++    def test_init_confirm_creates_skeleton(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, payload = run("init", "--cwd", str(root), "--confirm")
++            self.assertEqual(code, 0, payload)
++            spec = root / "spec"
++            self.assertTrue((spec / ".mirror.json").is_file())
++            self.assertTrue((spec / "README.md").is_file())
++            self.assertTrue((spec / "concepts" / "INDEX.md").is_file())
++            state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))
++            self.assertEqual(state["placement"], "in-project")
++            self.assertEqual(state["source"], "..")
++            self.assertEqual(state["mode"], "concise")
++            self.assertIsNone(state["synced_commit"])
++
++    def test_occupied_spec_dir_exits_2(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            spec = root / "spec"
++            spec.mkdir()
++            (spec / "other.md").write_text("not a mirror\n", encoding="utf-8")
++            code, payload = run("init", "--cwd", str(root), "--confirm")
++            self.assertEqual(code, 2)
++            self.assertEqual(payload["reason"], "spec_dir_occupied")
++
++    def test_in_project_from_subdir(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            sub = root / "internal"
++            code, payload = run(
++                "init", "--cwd", str(sub), "--in-project", "--confirm"
++            )
++            self.assertEqual(code, 0, payload)
++            self.assertTrue((root / "spec" / ".mirror.json").is_file())
++            self.assertEqual(payload["placement"], "in-project")
++
++
++class GitAndSyncTest(unittest.TestCase):
++    def test_diff_then_set_sync(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, _ = run("init", "--cwd", str(root), "--confirm")
++            self.assertEqual(code, 0)
++            sha = git(root, "rev-parse", "HEAD").stdout.strip()
++            code, payload = run("diff", "--cwd", str(root))
++            self.assertEqual(code, 0)
++            self.assertTrue(payload["full"])
++            self.assertEqual(payload["to"], sha)
++
++            (root / "internal" / "order.go").write_text(
++                "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n\nfunc Get() {}\n",
++                encoding="utf-8",
++            )
++            git(root, "add", ".")
++            git(root, "commit", "-q", "-m", "add Get")
++            new_sha = git(root, "rev-parse", "HEAD").stdout.strip()
++
++            code, payload = run("set-sync", "--cwd", str(root), "--commit", sha)
++            self.assertEqual(code, 0, payload)
++            code, payload = run("diff", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertFalse(payload["full"])
++            paths = {item["path"] for item in payload["files"]}
++            self.assertIn("internal/order.go", paths)
++
++            code, payload = run("status", "--cwd", str(root))
++            self.assertEqual(code, 0)
++            self.assertFalse(payload["freshness"]["in_sync"])
++            self.assertTrue(payload["freshness"]["is_ancestor"])
++
++            code, payload = run("set-sync", "--cwd", str(root), "--commit", new_sha)
++            self.assertEqual(code, 0)
++            code, payload = run("status", "--cwd", str(root))
++            self.assertTrue(payload["freshness"]["in_sync"])
++
++    def test_inventory_skips_secrets_and_vendor(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            (root / ".env").write_text("SECRET=1\n", encoding="utf-8")
++            (root / "vendor" / "lib.go").parent.mkdir()
++            (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
++            git(root, "add", "-f", ".env", "vendor/lib.go")
++            git(root, "commit", "-q", "-m", "noise")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("inventory", "--cwd", str(root))
++            self.assertEqual(code, 0)
++            names = payload["files"]
++            self.assertNotIn(".env", names)
++            self.assertTrue(all(not item.startswith("vendor/") for item in names))
++            self.assertIn("internal/order.go", names)
++
++
++class SymbolsTest(unittest.TestCase):
++    def test_python_ast_and_go_regex(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = Path(raw) / "demo"
++            root.mkdir()
++            (root / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
++            (root / "app.py").write_text(
++                "VALUE = 1\n_hidden = 2\n\nclass Order:\n    def place(self):\n        return 1\n\ndef cancel():\n    return 0\n",
++                encoding="utf-8",
++            )
++            (root / "order.go").write_text(
++                "package order\n\nfunc Place() {}\n",
++                encoding="utf-8",
++            )
++            code, payload = run("init", "--cwd", str(root), "--confirm")
++            self.assertEqual(code, 0, payload)
++            code, payload = run(
++                "symbols", "--cwd", str(root), "--file", "app.py", "--file", "order.go"
++            )
++            self.assertEqual(code, 0, payload)
++            by_path = {item["path"]: item["symbols"] for item in payload["files"]}
++            py_names = {item["name"] for item in by_path["app.py"]}
++            self.assertIn("VALUE", py_names)
++            self.assertIn("Order", py_names)
++            self.assertIn("Order.place", py_names)
++            self.assertIn("cancel", py_names)
++            self.assertNotIn("_hidden", py_names)
++            go_names = {item["name"] for item in by_path["order.go"]}
++            self.assertIn("Place", go_names)
++
++
++class ValidateTest(unittest.TestCase):
++    def test_validate_ok_after_init(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("validate", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["issues"], [])
++
++    def test_direct_helpers_secret_skip(self) -> None:
++        self.assertTrue(specctl.should_skip_file(".env.local"))
++        self.assertTrue(specctl.should_skip_file("certs/server.pem"))
++        self.assertFalse(specctl.should_skip_file("internal/order.go"))
++
++
++if __name__ == "__main__":
++    unittest.main()
