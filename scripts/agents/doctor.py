@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from common import Catalog, TOOLS
+import defaults as skill_defaults
 import doctor_impl as env_doctor
 
 STATUS_PASS = env_doctor.STATUS_PASS
@@ -77,6 +78,41 @@ def check_skills_drift(cat: Catalog, report: DoctorReport) -> None:
             "skills-drift",
             STATUS_PASS,
             f"~/.agents/skills 与源一致（{len(skill_ids)} 项）",
+        )
+
+    try:
+        defaults = skill_defaults.load_catalog(cat.root)
+    except SystemExit as exc:
+        msg = str(exc)
+        if msg.startswith("error: "):
+            msg = msg[7:]
+        report.add("skills", "defaults-catalog", STATUS_FAIL, msg)
+        return
+    report.add(
+        "skills",
+        "defaults-catalog",
+        STATUS_PASS,
+        f"默认 skill 清单 {len(defaults)} 项",
+    )
+    missing_defaults = [
+        it["skill"]
+        for it in defaults
+        if not skill_defaults.dest_skill_md(it["skill"], skill_dest).is_file()
+    ]
+    if missing_defaults:
+        report.add(
+            "skills",
+            "defaults-drift",
+            STATUS_WARN,
+            f"~/.agents/skills 缺少默认 skill（{', '.join(missing_defaults)}）",
+            hint="运行 scripts/agents/sync.sh --skills-only（需 npx）",
+        )
+    else:
+        report.add(
+            "skills",
+            "defaults-drift",
+            STATUS_PASS,
+            f"默认 skill 已安装（{len(defaults)} 项）",
         )
 
 

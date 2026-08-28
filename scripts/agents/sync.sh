@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 统一 agents sync：skills（tool 无关，→ ~/.agents/skills）+ MCP/env（按 tool 过滤）。
+# 统一 agents sync：一手 skills + 第三方默认 skill（~/.agents/skills）+ MCP/env（按 tool 过滤）。
 # 用法:
 #   sync.sh [cursor|kiro|opencode|codex|kimi-code|pi|zcode|dsh|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
@@ -81,6 +81,8 @@ if [ "$SKILLS" -eq 1 ]; then
     skills_args+=(--dry-run)
   fi
   python3 "$SCRIPT_DIR/sync.py" "${skills_args[@]}"
+  echo "--- default skills ---"
+  python3 "$SCRIPT_DIR/defaults.py" "${skills_args[@]}"
 fi
 
 if [ "$ENV" -eq 1 ]; then
