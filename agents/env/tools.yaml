@@ -64,3 +64,10 @@ tools:
     required: false
     profiles: [browser, full]
     install_hint: "随 Node.js 提供；browser profile 需要 npx 启动 Playwright MCP"
+
+  browser-use:
+    command: browser-use
+    version_cmd: ["browser-use", "--version"]
+    required: false
+    profiles: [browser, full]
+    install_hint: "uv tool install --python 3.12 --upgrade --force browser-use"
