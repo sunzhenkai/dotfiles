@@ -5,7 +5,7 @@ description: Direct-invocation specialist for self-contained HTML diagrams whose
 
 # HTML Diagram
 
-> Vendored reference from [plannotator/effective-html `skills/html-diagram`](https://github.com/plannotator/effective-html/blob/main/skills/html-diagram/SKILL.md). When invoked via `pretty-view-html`, follow the parent Skill for embedding, Chinoiserie palette, and page layout; this file supplies diagram modeling and rendering guidance.
+> Vendored reference from [plannotator/effective-html `skills/html-diagram`](https://github.com/plannotator/effective-html/blob/main/skills/html-diagram/SKILL.md). When invoked via `pretty-view-html`, follow the parent Skill for embedding, the page visual language, and page layout; this file supplies diagram modeling and rendering guidance.
 
 Build the smallest visual model that makes the relationship easier to understand than prose alone. Match the notation and visual language to the user's project and subject. Do not force every topic into the same SVG boxes and arrows.
 
@@ -36,7 +36,7 @@ Use HTML and CSS, SVG, Canvas, or WebGL according to the information and scale. 
 
 Add sequencing, filtering, path tracing, pan and zoom, or animation only when it helps answer the stated question. Keep overlays dismissible, controls keyboard-accessible, and motion compatible with `prefers-reduced-motion`.
 
-When used from `pretty-view-html`, the parent Skill's Chinoiserie palette and [frontend-design](../frontend-design/SKILL.md) guidance set the surrounding composition and visual register. Keep the chosen diagram grammar, label legibility, and relationships authoritative over decorative treatment.
+When used from `pretty-view-html`, the parent Skill's selected palette and [frontend-design](../frontend-design/SKILL.md) guidance set the surrounding composition and visual register. Keep the chosen diagram grammar, label legibility, and relationships authoritative over decorative treatment.
 
 ## Build and verify
 
