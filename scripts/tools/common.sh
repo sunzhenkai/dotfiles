@@ -120,6 +120,21 @@ pip_install_system() {
 # 确认函数（提示与输入均走 /dev/tty，避免被 runner 捕获 stdout/stderr 时不可见）
 # 参数: $1=提示信息, $2=默认值(Y/N, 默认Y)
 # 返回: 0=用户确认, 1=用户拒绝
+#
+# /dev/tty 可用性检测：仅 [-r/-w] 查 file mode 不够，PTY-less 会话仍 ENXIO。
+# 需用真打开 FD 试探两次（read+write）才能可靠识别。
+is_tty_available() {
+  if ! exec 3</dev/tty 2>/dev/null; then
+    return 1
+  fi
+  exec 3<&-
+  if ! exec 3>/dev/tty 2>/dev/null; then
+    return 1
+  fi
+  exec 3>&-
+  return 0
+}
+
 confirm() {
   local prompt="$1"
   local default="${2:-Y}"
@@ -129,19 +144,19 @@ confirm() {
     return 0
   fi
 
-  if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+  if ! is_tty_available; then
     echo "错误: 非 TTY 环境请使用 --yes 或 --dry-run" >&2
     return 1
   fi
 
-  local reply
+  local reply=""
   if [[ "$default" == "Y" ]]; then
     printf '%s [Y/n]: ' "$prompt" >/dev/tty
-    read -r reply </dev/tty || true
+    read -r reply </dev/tty || reply=""
     [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
   else
     printf '%s [y/N]: ' "$prompt" >/dev/tty
-    read -r reply </dev/tty || true
+    read -r reply </dev/tty || reply=""
     [[ "$reply" =~ ^[Yy] ]]
   fi
 }

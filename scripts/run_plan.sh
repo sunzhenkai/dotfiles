@@ -52,18 +52,31 @@ if [ -z "$PLAN_FILE" ] || [ ! -f "$PLAN_FILE" ]; then
   exit 2
 fi
 
+# 真检测 /dev/tty 是否可读写（仅查 file mode 的 -r/-w 在 PTY-less 会话会绕过）
+is_tty_available() {
+  if ! exec 3</dev/tty 2>/dev/null; then
+    return 1
+  fi
+  exec 3<&-
+  if ! exec 3>/dev/tty 2>/dev/null; then
+    return 1
+  fi
+  exec 3>&-
+  return 0
+}
+
 confirm() {
   local prompt="$1"
-  local reply
+  local reply=""
   if [ "$ASSUME_YES" -eq 1 ]; then
     return 0
   fi
-  if [ ! -r /dev/tty ]; then
+  if ! is_tty_available; then
     echo "错误: 非 TTY 环境请使用 --yes 或 --dry-run" >&2
     return 1
   fi
   printf '%s [y/N]: ' "$prompt" >/dev/tty
-  read -r reply </dev/tty || true
+  read -r reply </dev/tty || reply=""
   [[ "$reply" =~ ^[Yy]$ ]]
 }
 
@@ -138,7 +151,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 if [ "$ASSUME_YES" -ne 1 ]; then
-  if [ ! -r /dev/tty ]; then
+  if ! is_tty_available; then
     echo "错误: 非 TTY 环境请使用 --yes 或 --dry-run" >&2
     exit 1
   fi

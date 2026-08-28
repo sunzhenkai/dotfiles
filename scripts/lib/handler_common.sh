@@ -15,12 +15,23 @@ dotf_handler_init() {
   fi
 }
 
-# 若 bin 已在 PATH 或 ~/.local/bin，返回 unchanged
+# 若 bin 已在 PATH 或 ~/.local/bin 且真实可执行，返回 unchanged
 # 用法: dotf_skip_if_bin <bin_name> → 0=应跳过并已 emit，1=继续安装
+#
+# 注意：仅 [ -x ] / command -v 不够 —— 悬空 symlink（link 存在但 target 缺失）
+# 在部分 shell 里会让 [ -x ] 仍为真，导致二进制实际丢失却误报已装。
+# 必须解析到真实路径后检查文件存在并可执行。
 dotf_skip_if_bin() {
   local bin_name="$1"
   local local_path="${HOME}/.local/bin/${bin_name}"
-  if command -v "$bin_name" >/dev/null 2>&1 || [ -x "$local_path" ]; then
+  local resolved
+
+  resolved="$(command -v "$bin_name" 2>/dev/null || true)"
+  if [ -n "$resolved" ] && [ -e "$resolved" ] && [ -x "$resolved" ]; then
+    dotf_result_unchanged "${bin_name} already installed"
+    return 0
+  fi
+  if [ -e "$local_path" ] && [ -x "$local_path" ]; then
     dotf_result_unchanged "${bin_name} already installed"
     return 0
   fi
