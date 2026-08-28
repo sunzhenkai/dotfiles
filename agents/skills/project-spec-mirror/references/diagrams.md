@@ -3,7 +3,7 @@
 镜像里的结构图、流程图、时序、数据流、状态机 **委托 skill `archify`**，不要用手绘 SVG/Mermaid 冒充 archify 产物，也不要把 archify 的 schema 或渲染器拷进本 Skill。
 
 - 上游： [tt-a1i/archify](https://github.com/tt-a1i/archify)（入口 `archify/SKILL.md`）
-- 安装（若环境还没有）：按其 README，例如 `npx skills add tt-a1i/archify`
+- 安装：`dotf agents -c` 会按 `agents/skills-defaults.yaml` 装到 `~/.agents/skills`；环境还没有时也可手动 `npx skills add tt-a1i/archify -g -y --copy`
 - 类型：`architecture` | `workflow` | `sequence` | `dataflow` | `lifecycle`
 - 产物：自包含 HTML，放到 `<spec_root>/diagrams/<slug>.html`；JSON 候选与 HTML 同目录、同 slug（如 `<slug>.json`），便于下次差分
 - `diagrams/INDEX.md`：图 / 类型 / 回答什么问题 / 链接

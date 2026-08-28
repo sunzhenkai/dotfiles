@@ -25,9 +25,10 @@ python3 scripts/agents/doctor.py
 
 ```text
 agents/
-  skills/<skill-id>/SKILL.md       # skill 源（frontmatter 渲染后分发）
+  skills/<skill-id>/SKILL.md       # 一手 skill 源（frontmatter 渲染后分发）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
+  skills-defaults.yaml             # 第三方默认 skill（npx skills add -g → ~/.agents/skills）
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
   env/                             # MCP / profiles / browser / security 真相源
   README.md
@@ -78,6 +79,8 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 
 skills 只同步到一个共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。
 
+一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过 `npx skills add <source> --skill <name> -g -y --copy` 安装到同一个 `~/.agents/skills`（不传 `-a`，避免写入各工具私有目录）。已存在的 skill 会跳过，不在每次 sync 时升级；升级用 `npx skills update -g`。缺少 npx 或网络时只警告，不阻断一手 skill 同步。
+
 ```bash
 # 同步 skills（tool 无关，一次性）+ 全部工具的 MCP/env
 scripts/agents/sync.sh all
@@ -95,8 +98,10 @@ scripts/config.sh agents
 共享 sync：`dotf agents -c [--tool <name>]`（`--tool` 只过滤 MCP/env）。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `dsh`（DeepSeek Harness CLI，bin: `dsh`）：MCP client 配置在 profile 内，不参与 agents/env 聚合（env_sync 为 skip stub）。安装走 `dotf dsh -i`。
 
-**不要手改** `~/.agents/skills/` 里由本系统生成的文件；请改 `agents/skills` 后重新 sync。
+**不要手改** `~/.agents/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`。
 
 ## 示例条目
 
-仓库自带：`browser`、`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + `frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-workflow`（task-new/explore/design/propose/apply/archive 生命周期）、`task-design`（复杂任务可选设计环节）、`taskflow`（driver change 编排一批子 change，零脚本，与 `task-workflow` 并存但互斥）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`task-workflow` 在已安装时委托它们。
+仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-workflow`（task-new/explore/design/propose/apply/archive 生命周期）、`task-design`（复杂任务可选设计环节）、`taskflow`（driver change 编排一批子 change，零脚本，与 `task-workflow` 并存但互斥）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`task-workflow` 在已安装时委托它们。
+
+第三方默认（`agents/skills-defaults.yaml`，`npx skills add -g`）：`archify`（`tt-a1i/archify`）、`browser-use`（`browser-use/browser-use`）、`frontend-design`（`anthropics/skills`）。多 skill 仓库只装点名的那一项，不会 `--all`。
