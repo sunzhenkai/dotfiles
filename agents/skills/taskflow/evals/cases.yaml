@@ -91,18 +91,19 @@ cases:
   - id: fail-closed-must-repos
     kind: core
     judge: deterministic
-    description: 必须仓切分支时 dirty 须确认带走，禁止 stash/reset/强制切换
+    description: 必须仓切分支时仅本 task 的 OpenSpec change 可免问，禁止 stash/reset/强制切换
     given: 准备涉及面角色为必须的仓
     expect:
       must:
         - 无任务分支则 git switch -c，已有则 git switch
-        - 工作树 dirty 时列出未提交路径并确认是否带到目标分支
+        - dirty 且未提交路径仅含 openspec/changes/{task}-* 时直接 checkout，不提问
+        - dirty 且含其它路径时列出未提交路径，只确认是否继续 checkout
         - 用户未确认或 git 拒绝时报告该仓并等用户处理；已准备成功的仓保留现状
       must_not:
         - 自动 stash、reset 或强制切换
-        - dirty 时未经确认直接切走
+        - dirty 含非当前 task 路径时未经确认直接切走
         - 对建议/排除仓切分支
-        - 按路径白名单自行判定哪些 dirty 可带走
+        - dirty 时展开成提交、留在当前分支或其它处理方式的选项
 
   - id: round-end-three-only
     kind: core
