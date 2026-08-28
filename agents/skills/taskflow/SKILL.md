@@ -69,7 +69,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 - 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
 - 子 change 一律命名 `{task}-<slice>`，与本 change 同一 planning root；跨 root 时在涉及面表显式记录 root 或 store id
 - 实现进度只认子 change 自己的 `tasks.md`；本文件的 checkbox 只在对应子 change 全勾且 `validate --strict` 通过后才勾
-- 涉及面里角色为 `必须` 的仓在实施前切任务分支；dirty 或 fetch 失败一律停下问用户，不自动 stash / reset / 强制切换
+- 涉及面里角色为 `必须` 的仓在实施前切任务分支：没有则 `git switch -c`，已有则 `git switch`。不许 stash / reset / 强制切换。工作树 dirty 时先列出未提交路径，确认是否把改动带到目标分支；用户不同意、git 拒绝或切错仓时停下
 - 只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了就保持未勾，在验证记录写一行原因后继续下一项
 - 结束时逐条列出未勾项与原因，不按 change 汇总
 
@@ -118,7 +118,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 - 角色只有三个取值：`必须`（会修改，实施前切任务分支）、`建议`（只读参考）、`排除`。
 - 分支准备是 driver `tasks.md` 里的 checkbox，只处理 `必须` 仓；`建议` 与 `排除` 仓保持只读。
-- fail closed：某个必须仓存在非目标分支的未提交改动，或 origin fetch 失败，就报告该仓并等用户处理；**禁止**自动 stash、reset 或强制切换。已准备成功的仓保留现状以便重试。
+- fail closed：**禁止**自动 stash、reset 或强制切换。目标分支不存在则 `git switch -c`，已存在则 `git switch`。工作树 dirty 时必须先列出未提交路径并获得确认再带走；用户未确认、git 拒绝或切到非必须仓时停下。已准备成功的仓保留现状以便重试。
 
 ### 一轮结束
 
