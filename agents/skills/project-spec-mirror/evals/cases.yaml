@@ -75,8 +75,8 @@ cases:
     given: 骨架已在，开始 build
     expect:
       must:
-        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md、routing.md
-        - 从上往下写 README / overview / facets / concepts / entities / flows / modules
+        - 先读 references/layout.md、modes.md、knowledge.md、projections.md、facets.md、diagrams.md、routing.md
+        - 从上往下写 README / overview / context / surface / data / runtime / build / facets / concepts / entities / flows / modules
         - 模块 README 含「根」表与「文件」表
         - 切片不必等全部契约写完
         - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
@@ -93,13 +93,28 @@ cases:
     given: build 或需要模块地图/切片路径/状态机图
     expect:
       must:
-        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现则 VERIFY/TRAFFIC 标明不适用）
+        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现时 VERIFY 仍写测试/性质，差分写无；无灰度时 TRAFFIC 仍写发布与回滚）
         - 切片生命周期从 identified 起写，不跳步假装 migrated
         - 需要图时加载 archify，HTML 写入 diagrams/
       must_not:
         - 把 archify schema 或渲染器拷进本 Skill
         - 未安装 archify 时声称已交付 HTML 图
         - 把 PHP/Go 写死为唯一对照语言对
+
+  - id: recovery-projections-runnable
+    kind: core
+    judge: deterministic
+    description: 维护五层恢复投影；验收是只凭镜像能重建可运行系统
+    given: 骨架已在，开始 build 或已有镜像缺恢复投影
+    expect:
+      must:
+        - 维护 context/ data/ surface/（含 config.md） runtime/ build/ 的 INDEX 与必填节
+        - 结束前做恢复完备自检（边界、表面、数据、拓扑、再生、脱敏）
+        - 缺骨架时先补这六个文件再改正文
+      must_not:
+        - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
+        - 把 contracts/runtime.md 当成部署拓扑页
+        - 再造本 Skill 未列出的顶层目录
 
   - id: delivery-summary-fields
     kind: core

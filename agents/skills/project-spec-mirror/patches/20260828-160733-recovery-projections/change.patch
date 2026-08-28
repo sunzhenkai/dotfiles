@@ -1,0 +1,679 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+index d5faaed..f80f51f 100644
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -2,9 +2,10 @@
+ id: project-spec-mirror
+ name: project-spec-mirror
+ description: >-
+-  为项目维护给人读的 spec 孪生目录：金字塔组织、工程切面（来源/契约/切片/验证/流量）、
+-  简约/详尽两种粒度，并用 git commit 做增量更新。图表委托 archify。在用户要求创建或更新
+-  project spec 镜像、spec 孪生、可读规格目录、工程切面，或点名 project-spec-mirror 时使用。
++  为项目维护给人读的 spec 孪生目录：金字塔、恢复投影（上下文/数据/表面/运行时/构建）、
++  工程切面（来源/契约/切片/验证/流量）、简约/详尽两档，并用 git commit 做增量更新。
++  图表委托 archify。验收是只凭镜像能重建可运行系统。在用户要求创建或更新 project spec
++  镜像、spec 孪生、可读规格目录、工程切面，或点名 project-spec-mirror 时使用。
+   不要用于 OpenSpec change、实现代码或只读问答。
+ ---
+ 
+@@ -12,7 +13,7 @@ description: >-
+ 
+ 面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
+ 
+-为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、切面正文由 Agent 撰写。需要结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
++为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收档 C：只凭镜像能重建可运行系统。需要结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
+ 
+ ```bash
+ SPECCTL=$(command -v specctl || echo "python3 <this-skill>/scripts/specctl.py")
+@@ -56,9 +57,9 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ | 阶段 | 做什么 | 先读 |
+ |------|--------|------|
+ | `init` | 探测、确认、写骨架 | 本文件 |
+-| `build` | 按粒度生成金字塔 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md)、[routing.md](references/routing.md) |
++| `build` | 按粒度生成金字塔 + 恢复投影 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[projections.md](references/projections.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md)、[routing.md](references/routing.md) |
+ | `update` | 用 git diff 把变更文件路由到已有页 | 同上，只加载受影响层 |
+-| `maintain` | 改概念/实体/流/模块/切面/图中的指定条目 | 对应 reference |
++| `maintain` | 改概念/实体/流/模块/切面/图/恢复投影中的指定条目 | 对应 reference |
+ | `status` | 只读同步状态 | 本文件 |
+ 
+ 一次会话只服务**一个** target project。
+@@ -76,7 +77,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+ | `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
+-| `validate` | 金字塔、切面骨架与 `.mirror.json` 完整性 |
++| `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
+ 
+ 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
+ 
+@@ -102,18 +103,19 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 
+ 1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对 `scope` 内、且将写入模块表的文件跑 `symbols`）
+ 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+-3. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+-4. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified
+-5. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+-6. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。用户要「每个文件一页」时说明新模型，改为热点或 detailed 加深。要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+-7. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`（有热点则加 `--hotspot`），再 `$SPECCTL validate`
+-8. 向用户给出镜像根路径、怎么读（先 overview 再切面/金字塔）、同步 commit
++3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
++4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
++5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
++6. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。用户要「每个文件一页」时说明新模型，改为热点或 detailed 加深。要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
++8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`（有热点则加 `--hotspot`），再 `$SPECCTL validate`
++9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update
+ 
+ 1. `$SPECCTL status` 与 `$SPECCTL route`（内部用与 `diff` 相同的 `synced_commit..目标分支 commit`；可加 `--from` / `--to`）。按返回的 `modules` / `pages` / `renames` / `unmapped` 改页，不要手算、不要绕过 `route`
+-2. 只改映射到的模块 README 与跟链接的概念、实体、处理线、切面与相关图；rename（`status=R`）改文件表路径，不当删+增。上层概述若结论变了才改
+-3. 若缺 `facets/` 或 `diagrams/` 骨架，先补 INDEX（及切面短页），再改正文；不删已有金字塔
++2. 只改映射到的模块 README 与跟链接的概念、实体、处理线、恢复投影、切面与相关图；rename（`status=R`）改文件表路径，不当删+增。上层概述若结论变了才改
++3. 若缺 `context/` `data/` `surface/` `runtime/` `build/`、`facets/` 或 `diagrams/` 骨架，先补 INDEX（及 `surface/config.md`、切面短页），再改正文；不删已有金字塔
+ 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+ 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
+@@ -121,7 +123,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 
+ ### maintain
+ 
+-用户点名改某一概念/实体/流/模块/切面/图时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：改该模块文件表对应行并跟链接；只有用户明确要详注时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
++用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：改该模块文件表对应行并跟链接；只有用户明确要详注时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+ 
+ ### status
+ 
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+index c812921..b33d0f3 100644
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -75,8 +75,8 @@ cases:
+     given: 骨架已在，开始 build
+     expect:
+       must:
+-        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md、routing.md
+-        - 从上往下写 README / overview / facets / concepts / entities / flows / modules
++        - 先读 references/layout.md、modes.md、knowledge.md、projections.md、facets.md、diagrams.md、routing.md
++        - 从上往下写 README / overview / context / surface / data / runtime / build / facets / concepts / entities / flows / modules
+         - 模块 README 含「根」表与「文件」表
+         - 切片不必等全部契约写完
+         - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
+@@ -93,7 +93,7 @@ cases:
+     given: build 或需要模块地图/切片路径/状态机图
+     expect:
+       must:
+-        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现则 VERIFY/TRAFFIC 标明不适用）
++        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现时 VERIFY 仍写测试/性质，差分写无；无灰度时 TRAFFIC 仍写发布与回滚）
+         - 切片生命周期从 identified 起写，不跳步假装 migrated
+         - 需要图时加载 archify，HTML 写入 diagrams/
+       must_not:
+@@ -101,6 +101,21 @@ cases:
+         - 未安装 archify 时声称已交付 HTML 图
+         - 把 PHP/Go 写死为唯一对照语言对
+ 
++  - id: recovery-projections-runnable
++    kind: core
++    judge: deterministic
++    description: 维护五层恢复投影；验收是只凭镜像能重建可运行系统
++    given: 骨架已在，开始 build 或已有镜像缺恢复投影
++    expect:
++      must:
++        - 维护 context/ data/ surface/（含 config.md） runtime/ build/ 的 INDEX 与必填节
++        - 结束前做恢复完备自检（边界、表面、数据、拓扑、再生、脱敏）
++        - 缺骨架时先补这六个文件再改正文
++      must_not:
++        - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
++        - 把 contracts/runtime.md 当成部署拓扑页
++        - 再造本 Skill 未列出的顶层目录
++
+   - id: delivery-summary-fields
+     kind: core
+     judge: deterministic
+diff --git a/agents/skills/project-spec-mirror/references/diagrams.md b/agents/skills/project-spec-mirror/references/diagrams.md
+index 92ddc8f..bb80d71 100644
+--- a/agents/skills/project-spec-mirror/references/diagrams.md
++++ b/agents/skills/project-spec-mirror/references/diagrams.md
+@@ -10,7 +10,7 @@
+ 
+ ## 何时画
+ 
+-仅当表格说不清关系时：模块地图、切片主路径、对照实现差分、状态机。overview 与切片页用一句话说明「看哪张图」，不要在 Markdown 里再画一遍。
++仅当表格说不清关系时：系统上下文、模块地图、部署/进程拓扑、切片主路径、对照实现差分、状态机。overview 与切片页用一句话说明「看哪张图」，不要在 Markdown 里再画一遍。
+ 
+ ## 执行
+ 
+@@ -23,8 +23,10 @@
+ 
+ | 要回答的问题 | 优先类型 |
+ |--------------|----------|
++| 系统与邻接、信任边界 | `architecture`（链到 `context/`） |
+ | 模块、边界、依赖 | `architecture` |
++| 进程、部署、网络 | `architecture`（链到 `runtime/`） |
+ | 切片或发布步骤 | `workflow` |
+ | 一次请求/调用链 | `sequence` |
+-| 管道、血缘、存储 | `dataflow` |
++| 管道、血缘、存储 | `dataflow`（链到 `data/`） |
+ | 状态、重试、终态 | `lifecycle` |
+diff --git a/agents/skills/project-spec-mirror/references/facets.md b/agents/skills/project-spec-mirror/references/facets.md
+index a5549ac..6846893 100644
+--- a/agents/skills/project-spec-mirror/references/facets.md
++++ b/agents/skills/project-spec-mirror/references/facets.md
+@@ -1,6 +1,6 @@
+ # 工程切面
+ 
+-金字塔（概念 / 实体 / 处理线 / 模块）回答「这是什么」。切面回答「怎样可验证地改、迁、验」。两者并存，不互相替代。
++金字塔（概念 / 实体 / 处理线 / 模块）回答「这是什么」。恢复投影（`context/` `data/` `surface/` `runtime/` `build/`）回答「只凭镜像能否重建可运行系统」。切面回答「怎样可验证地改、迁、验」。三者并存，不互相替代。拓扑与启动走 `runtime/` / `build/`；本目录的 `contracts/runtime.md` 只写指标、灰度条件、回滚条件。
+ 
+ 参考结构来自可执行契约 + 垂直切片：先把现状变成证据，再以切片为最小交付单元；**不必等全部契约写完才开始维护切片**。PHP→Go 一类双栈迁移只是对照实现的一种实例，正文用「现状实现 / 对照实现」，不要写死语言对。
+ 
+@@ -33,10 +33,10 @@ build / update 识别并维护这些页。没有证据的契约页保留标题
+ | SOURCE | `source.md` | 事实从哪来：代码、配置、已有测试、脱敏请求/样本 |
+ | CONTRACT | `contracts/` | 必须保持为真的约定 |
+ | SLICE | `slices/` | 一条可独立交付的垂直切口 |
+-| VERIFY | `verify.md` | 如何对照验证（接口、数据、外部调用） |
+-| TRAFFIC | `traffic.md` | 流量如何影子 / 灰度 / 切换 / 回滚 |
++| VERIFY | `verify.md` | 如何证明行为仍真（测试、性质、对照差分） |
++| TRAFFIC | `traffic.md` | 如何发布与回滚（含影子 / 灰度；没有则写「无」） |
+ 
+-`facets/INDEX.md` 用表格链到上列五层；没有迁移或对照实现时，VERIFY/TRAFFIC 可以是短页「当前仅单实现，差分不适用」。
++`facets/INDEX.md` 用表格链到上列五层。没有对照实现时，VERIFY 仍须写用哪些测试或性质证明行为，差分一行写「无」；不要整页「不适用」。没有灰度时，TRAFFIC 仍须写发布步骤与回滚；完全没有发布机制才写「无」。
+ 
+ ## 契约种类
+ 
+@@ -48,7 +48,7 @@ build / update 识别并维护这些页。没有证据的契约页保留标题
+ | 行为 | `behavior.md` | 特征测试、Golden Case、输入→输出 |
+ | 副作用 | `side-effects.md` | DB / MQ / 外部调用断言 |
+ | 决策 | `decisions.md` | 轻量意图、ADR、开放问题 |
+-| 运行 | `runtime.md` | 指标、灰度条件、回滚条件 |
++| 运行 | `runtime.md` | 指标、灰度条件、回滚条件（拓扑见 `<spec_root>/runtime/`） |
+ 
+ 契约必须能追溯到 SOURCE（路径或测试名）。解释意图用短段；固化行为优先链到测试，不要把测试抄进 Spec。
+ 
+@@ -79,11 +79,11 @@ identified → characterized → specified → implemented → verified → cana
+ 
+ 切片页最少包含：一句话目标、入口、SOURCE 链接、契约链接、处理线链接、生命周期、副作用、验证方式。图放 `diagrams/`，页内只链过去。
+ 
+-推荐循环（有对照实现时）：选切片 → 分析现状行为 → 特征测试 → 轻量契约 → 实现对照侧 → 差分 → 灰度 → 回写本镜像。无对照实现时停在「特征测试 + 契约 + 源码同步」。
++推荐循环（有对照实现时）：选切片 → 分析现状行为 → 特征测试 → 轻量契约 → 实现对照侧 → 差分 → 灰度 → 回写本镜像。无对照实现时停在「特征测试 + 契约 + 源码同步」，VERIFY 仍记录这些测试。
+ 
+ ## 维护
+ 
+ - 新增切片：源码里能划清入口与副作用时再建页；先 identified，再补契约。
+ - 更新：`diff` 波及的路由/schema/测试按 [routing.md](routing.md) 改对应契约与切片，overview 只在地图变了才改。
+ - `<!-- manual -->` 块同样不可覆盖。
+-- 切面与金字塔交叉链接：切片 → flow / module / entity；契约 → 测试路径。
++- 切面与金字塔、恢复投影交叉链接：切片 → flow / module / entity / surface；契约 → 测试路径；VERIFY → `build/` 测试命令。
+diff --git a/agents/skills/project-spec-mirror/references/knowledge.md b/agents/skills/project-spec-mirror/references/knowledge.md
+index 0f51dc3..a185898 100644
+--- a/agents/skills/project-spec-mirror/references/knowledge.md
++++ b/agents/skills/project-spec-mirror/references/knowledge.md
+@@ -68,4 +68,4 @@ INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
+ | 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
+ | 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
+ 
+-build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。
++build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+index eb9789a..89a992c 100644
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -10,6 +10,17 @@
+ ├── README.md             # 入口：怎么读、版本、地图
+ ├── overview.md           # 一层：项目是什么、为什么、模块与主路径
+ ├── changelog.md          # 镜像同步史，不是产品 changelog
++├── context/              # 恢复：系统在环境里的位置
++│   └── INDEX.md
++├── data/                 # 恢复：持久化与一致性
++│   └── INDEX.md
++├── surface/              # 恢复：对外表面
++│   ├── INDEX.md
++│   └── config.md         # 配置键表
++├── runtime/              # 恢复：进程与部署拓扑
++│   └── INDEX.md
++├── build/                # 恢复：构建 / 测试 / 迁移 / 启动
++│   └── INDEX.md
+ ├── concepts/
+ │   ├── INDEX.md
+ │   └── <concept>.md
+@@ -36,7 +47,7 @@
+     └── INDEX.md
+ ```
+ 
+-不要在金字塔和切面/图表之外再造顶层分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
++顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+ 
+ ## 阅读顺序（强制）
+ 
+@@ -44,10 +55,11 @@
+ 
+ 1. `README.md` — 30 秒：这是什么镜像、当前版本、地图入口
+ 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
+-3. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
+-4. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
+-5. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
+-6. `diagrams/` — 看图，不替代上文段落
++3. `context/` / `surface/` / `data/` / `runtime/` / `build/` — 恢复可运行系统所需的投影
++4. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
++5. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
++6. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
++7. `diagrams/` — 看图，不替代上文段落
+ 
+ 下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
+ 
+@@ -84,7 +96,7 @@
+ ```markdown
+ # Spec 镜像 — <project>
+ 
+-给人读的孪生规格，不是源码、不是 OpenSpec。
++给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
+ 
+ | 项 | 值 |
+ |----|-----|
+@@ -96,14 +108,20 @@
+ ## 怎么读
+ 
+ 1. [overview.md](overview.md)
+-2. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+-3. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
++2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
++3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
++4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
+ 
+ ## 地图
+ 
+ | 层 | 路径 | 回答什么 |
+ |----|------|----------|
+ | 总览 | overview.md | 这是什么、边界在哪 |
++| 上下文 | context/ | 系统在环境里的位置 |
++| 表面 | surface/ | 对外接口与配置键 |
++| 数据 | data/ | 持久化与一致性 |
++| 运行时 | runtime/ | 进程、部署、拓扑 |
++| 构建 | build/ | 如何构建、迁移、启动 |
+ | 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
+ | 概念 | concepts/ | 领域用语 |
+ | 实体 | entities/ | 关键对象及其关系 |
+@@ -118,11 +136,12 @@
+ 
+ 1. **一句话** — 这个项目做什么
+ 2. **背景与目标** — 谁用、解决什么、非目标
+-3. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
+-4. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
+-5. **主切片** — 链到 `facets/slices/` 里正在维护的切口
+-6. **关键实体与概念** — 链到对应页面，不在这里下定义
+-7. **图** — 链到 `diagrams/`，没有图则省略本节
++3. **恢复入口** — 链到 context / surface / data / runtime / build，不在这里下定义
++4. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
++5. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
++6. **主切片** — 链到 `facets/slices/` 里正在维护的切口
++7. **关键实体与概念** — 链到对应页面，不在这里下定义
++8. **图** — 链到 `diagrams/`，没有图则省略本节
+ 
+ ## 模块如何划
+ 
+@@ -197,6 +216,6 @@
+ - 标题即论点；表格优先于段落。
+ - 标识符、文件名、命令保持原文；叙述用中文。
+ - 每页开头用 1–3 句让人决定要不要继续读。
+-- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块 ↔ 切片能互相跳。
++- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块 ↔ 切片 ↔ 恢复投影能互相跳。
+ - 图只放 `diagrams/` 的 archify HTML 链接；Markdown 里不要再画一遍拓扑。
+ - 不确定就写「未知 / 推断」，并标出来源路径；不要把命名猜测写成事实。
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+index 117da2c..7c6dcc8 100644
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -37,6 +37,7 @@
+ | 模块 README | 核心符号补参数、返回、副作用、错误如何结束；文件表仍一行一个文件 |
+ | 实体 | 领域字段、约束、不变式 |
+ | 处理线 | 每步落到模块 + 符号 + 失败形态 |
++| 恢复投影 | 同一批 INDEX（及 `surface/config.md`）写深：邻接协议、存储差、接口目录、拓扑、可再生命令 |
+ | 契约 | 能追溯 SOURCE；切片尽量到 specified |
+ | `notes/` | **默认仍不建**。只对用户点名或符合热点条件的路径建 |
+ 
+@@ -71,9 +72,9 @@
+ 
+ ## 更新时
+ 
+-按 [routing.md](routing.md) 把 `diff` 的文件映射到模块，再跟链接改知识层与切面。
++按 [routing.md](routing.md) 把 `diff` 的文件映射到模块，再跟链接改知识层、恢复投影与切面。
+ 
+-- 简约：只改模块文件表和被波及的知识/切面页。
++- 简约：只改模块文件表和被波及的知识/投影/切面页。
+ - 详尽：同样改这些页并写深；不要为每个变更文件建或重写详页。
+ - rename（`status=R`）：改文件表路径（及已有 `notes/` 文件名），不当成删除 + 新增。
+ - 从 concise 升到 detailed：加深已有页；不要补全量 `files/` 或 `notes/`。
+diff --git a/agents/skills/project-spec-mirror/references/projections.md b/agents/skills/project-spec-mirror/references/projections.md
+new file mode 100644
+index 0000000..1c59e8b
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/projections.md
+@@ -0,0 +1,142 @@
++# 恢复投影（可运行系统）
++
++金字塔回答「这是什么」。切面回答「怎样可验证地改、迁、验」。本文件的五层顶层回答「只凭镜像能否重建可运行系统」。三者并存，不互相替代。
++
++验收档 **C**：不读源码也应能（1）说明系统边界与邻接，（2）对上对外表面与配置键，（3）重建存储与一致性，（4）画出进程/部署拓扑，（5）从零构建、迁移、启动。不是源码逐行副本，也不是把测试正文抄进 Spec。
++
++## 目录
++
++```text
++<spec_root>/
++├── context/
++│   └── INDEX.md           # 系统在环境里的位置
++├── data/
++│   └── INDEX.md           # 持久化与一致性
++├── surface/
++│   ├── INDEX.md           # 对外接口目录
++│   └── config.md          # 配置键表（值脱敏）
++├── runtime/
++│   └── INDEX.md           # 进程、部署、拓扑
++└── build/
++    └── INDEX.md           # 构建 / 测试 / 迁移 / 启动
++```
++
++INDEX 是该层的阅读叶子。仅当 INDEX 放不下时再加页：多个邻接系统、多个存储、多个协议族。不要为每个源文件或每张表建页。
++
++`init` 必须创建上列六个文件；已有镜像在 update 时若缺则先补骨架再改正文。
++
++## 与金字塔 / 切面的分工
++
++| 已有层 | 回答 | 不要塞进这里 |
++|--------|------|----------------|
++| 概念 / 实体 | 领域词与对象 | 库实例、迁移、一致性模型 |
++| 处理线 | 一次业务怎么走完 | 系统级超时/重试/降级目录 |
++| 模块 | 代码如何落地 | 进程、端口、部署单元 |
++| SOURCE | 事实从哪来 | 配置键语义与环境差 |
++| 结构契约 | 必须为真的路由/schema 名 | 完整对外目录与兼容策略 |
++| `contracts/runtime.md` | 指标、灰度条件、回滚条件 | 拓扑与启动顺序（走 `runtime/`） |
++| VERIFY / TRAFFIC | 如何证明仍真、如何发布回滚 | 构建配方（走 `build/`） |
++
++交叉链接：context → surface / runtime；surface → 结构契约 / 处理线；data → 实体；runtime → build / 模块；build → runtime / VERIFY。
++
++## context/
++
++系统在环境中的位置。没有这页，模块和切片都是悬空的。
++
++INDEX 最少包含：
++
++1. **一句话** — 这个系统对谁、在哪条链上负责什么
++2. **使用者** — actor / 角色；没有真人用户则写调用方系统
++3. **邻接系统** — 表：邻接 / 方向（入|出|双向） / 协议 / 责任切在哪
++4. **信任边界** — 哪些调用过鉴权、哪些是内网、租户如何隔离
++5. **质量属性** — 延迟、吞吐、可用、容量中实际约束设计的项；没有则写「未知」并给推断来源
++6. **安全** — 认证、鉴权、租户；密钥只写「存在 / 轮换方式」，值写 `<REDACTED>`
++
++不确定就写「未知 / 推断」并标路径。不要编造邻接系统。
++
++## data/
++
++持久化与一致性。实体是领域对象；本层是数据怎么活。
++
++INDEX 最少包含：
++
++1. **存储实例** — 表：名称 / 引擎 / 角色（主数据|缓存|队列|对象存储） / 谁读写
++2. **与实体的差** — 哪些实体落在哪；哪些表/集合没有对应实体页（胶水表注明即可）
++3. **迁移与索引** — 迁移目录或工具；关键索引与唯一约束（链路径，不贴 SQL 全文）
++4. **一致性与保留** — 事务边界、重复投递、保留/归档/删除；没有则写「未知」
++
++多个存储且一张表说不清时，可加 `data/<store>.md`，INDEX 只留地图。
++
++## surface/
++
++必须对上的对外表面。对不上就不是同一个系统。
++
++`INDEX.md` 最少包含：
++
++1. **接口目录** — 表：入口（路由/命令/消息名） / 协议 / 版本 / 一句话 / 处理线或切片
++2. **兼容** — 版本策略、废弃、错误码习惯；没有版本则写「无」
++3. **对内接口** — 仅当它也是稳定契约时列入，并标明「对内」
++
++`config.md` 最少包含：
++
++1. **键表** — 名 / 语义 / 默认 / 环境差（dev/staging/prod 只写差，不写值）
++2. **开关** — feature flag 名与默认开闭
++3. 值、口令、连接串一律 `<REDACTED>`
++
++SOURCE 仍登记配置文件路径；本页只写键语义。结构契约仍登记必须为真的 schema 名；完整目录以本层为准。
++
++## runtime/
++
++进程与部署拓扑。`facets/contracts/runtime.md` 仍写指标与灰度/回滚条件，不写拓扑。
++
++INDEX 最少包含：
++
++1. **拓扑** — 表：进程或容器 / 角色 / 端口 / 副本或实例关系
++2. **网络与依赖** — 谁连谁、发现方式；链到 context 邻接
++3. **启动顺序** — 先存储/总线再应用等；链到 `build/` 的启动命令
++4. **健康检查** — 探活路径或命令；没有则写「无」
++5. **故障与弹性** — 超时、重试、降级、幂等中实际存在的策略
++6. **可观测** — 关键日志/指标/追踪/告警/SLO；没有则写「未知」
++
++compose / 清单 / 单元文件是证据路径，不要把整份 YAML 贴进本页。
++
++## build/
++
++可再生配方：从干净环境到可运行。不是项目对外 README，也不代替 README。
++
++INDEX 最少包含：
++
++1. **工具链** — 语言/运行时版本、包管理器；锁文件只列路径
++2. **依赖** — 必连的外部服务；第三方库只列影响运行的约束，不抄全 lock
++3. **构建** — 一条可复制的构建命令与产物路径
++4. **测试** — 一条可复制的测试命令；链到 VERIFY，不抄测试正文
++5. **迁移** — 如何套用 `data/` 里的迁移
++6. **启动** — 如何把 `runtime/` 拓扑跑起来（命令或 compose 名）
++
++缺命令就写「未知」并标清单文件路径，不要编造 `make` 目标。
++
++## 恢复完备自检
++
++build / update 结束前核对这些项；任一项做不到就在页内写「未知」与缺口，不要假装可恢复：
++
++| 检查 | 通过标准 |
++|------|----------|
++| 边界 | 只读 `context/` 能说出 actor、邻接与责任切 |
++| 表面 | 只读 `surface/` 能列出对外入口与配置键 |
++| 数据 | 只读 `data/` + 实体能重建存储与一致性 |
++| 拓扑 | 只读 `runtime/` 能画出进程/端口/启动顺序 |
++| 再生 | 只读 `build/` 能构建、迁移、启动（命令可执行或标明未知） |
++| 脱敏 | 无密钥、连接串、`.env` 原文 |
++
++`validate` 只检查这六个文件存在，不判断正文是否写满。
++
++## 维护
++
++| 动作 | 做法 |
++|------|------|
++| 新增 | 源码或清单里能划清的邻接/存储/入口/进程/命令，补进对应 INDEX |
++| 更新 | 按 [routing.md](routing.md) 落到投影页，再跟链接改契约/切片/实体 |
++| 删除 | 源已消失：表行删除或标废弃；保留 `<!-- manual -->` |
++| 已有镜像 | 缺骨架则先建上列六个文件的 stub，再填正文；不删金字塔 |
++
++简约只写表和必填节；详尽加深同一批页，见 [modes.md](modes.md)。
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+index a1e1ec0..844da5c 100644
+--- a/agents/skills/project-spec-mirror/references/routing.md
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -12,8 +12,8 @@ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unm
+ 2. **文件表精确匹配** `path`（rename 则先匹配 `from`）→ 落入含该行的模块。
+ 3. 未命中 → **最长前缀**匹配该模块 README「根」表第一列。
+ 4. 仍未命中 → 记入 `unmapped`：并入最近模块或新建模块，不得丢弃，也不得为此建文件详页。
+-5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
+-6. 非代码、配置、测试：优先 `facets/source.md` 与相关契约/切片，其次才是模块表。
++5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约 / 恢复投影。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
++6. 非代码、配置、测试：先按下方「与切面的分工」落到恢复投影或 `facets/source.md`，其次才是模块表。
+ 
+ 标题约定（与 [layout.md](layout.md) 一致，便于日后 CLI 解析）：「根」或 `Roots`；「文件」或 `Files`。不要靠扫全库反引号路径做路由（易误伤）。
+ 
+@@ -24,9 +24,14 @@ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unm
+ | 变更像什么 | 优先改 |
+ |------------|--------|
+ | 领域包、入口、符号 | 模块 README 文件表；跟链接的实体/处理线 |
+-| 路由 / schema / 测试名 | 契约页与切片 |
+-| 配置、样本、SOURCE 证据 | `facets/source.md` |
+-| 放量、灰度 | `traffic.md`（无则写「无」） |
++| 路由 / OpenAPI / proto / 消息名 | `surface/INDEX.md` 与结构契约、切片 |
++| schema / migration | `data/` 与结构契约 |
++| 配置键、`.env.example`、feature flag | `surface/config.md`；路径仍登记 SOURCE |
++| compose / 编排 / Dockerfile / 单元文件 | `runtime/` |
++| Makefile、CI、包清单、启动脚本 | `build/` |
++| 邻接客户端、网关、鉴权入口 | `context/` |
++| 测试名、断言 | VERIFY 与行为/副作用契约 |
++| 放量、发布、回滚 | `traffic.md`（无发布机制则写「无」） |
+ 
+ 切片是垂直切口，穿过多个文件。不要为切片里的每个文件建页；入口文件成为热点的条件见 [modes.md](modes.md)。
+ 
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+index 03b24b9..b833907 100755
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -2,7 +2,7 @@
+ """specctl — project-spec-mirror 的机械管理工作。
+ 
+ 只做路径探测、目录骨架、git 版本、文件清单、符号提取与镜像状态。
+-给人读的金字塔正文由 Agent 撰写。
++给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
+ 
+ stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
+ """
+@@ -670,7 +670,7 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
+     branch_text = branch or "（无）"
+     return f"""# Spec 镜像 — {project}
+ 
+-给人读的孪生规格，不是源码、不是 OpenSpec。
++给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
+ 
+ | 项 | 值 |
+ |----|-----|
+@@ -682,14 +682,20 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
+ ## 怎么读
+ 
+ 1. [overview.md](overview.md)
+-2. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+-3. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
++2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
++3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
++4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
+ 
+ ## 地图
+ 
+ | 层 | 路径 | 回答什么 |
+ |----|------|----------|
+ | 总览 | overview.md | 这是什么、边界在哪 |
++| 上下文 | context/ | 系统在环境里的位置 |
++| 表面 | surface/ | 对外接口与配置键 |
++| 数据 | data/ | 持久化与一致性 |
++| 运行时 | runtime/ | 进程、部署、拓扑 |
++| 构建 | build/ | 如何构建、迁移、启动 |
+ | 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
+ | 概念 | concepts/ | 领域用语 |
+ | 实体 | entities/ | 关键对象及其关系 |
+@@ -710,6 +716,14 @@ def skeleton_overview(project: str) -> str:
+ - 目标：
+ - 非目标：
+ 
++## 恢复入口
++
++- [上下文](context/INDEX.md)
++- [表面](surface/INDEX.md) · [配置键](surface/config.md)
++- [数据](data/INDEX.md)
++- [运行时](runtime/INDEX.md)
++- [构建](build/INDEX.md)
++
+ ## 模块地图
+ 
+ | 模块 | 职责 | 入口 |
+@@ -805,11 +819,41 @@ def create_skeleton(
+     write_text(spec_root / "facets" / "slices" / "INDEX.md", skeleton_index("垂直切片"))
+     write_text(
+         spec_root / "facets" / "verify.md",
+-        skeleton_facet_stub("对照验证", "接口 / 数据 / 外部调用如何差分；单实现则写不适用。"),
++        skeleton_facet_stub(
++            "对照验证",
++            "如何证明行为仍真：测试、性质、对照差分。单实现也须写测试/性质；差分没有则写无。",
++        ),
+     )
+     write_text(
+         spec_root / "facets" / "traffic.md",
+-        skeleton_facet_stub("流量控制", "影子 / 灰度 / 切换 / 回滚；无放量则写无。"),
++        skeleton_facet_stub(
++            "流量控制",
++            "如何发布与回滚。无灰度也须写发布步骤与回滚；完全没有发布机制则写无。",
++        ),
++    )
++    write_text(
++        spec_root / "context" / "INDEX.md",
++        skeleton_facet_stub("系统上下文", "actor、邻接系统、协议、信任边界、质量属性、安全。"),
++    )
++    write_text(
++        spec_root / "data" / "INDEX.md",
++        skeleton_facet_stub("数据面", "存储实例、与实体的差、迁移、一致性与保留。"),
++    )
++    write_text(
++        spec_root / "surface" / "INDEX.md",
++        skeleton_facet_stub("对外表面", "接口目录、版本与兼容；配置键见 config.md。"),
++    )
++    write_text(
++        spec_root / "surface" / "config.md",
++        skeleton_facet_stub("配置键", "键、语义、默认、环境差；值写 <REDACTED>。"),
++    )
++    write_text(
++        spec_root / "runtime" / "INDEX.md",
++        skeleton_facet_stub("运行时", "进程/容器/端口、启动顺序、健康检查、故障弹性。"),
++    )
++    write_text(
++        spec_root / "build" / "INDEX.md",
++        skeleton_facet_stub("构建与再生", "工具链、构建/测试/迁移/启动命令与产物。"),
+     )
+     write_text(spec_root / "diagrams" / "INDEX.md", skeleton_index("图表"))
+ 
+@@ -1413,6 +1457,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
+         "facets/slices/INDEX.md",
+         "facets/verify.md",
+         "facets/traffic.md",
++        "context/INDEX.md",
++        "data/INDEX.md",
++        "surface/INDEX.md",
++        "surface/config.md",
++        "runtime/INDEX.md",
++        "build/INDEX.md",
+         "diagrams/INDEX.md",
+     ]
+     missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
+@@ -1535,7 +1585,7 @@ def build_parser() -> argparse.ArgumentParser:
+         help="热点源路径，可重复；本轮给出的列表整表写回",
+     )
+ 
+-    add("validate", help="检查金字塔骨架与状态文件")
++    add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
+     return parser
+ 
+ 
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+index b45f5c6..9f6a55d 100644
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -47,5 +47,6 @@ class ContractTest(unittest.TestCase):
+             "references/facets.md",
+             "references/diagrams.md",
+             "references/routing.md",
++            "references/projections.md",
+         ):
+             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+index 73e0e6b..17ed4da 100644
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -222,6 +222,12 @@ class InitTest(unittest.TestCase):
+             self.assertTrue((spec / ".mirror.json").is_file())
+             self.assertTrue((spec / "README.md").is_file())
+             self.assertTrue((spec / "concepts" / "INDEX.md").is_file())
++            self.assertTrue((spec / "context" / "INDEX.md").is_file())
++            self.assertTrue((spec / "data" / "INDEX.md").is_file())
++            self.assertTrue((spec / "surface" / "INDEX.md").is_file())
++            self.assertTrue((spec / "surface" / "config.md").is_file())
++            self.assertTrue((spec / "runtime" / "INDEX.md").is_file())
++            self.assertTrue((spec / "build" / "INDEX.md").is_file())
+             self.assertTrue((spec / "facets" / "INDEX.md").is_file())
+             self.assertTrue((spec / "diagrams" / "INDEX.md").is_file())
+             state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))

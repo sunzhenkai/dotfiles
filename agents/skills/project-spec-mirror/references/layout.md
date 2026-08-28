@@ -10,6 +10,17 @@
 ├── README.md             # 入口：怎么读、版本、地图
 ├── overview.md           # 一层：项目是什么、为什么、模块与主路径
 ├── changelog.md          # 镜像同步史，不是产品 changelog
+├── context/              # 恢复：系统在环境里的位置
+│   └── INDEX.md
+├── data/                 # 恢复：持久化与一致性
+│   └── INDEX.md
+├── surface/              # 恢复：对外表面
+│   ├── INDEX.md
+│   └── config.md         # 配置键表
+├── runtime/              # 恢复：进程与部署拓扑
+│   └── INDEX.md
+├── build/                # 恢复：构建 / 测试 / 迁移 / 启动
+│   └── INDEX.md
 ├── concepts/
 │   ├── INDEX.md
 │   └── <concept>.md
@@ -36,7 +47,7 @@
     └── INDEX.md
 ```
 
-不要在金字塔和切面/图表之外再造顶层分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
 
 ## 阅读顺序（强制）
 
@@ -44,10 +55,11 @@
 
 1. `README.md` — 30 秒：这是什么镜像、当前版本、地图入口
 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
-3. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
-4. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
-5. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
-6. `diagrams/` — 看图，不替代上文段落
+3. `context/` / `surface/` / `data/` / `runtime/` / `build/` — 恢复可运行系统所需的投影
+4. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
+5. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
+6. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
+7. `diagrams/` — 看图，不替代上文段落
 
 下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
 
@@ -84,7 +96,7 @@
 ```markdown
 # Spec 镜像 — <project>
 
-给人读的孪生规格，不是源码、不是 OpenSpec。
+给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
 
 | 项 | 值 |
 |----|-----|
@@ -96,14 +108,20 @@
 ## 怎么读
 
 1. [overview.md](overview.md)
-2. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
-3. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
+2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
+3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
 
 ## 地图
 
 | 层 | 路径 | 回答什么 |
 |----|------|----------|
 | 总览 | overview.md | 这是什么、边界在哪 |
+| 上下文 | context/ | 系统在环境里的位置 |
+| 表面 | surface/ | 对外接口与配置键 |
+| 数据 | data/ | 持久化与一致性 |
+| 运行时 | runtime/ | 进程、部署、拓扑 |
+| 构建 | build/ | 如何构建、迁移、启动 |
 | 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
 | 概念 | concepts/ | 领域用语 |
 | 实体 | entities/ | 关键对象及其关系 |
@@ -118,11 +136,12 @@
 
 1. **一句话** — 这个项目做什么
 2. **背景与目标** — 谁用、解决什么、非目标
-3. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
-4. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
-5. **主切片** — 链到 `facets/slices/` 里正在维护的切口
-6. **关键实体与概念** — 链到对应页面，不在这里下定义
-7. **图** — 链到 `diagrams/`，没有图则省略本节
+3. **恢复入口** — 链到 context / surface / data / runtime / build，不在这里下定义
+4. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
+5. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
+6. **主切片** — 链到 `facets/slices/` 里正在维护的切口
+7. **关键实体与概念** — 链到对应页面，不在这里下定义
+8. **图** — 链到 `diagrams/`，没有图则省略本节
 
 ## 模块如何划
 
@@ -197,6 +216,6 @@
 - 标题即论点；表格优先于段落。
 - 标识符、文件名、命令保持原文；叙述用中文。
 - 每页开头用 1–3 句让人决定要不要继续读。
-- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块 ↔ 切片能互相跳。
+- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块 ↔ 切片 ↔ 恢复投影能互相跳。
 - 图只放 `diagrams/` 的 archify HTML 链接；Markdown 里不要再画一遍拓扑。
 - 不确定就写「未知 / 推断」，并标出来源路径；不要把命名猜测写成事实。

@@ -2,7 +2,7 @@
 """specctl — project-spec-mirror 的机械管理工作。
 
 只做路径探测、目录骨架、git 版本、文件清单、符号提取与镜像状态。
-给人读的金字塔正文由 Agent 撰写。
+给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
 
 stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
 """
@@ -670,7 +670,7 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
     branch_text = branch or "（无）"
     return f"""# Spec 镜像 — {project}
 
-给人读的孪生规格，不是源码、不是 OpenSpec。
+给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
 
 | 项 | 值 |
 |----|-----|
@@ -682,14 +682,20 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
 ## 怎么读
 
 1. [overview.md](overview.md)
-2. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
-3. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
+2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
+3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
 
 ## 地图
 
 | 层 | 路径 | 回答什么 |
 |----|------|----------|
 | 总览 | overview.md | 这是什么、边界在哪 |
+| 上下文 | context/ | 系统在环境里的位置 |
+| 表面 | surface/ | 对外接口与配置键 |
+| 数据 | data/ | 持久化与一致性 |
+| 运行时 | runtime/ | 进程、部署、拓扑 |
+| 构建 | build/ | 如何构建、迁移、启动 |
 | 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
 | 概念 | concepts/ | 领域用语 |
 | 实体 | entities/ | 关键对象及其关系 |
@@ -709,6 +715,14 @@ def skeleton_overview(project: str) -> str:
 - 背景：
 - 目标：
 - 非目标：
+
+## 恢复入口
+
+- [上下文](context/INDEX.md)
+- [表面](surface/INDEX.md) · [配置键](surface/config.md)
+- [数据](data/INDEX.md)
+- [运行时](runtime/INDEX.md)
+- [构建](build/INDEX.md)
 
 ## 模块地图
 
@@ -805,11 +819,41 @@ def create_skeleton(
     write_text(spec_root / "facets" / "slices" / "INDEX.md", skeleton_index("垂直切片"))
     write_text(
         spec_root / "facets" / "verify.md",
-        skeleton_facet_stub("对照验证", "接口 / 数据 / 外部调用如何差分；单实现则写不适用。"),
+        skeleton_facet_stub(
+            "对照验证",
+            "如何证明行为仍真：测试、性质、对照差分。单实现也须写测试/性质；差分没有则写无。",
+        ),
     )
     write_text(
         spec_root / "facets" / "traffic.md",
-        skeleton_facet_stub("流量控制", "影子 / 灰度 / 切换 / 回滚；无放量则写无。"),
+        skeleton_facet_stub(
+            "流量控制",
+            "如何发布与回滚。无灰度也须写发布步骤与回滚；完全没有发布机制则写无。",
+        ),
+    )
+    write_text(
+        spec_root / "context" / "INDEX.md",
+        skeleton_facet_stub("系统上下文", "actor、邻接系统、协议、信任边界、质量属性、安全。"),
+    )
+    write_text(
+        spec_root / "data" / "INDEX.md",
+        skeleton_facet_stub("数据面", "存储实例、与实体的差、迁移、一致性与保留。"),
+    )
+    write_text(
+        spec_root / "surface" / "INDEX.md",
+        skeleton_facet_stub("对外表面", "接口目录、版本与兼容；配置键见 config.md。"),
+    )
+    write_text(
+        spec_root / "surface" / "config.md",
+        skeleton_facet_stub("配置键", "键、语义、默认、环境差；值写 <REDACTED>。"),
+    )
+    write_text(
+        spec_root / "runtime" / "INDEX.md",
+        skeleton_facet_stub("运行时", "进程/容器/端口、启动顺序、健康检查、故障弹性。"),
+    )
+    write_text(
+        spec_root / "build" / "INDEX.md",
+        skeleton_facet_stub("构建与再生", "工具链、构建/测试/迁移/启动命令与产物。"),
     )
     write_text(spec_root / "diagrams" / "INDEX.md", skeleton_index("图表"))
 
@@ -1413,6 +1457,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
         "facets/slices/INDEX.md",
         "facets/verify.md",
         "facets/traffic.md",
+        "context/INDEX.md",
+        "data/INDEX.md",
+        "surface/INDEX.md",
+        "surface/config.md",
+        "runtime/INDEX.md",
+        "build/INDEX.md",
         "diagrams/INDEX.md",
     ]
     missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
@@ -1535,7 +1585,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="热点源路径，可重复；本轮给出的列表整表写回",
     )
 
-    add("validate", help="检查金字塔骨架与状态文件")
+    add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
     return parser
 
 

@@ -47,5 +47,6 @@ class ContractTest(unittest.TestCase):
             "references/facets.md",
             "references/diagrams.md",
             "references/routing.md",
+            "references/projections.md",
         ):
             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)

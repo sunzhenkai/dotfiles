@@ -12,8 +12,8 @@ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unm
 2. **文件表精确匹配** `path`（rename 则先匹配 `from`）→ 落入含该行的模块。
 3. 未命中 → **最长前缀**匹配该模块 README「根」表第一列。
 4. 仍未命中 → 记入 `unmapped`：并入最近模块或新建模块，不得丢弃，也不得为此建文件详页。
-5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
-6. 非代码、配置、测试：优先 `facets/source.md` 与相关契约/切片，其次才是模块表。
+5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约 / 恢复投影。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
+6. 非代码、配置、测试：先按下方「与切面的分工」落到恢复投影或 `facets/source.md`，其次才是模块表。
 
 标题约定（与 [layout.md](layout.md) 一致，便于日后 CLI 解析）：「根」或 `Roots`；「文件」或 `Files`。不要靠扫全库反引号路径做路由（易误伤）。
 
@@ -24,9 +24,14 @@ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unm
 | 变更像什么 | 优先改 |
 |------------|--------|
 | 领域包、入口、符号 | 模块 README 文件表；跟链接的实体/处理线 |
-| 路由 / schema / 测试名 | 契约页与切片 |
-| 配置、样本、SOURCE 证据 | `facets/source.md` |
-| 放量、灰度 | `traffic.md`（无则写「无」） |
+| 路由 / OpenAPI / proto / 消息名 | `surface/INDEX.md` 与结构契约、切片 |
+| schema / migration | `data/` 与结构契约 |
+| 配置键、`.env.example`、feature flag | `surface/config.md`；路径仍登记 SOURCE |
+| compose / 编排 / Dockerfile / 单元文件 | `runtime/` |
+| Makefile、CI、包清单、启动脚本 | `build/` |
+| 邻接客户端、网关、鉴权入口 | `context/` |
+| 测试名、断言 | VERIFY 与行为/副作用契约 |
+| 放量、发布、回滚 | `traffic.md`（无发布机制则写「无」） |
 
 切片是垂直切口，穿过多个文件。不要为切片里的每个文件建页；入口文件成为热点的条件见 [modes.md](modes.md)。
 
