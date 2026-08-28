@@ -1,0 +1,837 @@
+diff --git a/agents/skills/project-init/SKILL.md b/agents/skills/project-init/SKILL.md
+--- a/agents/skills/project-init/SKILL.md
++++ b/agents/skills/project-init/SKILL.md
+@@ -1,111 +1,138 @@
+----
+-id: project-init
+-name: project-init
+-description: >-
+-  按约定脚手架创建或对齐项目（v1：Python API 与前端）。
+-  仅在用户显式要求初始化项目、创建项目脚手架、scaffold，或要求把已有项目架构向本 skill 对齐时使用。
+-  不要用于日常写功能、装机、克隆仓库或启动服务。
+----
+-
+-# Project Init
+-
+-面向用户的输出默认使用简体中文。命令、路径、代码、包名与既成术语保持原文。
+-
+-按约定脚手架**创建**新项目，或把**已有项目**对齐到本 skill 的架构约定。v1 只实现 Python API 与前端两栈；其他语言/架构未提供 reference 时不得即兴发明。
+-
+-## 门禁（强制）
+-
+-未过门禁不得创建目录、改依赖、改配置或重写目录结构。
+-
+-**算触发（必须同时满足「显式」）：**
+-
+-- 用户点名本 skill / `project-init`，或明确说要**初始化项目**、**创建项目脚手架**、**scaffold 新项目**。
+-- 用户明确要求把**已有项目/已有架构向本 skill 对齐**（例如「按 project-init 对齐」「对齐 Django+DRF 脚手架」）。
+-
+-**不算触发：**
+-
+-- 日常加功能、改 bug、加组件、加 API 接口。
+-- 装机/配环境（交给对应环境 skill）、克隆仓库、启动/停止服务。
+-- 顺口的 `git init`、`npm init`、建单个文件、在已有应用里加一个页面。
+-- 用户只说「新写一个函数/页面/接口」，没有要求初始化或对齐项目架构。
+-
+-不确定时先问一句是否要走本 skill，得到明确肯定前当普通编码任务处理。
+-
+-## 非目标
+-
+-- 不实现业务功能、产品页面或领域模型；脚手架只含能跑通的空壳与健康检查。
+-- 不装机、不改系统包、不克隆远程仓、不代替服务启停。
+-- 不自动 commit / push；不写入密钥、真实 `.env` 值、内部 URL。
+-- 不把未支持的栈临时写成「官方默认」；要扩栈须改本 skill 的 reference，不在一次脚手架会话里发明新约定。
+-
+-## 模式
+-
+-| 模式 | 何时 | 行为 |
+-|------|------|------|
+-| `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 用官方脚手架创建，再套本 skill 约定 |
+-| `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
+-
+-目录已有另一套框架（如 FastAPI、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
+-
+-一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
+-
+-## 栈（v1）
+-
+-未说明栈时：像 API 服务的 Python → `python-api`；像 SPA/站点 UI 的前端 → `frontend`。Python 但不是 API（CLI / 库 / 脚本）→ 告知 v1 未覆盖，停止，不擅自改用 Flask/FastAPI。用户点名其他框架则尊重，并在摘要里标明「偏离默认」。
+-
+-| 栈 id | 默认 | 先读 |
+-|-------|------|------|
+-| `python-api` | Django + django-rest-framework | [python-api.md](references/python-api.md) |
+-| `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
+-
+-### 前端分层
+-
+-建议列决定 init 是否默认装入，见 [frontend.md](references/frontend.md) 的映射。
+-
+-| 层 | 选择 | Agent 友好度 | 建议 |
+-|----|------|-------------|------|
+-| Language | TypeScript | ⭐⭐⭐⭐⭐ | 必选 |
+-| UI Framework | React | ⭐⭐⭐⭐⭐ | 必选 |
+-| Build | Vite | ⭐⭐⭐⭐⭐ | 默认 |
+-| CSS | Tailwind CSS | ⭐⭐⭐⭐⭐ | 默认 |
+-| UI | shadcn/ui | ⭐⭐⭐⭐⭐ | 强烈推荐 |
+-| Server State | TanStack Query | ⭐⭐⭐⭐⭐ | 推荐 |
+-| Client State | Zustand | ⭐⭐⭐⭐⭐ | 推荐 |
+-| Validation | Zod | ⭐⭐⭐⭐⭐ | 推荐 |
+-| Form | React Hook Form | ⭐⭐⭐⭐ | 需要表单再用 |
+-| API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
+-| E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
+-| Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
+-| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
+-
+-包管理器：用户指定优先；否则 Python 用 `uv`（无则 venv + pip），前端用 `pnpm`（无则 npm）。不要为了脚手架去全局安装包管理器，除非用户要求。
+-
+-## 工作流
+-
+-1. **过门禁**，判定 `init` 或 `align`。目标路径未给则询问，不在无关 cwd 里下手。
+-2. **确认最小集合**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。
+-3. **只加载对应 reference**，按其步骤执行。禁止跳过官方 CLI 去手搓会与官方模板漂移的完整项目树，除非 CLI 不可用且用户同意手写最小可运行壳。
+-4. **`init`**：官方脚手架 → 本 skill 约定（配置、空 `apps`/`components` 布局、健康检查、`.env.example`、`.gitignore`、README 运行说明）→ 冒烟（见各 reference）。不要启动长期 dev server。
+-5. **`align`**：读现有清单与入口 → 对照 reference 列出匹配/缺口/拟改文件 → 等用户确认 → 只改已确认项。不重写业务代码来「看起来更像模板」。
+-6. **交付摘要**（见下）。不 commit。
+-
+-## 安全
+-
+-- 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
+-- `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
+-- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `django-admin startproject`、`create vite`、`shadcn init`）。
+-- `.env.example` 只放变量名与无害示例值；真实密钥不入库。
+-
+-## 交付摘要
+-
+-完成后用简短列表告诉用户：
+-
+-- 模式（`init` / `align`）与目标路径
+-- 实际采用的栈与是否偏离默认（含前端各层：装了什么、故意没装什么）
+-- 关键路径（如何启动、健康检查 URL 或 build / test 命令）
+-- 改了哪些文件（align 必列）
+-- 明确没做的事（业务、部署、CI、commit）
+-
+-## 扩展
+-
+-新增栈：增加 `references/<stack-id>.md`，并在上表加一行。reference 必须写清官方脚手架命令、目录约定、默认依赖、冒烟命令、align 对照清单。无 reference 的栈 = 未支持。
++---
++id: project-init
++name: project-init
++description: >-
++  按约定脚手架创建或对齐项目（v1：Python API 与前端）。
++  仅在用户显式要求初始化项目、创建项目脚手架、scaffold，或要求把已有项目架构向本 skill 对齐时使用。
++  不要用于日常写功能、装机、克隆仓库或启动服务。
++---
++
++# Project Init
++
++面向用户的输出默认使用简体中文。命令、路径、代码、包名与既成术语保持原文。
++
++按约定脚手架**创建**新项目，或把**已有项目**对齐到本 skill 的架构约定。v1 只实现 Python API 与前端两栈；其他语言/架构未提供 reference 时不得即兴发明。已支持栈内的具体框架按分层表与需求选择，不得无视需求套死一套。
++
++## 门禁（强制）
++
++未过门禁不得创建目录、改依赖、改配置或重写目录结构。
++
++**算触发（必须同时满足「显式」）：**
++
++- 用户点名本 skill / `project-init`，或明确说要**初始化项目**、**创建项目脚手架**、**scaffold 新项目**。
++- 用户明确要求把**已有项目/已有架构向本 skill 对齐**（例如「按 project-init 对齐」「对齐 FastAPI 脚手架」）。
++
++**不算触发：**
++
++- 日常加功能、改 bug、加组件、加 API 接口。
++- 装机/配环境（交给对应环境 skill）、克隆仓库、启动/停止服务。
++- 顺口的 `git init`、`npm init`、建单个文件、在已有应用里加一个页面。
++- 用户只说「新写一个函数/页面/接口」，没有要求初始化或对齐项目架构。
++
++不确定时先问一句是否要走本 skill，得到明确肯定前当普通编码任务处理。
++
++## 非目标
++
++- 不实现业务功能、产品页面或领域模型；脚手架只含能跑通的空壳与健康检查。
++- 不装机、不改系统包、不克隆远程仓、不代替服务启停。
++- 不自动 commit / push；不写入密钥、真实 `.env` 值、内部 URL。
++- 不把未支持的栈临时写成「官方默认」；要扩栈须改本 skill 的 reference，不在一次脚手架会话里发明新约定。
++- 不把「特定场景再用 / 需要再用 / 用户点名」的备选预装进默认脚手架。
++
++## 模式
++
++| 模式 | 何时 | 行为 |
++|------|------|------|
++| `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 用官方脚手架创建，再套本 skill 约定 |
++| `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
++
++目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
++
++一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
++
++## 栈（v1）
++
++未说明栈时：像 API 服务的 Python → `python-api`（Web Framework 默认 FastAPI）；像 SPA/站点 UI 的前端 → `frontend`。Python 但不是 API（CLI / 库 / 脚本）→ 告知 v1 未覆盖，停止，不擅自改用 Flask/FastAPI。
++
++**按需求选层（强制）**：先根据已确认需求对照分层表选择具体库，再跑脚手架。用户点名的库优先于表中的默认/推荐，并在摘要标明偏离。需求不足以下决定的层：采用「必选」「默认」；「推荐」在用户未拒绝时装入；「需要…再用」「特定场景再用」「用户点名」一律不预装。禁止凭偏好把默认 FastAPI 换成 Django，或把已有 Django 在 align 中改成 FastAPI。
++
++| 栈 id | 默认 | 先读 |
++|-------|------|------|
++| `python-api` | 分层见下表；纯 API 默认 FastAPI | [python-api.md](references/python-api.md) |
++| `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
++
++### Python 分层
++
++建议列决定 init 是否默认装入，见 [python-api.md](references/python-api.md) 的映射。
++
++| 层 | 选择 | Agent 友好度 | 建议 |
++|----|------|-------------|------|
++| Web Framework | FastAPI | ⭐⭐⭐⭐⭐ | 默认 |
++| Web Framework | Django | ⭐⭐⭐⭐ | 特定场景再用（Admin / MTV / Django 全家桶） |
++| Web Framework | Flask | ⭐⭐⭐ | 用户点名 |
++| Web Framework | Litestar | ⭐⭐⭐ | 用户点名 |
++| API / Validation | Pydantic | ⭐⭐⭐⭐⭐ | 必选（非 Django 路径） |
++| API / Validation | OpenAPI | ⭐⭐⭐⭐⭐ | 必选 |
++| API / Validation | SQLModel | ⭐⭐⭐ | 需要模型与 schema 一体再用 |
++| ORM | SQLAlchemy | ⭐⭐⭐⭐⭐ | 默认（非 Django） |
++| ORM | Django ORM | ⭐⭐⭐⭐ | 随 Django |
++| ORM | Tortoise ORM | ⭐⭐ | 用户点名 |
++| Async / Runtime | asyncio · uvicorn · anyio | — | FastAPI / Litestar 默认 |
++| Background Jobs | Celery · Dramatiq · ARQ | — | 需要后台任务再用 |
++| Testing | pytest · httpx | — | 必选 |
++| Testing | Playwright | — | 需要浏览器 E2E 再用 |
++| Tooling | uv | — | 默认包管理 |
++| Tooling | Ruff | — | 推荐 |
++| Tooling | mypy / pyright | — | 推荐 |
++
++### 前端分层
++
++建议列决定 init 是否默认装入，见 [frontend.md](references/frontend.md) 的映射。
++
++| 层 | 选择 | Agent 友好度 | 建议 |
++|----|------|-------------|------|
++| Language | TypeScript | ⭐⭐⭐⭐⭐ | 必选 |
++| UI Framework | React | ⭐⭐⭐⭐⭐ | 必选 |
++| Build | Vite | ⭐⭐⭐⭐⭐ | 默认 |
++| CSS | Tailwind CSS | ⭐⭐⭐⭐⭐ | 默认 |
++| UI | shadcn/ui | ⭐⭐⭐⭐⭐ | 强烈推荐 |
++| Server State | TanStack Query | ⭐⭐⭐⭐⭐ | 推荐 |
++| Client State | Zustand | ⭐⭐⭐⭐⭐ | 推荐 |
++| Validation | Zod | ⭐⭐⭐⭐⭐ | 推荐 |
++| Form | React Hook Form | ⭐⭐⭐⭐ | 需要表单再用 |
++| API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
++| E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
++| Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
++| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
++
++包管理器：用户指定优先；否则 Python 用 `uv`（无则 venv + pip），前端用 `pnpm`（无则 npm）。不要为了脚手架去全局安装包管理器，除非用户要求。
++
++## 工作流
++
++1. **过门禁**，判定 `init` 或 `align`。目标路径未给则询问，不在无关 cwd 里下手。
++2. **确认最小集合**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。需求特征会影响选层时（Admin、后台任务、模型与 schema 一体、浏览器 E2E、SSR 等）缺则问，不猜。
++3. **只加载对应 reference**，只执行其中与所选层匹配的步骤。禁止跳过官方 CLI 去手搓会与官方模板漂移的完整项目树，除非 CLI 不可用且用户同意手写最小可运行壳。
++4. **`init`**：官方脚手架 → 本 skill 约定（配置、空布局、健康检查、`.env.example`、`.gitignore`、README 运行说明）→ 冒烟（见各 reference）。不要启动长期 dev server。
++5. **`align`**：读现有清单与入口 → 对照所选层列出匹配/缺口/拟改文件 → 等用户确认 → 只改已确认项。不重写业务代码来「看起来更像模板」。
++6. **交付摘要**（见下）。不 commit。
++
++## 安全
++
++- 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
++- `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
++- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`shadcn init`）。
++- `.env.example` 只放变量名与无害示例值；真实密钥不入库。
++
++## 交付摘要
++
++完成后用简短列表告诉用户：
++
++- 模式（`init` / `align`）与目标路径
++- 实际采用的栈与是否偏离默认（含 Python / 前端各层：装了什么、因何需求、故意没装什么）
++- 关键路径（如何启动、健康检查 URL 或 build / test 命令）
++- 改了哪些文件（align 必列）
++- 明确没做的事（业务、部署、CI、commit）
++
++## 扩展
++
++新增栈：增加 `references/<stack-id>.md`，并在上表加一行。reference 必须写清官方脚手架命令、目录约定、默认依赖、冒烟命令、align 对照清单。无 reference 的栈 = 未支持。
+diff --git a/agents/skills/project-init/references/python-api.md b/agents/skills/project-init/references/python-api.md
+--- a/agents/skills/project-init/references/python-api.md
++++ b/agents/skills/project-init/references/python-api.md
+@@ -1,108 +1,274 @@
+-# Python API（Django + DRF）
+-
+-本 reference 只在栈为 `python-api` 时读取。默认：**Django + django-rest-framework**。用户点名 FastAPI / Flask 等则不要套本文件。
+-
+-## 官方入口
+-
+-优先 `uv`：
+-
+-```bash
+-uv init --name <project-name>
+-uv add django djangorestframework
+-uv run django-admin startproject config .
+-```
+-
+-无 `uv` 时：
+-
+-```bash
+-python3 -m venv .venv
+-.venv/bin/pip install django djangorestframework
+-.venv/bin/django-admin startproject config .
+-```
+-
+-- Django 工程包名默认 `config`（避免与目录名撞车）。用户指定其他包名则用用户的。
+-- 在目标根执行 `startproject`，使 `manage.py` 位于项目根。
+-- 不要全局 `pip install`。
+-
+-`uv init` 若已写出占位 `main.py` 且与 Django 无关，删除该占位，避免两个入口并存。
+-
+-## 目录约定
+-
+-```text
+-<project-root>/
+-  pyproject.toml          # 或 requirements.txt（仅无 uv 时）
+-  manage.py
+-  README.md
+-  .gitignore
+-  .env.example
+-  config/
+-    __init__.py
+-    settings.py
+-    urls.py
+-    wsgi.py
+-    asgi.py
+-    views.py              # 仅 health
+-  apps/
+-    __init__.py           # 业务 app 放这里；init 不创建业务 app
+-```
+-
+-后续业务 app：`uv run python manage.py startapp <name> apps/<name>`，`INSTALLED_APPS` 登记 `apps.<name>`。init 阶段不要 `startapp` 业务应用。
+-
+-## 必须写入的配置
+-
+-在 `config/settings.py`（官方生成后再改，不要整文件替换掉未知项）：
+-
+-- `INSTALLED_APPS` 加入 `rest_framework`。
+-- `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` 从环境变量读取；本地缺省仅用于开发（与 `.env.example` 一致），注释标明不可用于生产。
+-- 增加：
+-
+-```python
+-REST_FRAMEWORK = {
+-    "DEFAULT_RENDERER_CLASSES": [
+-        "rest_framework.renderers.JSONRenderer",
+-    ],
+-    "DEFAULT_PARSER_CLASSES": [
+-        "rest_framework.parsers.JSONParser",
+-    ],
+-}
+-```
+-
+-- 仅当本次同时初始化会跨域访问本 API 的前端时，才添加 `django-cors-headers` 并配置 `CORS_ALLOWED_ORIGINS`；API-only 不要默认加 CORS。
+-
+-`config/views.py` + `config/urls.py` 提供 `GET /api/health/`，JSON `{"status": "ok"}`。不要加 admin 定制、用户系统、鉴权或示例 CRUD。
+-
+-`.env.example`：
+-
+-```text
+-DJANGO_SECRET_KEY=dev-only-change-me
+-DJANGO_DEBUG=true
+-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+-```
+-
+-`.gitignore` 至少覆盖：`.venv/`、`__pycache__/`、`*.py[cod]`、`.env`、`db.sqlite3`、`staticfiles/`。
+-
+-README 写清：安装依赖、`migrate`（init 可跑 `migrate` 以创建本地 sqlite）、`runserver`、health URL。不要写虚构的部署/公司环境。
+-
+-## 冒烟（init 必做）
+-
+-```bash
+-uv run python manage.py check
+-uv run python manage.py migrate --noinput
+-```
+-
+-无 `uv` 则用 `.venv/bin/python`。不要 `runserver`。`check` 或 `migrate` 失败则修复脚手架后再结束。
+-
+-## align 对照
+-
+-已是 Django 时逐项看，缺什么列什么，确认后再补：
+-
+-| 项 | 期望 |
+-|----|------|
+-| 依赖 | `django`、`djangorestframework` |
+-| `INSTALLED_APPS` | 含 `rest_framework` |
+-| `REST_FRAMEWORK` | 有显式配置（可与上表不同，但应存在） |
+-| health | 有可访问的健康检查，或用户明确不要 |
+-| 业务 app 位置 | 约定在 `apps/`；已有 app 在别处则**不要**搬家，只在摘要说明偏差 |
+-| 密钥 | 无明文生产密钥入库 |
+-
+-已是 FastAPI / Flask / 纯脚本：报告「栈不兼容」，给出若迁移需要替换的入口与依赖；**不改代码**，除非用户明确要求迁移并确认计划。
++# Python API
++
++本 reference 只在栈为 `python-api` 时读取。分层与建议以 `SKILL.md` Python 表为准；这里只写怎么落地。先选层，再执行**与所选 Web Framework 匹配**的路径，不要把所有备选都装上。
++
++## 建议 → init 行为
++
++| 建议 | init | align 缺口 |
++|------|------|------------|
++| 必选 | 必须具备，缺则不算完成 | 列为应补 |
++| 默认 | 未指定替代时采用 | 已用等价替代则记录偏差，不强制改回 |
++| 推荐 | 默认装入；用户明确拒绝才省略 | 列为建议补，确认后再改 |
++| 需要…再用 | **不预装** | 仅当需求已出现、或用户要求时才提议 |
++| 特定场景再用 | **不作为默认**；仅需求匹配或用户点名 | 已采用则按该路径对照，不改回默认 |
++| 用户点名 | **不预装**；仅用户点名该库 | 已采用则按该库对照，不改回默认 |
++
++## 需求 → 选层
++
++| 已确认需求 | 选择 |
++|------------|------|
++| 用户点名 FastAPI / Django / Flask / Litestar | 用用户的 Web Framework |
++| 要 Django Admin、MTV、Django 生态插件或传统全栈 Django | Django |
++| 其余纯 HTTP API，或需求未区分框架 | FastAPI |
++| 非 Django 的 API / Validation | Pydantic + OpenAPI（FastAPI / Litestar 原生导出；Flask 用 Pydantic 模型并显式提供 OpenAPI 或等价 schema） |
++| Django 路径的 API | django-rest-framework；不要为了「看起来像 FastAPI」再叠一套 Pydantic 除非用户点名 |
++| ORM（非 Django） | SQLAlchemy |
++| ORM（Django） | Django ORM |
++| 要模型类与 Pydantic schema 同一套，或点名 SQLModel | SQLModel（不要与手写 SQLAlchemy 模型双轨） |
++| 点名 Tortoise ORM | Tortoise（不要与 SQLAlchemy 双轨） |
++| 要后台任务 | **只选一个**：Celery（多 worker / Beat / 已有该生态）、Dramatiq（更简单 broker 模型）、ARQ（已是 asyncio + Redis） |
++| 同时提到多种 jobs 且未选 | 问一句，不要三个都装 |
++| 测试 | pytest + httpx 必选 |
++| 要浏览器 E2E | Playwright；API-only 不预装 |
++| Tooling | uv 默认；Ruff 与 pyright（或用户指定的 mypy）推荐装入 |
++
++Async / Runtime：FastAPI / Litestar 用 asyncio + uvicorn；anyio 随框架传递，不要单独钉版本。Django 用其官方 ASGI/WSGI，不要无故改成 uvicorn 优先。
++
++## 共用（所有 python-api 路径）
++
++优先 `uv`：
++
++```bash
++uv init --name <project-name>
++```
++
++无 `uv` 时：`python3 -m venv .venv`，再用 `.venv/bin/pip`。不要全局 `pip install`。
++
++`uv init` 若写出与所选框架无关的占位 `main.py`，删除该占位，避免两个入口并存。
++
++随后按所选路径 `uv add` 依赖；共用开发依赖：
++
++```bash
++uv add --dev pytest httpx ruff pyright
++```
++
++用户明确只要 mypy、不要 pyright 时，把 `pyright` 换成 `mypy`。用户明确拒绝推荐工具时省略 Ruff / 类型检查。
++
++`.gitignore` 至少覆盖：`.venv/`、`__pycache__/`、`*.py[cod]`、`.env`、`.ruff_cache/`、`.pytest_cache/`、`.mypy_cache/`。Django 路径另加 `db.sqlite3`、`staticfiles/`；SQLAlchemy 路径另加 `*.db`。
++
++README 写清：安装依赖、启动、health URL、`pytest`、Ruff（若已装）。不要写虚构的部署/公司环境。
++
++## FastAPI（默认）
++
++官方入口无独立 create 模板时：`uv init` 后装依赖并写最小可运行包（用户同意手写最小壳）。不要手搓与 FastAPI 文档漂移的大型目录（无 `services/` 领域分层，除非用户要求）。
++
++```bash
++uv add "fastapi[standard]" sqlalchemy pydantic-settings
++```
++
++`fastapi[standard]` 含 uvicorn；不要再重复加一份冲突的 ASGI 服务器，除非用户点名。
++
++### 目录约定
++
++```text
++<project-root>/
++  pyproject.toml
++  README.md
++  .gitignore
++  .env.example
++  app/
++    __init__.py
++    main.py              # FastAPI()；挂路由；可供 uvicorn / fastapi dev
++    api/
++      __init__.py
++      health.py          # GET /api/health
++    core/
++      __init__.py
++      config.py          # pydantic-settings
++      db.py              # SQLAlchemy engine / Session；health 不得依赖 DB
++    models/
++      __init__.py        # 只导出 Base；不放业务表
++    schemas/
++      __init__.py
++      health.py          # Pydantic；与 health 响应一致
++  tests/
++    test_health.py
++```
++
++`app/main.py` 必须能被 OpenAPI 发现（默认 `/docs`、`/openapi.json`）。不要关 OpenAPI。不要加用户系统、鉴权或示例 CRUD。
++
++`config.py`：`SECRET_KEY` / `DEBUG` / `DATABASE_URL` 从环境变量读取；本地缺省仅用于开发，注释标明不可用于生产。
++
++`.env.example`：
++
++```text
++APP_SECRET_KEY=dev-only-change-me
++APP_DEBUG=true
++DATABASE_URL=sqlite:///./app.db
++```
++
++仅当本次同时初始化会跨域访问本 API 的前端时，才配置 CORS；API-only 不要默认加 CORS。
++
++不要默认装 Alembic；有真实迁移需求再加。不要默认装 SQLModel、Tortoise、Celery、Dramatiq、ARQ、Playwright。
++
++### 冒烟（init 必做）
++
++```bash
++uv run pytest
++uv run ruff check .
++```
++
++无 `uv` 则用 `.venv/bin/pytest` 与 `.venv/bin/ruff`。`tests/test_health.py` 用 httpx / FastAPI `TestClient` 断言 `GET /api/health` 返回 JSON `{"status": "ok"}`。失败则修复脚手架后再结束。不要启动长期 `uvicorn` / `fastapi dev`。
++
++## Django（特定场景）
++
++仅当选层结果为 Django 时执行本节。默认：**Django + django-rest-framework** + Django ORM。
++
++```bash
++uv add django djangorestframework
++uv run django-admin startproject config .
++```
++
++无 `uv` 时：
++
++```bash
++.venv/bin/pip install django djangorestframework
++.venv/bin/django-admin startproject config .
++```
++
++- Django 工程包名默认 `config`（避免与目录名撞车）。用户指定其他包名则用用户的。
++- 在目标根执行 `startproject`，使 `manage.py` 位于项目根。
++
++### 目录约定
++
++```text
++<project-root>/
++  pyproject.toml          # 或 requirements.txt（仅无 uv 时）
++  manage.py
++  README.md
++  .gitignore
++  .env.example
++  config/
++    __init__.py
++    settings.py
++    urls.py
++    wsgi.py
++    asgi.py
++    views.py              # 仅 health
++  apps/
++    __init__.py           # 业务 app 放这里；init 不创建业务 app
++  tests/
++    test_health.py
++```
++
++后续业务 app：`uv run python manage.py startapp <name> apps/<name>`，`INSTALLED_APPS` 登记 `apps.<name>`。init 阶段不要 `startapp` 业务应用。
++
++### 必须写入的配置
++
++在 `config/settings.py`（官方生成后再改，不要整文件替换掉未知项）：
++
++- `INSTALLED_APPS` 加入 `rest_framework`。
++- `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` 从环境变量读取；本地缺省仅用于开发（与 `.env.example` 一致），注释标明不可用于生产。
++- 增加：
++
++```python
++REST_FRAMEWORK = {
++    "DEFAULT_RENDERER_CLASSES": [
++        "rest_framework.renderers.JSONRenderer",
++    ],
++    "DEFAULT_PARSER_CLASSES": [
++        "rest_framework.parsers.JSONParser",
++    ],
++}
++```
++
++- 仅当本次同时初始化会跨域访问本 API 的前端时，才添加 `django-cors-headers` 并配置 `CORS_ALLOWED_ORIGINS`；API-only 不要默认加 CORS。
++
++`config/views.py` + `config/urls.py` 提供 `GET /api/health/`，JSON `{"status": "ok"}`。不要加 admin 定制、用户系统、鉴权或示例 CRUD。Admin 场景只保留 `startproject` 自带的 admin，不要在 init 里做定制站点。
++
++开发依赖另加 `pytest-django`。在 `pyproject.toml` 或 `pytest.ini` 设置 `DJANGO_SETTINGS_MODULE=config.settings`。
++
++`.env.example`：
++
++```text
++DJANGO_SECRET_KEY=dev-only-change-me
++DJANGO_DEBUG=true
++DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
++```
++
++README 写清：安装依赖、`migrate`（init 可跑 `migrate` 以创建本地 sqlite）、`runserver`、health URL、`pytest`。
++
++### 冒烟（init 必做）
++
++```bash
++uv run python manage.py check
++uv run python manage.py migrate --noinput
++uv run pytest
++uv run ruff check .
++```
++
++无 `uv` 则用 `.venv/bin/python` 与对应工具。不要 `runserver`。任一步失败则修复脚手架后再结束。
++
++## Flask（用户点名）
++
++仅用户点名 Flask 时：
++
++```bash
++uv add flask sqlalchemy pydantic pydantic-settings
++```
++
++最小可运行应用（`app/main.py` 或根 `app.py`，二选一、保持扁）：提供 `GET /api/health` 与 Pydantic 响应模型。用 SQLAlchemy 与 pydantic-settings，规则同 FastAPI：health 不依赖 DB。不要发明深度分层。冒烟：`pytest` + `ruff check`（httpx 测 health）。不要默认加 Flask-RESTX / 蓝图全家桶，除非用户要求。
++
++## Litestar（用户点名）
++
++仅用户点名 Litestar 时：
++
++```bash
++uv add "litestar[standard]" sqlalchemy pydantic-settings
++```
++
++若 extra 名称与当时官方文档不一致，改用文档中的等价安装方式，并显式加上 uvicorn。最小应用提供 `GET /api/health`、Pydantic schema、原生 OpenAPI。SQLAlchemy session 骨架同 FastAPI 原则。冒烟：`pytest` + `ruff check`。不要启动长期 uvicorn。
++
++## 可选层（按需，不预装）
++
++只在选层结果需要时加**一个**对应实现；加完后补一条不访问外部 broker / 浏览器的单测或跳过说明。
++
++| 层 | 落地 |
++|----|------|
++| SQLModel | 用 SQLModel 代替手写 `DeclarativeBase` 模型；Pydantic schema 与表定义合一。不要同时维护两套模型。 |
++| Tortoise ORM | 按官方 FastAPI/Litestar 集成初始化；不要与 SQLAlchemy 并存。 |
++| Celery | 官方入口创建最小 `tasks` 模块 + 配置从环境变量读 broker；init 不写 docker-compose，不连真实 broker。 |
++| Dramatiq | 同上，只建最小 actor 模块。 |
++| ARQ | 仅 asyncio 路径；最小 worker 设置从环境变量读 Redis URL。 |
++| Playwright | `pytest-playwright` 或官方 Python Playwright；一条访问文档或 health 页的 smoke。init **不**默认下载浏览器；README 写明 `playwright install`。 |
++
++## align 对照
++
++按**当前项目已采用的 Web Framework**对照，不要把异栈列为「应改成默认」。缺什么列什么，确认后再补。
++
++### 已是 FastAPI（或用户确认保留的 Litestar / Flask）
++
++| 项 | 期望 |
++|----|------|
++| 依赖 | 所选框架；Pydantic；非 Django 时 SQLAlchemy（或用户已选的 SQLModel / Tortoise） |
++| OpenAPI | FastAPI / Litestar 可导出；Flask 有等价 schema 或显式 OpenAPI |
++| health | 有可访问的健康检查，或用户明确不要 |
++| 配置 | 密钥与 `DATABASE_URL` 来自环境变量；无明文生产密钥入库 |
++| 测试 | pytest 可运行；httpx 覆盖 health |
++| Tooling | 已有 Ruff / 类型检查则不换实现；没有则按推荐提议 |
++| Jobs / Playwright / SQLModel | 仅当项目已有该需求或用户要加 |
++
++### 已是 Django
++
++| 项 | 期望 |
++|----|------|
++| 依赖 | `django`、`djangorestframework` |
++| `INSTALLED_APPS` | 含 `rest_framework` |
++| `REST_FRAMEWORK` | 有显式配置（可与上表不同，但应存在） |
++| health | 有可访问的健康检查，或用户明确不要 |
++| 业务 app 位置 | 约定在 `apps/`；已有 app 在别处则**不要**搬家，只在摘要说明偏差 |
++| ORM | Django ORM；不要擅自换成 SQLAlchemy |
++| 密钥 | 无明文生产密钥入库 |
++| 测试 | pytest 可运行（pytest-django 或项目已有等价） |
++
++已是未点名且 v1 未覆盖的框架，或 Python 但不是 API：报告「栈不兼容」，给出若迁移需要替换的入口与依赖；**不改代码**，除非用户明确要求迁移并确认计划。
+diff --git a/agents/skills/project-init/tests/test_skill_contract.py b/agents/skills/project-init/tests/test_skill_contract.py
+--- a/agents/skills/project-init/tests/test_skill_contract.py
++++ b/agents/skills/project-init/tests/test_skill_contract.py
+@@ -1,79 +1,115 @@
+-"""project-init：frontmatter、引用文件与门禁用语。"""
+-
+-from __future__ import annotations
+-
+-import unittest
+-from pathlib import Path
+-
+-ROOT = Path(__file__).resolve().parents[1]
+-
+-
+-def _frontmatter(skill_md: str) -> str:
+-    parts = skill_md.split("---", 2)
+-    if len(parts) < 3:
+-        return ""
+-    return parts[1]
+-
+-
+-class ContractTest(unittest.TestCase):
+-    def test_frontmatter_name(self) -> None:
+-        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        self.assertIn("name: project-init", text)
+-        self.assertIn("id: project-init", text)
+-
+-    def test_description_omits_frameworks(self) -> None:
+-        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        fm = _frontmatter(text)
+-        for needle in (
+-            "Django",
+-            "django-rest-framework",
+-            "Vite",
+-            "shadcn",
+-            "Tailwind",
+-            "React",
+-            "Next.js",
+-            "Playwright",
+-        ):
+-            self.assertNotIn(needle, fm)
+-
+-    def test_reference_files_exist(self) -> None:
+-        for rel in ("references/python-api.md", "references/frontend.md"):
+-            self.assertTrue((ROOT / rel).is_file(), rel)
+-
+-    def test_gate_and_stacks(self) -> None:
+-        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        self.assertIn("显式", text)
+-        self.assertIn("python-api", text)
+-        self.assertIn("frontend", text)
+-        self.assertIn("django-rest-framework", text)
+-        self.assertIn("Playwright", text)
+-        self.assertIn("特定场景再用", text)
+-
+-    def test_frontend_layers(self) -> None:
+-        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
+-        for needle in (
+-            "TypeScript",
+-            "TanStack Query",
+-            "Zustand",
+-            "Zod",
+-            "React Hook Form",
+-            "OpenAPI",
+-            "Playwright",
+-            "Vitest",
+-            "Next.js",
+-        ):
+-            self.assertIn(needle, skill)
+-        self.assertIn("需要表单再用", fe)
+-        self.assertIn("playwright", fe.lower())
+-        self.assertIn("vitest", fe.lower())
+-        self.assertIn("react-hook-form", fe)
+-
+-    def test_references_name_defaults(self) -> None:
+-        py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
+-        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
+-        self.assertIn("startproject", py)
+-        self.assertIn("rest_framework", py)
+-        self.assertIn("react-ts", fe)
+-        self.assertIn("shadcn", fe)
+-        self.assertIn("Tailwind", fe)
++"""project-init：frontmatter、引用文件与门禁用语。"""
++
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def _frontmatter(skill_md: str) -> str:
++    parts = skill_md.split("---", 2)
++    if len(parts) < 3:
++        return ""
++    return parts[1]
++
++
++class ContractTest(unittest.TestCase):
++    def test_frontmatter_name(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("name: project-init", text)
++        self.assertIn("id: project-init", text)
++
++    def test_description_omits_frameworks(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fm = _frontmatter(text)
++        for needle in (
++            "Django",
++            "django-rest-framework",
++            "FastAPI",
++            "Flask",
++            "Pydantic",
++            "SQLAlchemy",
++            "Vite",
++            "shadcn",
++            "Tailwind",
++            "React",
++            "Next.js",
++            "Playwright",
++        ):
++            self.assertNotIn(needle, fm)
++
++    def test_reference_files_exist(self) -> None:
++        for rel in ("references/python-api.md", "references/frontend.md"):
++            self.assertTrue((ROOT / rel).is_file(), rel)
++
++    def test_gate_and_stacks(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("显式", text)
++        self.assertIn("python-api", text)
++        self.assertIn("frontend", text)
++        self.assertIn("FastAPI", text)
++        self.assertIn("按需求选层", text)
++        self.assertIn("Playwright", text)
++        self.assertIn("特定场景再用", text)
++
++    def test_python_layers(self) -> None:
++        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
++        for needle in (
++            "FastAPI",
++            "Django",
++            "Flask",
++            "Litestar",
++            "Pydantic",
++            "OpenAPI",
++            "SQLModel",
++            "SQLAlchemy",
++            "Tortoise",
++            "uvicorn",
++            "Celery",
++            "Dramatiq",
++            "ARQ",
++            "pytest",
++            "httpx",
++            "Ruff",
++        ):
++            self.assertIn(needle, skill)
++        self.assertIn("fastapi[standard]", py)
++        self.assertIn("sqlalchemy", py.lower())
++        self.assertIn("需要后台任务再用", skill)
++        self.assertIn("startproject", py)
++        self.assertIn("rest_framework", py)
++        self.assertIn("不要把所有备选都装上", py)
++
++    def test_frontend_layers(self) -> None:
++        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        for needle in (
++            "TypeScript",
++            "TanStack Query",
++            "Zustand",
++            "Zod",
++            "React Hook Form",
++            "OpenAPI",
++            "Playwright",
++            "Vitest",
++            "Next.js",
++        ):
++            self.assertIn(needle, skill)
++        self.assertIn("需要表单再用", fe)
++        self.assertIn("playwright", fe.lower())
++        self.assertIn("vitest", fe.lower())
++        self.assertIn("react-hook-form", fe)
++
++    def test_references_name_defaults(self) -> None:
++        py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        self.assertIn("fastapi[standard]", py)
++        self.assertIn("pydantic-settings", py)
++        self.assertIn("startproject", py)
++        self.assertIn("rest_framework", py)
++        self.assertIn("react-ts", fe)
++        self.assertIn("shadcn", fe)
++        self.assertIn("Tailwind", fe)

@@ -1,0 +1,453 @@
+diff --git a/agents/skills/project-init/SKILL.md b/agents/skills/project-init/SKILL.md
+new file mode 100644
+index 0000000..f5585bb
+--- /dev/null
++++ b/agents/skills/project-init/SKILL.md
+@@ -0,0 +1,111 @@
++---
++id: project-init
++name: project-init
++description: >-
++  按约定脚手架创建或对齐项目（v1：Python API 与前端）。
++  仅在用户显式要求初始化项目、创建项目脚手架、scaffold，或要求把已有项目架构向本 skill 对齐时使用。
++  不要用于日常写功能、装机、克隆仓库或启动服务。
++---
++
++# Project Init
++
++面向用户的输出默认使用简体中文。命令、路径、代码、包名与既成术语保持原文。
++
++按约定脚手架**创建**新项目，或把**已有项目**对齐到本 skill 的架构约定。v1 只实现 Python API 与前端两栈；其他语言/架构未提供 reference 时不得即兴发明。
++
++## 门禁（强制）
++
++未过门禁不得创建目录、改依赖、改配置或重写目录结构。
++
++**算触发（必须同时满足「显式」）：**
++
++- 用户点名本 skill / `project-init`，或明确说要**初始化项目**、**创建项目脚手架**、**scaffold 新项目**。
++- 用户明确要求把**已有项目/已有架构向本 skill 对齐**（例如「按 project-init 对齐」「对齐 Django+DRF 脚手架」）。
++
++**不算触发：**
++
++- 日常加功能、改 bug、加组件、加 API 接口。
++- 装机/配环境（交给对应环境 skill）、克隆仓库、启动/停止服务。
++- 顺口的 `git init`、`npm init`、建单个文件、在已有应用里加一个页面。
++- 用户只说「新写一个函数/页面/接口」，没有要求初始化或对齐项目架构。
++
++不确定时先问一句是否要走本 skill，得到明确肯定前当普通编码任务处理。
++
++## 非目标
++
++- 不实现业务功能、产品页面或领域模型；脚手架只含能跑通的空壳与健康检查。
++- 不装机、不改系统包、不克隆远程仓、不代替服务启停。
++- 不自动 commit / push；不写入密钥、真实 `.env` 值、内部 URL。
++- 不把未支持的栈临时写成「官方默认」；要扩栈须改本 skill 的 reference，不在一次脚手架会话里发明新约定。
++
++## 模式
++
++| 模式 | 何时 | 行为 |
++|------|------|------|
++| `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 用官方脚手架创建，再套本 skill 约定 |
++| `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
++
++目录已有另一套框架（如 FastAPI、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
++
++一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
++
++## 栈（v1）
++
++未说明栈时：像 API 服务的 Python → `python-api`；像 SPA/站点 UI 的前端 → `frontend`。Python 但不是 API（CLI / 库 / 脚本）→ 告知 v1 未覆盖，停止，不擅自改用 Flask/FastAPI。用户点名其他框架则尊重，并在摘要里标明「偏离默认」。
++
++| 栈 id | 默认 | 先读 |
++|-------|------|------|
++| `python-api` | Django + django-rest-framework | [python-api.md](references/python-api.md) |
++| `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
++
++### 前端分层
++
++建议列决定 init 是否默认装入，见 [frontend.md](references/frontend.md) 的映射。
++
++| 层 | 选择 | Agent 友好度 | 建议 |
++|----|------|-------------|------|
++| Language | TypeScript | ⭐⭐⭐⭐⭐ | 必选 |
++| UI Framework | React | ⭐⭐⭐⭐⭐ | 必选 |
++| Build | Vite | ⭐⭐⭐⭐⭐ | 默认 |
++| CSS | Tailwind CSS | ⭐⭐⭐⭐⭐ | 默认 |
++| UI | shadcn/ui | ⭐⭐⭐⭐⭐ | 强烈推荐 |
++| Server State | TanStack Query | ⭐⭐⭐⭐⭐ | 推荐 |
++| Client State | Zustand | ⭐⭐⭐⭐⭐ | 推荐 |
++| Validation | Zod | ⭐⭐⭐⭐⭐ | 推荐 |
++| Form | React Hook Form | ⭐⭐⭐⭐ | 需要表单再用 |
++| API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
++| E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
++| Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
++| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
++
++包管理器：用户指定优先；否则 Python 用 `uv`（无则 venv + pip），前端用 `pnpm`（无则 npm）。不要为了脚手架去全局安装包管理器，除非用户要求。
++
++## 工作流
++
++1. **过门禁**，判定 `init` 或 `align`。目标路径未给则询问，不在无关 cwd 里下手。
++2. **确认最小集合**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。
++3. **只加载对应 reference**，按其步骤执行。禁止跳过官方 CLI 去手搓会与官方模板漂移的完整项目树，除非 CLI 不可用且用户同意手写最小可运行壳。
++4. **`init`**：官方脚手架 → 本 skill 约定（配置、空 `apps`/`components` 布局、健康检查、`.env.example`、`.gitignore`、README 运行说明）→ 冒烟（见各 reference）。不要启动长期 dev server。
++5. **`align`**：读现有清单与入口 → 对照 reference 列出匹配/缺口/拟改文件 → 等用户确认 → 只改已确认项。不重写业务代码来「看起来更像模板」。
++6. **交付摘要**（见下）。不 commit。
++
++## 安全
++
++- 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
++- `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
++- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `django-admin startproject`、`create vite`、`shadcn init`）。
++- `.env.example` 只放变量名与无害示例值；真实密钥不入库。
++
++## 交付摘要
++
++完成后用简短列表告诉用户：
++
++- 模式（`init` / `align`）与目标路径
++- 实际采用的栈与是否偏离默认（含前端各层：装了什么、故意没装什么）
++- 关键路径（如何启动、健康检查 URL 或 build / test 命令）
++- 改了哪些文件（align 必列）
++- 明确没做的事（业务、部署、CI、commit）
++
++## 扩展
++
++新增栈：增加 `references/<stack-id>.md`，并在上表加一行。reference 必须写清官方脚手架命令、目录约定、默认依赖、冒烟命令、align 对照清单。无 reference 的栈 = 未支持。
+diff --git a/agents/skills/project-init/references/frontend.md b/agents/skills/project-init/references/frontend.md
+new file mode 100644
+index 0000000..f2b3b2c
+--- /dev/null
++++ b/agents/skills/project-init/references/frontend.md
+@@ -0,0 +1,131 @@
++# 前端
++
++本 reference 只在栈为 `frontend` 时读取。分层与建议以 `SKILL.md` 前端表为准；这里只写怎么落地。用户点名 Vue / CRA 等则不要套本文件。
++
++## 建议 → init 行为
++
++| 建议 | init | align 缺口 |
++|------|------|------------|
++| 必选 | 必须具备，缺则不算完成 | 列为应补 |
++| 默认 | 未指定替代时采用 | 已用等价替代则记录偏差，不强制改回 |
++| 强烈推荐 | 默认装入；用户明确拒绝才省略 | 列为应补（除非用户已拒绝） |
++| 推荐 | 默认装入；用户明确拒绝才省略 | 列为建议补，确认后再改 |
++| 需要表单再用 | **不预装** | 仅当项目已有表单、或用户要加表单时才提议 |
++| 特定场景再用 | **不作为默认**；仅用户点名该场景 | 已采用则按该场景对照，不改回默认 |
++
++Next.js 属于「特定场景再用」：仅当用户明确要 SSR / RSC / SEO / App Router 等时用官方 `create-next-app`（TypeScript），再按 shadcn 的 Next 指南接入。不要与 Vite 并存。其余层（TS、React、Tailwind、shadcn、Query、Zustand、Zod、Playwright、Vitest）仍然适用，Build 改由 Next 承担。
++
++## 官方入口（默认：Vite）
++
++包管理器：`pnpm` > `npm`（用户指定优先）。在**已确认的空目标**（或仅 git 占位）下：
++
++```bash
++pnpm create vite . --template react-ts
++# 或：npm create vite@latest . -- --template react-ts
++```
++
++若 CLI 拒绝非空目录：先确认里面只有安全占位文件；可用官方文档中的 force 类参数，或在临时空目录生成再移入用户确认过的文件。禁止覆盖已有 `src/`。
++
++然后按 **shadcn/ui 当前 Vite 指南**初始化（会安装 Tailwind 并写 `components.json`）。优先非交互：
++
++```bash
++pnpm dlx shadcn@latest init -d
++# 或：npx shadcn@latest init -d
++```
++
++`-d` / `--defaults` 以当时 CLI 为准；若标志变更，改用官方文档的非交互等价参数，不要手搓与 shadcn 漂移的 Tailwind 配置。
++
++```bash
++pnpm dlx shadcn@latest add button
++```
++
++空壳：极简占位（标题 + 一个 shadcn `Button`）即可，不要一次装整套组件。
++
++## 各层落地（默认 Vite 路径）
++
++在 Vite + shadcn 之上按表补齐。包名用当时官方包，不在本文件钉死次版本。
++
++| 层 | 做什么 |
++|----|--------|
++| Language / UI Framework | `react-ts` 模板；禁止改回 JavaScript |
++| Build | 保留 Vite；用户未点名 Next 时不要换成 Next |
++| CSS / UI | 跟随 `shadcn init`；`src/components/ui/` 只放 shadcn 生成物 |
++| Server State | 安装 `@tanstack/react-query`；在根部挂 `QueryClientProvider`（空配置，不写业务 query） |
++| Client State | 安装 `zustand`；`src/stores/` 只放可扩展的空 store 骨架，不放领域字段 |
++| Validation | 安装 `zod`；与 API Contract 共用 |
++| Form | 不安装 `react-hook-form`，除非用户要表单 |
++| API Contract | 安装 `zod`。有 OpenAPI 文档（本地 `openapi.json` / 用户给出的 spec）时用官方 codegen（如 `openapi-typescript`）生成客户端，Zod 做运行时校验；**没有 spec 时不要虚构一整份 OpenAPI**。建 `src/lib/api/`：`client.ts` 薄封装 + 一个与健康检查对应的 Zod schema 作为合同示例 |
++| E2E | 安装 `@playwright/test`，写 `playwright.config.ts` 与一条访问根路径的 smoke spec。init **不**默认下载浏览器二进制；README 写明 `playwright install` 后再跑 E2E |
++| Unit | 安装 `vitest`（及官方 React 测试搭档，如 jsdom + Testing Library）；能跑通一条渲染占位的测试即可 |
++
++不要默认再加 React Router、MUI、Ant Design 等。用户点名则加，并在摘要标明偏离。
++
++## 目录约定
++
++以 Vite + shadcn 官方结果为底，再加本表目录（不要另造 `features/` 分层，除非用户要求）：
++
++```text
++<project-root>/
++  package.json
++  tsconfig.json
++  tsconfig.app.json          # 以 CLI 实际产出为准
++  vite.config.ts
++  vitest.config.ts           # 或并入 vite.config.ts，以官方推荐为准
++  playwright.config.ts
++  components.json
++  index.html
++  README.md
++  .gitignore
++  e2e/
++    smoke.spec.ts
++  src/
++    main.tsx                 # QueryClientProvider
++    App.tsx
++    index.css
++    test/
++      setup.ts               # 若 Vitest 需要
++    lib/
++      utils.ts
++      api/
++        client.ts
++        health.ts            # Zod schema 示例
++    stores/
++      app-store.ts
++    components/ui/
++```
++
++- 路径别名 `@/` 必须在 tsc 与 Vite 中都有效。
++- 业务组件放 `src/components/`（`ui/` 留给 shadcn）。
++- 不要提交 `node_modules/`。`.gitignore` 含 `.env`、`.env.local`、Playwright 产物。
++
++README 写清：`dev`、`build`、`vitest`、Playwright（含先 `playwright install`）。不要写虚构部署环境。
++
++## 冒烟（init 必做）
++
++```bash
++pnpm build
++pnpm exec vitest run
++```
++
++无 `pnpm` 则用 `npm run build` 与 `npx vitest run`。失败则修复后再结束。不要后台挂起 `dev`，也不要默认跑 Playwright（缺浏览器）。
++
++## align 对照
++
++已是 Vite + React + TS，或用户确认保留的 Next.js 时，按分层表逐项看，确认后再补：
++
++| 层 | 期望 |
++|----|------|
++| Language | TypeScript |
++| UI Framework | React |
++| Build | Vite（Next 场景则为 Next，不改回 Vite） |
++| CSS | Tailwind，且与 shadcn 一致 |
++| UI | `components.json` + `src/components/ui/` |
++| Server State | TanStack Query 已接入根 Provider |
++| Client State | Zustand 已有 stores 约定 |
++| Validation | Zod 已用于契约或表单 |
++| Form | 有表单才需要 React Hook Form；无表单不装 |
++| API Contract | OpenAPI codegen 或等价 Zod schema；禁止手写无校验的散落 `fetch` 作为唯一合同 |
++| E2E | Playwright 配置 + 至少一条 smoke |
++| Unit | Vitest 可运行 |
++
++Vue / CRA / Svelte / 无打包静态页：报告「栈不兼容」，**不改代码**，除非用户明确要求迁移并确认计划。仅缺 shadcn/Tailwind、其余已是 Vite+React+TS 时，确认后按官方 `shadcn init` 补齐。
+diff --git a/agents/skills/project-init/references/python-api.md b/agents/skills/project-init/references/python-api.md
+new file mode 100644
+index 0000000..8bf7e26
+--- /dev/null
++++ b/agents/skills/project-init/references/python-api.md
+@@ -0,0 +1,108 @@
++# Python API（Django + DRF）
++
++本 reference 只在栈为 `python-api` 时读取。默认：**Django + django-rest-framework**。用户点名 FastAPI / Flask 等则不要套本文件。
++
++## 官方入口
++
++优先 `uv`：
++
++```bash
++uv init --name <project-name>
++uv add django djangorestframework
++uv run django-admin startproject config .
++```
++
++无 `uv` 时：
++
++```bash
++python3 -m venv .venv
++.venv/bin/pip install django djangorestframework
++.venv/bin/django-admin startproject config .
++```
++
++- Django 工程包名默认 `config`（避免与目录名撞车）。用户指定其他包名则用用户的。
++- 在目标根执行 `startproject`，使 `manage.py` 位于项目根。
++- 不要全局 `pip install`。
++
++`uv init` 若已写出占位 `main.py` 且与 Django 无关，删除该占位，避免两个入口并存。
++
++## 目录约定
++
++```text
++<project-root>/
++  pyproject.toml          # 或 requirements.txt（仅无 uv 时）
++  manage.py
++  README.md
++  .gitignore
++  .env.example
++  config/
++    __init__.py
++    settings.py
++    urls.py
++    wsgi.py
++    asgi.py
++    views.py              # 仅 health
++  apps/
++    __init__.py           # 业务 app 放这里；init 不创建业务 app
++```
++
++后续业务 app：`uv run python manage.py startapp <name> apps/<name>`，`INSTALLED_APPS` 登记 `apps.<name>`。init 阶段不要 `startapp` 业务应用。
++
++## 必须写入的配置
++
++在 `config/settings.py`（官方生成后再改，不要整文件替换掉未知项）：
++
++- `INSTALLED_APPS` 加入 `rest_framework`。
++- `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` 从环境变量读取；本地缺省仅用于开发（与 `.env.example` 一致），注释标明不可用于生产。
++- 增加：
++
++```python
++REST_FRAMEWORK = {
++    "DEFAULT_RENDERER_CLASSES": [
++        "rest_framework.renderers.JSONRenderer",
++    ],
++    "DEFAULT_PARSER_CLASSES": [
++        "rest_framework.parsers.JSONParser",
++    ],
++}
++```
++
++- 仅当本次同时初始化会跨域访问本 API 的前端时，才添加 `django-cors-headers` 并配置 `CORS_ALLOWED_ORIGINS`；API-only 不要默认加 CORS。
++
++`config/views.py` + `config/urls.py` 提供 `GET /api/health/`，JSON `{"status": "ok"}`。不要加 admin 定制、用户系统、鉴权或示例 CRUD。
++
++`.env.example`：
++
++```text
++DJANGO_SECRET_KEY=dev-only-change-me
++DJANGO_DEBUG=true
++DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
++```
++
++`.gitignore` 至少覆盖：`.venv/`、`__pycache__/`、`*.py[cod]`、`.env`、`db.sqlite3`、`staticfiles/`。
++
++README 写清：安装依赖、`migrate`（init 可跑 `migrate` 以创建本地 sqlite）、`runserver`、health URL。不要写虚构的部署/公司环境。
++
++## 冒烟（init 必做）
++
++```bash
++uv run python manage.py check
++uv run python manage.py migrate --noinput
++```
++
++无 `uv` 则用 `.venv/bin/python`。不要 `runserver`。`check` 或 `migrate` 失败则修复脚手架后再结束。
++
++## align 对照
++
++已是 Django 时逐项看，缺什么列什么，确认后再补：
++
++| 项 | 期望 |
++|----|------|
++| 依赖 | `django`、`djangorestframework` |
++| `INSTALLED_APPS` | 含 `rest_framework` |
++| `REST_FRAMEWORK` | 有显式配置（可与上表不同，但应存在） |
++| health | 有可访问的健康检查，或用户明确不要 |
++| 业务 app 位置 | 约定在 `apps/`；已有 app 在别处则**不要**搬家，只在摘要说明偏差 |
++| 密钥 | 无明文生产密钥入库 |
++
++已是 FastAPI / Flask / 纯脚本：报告「栈不兼容」，给出若迁移需要替换的入口与依赖；**不改代码**，除非用户明确要求迁移并确认计划。
+diff --git a/agents/skills/project-init/tests/test_skill_contract.py b/agents/skills/project-init/tests/test_skill_contract.py
+new file mode 100644
+index 0000000..110e4e4
+--- /dev/null
++++ b/agents/skills/project-init/tests/test_skill_contract.py
+@@ -0,0 +1,79 @@
++"""project-init：frontmatter、引用文件与门禁用语。"""
++
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def _frontmatter(skill_md: str) -> str:
++    parts = skill_md.split("---", 2)
++    if len(parts) < 3:
++        return ""
++    return parts[1]
++
++
++class ContractTest(unittest.TestCase):
++    def test_frontmatter_name(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("name: project-init", text)
++        self.assertIn("id: project-init", text)
++
++    def test_description_omits_frameworks(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fm = _frontmatter(text)
++        for needle in (
++            "Django",
++            "django-rest-framework",
++            "Vite",
++            "shadcn",
++            "Tailwind",
++            "React",
++            "Next.js",
++            "Playwright",
++        ):
++            self.assertNotIn(needle, fm)
++
++    def test_reference_files_exist(self) -> None:
++        for rel in ("references/python-api.md", "references/frontend.md"):
++            self.assertTrue((ROOT / rel).is_file(), rel)
++
++    def test_gate_and_stacks(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("显式", text)
++        self.assertIn("python-api", text)
++        self.assertIn("frontend", text)
++        self.assertIn("django-rest-framework", text)
++        self.assertIn("Playwright", text)
++        self.assertIn("特定场景再用", text)
++
++    def test_frontend_layers(self) -> None:
++        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        for needle in (
++            "TypeScript",
++            "TanStack Query",
++            "Zustand",
++            "Zod",
++            "React Hook Form",
++            "OpenAPI",
++            "Playwright",
++            "Vitest",
++            "Next.js",
++        ):
++            self.assertIn(needle, skill)
++        self.assertIn("需要表单再用", fe)
++        self.assertIn("playwright", fe.lower())
++        self.assertIn("vitest", fe.lower())
++        self.assertIn("react-hook-form", fe)
++
++    def test_references_name_defaults(self) -> None:
++        py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        self.assertIn("startproject", py)
++        self.assertIn("rest_framework", py)
++        self.assertIn("react-ts", fe)
++        self.assertIn("shadcn", fe)
++        self.assertIn("Tailwind", fe)

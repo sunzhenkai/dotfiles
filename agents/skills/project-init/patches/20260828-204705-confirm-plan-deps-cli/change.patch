@@ -1,0 +1,197 @@
+diff --git a/agents/skills/project-init/SKILL.md b/agents/skills/project-init/SKILL.md
+--- a/agents/skills/project-init/SKILL.md
++++ b/agents/skills/project-init/SKILL.md
+@@ -13,11 +13,11 @@
+ 
+ 按约定脚手架**创建**新项目，或把**已有项目**对齐到本 skill 的架构约定。v1 只实现 Python API 与前端两栈；其他语言/架构未提供 reference 时不得即兴发明。已支持栈内的具体框架按分层表与需求选择，不得无视需求套死一套。
+ 
+ ## 门禁（强制）
+ 
+-未过门禁不得创建目录、改依赖、改配置或重写目录结构。
++未过门禁不得创建目录、改依赖、改配置或重写目录结构。最终方案未经用户确认、缺失依赖未经询问，同样不得动手。
+ 
+ **算触发（必须同时满足「显式」）：**
+ 
+ - 用户点名本 skill / `project-init`，或明确说要**初始化项目**、**创建项目脚手架**、**scaffold 新项目**。
+ - 用户明确要求把**已有项目/已有架构向本 skill 对齐**（例如「按 project-init 对齐」「对齐 FastAPI 脚手架」）。
+@@ -36,27 +36,28 @@
+ - 不实现业务功能、产品页面或领域模型；脚手架只含能跑通的空壳与健康检查。
+ - 不装机、不改系统包、不克隆远程仓、不代替服务启停。
+ - 不自动 commit / push；不写入密钥、真实 `.env` 值、内部 URL。
+ - 不把未支持的栈临时写成「官方默认」；要扩栈须改本 skill 的 reference，不在一次脚手架会话里发明新约定。
+ - 不把「特定场景再用 / 需要再用 / 用户点名」的备选预装进默认脚手架。
++- 不在用户未确认时默默切换包管理器，或为脚手架擅自全局安装工具。
+ 
+ ## 模式
+ 
+ | 模式 | 何时 | 行为 |
+ |------|------|------|
+-| `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 用官方脚手架创建，再套本 skill 约定 |
++| `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 方案确认后用官方工具命令创建，再套本 skill 约定 |
+ | `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
+ 
+ 目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
+ 
+ 一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
+ 
+ ## 栈（v1）
+ 
+ 未说明栈时：像 API 服务的 Python → `python-api`（Web Framework 默认 FastAPI）；像 SPA/站点 UI 的前端 → `frontend`。Python 但不是 API（CLI / 库 / 脚本）→ 告知 v1 未覆盖，停止，不擅自改用 Flask/FastAPI。
+ 
+-**按需求选层（强制）**：先根据已确认需求对照分层表选择具体库，再跑脚手架。用户点名的库优先于表中的默认/推荐，并在摘要标明偏离。需求不足以下决定的层：采用「必选」「默认」；「推荐」在用户未拒绝时装入；「需要…再用」「特定场景再用」「用户点名」一律不预装。禁止凭偏好把默认 FastAPI 换成 Django，或把已有 Django 在 align 中改成 FastAPI。
++**按需求选层（强制）**：先根据已确认需求对照分层表选择具体库，形成最终方案并确认后再执行。用户点名的库优先于表中的默认/推荐，并在摘要标明偏离。需求不足以下决定的层：采用「必选」「默认」；「推荐」在用户未拒绝时装入；「需要…再用」「特定场景再用」「用户点名」一律不预装。禁止凭偏好把默认 FastAPI 换成 Django，或把已有 Django 在 align 中改成 FastAPI。
+ 
+ | 栈 id | 默认 | 先读 |
+ |-------|------|------|
+ | `python-api` | 分层见下表；纯 API 默认 FastAPI | [python-api.md](references/python-api.md) |
+ | `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
+@@ -103,33 +104,35 @@
+ | API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
+ | E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
+ | Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
+ | Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
+ 
+-包管理器：用户指定优先；否则 Python 用 `uv`（无则 venv + pip），前端用 `pnpm`（无则 npm）。不要为了脚手架去全局安装包管理器，除非用户要求。
++包管理器：用户指定优先；否则 Python 默认 `uv`，前端默认 `pnpm`。工具或包管理器缺失时列入依赖缺口，**询问是否补齐**（安装该工具，或改用已说明的回退：Python 为 venv + pip，前端为 npm）。未确认不得自行切换，也不得为脚手架擅自全局安装。
+ 
+ ## 工作流
+ 
+ 1. **过门禁**，判定 `init` 或 `align`。目标路径未给则询问，不在无关 cwd 里下手。
+-2. **确认最小集合**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。需求特征会影响选层时（Admin、后台任务、模型与 schema 一体、浏览器 E2E、SSR 等）缺则问，不猜。
+-3. **只加载对应 reference**，只执行其中与所选层匹配的步骤。禁止跳过官方 CLI 去手搓会与官方模板漂移的完整项目树，除非 CLI 不可用且用户同意手写最小可运行壳。
+-4. **`init`**：官方脚手架 → 本 skill 约定（配置、空布局、健康检查、`.env.example`、`.gitignore`、README 运行说明）→ 冒烟（见各 reference）。不要启动长期 dev server。
+-5. **`align`**：读现有清单与入口 → 对照所选层列出匹配/缺口/拟改文件 → 等用户确认 → 只改已确认项。不重写业务代码来「看起来更像模板」。
++2. **收集输入**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。需求特征会影响选层时（Admin、后台任务、模型与 schema 一体、浏览器 E2E、SSR 等）缺则问，不猜。
++3. **形成最终方案并确认**：只加载对应 reference，按需求选层，列出最终方案（模式、目标路径、各层选择与原因、拟用官方工具命令、将写入的约定、冒烟命令）。**展示给用户并等待明确确认**。未确认不得创建目录、改依赖或改文件。用户改需求则回到选层，不要边做边改方案。
++4. **检查依赖**：方案选定并确认之后、动手之前，检查该方案所需的工具命令是否可用（如 `uv`、`python3`、`pnpm`/`npm`、`node`，以及该栈官方 create/init CLI）。列出缺失项，**询问是否补齐**。用户同意后再安装或启用已确认的回退；用户拒绝则停止或改用其指定替代。不得默默全局安装，不得未经询问切换包管理器。项目框架包跟随官方 CLI / `uv add` / 包管理器安装，不要预先手搓 lockfile。
++5. **执行**：`init` **优先借助该栈官方工具命令**（见各 reference，如 `uv init`、`django-admin startproject`、`pnpm create vite`、`shadcn init`），再用本 skill 约定补配置、空布局、健康检查、`.env.example`、`.gitignore`、README。官方 CLI 可用时禁止手搓完整项目树。CLI 缺失：先按步骤 4 问是否补齐；仍不可用且用户明确同意后，才写最小可运行壳。`align`：只改已确认项，补齐同样走官方工具命令；不重写业务代码来「看起来更像模板」。不要启动长期 dev server。冒烟见各 reference。
+ 6. **交付摘要**（见下）。不 commit。
+ 
+ ## 安全
+ 
+ - 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
+ - `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
+-- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`shadcn init`）。
++- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`shadcn init`）。初始化应优先跑这些命令，而不是先手写同等文件。
+ - `.env.example` 只放变量名与无害示例值；真实密钥不入库。
+ 
+ ## 交付摘要
+ 
+ 完成后用简短列表告诉用户：
+ 
+ - 模式（`init` / `align`）与目标路径
++- 方案是否已经用户确认
++- 依赖检查：缺什么、是否补齐、用了什么回退
+ - 实际采用的栈与是否偏离默认（含 Python / 前端各层：装了什么、因何需求、故意没装什么）
+ - 关键路径（如何启动、健康检查 URL 或 build / test 命令）
+ - 改了哪些文件（align 必列）
+ - 明确没做的事（业务、部署、CI、commit）
+ 
+diff --git a/agents/skills/project-init/references/python-api.md b/agents/skills/project-init/references/python-api.md
+--- a/agents/skills/project-init/references/python-api.md
++++ b/agents/skills/project-init/references/python-api.md
+@@ -1,8 +1,10 @@
+ # Python API
+ 
+-本 reference 只在栈为 `python-api` 时读取。分层与建议以 `SKILL.md` Python 表为准；这里只写怎么落地。先选层，再执行**与所选 Web Framework 匹配**的路径，不要把所有备选都装上。
++本 reference 只在栈为 `python-api` 时读取。分层与建议以 `SKILL.md` Python 表为准；这里只写怎么落地。先选层并得到用户确认的最终方案，再执行**与所选 Web Framework 匹配**的路径，不要把所有备选都装上。
++
++**工具命令优先**：项目骨架用 `uv init`、`uv add`、`django-admin startproject` 等官方命令生成。官方 CLI 可用时不要从零手搓 `pyproject.toml` 与完整目录树。CLI 缺失时先按 `SKILL.md` 询问是否补齐。
+ 
+ ## 建议 → init 行为
+ 
+ | 建议 | init | align 缺口 |
+ |------|------|------------|
+@@ -40,11 +42,11 @@
+ 
+ ```bash
+ uv init --name <project-name>
+ ```
+ 
+-无 `uv` 时：`python3 -m venv .venv`，再用 `.venv/bin/pip`。不要全局 `pip install`。
++无 `uv` 时：不要直接改用 venv。把 `uv` 列为缺失依赖，**询问是否补齐**（安装 `uv`，或改用 `python3 -m venv .venv` + pip）。未确认不得自行切换。不要全局 `pip install`。
+ 
+ `uv init` 若写出与所选框架无关的占位 `main.py`，删除该占位，避免两个入口并存。
+ 
+ 随后按所选路径 `uv add` 依赖；共用开发依赖：
+ 
+@@ -58,11 +60,11 @@
+ 
+ README 写清：安装依赖、启动、health URL、`pytest`、Ruff（若已装）。不要写虚构的部署/公司环境。
+ 
+ ## FastAPI（默认）
+ 
+-官方入口无独立 create 模板时：`uv init` 后装依赖并写最小可运行包（用户同意手写最小壳）。不要手搓与 FastAPI 文档漂移的大型目录（无 `services/` 领域分层，除非用户要求）。
++优先 `uv init` + `uv add`。FastAPI 无独立 create 模板时，用上述工具命令生成项目后再写入本约定的最小包结构，不要从零手搓依赖清单。不要手搓与 FastAPI 文档漂移的大型目录（无 `services/` 领域分层，除非用户要求）。
+ 
+ ```bash
+ uv add "fastapi[standard]" sqlalchemy pydantic-settings
+ ```
+ 
+diff --git a/agents/skills/project-init/references/frontend.md b/agents/skills/project-init/references/frontend.md
+--- a/agents/skills/project-init/references/frontend.md
++++ b/agents/skills/project-init/references/frontend.md
+@@ -1,8 +1,10 @@
+ # 前端
+ 
+ 本 reference 只在栈为 `frontend` 时读取。分层与建议以 `SKILL.md` 前端表为准；这里只写怎么落地。用户点名 Vue / CRA 等则不要套本文件。
++
++**工具命令优先**：先跑 `pnpm create vite` / `create-next-app` / `shadcn init`。官方 CLI 可用时不要手写 `package.json`、Vite 或 Tailwind 配置来「等价生成」。CLI 缺失时先按 `SKILL.md` 询问是否补齐。
+ 
+ ## 建议 → init 行为
+ 
+ | 建议 | init | align 缺口 |
+ |------|------|------------|
+@@ -15,11 +17,11 @@
+ 
+ Next.js 属于「特定场景再用」：仅当用户明确要 SSR / RSC / SEO / App Router 等时用官方 `create-next-app`（TypeScript），再按 shadcn 的 Next 指南接入。不要与 Vite 并存。其余层（TS、React、Tailwind、shadcn、Query、Zustand、Zod、Playwright、Vitest）仍然适用，Build 改由 Next 承担。
+ 
+ ## 官方入口（默认：Vite）
+ 
+-包管理器：`pnpm` > `npm`（用户指定优先）。在**已确认的空目标**（或仅 git 占位）下：
++包管理器：`pnpm` > `npm`（用户指定优先）。无 `pnpm` 时列入缺失，**询问是否补齐**（安装 `pnpm`，或改用 npm）；未确认不得自行切换。在**最终方案已确认、依赖已检查**的空目标（或仅 git 占位）下：
+ 
+ ```bash
+ pnpm create vite . --template react-ts
+ # 或：npm create vite@latest . -- --template react-ts
+ ```
+@@ -105,11 +107,11 @@
+ ```bash
+ pnpm build
+ pnpm exec vitest run
+ ```
+ 
+-无 `pnpm` 则用 `npm run build` 与 `npx vitest run`。失败则修复后再结束。不要后台挂起 `dev`，也不要默认跑 Playwright（缺浏览器）。
++无 `pnpm` 且方案已确认改用 npm 时：`npm run build` 与 `npx vitest run`。失败则修复后再结束。不要后台挂起 `dev`，也不要默认跑 Playwright（缺浏览器）。
+ 
+ ## align 对照
+ 
+ 已是 Vite + React + TS，或用户确认保留的 Next.js 时，按分层表逐项看，确认后再补：
+ 
+diff --git a/agents/skills/project-init/tests/test_skill_contract.py b/agents/skills/project-init/tests/test_skill_contract.py
+--- a/agents/skills/project-init/tests/test_skill_contract.py
++++ b/agents/skills/project-init/tests/test_skill_contract.py
+@@ -101,10 +101,23 @@
+         self.assertIn("需要表单再用", fe)
+         self.assertIn("playwright", fe.lower())
+         self.assertIn("vitest", fe.lower())
+         self.assertIn("react-hook-form", fe)
+ 
++    def test_plan_confirm_and_tool_cli(self) -> None:
++        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        self.assertIn("最终方案", skill)
++        self.assertIn("询问是否补齐", skill)
++        self.assertIn("优先借助", skill)
++        self.assertIn("官方工具命令", skill)
++        self.assertIn("工具命令优先", py)
++        self.assertIn("询问是否补齐", py)
++        self.assertIn("工具命令优先", fe)
++        self.assertIn("询问是否补齐", fe)
++
+     def test_references_name_defaults(self) -> None:
+         py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")
+         fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
+         self.assertIn("fastapi[standard]", py)
+         self.assertIn("pydantic-settings", py)
