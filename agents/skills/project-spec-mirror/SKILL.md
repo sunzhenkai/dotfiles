@@ -3,7 +3,7 @@ id: project-spec-mirror
 name: project-spec-mirror
 description: >-
   为项目维护给人读的 spec 孪生目录：金字塔、恢复投影（上下文/数据/表面/运行时/构建）、
-  工程切面（来源/契约/切片/验证/流量）、简约/详尽两档，并用 git commit 做增量更新。
+  工程切面（来源/契约/切片/验证/流量）、简约/详尽模式及详尽下的文件整理粒度，并用 git commit 做增量更新。
   图表委托 archify。验收是只凭镜像能重建可运行系统。在用户要求创建或更新 project spec
   镜像、spec 孪生、可读规格目录、工程切面，或点名 project-spec-mirror 时使用。
   不要用于 OpenSpec change、实现代码或只读问答。
@@ -105,14 +105,14 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ### build
 
-1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对 `scope` 内、且将写入模块表的文件跑 `symbols`）
+1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`），再仅对所选范围内且将写入模块表或热点页的文件跑 `symbols`
 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
 3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
 6. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。用户要「每个文件一页」时说明新模型，改为热点或 detailed 加深。要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
-8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`（有热点则加 `--hotspot`），再 `$SPECCTL validate`
+7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理；`important` 只整理重要文件并忽略或合并简单文件；`lightweight` 沿用当前轻量规则。重要文件模式只能忽略无业务含义文件。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
 
 ### update
@@ -127,7 +127,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ### maintain
 
-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：改该模块文件表对应行并跟链接；只有用户明确要详注时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
 
 ### status
 

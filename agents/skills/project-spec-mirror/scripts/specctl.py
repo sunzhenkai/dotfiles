@@ -37,6 +37,7 @@ PROJECT_FILE_MARKERS = frozenset(
         "Gemfile",
     }
 )
+DETAIL_LEVELS = ("complete", "important", "lightweight")
 IGNORE_DIR_NAMES = frozenset(
     {
         ".git",
@@ -856,6 +857,7 @@ def create_skeleton(
     source: Path,
     branch: str | None,
     mode: str,
+    detail_level: str,
 ) -> None:
     spec_root.mkdir(parents=True, exist_ok=True)
     source_rel = rel_to(source, spec_root)
@@ -866,6 +868,7 @@ def create_skeleton(
         "source": source_rel,
         "branch": branch,
         "mode": mode,
+        "detail_level": detail_level,
         "scope": [],
         "hotspots": [],
         "synced_commit": None,
@@ -1200,10 +1203,11 @@ def cmd_init(args: argparse.Namespace) -> int:
             summary=f"init: occupied {spec_root}",
         )
     mode = args.mode
+    detail_level = args.detail_level
     info = git_info(source, args.branch)
     branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
     if not args.confirm:
-        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
+        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode, "--detail-level", detail_level]
         if args.project:
             confirm_args.extend(["--project", args.project])
         if args.source:
@@ -1223,6 +1227,7 @@ def cmd_init(args: argparse.Namespace) -> int:
                 "project": project,
                 "branch": branch,
                 "mode": mode,
+                "detail_level": detail_level,
                 "prompt": (
                     f"将创建 spec 镜像目录 {spec_root} "
                     f"（placement={layout['placement']}，source={source}）。"
@@ -1240,6 +1245,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         source=source,
         branch=branch,
         mode=mode,
+        detail_level=detail_level,
     )
     return emit(
         {
@@ -1252,6 +1258,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             "placement": layout["placement"],
             "branch": branch,
             "mode": mode,
+            "detail_level": detail_level,
         },
         summary=f"init: created {spec_root}",
     )
@@ -1490,6 +1497,8 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
         if args.mode not in {"concise", "detailed"}:
             raise SpecError("mode must be concise or detailed", reason="usage")
         state["mode"] = args.mode
+    if args.detail_level:
+        state["detail_level"] = args.detail_level
     if args.branch:
         state["branch"] = args.branch
     if args.scope is not None:
@@ -1556,6 +1565,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
             issues.append(f"state missing {key}")
     if state.get("mode") not in {None, "concise", "detailed"}:
         issues.append(f"invalid mode {state.get('mode')!r}")
+    detail_level = state.get("detail_level", "important")
+    if detail_level not in DETAIL_LEVELS:
+        issues.append(f"invalid detail_level {detail_level!r}")
     hotspots = state.get("hotspots", [])
     if hotspots is None:
         hotspots = []
@@ -1577,6 +1589,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         "source_ok": source_ok,
         "source": str(source) if source else None,
         "mode": state.get("mode"),
+        "detail_level": detail_level,
     }
     return emit(
         payload,
@@ -1635,6 +1648,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("concise", "detailed"),
         default="concise",
     )
+    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default="important")
 
     add("status", help="镜像状态与 git 新鲜度")
     add("git-info", help="源仓库分支与 commit")
@@ -1659,6 +1673,7 @@ def build_parser() -> argparse.ArgumentParser:
     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
     set_sync.add_argument("--commit", default=None)
     set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
+    set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
     set_sync.add_argument("--scope", action="append", default=None)
     set_sync.add_argument(
         "--hotspot",

@@ -234,6 +234,7 @@ class InitTest(unittest.TestCase):
             self.assertEqual(state["placement"], "in-project")
             self.assertEqual(state["source"], "..")
             self.assertEqual(state["mode"], "concise")
+            self.assertEqual(state["detail_level"], "important")
             self.assertEqual(state.get("hotspots"), [])
             self.assertIsNone(state["synced_commit"])
 
