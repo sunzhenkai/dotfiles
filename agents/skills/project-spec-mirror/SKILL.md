@@ -110,7 +110,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
-6. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
 7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
 8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit

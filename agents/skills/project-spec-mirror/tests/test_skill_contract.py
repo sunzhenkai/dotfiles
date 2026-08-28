@@ -78,3 +78,14 @@ class ContractTest(unittest.TestCase):
         self.assertIn("<REDACTED>", modes)
         self.assertIn("AppKey", modes)
         self.assertIn("SecretKey", modes)
+
+    def test_diagrams_must_deliver_html_this_session(self) -> None:
+        diagrams = (SKILL_ROOT / "references" / "diagrams.md").read_text(encoding="utf-8")
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
+        self.assertIn("本轮必须交付", diagrams)
+        self.assertIn("暂未生成图表", diagrams)
+        self.assertIn("在本轮", skill)
+        self.assertIn("后续用 archify", skill)
+        self.assertIn("暂未生成图表", evals)
+        self.assertIn("只写 JSON 候选", evals)

@@ -96,11 +96,14 @@ cases:
       must:
         - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现时 VERIFY 仍写测试/性质，差分写无；无灰度时 TRAFFIC 仍写发布与回滚）
         - 切片生命周期从 identified 起写，不跳步假装 migrated
-        - 需要图时加载 archify，HTML 写入 diagrams/
+        - 需要图且 archify CLI 可用时，本轮加载 archify Skill（会话列表没有也要 Read 已安装的 SKILL.md），validate 后 deliver，HTML 写入 diagrams/<slug>.html
+        - INDEX 只链已存在的 .html；init 空表可以保留
       must_not:
         - 把 archify schema 或渲染器拷进本 Skill
         - 未安装 archify 时声称已交付 HTML 图
         - 把 PHP/Go 写死为唯一对照语言对
+        - 写「暂未生成图表」「后续可用 archify」占位，或把 INDEX 链到 archify Skill 目录
+        - 只写 JSON 候选或只列图名却不 deliver HTML（CLI 可用时）
 
   - id: recovery-projections-runnable
     kind: core
