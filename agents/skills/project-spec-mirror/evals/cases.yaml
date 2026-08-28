@@ -235,6 +235,21 @@ cases:
       must_not:
         - 为全库每个代码文件建 files/ 或 notes/
 
+  - id: skip-third-party-and-foreign-repos
+    kind: boundary
+    judge: deterministic
+    description: 只整理本工程代码，跳过三方依赖与外来仓源码
+    given: 源树含 vendor/、node_modules/、git submodule 或 replace/path 指向的其他仓库
+    expect:
+      must:
+        - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
+        - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
+        - 邻接系统只在 context/ 记边界；包名与约束只在 build/ 点到为止
+      must_not:
+        - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
+        - 把 unmapped 的三方/外来路径并入本工程模块
+        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写金字塔
+
   - id: not-openspec-not-source-edit
     kind: boundary
     judge: deterministic

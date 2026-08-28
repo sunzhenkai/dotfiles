@@ -29,6 +29,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
 - 不自动 commit / push；不把密钥、`.env`、凭据写进镜像。
 - 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
+- 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+  - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
+  - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
+  - 不要为三方或外来仓建模块、文件表行、`notes/`、概念或切片。需要给那个仓做镜像时，另开一次会话并显式 `--source`。
 
 ## 放置规则
 
@@ -71,10 +75,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `detect` | 判定 project 根、放置方式、是否已有镜像 |
 | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
 | `status` | 镜像状态 + git 新鲜度 |
-| `inventory` | 源文件清单（已忽略构建产物与密钥类文件） |
+| `inventory` | 源文件清单（已忽略构建产物、密钥、三方安装树与外来仓） |
 | `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
 | `git-info` | 是否 git、默认分支、指定分支的 commit |
-| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
+| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
 | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
 | `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
 | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |

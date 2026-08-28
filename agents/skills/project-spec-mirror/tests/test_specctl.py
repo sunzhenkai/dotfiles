@@ -311,7 +311,9 @@ class GitAndSyncTest(unittest.TestCase):
             (root / ".env").write_text("SECRET=1\n", encoding="utf-8")
             (root / "vendor" / "lib.go").parent.mkdir()
             (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
-            git(root, "add", "-f", ".env", "vendor/lib.go")
+            (root / "node_modules" / "pkg" / "index.js").parent.mkdir(parents=True)
+            (root / "node_modules" / "pkg" / "index.js").write_text("module.exports = 1\n", encoding="utf-8")
+            git(root, "add", "-f", ".env", "vendor/lib.go", "node_modules/pkg/index.js")
             git(root, "commit", "-q", "-m", "noise")
             run("init", "--cwd", str(root), "--confirm")
             code, payload = run("inventory", "--cwd", str(root))
@@ -319,6 +321,7 @@ class GitAndSyncTest(unittest.TestCase):
             names = payload["files"]
             self.assertNotIn(".env", names)
             self.assertTrue(all(not item.startswith("vendor/") for item in names))
+            self.assertTrue(all(not item.startswith("node_modules/") for item in names))
             self.assertIn("internal/order.go", names)
 
 
@@ -369,7 +372,94 @@ class ValidateTest(unittest.TestCase):
     def test_direct_helpers_secret_skip(self) -> None:
         self.assertTrue(specctl.should_skip_file(".env.local"))
         self.assertTrue(specctl.should_skip_file("certs/server.pem"))
+        self.assertTrue(specctl.should_skip_file("vendor/github.com/foo/lib.go"))
+        self.assertTrue(specctl.should_skip_file("node_modules/pkg/index.js"))
         self.assertFalse(specctl.should_skip_file("internal/order.go"))
+        self.assertFalse(specctl.should_skip_file("src/App.php"))
+
+    def test_diff_skips_vendor_changes(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            run("init", "--cwd", str(root), "--confirm")
+            sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            run("set-sync", "--cwd", str(root), "--commit", sha)
+            (root / "vendor" / "lib.go").parent.mkdir()
+            (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
+            (root / "internal" / "order.go").write_text(
+                "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n\nfunc Get() {}\n",
+                encoding="utf-8",
+            )
+            git(root, "add", "-f", "vendor/lib.go", "internal/order.go")
+            git(root, "commit", "-q", "-m", "vendor and code")
+            code, payload = run("diff", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            paths = {item["path"] for item in payload["files"]}
+            self.assertIn("internal/order.go", paths)
+            self.assertTrue(all(not item.startswith("vendor/") for item in paths))
+
+    def test_inventory_skips_nested_git_on_nongit_source(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "app"
+            root.mkdir()
+            (root / "composer.json").write_text("{\n}\n", encoding="utf-8")
+            (root / "src").mkdir()
+            (root / "src" / "App.php").write_text("<?php\n", encoding="utf-8")
+            nested = make_repo(Path(raw) / "app" / "libs" / "other")
+            self.assertTrue((nested / "internal" / "order.go").is_file())
+            run("init", "--cwd", str(root), "--confirm")
+            code, payload = run("inventory", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            names = payload["files"]
+            self.assertIn("src/App.php", names)
+            self.assertTrue(all(not item.startswith("libs/other") for item in names))
+
+    def test_inventory_skips_gitlink(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            nested = make_repo(Path(raw) / "other-lib")
+            sha = git(nested, "rev-parse", "HEAD").stdout.strip()
+            root = make_repo(Path(raw) / "example-api")
+            git(
+                root,
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"160000,{sha},libs/other-lib",
+            )
+            git(root, "commit", "-q", "-m", "gitlink")
+            run("init", "--cwd", str(root), "--confirm")
+            code, payload = run("inventory", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            names = payload["files"]
+            self.assertIn("internal/order.go", names)
+            self.assertNotIn("libs/other-lib", names)
+            self.assertTrue(all(not item.startswith("libs/other-lib") for item in names))
+
+    def test_symbols_skips_vendor(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            (root / "vendor" / "lib.go").parent.mkdir()
+            (root / "vendor" / "lib.go").write_text(
+                "package vendor\n\nfunc Ignore() {}\n", encoding="utf-8"
+            )
+            git(root, "add", "-f", "vendor/lib.go")
+            git(root, "commit", "-q", "-m", "vendor")
+            run("init", "--cwd", str(root), "--confirm")
+            code, payload = run(
+                "symbols", "--cwd", str(root), "--file", "vendor/lib.go"
+            )
+            self.assertEqual(code, 0, payload)
+            item = payload["files"][0]
+            self.assertTrue(item.get("skipped"))
+            self.assertEqual(item.get("reason"), "third_party")
+            self.assertEqual(item["symbols"], [])
 
 
 ORDER_README = """# order

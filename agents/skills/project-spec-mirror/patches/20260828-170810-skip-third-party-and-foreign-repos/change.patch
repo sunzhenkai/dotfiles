@@ -1,0 +1,408 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+index f80f51f..a777286 100644
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -29,6 +29,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
+ - 不自动 commit / push；不把密钥、`.env`、凭据写进镜像。
+ - 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
++- 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
++  - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
++  - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
++  - 不要为三方或外来仓建模块、文件表行、`notes/`、概念或切片。需要给那个仓做镜像时，另开一次会话并显式 `--source`。
+ 
+ ## 放置规则
+ 
+@@ -71,10 +75,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ | `detect` | 判定 project 根、放置方式、是否已有镜像 |
+ | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
+ | `status` | 镜像状态 + git 新鲜度 |
+-| `inventory` | 源文件清单（已忽略构建产物与密钥类文件） |
++| `inventory` | 源文件清单（已忽略构建产物、密钥、三方安装树与外来仓） |
+ | `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+-| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
++| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+ | `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
+ | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+index b33d0f3..4915629 100644
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -235,6 +235,21 @@ cases:
+       must_not:
+         - 为全库每个代码文件建 files/ 或 notes/
+ 
++  - id: skip-third-party-and-foreign-repos
++    kind: boundary
++    judge: deterministic
++    description: 只整理本工程代码，跳过三方依赖与外来仓源码
++    given: 源树含 vendor/、node_modules/、git submodule 或 replace/path 指向的其他仓库
++    expect:
++      must:
++        - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
++        - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
++        - 邻接系统只在 context/ 记边界；包名与约束只在 build/ 点到为止
++      must_not:
++        - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
++        - 把 unmapped 的三方/外来路径并入本工程模块
++        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写金字塔
++
+   - id: not-openspec-not-source-edit
+     kind: boundary
+     judge: deterministic
+diff --git a/agents/skills/project-spec-mirror/references/facets.md b/agents/skills/project-spec-mirror/references/facets.md
+index 6846893..a0bc956 100644
+--- a/agents/skills/project-spec-mirror/references/facets.md
++++ b/agents/skills/project-spec-mirror/references/facets.md
+@@ -30,7 +30,7 @@ build / update 识别并维护这些页。没有证据的契约页保留标题
+ 
+ | 切面 | 页 | 回答什么 |
+ |------|-----|----------|
+-| SOURCE | `source.md` | 事实从哪来：代码、配置、已有测试、脱敏请求/样本 |
++| SOURCE | `source.md` | 事实从哪来：本工程代码、配置、已有测试、脱敏请求/样本（不含三方安装树与外来仓源码） |
+ | CONTRACT | `contracts/` | 必须保持为真的约定 |
+ | SLICE | `slices/` | 一条可独立交付的垂直切口 |
+ | VERIFY | `verify.md` | 如何证明行为仍真（测试、性质、对照差分） |
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+index 89a992c..6db817e 100644
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -47,7 +47,7 @@
+     └── INDEX.md
+ ```
+ 
+-顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
++顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+ 
+ ## 阅读顺序（强制）
+ 
+diff --git a/agents/skills/project-spec-mirror/references/projections.md b/agents/skills/project-spec-mirror/references/projections.md
+index 1c59e8b..304fe02 100644
+--- a/agents/skills/project-spec-mirror/references/projections.md
++++ b/agents/skills/project-spec-mirror/references/projections.md
+@@ -107,7 +107,7 @@ compose / 清单 / 单元文件是证据路径，不要把整份 YAML 贴进本
+ INDEX 最少包含：
+ 
+ 1. **工具链** — 语言/运行时版本、包管理器；锁文件只列路径
+-2. **依赖** — 必连的外部服务；第三方库只列影响运行的约束，不抄全 lock
++2. **依赖** — 必连的外部服务；第三方只列包名与影响运行的约束，不抄 lock、不打开 `vendor/` 或外来仓源码
+ 3. **构建** — 一条可复制的构建命令与产物路径
+ 4. **测试** — 一条可复制的测试命令；链到 VERIFY，不抄测试正文
+ 5. **迁移** — 如何套用 `data/` 里的迁移
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+index 844da5c..0134f69 100644
+--- a/agents/skills/project-spec-mirror/references/routing.md
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -4,6 +4,8 @@
+ 
+ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
+ 
++`diff` / `inventory` / `route` 已丢弃三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是本工程代码：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时另开会话并给 `--source`。
++
+ ## 算法
+ 
+ 对 `$SPECCTL diff` 的每一条（`status` / `path`，rename 另有 `from`）：
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+index b833907..cdab676 100755
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -62,6 +62,9 @@ IGNORE_DIR_NAMES = frozenset(
+         ".pytest_cache",
+         ".eggs",
+         "eggs",
++        "bower_components",
++        "jspm_packages",
++        "Godeps",
+     }
+ )
+ LOCK_NAMES = frozenset(
+@@ -501,6 +504,79 @@ def should_skip_file(rel: str) -> bool:
+     return False
+ 
+ 
++def is_under_nested_git(source: Path, rel: str) -> bool:
++    """True when rel sits inside a nested clone or submodule checkout."""
++    current = source.resolve()
++    root = current
++    for part in Path(rel).parts:
++        current = current / part
++        if current != root and is_git_root(current):
++            return True
++    return False
++
++
++def path_covered_by(rel: str, prefixes: frozenset[str]) -> bool:
++    for prefix in prefixes:
++        if rel == prefix or rel.startswith(prefix.rstrip("/") + "/"):
++            return True
++    return False
++
++
++def skip_inventory_path(
++    source: Path, rel: str, *, gitlinks: frozenset[str] | None = None
++) -> bool:
++    """Skip third-party install trees, nested repos, secrets, and build artifacts."""
++    if not rel or should_skip_file(rel):
++        return True
++    if gitlinks and path_covered_by(rel, gitlinks):
++        return True
++    return is_under_nested_git(source, rel)
++
++
++def parse_ls_files_stage(raw: str, prefix: str) -> tuple[list[str], frozenset[str]]:
++    files: list[str] = []
++    gitlinks: list[str] = []
++    for entry in raw.split("\0"):
++        if not entry:
++            continue
++        if "\t" not in entry:
++            rel_root = entry.replace("\\", "/")
++            mode = ""
++        else:
++            meta, rel_root = entry.split("\t", 1)
++            mode = meta.split()[0] if meta.split() else ""
++            rel_root = rel_root.replace("\\", "/")
++        if prefix:
++            if not rel_root.startswith(prefix):
++                continue
++            rel = rel_root[len(prefix) :]
++        else:
++            rel = rel_root
++        if not rel:
++            continue
++        if mode == "160000":
++            gitlinks.append(rel)
++            continue
++        files.append(rel)
++    return files, frozenset(gitlinks)
++
++
++def list_gitlinks(source: Path) -> frozenset[str]:
++    root = find_git_root(source)
++    if root is None:
++        return frozenset()
++    out = git(["ls-files", "-z", "--stage"], source, check=False)
++    prefix = ""
++    src = source.resolve()
++    if src != root:
++        try:
++            prefix = src.relative_to(root).as_posix().rstrip("/") + "/"
++        except ValueError:
++            prefix = ""
++    _, gitlinks = parse_ls_files_stage(out, prefix)
++    return gitlinks
++
++
+ def looks_binary(path: Path) -> bool:
+     try:
+         chunk = path.read_bytes()[:8192]
+@@ -513,8 +589,7 @@ def list_git_files(source: Path) -> list[str]:
+     root = find_git_root(source)
+     if root is None:
+         return []
+-    out = git(["ls-files", "-z"], source)
+-    files: list[str] = []
++    out = git(["ls-files", "-z", "--stage"], source)
+     prefix = ""
+     src = source.resolve()
+     if src != root:
+@@ -522,35 +597,30 @@ def list_git_files(source: Path) -> list[str]:
+             prefix = src.relative_to(root).as_posix().rstrip("/") + "/"
+         except ValueError:
+             prefix = ""
+-    for raw in out.split("\0"):
+-        if not raw:
+-            continue
+-        rel_root = raw.replace("\\", "/")
+-        if prefix:
+-            if not rel_root.startswith(prefix):
+-                continue
+-            rel = rel_root[len(prefix) :]
+-        else:
+-            rel = rel_root
+-        if rel and not should_skip_file(rel):
+-            files.append(rel)
+-    return sorted(files)
++    staged, gitlinks = parse_ls_files_stage(out, prefix)
++    return sorted(
++        rel
++        for rel in staged
++        if not skip_inventory_path(source, rel, gitlinks=gitlinks)
++    )
+ 
+ 
+ def walk_files(source: Path) -> list[str]:
+     files: list[str] = []
+     source = source.resolve()
+     for dirpath, dirnames, filenames in os.walk(source):
++        base = Path(dirpath)
+         dirnames[:] = [
+             name
+             for name in dirnames
+-            if name not in IGNORE_DIR_NAMES and name != "spec"
++            if name not in IGNORE_DIR_NAMES
++            and name != "spec"
++            and not is_git_root(base / name)
+         ]
+-        base = Path(dirpath)
+         for name in filenames:
+             path = base / name
+             rel = path.relative_to(source).as_posix()
+-            if should_skip_file(rel):
++            if skip_inventory_path(source, rel):
+                 continue
+             files.append(rel)
+     return sorted(files)
+@@ -1040,6 +1110,12 @@ def collect_diff_files(
+         }
+     name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
+     files = parse_name_status(name_status)
++    gitlinks = list_gitlinks(source)
++    files = [
++        item
++        for item in files
++        if not skip_inventory_path(source, item["path"], gitlinks=gitlinks)
++    ]
+     if path:
+         prefix = path.strip().lstrip("./")
+         files = [
+@@ -1275,6 +1351,7 @@ def cmd_symbols(args: argparse.Namespace) -> int:
+     targets = list(args.file)
+     if not targets:
+         raise SpecError("symbols requires one or more --file", reason="usage")
++    gitlinks = list_gitlinks(source)
+     files_out: list[dict[str, Any]] = []
+     for rel in targets:
+         path = (source / rel).resolve()
+@@ -1282,6 +1359,11 @@ def cmd_symbols(args: argparse.Namespace) -> int:
+             path.relative_to(source.resolve())
+         except ValueError as exc:
+             raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
++        if skip_inventory_path(source, rel, gitlinks=gitlinks):
++            files_out.append(
++                {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
++            )
++            continue
+         if not path.is_file():
+             files_out.append({"path": rel, "missing": True, "symbols": []})
+             continue
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+index 17ed4da..d99f3b7 100644
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -311,7 +311,9 @@ class GitAndSyncTest(unittest.TestCase):
+             (root / ".env").write_text("SECRET=1\n", encoding="utf-8")
+             (root / "vendor" / "lib.go").parent.mkdir()
+             (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
+-            git(root, "add", "-f", ".env", "vendor/lib.go")
++            (root / "node_modules" / "pkg" / "index.js").parent.mkdir(parents=True)
++            (root / "node_modules" / "pkg" / "index.js").write_text("module.exports = 1\n", encoding="utf-8")
++            git(root, "add", "-f", ".env", "vendor/lib.go", "node_modules/pkg/index.js")
+             git(root, "commit", "-q", "-m", "noise")
+             run("init", "--cwd", str(root), "--confirm")
+             code, payload = run("inventory", "--cwd", str(root))
+@@ -319,6 +321,7 @@ class GitAndSyncTest(unittest.TestCase):
+             names = payload["files"]
+             self.assertNotIn(".env", names)
+             self.assertTrue(all(not item.startswith("vendor/") for item in names))
++            self.assertTrue(all(not item.startswith("node_modules/") for item in names))
+             self.assertIn("internal/order.go", names)
+ 
+ 
+@@ -369,7 +372,94 @@ class ValidateTest(unittest.TestCase):
+     def test_direct_helpers_secret_skip(self) -> None:
+         self.assertTrue(specctl.should_skip_file(".env.local"))
+         self.assertTrue(specctl.should_skip_file("certs/server.pem"))
++        self.assertTrue(specctl.should_skip_file("vendor/github.com/foo/lib.go"))
++        self.assertTrue(specctl.should_skip_file("node_modules/pkg/index.js"))
+         self.assertFalse(specctl.should_skip_file("internal/order.go"))
++        self.assertFalse(specctl.should_skip_file("src/App.php"))
++
++    def test_diff_skips_vendor_changes(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            run("init", "--cwd", str(root), "--confirm")
++            sha = git(root, "rev-parse", "HEAD").stdout.strip()
++            run("set-sync", "--cwd", str(root), "--commit", sha)
++            (root / "vendor" / "lib.go").parent.mkdir()
++            (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
++            (root / "internal" / "order.go").write_text(
++                "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n\nfunc Get() {}\n",
++                encoding="utf-8",
++            )
++            git(root, "add", "-f", "vendor/lib.go", "internal/order.go")
++            git(root, "commit", "-q", "-m", "vendor and code")
++            code, payload = run("diff", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            paths = {item["path"] for item in payload["files"]}
++            self.assertIn("internal/order.go", paths)
++            self.assertTrue(all(not item.startswith("vendor/") for item in paths))
++
++    def test_inventory_skips_nested_git_on_nongit_source(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = Path(raw) / "app"
++            root.mkdir()
++            (root / "composer.json").write_text("{\n}\n", encoding="utf-8")
++            (root / "src").mkdir()
++            (root / "src" / "App.php").write_text("<?php\n", encoding="utf-8")
++            nested = make_repo(Path(raw) / "app" / "libs" / "other")
++            self.assertTrue((nested / "internal" / "order.go").is_file())
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("inventory", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            names = payload["files"]
++            self.assertIn("src/App.php", names)
++            self.assertTrue(all(not item.startswith("libs/other") for item in names))
++
++    def test_inventory_skips_gitlink(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            nested = make_repo(Path(raw) / "other-lib")
++            sha = git(nested, "rev-parse", "HEAD").stdout.strip()
++            root = make_repo(Path(raw) / "example-api")
++            git(
++                root,
++                "update-index",
++                "--add",
++                "--cacheinfo",
++                f"160000,{sha},libs/other-lib",
++            )
++            git(root, "commit", "-q", "-m", "gitlink")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("inventory", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            names = payload["files"]
++            self.assertIn("internal/order.go", names)
++            self.assertNotIn("libs/other-lib", names)
++            self.assertTrue(all(not item.startswith("libs/other-lib") for item in names))
++
++    def test_symbols_skips_vendor(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            (root / "vendor" / "lib.go").parent.mkdir()
++            (root / "vendor" / "lib.go").write_text(
++                "package vendor\n\nfunc Ignore() {}\n", encoding="utf-8"
++            )
++            git(root, "add", "-f", "vendor/lib.go")
++            git(root, "commit", "-q", "-m", "vendor")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run(
++                "symbols", "--cwd", str(root), "--file", "vendor/lib.go"
++            )
++            self.assertEqual(code, 0, payload)
++            item = payload["files"][0]
++            self.assertTrue(item.get("skipped"))
++            self.assertEqual(item.get("reason"), "third_party")
++            self.assertEqual(item["symbols"], [])
+ 
+ 
+ ORDER_README = """# order

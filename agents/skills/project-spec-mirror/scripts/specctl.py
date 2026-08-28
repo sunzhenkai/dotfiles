@@ -62,6 +62,9 @@ IGNORE_DIR_NAMES = frozenset(
         ".pytest_cache",
         ".eggs",
         "eggs",
+        "bower_components",
+        "jspm_packages",
+        "Godeps",
     }
 )
 LOCK_NAMES = frozenset(
@@ -501,6 +504,79 @@ def should_skip_file(rel: str) -> bool:
     return False
 
 
+def is_under_nested_git(source: Path, rel: str) -> bool:
+    """True when rel sits inside a nested clone or submodule checkout."""
+    current = source.resolve()
+    root = current
+    for part in Path(rel).parts:
+        current = current / part
+        if current != root and is_git_root(current):
+            return True
+    return False
+
+
+def path_covered_by(rel: str, prefixes: frozenset[str]) -> bool:
+    for prefix in prefixes:
+        if rel == prefix or rel.startswith(prefix.rstrip("/") + "/"):
+            return True
+    return False
+
+
+def skip_inventory_path(
+    source: Path, rel: str, *, gitlinks: frozenset[str] | None = None
+) -> bool:
+    """Skip third-party install trees, nested repos, secrets, and build artifacts."""
+    if not rel or should_skip_file(rel):
+        return True
+    if gitlinks and path_covered_by(rel, gitlinks):
+        return True
+    return is_under_nested_git(source, rel)
+
+
+def parse_ls_files_stage(raw: str, prefix: str) -> tuple[list[str], frozenset[str]]:
+    files: list[str] = []
+    gitlinks: list[str] = []
+    for entry in raw.split("\0"):
+        if not entry:
+            continue
+        if "\t" not in entry:
+            rel_root = entry.replace("\\", "/")
+            mode = ""
+        else:
+            meta, rel_root = entry.split("\t", 1)
+            mode = meta.split()[0] if meta.split() else ""
+            rel_root = rel_root.replace("\\", "/")
+        if prefix:
+            if not rel_root.startswith(prefix):
+                continue
+            rel = rel_root[len(prefix) :]
+        else:
+            rel = rel_root
+        if not rel:
+            continue
+        if mode == "160000":
+            gitlinks.append(rel)
+            continue
+        files.append(rel)
+    return files, frozenset(gitlinks)
+
+
+def list_gitlinks(source: Path) -> frozenset[str]:
+    root = find_git_root(source)
+    if root is None:
+        return frozenset()
+    out = git(["ls-files", "-z", "--stage"], source, check=False)
+    prefix = ""
+    src = source.resolve()
+    if src != root:
+        try:
+            prefix = src.relative_to(root).as_posix().rstrip("/") + "/"
+        except ValueError:
+            prefix = ""
+    _, gitlinks = parse_ls_files_stage(out, prefix)
+    return gitlinks
+
+
 def looks_binary(path: Path) -> bool:
     try:
         chunk = path.read_bytes()[:8192]
@@ -513,8 +589,7 @@ def list_git_files(source: Path) -> list[str]:
     root = find_git_root(source)
     if root is None:
         return []
-    out = git(["ls-files", "-z"], source)
-    files: list[str] = []
+    out = git(["ls-files", "-z", "--stage"], source)
     prefix = ""
     src = source.resolve()
     if src != root:
@@ -522,35 +597,30 @@ def list_git_files(source: Path) -> list[str]:
             prefix = src.relative_to(root).as_posix().rstrip("/") + "/"
         except ValueError:
             prefix = ""
-    for raw in out.split("\0"):
-        if not raw:
-            continue
-        rel_root = raw.replace("\\", "/")
-        if prefix:
-            if not rel_root.startswith(prefix):
-                continue
-            rel = rel_root[len(prefix) :]
-        else:
-            rel = rel_root
-        if rel and not should_skip_file(rel):
-            files.append(rel)
-    return sorted(files)
+    staged, gitlinks = parse_ls_files_stage(out, prefix)
+    return sorted(
+        rel
+        for rel in staged
+        if not skip_inventory_path(source, rel, gitlinks=gitlinks)
+    )
 
 
 def walk_files(source: Path) -> list[str]:
     files: list[str] = []
     source = source.resolve()
     for dirpath, dirnames, filenames in os.walk(source):
+        base = Path(dirpath)
         dirnames[:] = [
             name
             for name in dirnames
-            if name not in IGNORE_DIR_NAMES and name != "spec"
+            if name not in IGNORE_DIR_NAMES
+            and name != "spec"
+            and not is_git_root(base / name)
         ]
-        base = Path(dirpath)
         for name in filenames:
             path = base / name
             rel = path.relative_to(source).as_posix()
-            if should_skip_file(rel):
+            if skip_inventory_path(source, rel):
                 continue
             files.append(rel)
     return sorted(files)
@@ -1040,6 +1110,12 @@ def collect_diff_files(
         }
     name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
     files = parse_name_status(name_status)
+    gitlinks = list_gitlinks(source)
+    files = [
+        item
+        for item in files
+        if not skip_inventory_path(source, item["path"], gitlinks=gitlinks)
+    ]
     if path:
         prefix = path.strip().lstrip("./")
         files = [
@@ -1275,6 +1351,7 @@ def cmd_symbols(args: argparse.Namespace) -> int:
     targets = list(args.file)
     if not targets:
         raise SpecError("symbols requires one or more --file", reason="usage")
+    gitlinks = list_gitlinks(source)
     files_out: list[dict[str, Any]] = []
     for rel in targets:
         path = (source / rel).resolve()
@@ -1282,6 +1359,11 @@ def cmd_symbols(args: argparse.Namespace) -> int:
             path.relative_to(source.resolve())
         except ValueError as exc:
             raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
+        if skip_inventory_path(source, rel, gitlinks=gitlinks):
+            files_out.append(
+                {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
+            )
+            continue
         if not path.is_file():
             files_out.append({"path": rel, "missing": True, "symbols": []})
             continue

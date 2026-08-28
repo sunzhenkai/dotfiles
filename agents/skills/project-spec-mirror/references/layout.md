@@ -47,7 +47,7 @@
     └── INDEX.md
 ```
 
-顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
 
 ## 阅读顺序（强制）
 
