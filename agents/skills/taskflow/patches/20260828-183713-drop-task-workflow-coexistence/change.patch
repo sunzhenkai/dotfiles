@@ -1,0 +1,59 @@
+diff --git a/agents/skills/taskflow/SKILL.md b/agents/skills/taskflow/SKILL.md
+--- a/agents/skills/taskflow/SKILL.md
++++ b/agents/skills/taskflow/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: taskflow
+ name: taskflow
+-description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。与 `task-workflow`（taskctl + `tasks/` 台账）并存但互斥，同一任务只用一套。
++description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。
+ ---
+ 
+ # taskflow
+@@ -12,7 +12,6 @@
+ 
+ **进度只有 checkbox 一种真相。** 不建 `tasks/` 台账、不写索引文件、不引入编号体系、不带脚本。
+ 
+-`task-workflow` 是另一套并存的工作流（taskctl + `tasks/` + status 字段）。同一任务只走一套，不要混用两个命令族。
+ 
+ ## 阶段路由
+ 
+diff --git a/agents/skills/taskflow/evals/cases.yaml b/agents/skills/taskflow/evals/cases.yaml
+--- a/agents/skills/taskflow/evals/cases.yaml
++++ b/agents/skills/taskflow/evals/cases.yaml
+@@ -152,17 +152,6 @@
+       must_not:
+         - 缺绑定仍委托
+ 
+-  - id: no-mix-with-task-workflow
+-    kind: failure
+-    judge: deterministic
+-    description: 同一任务不与 task-workflow 混用
+-    given: 用户已用 taskflow 立项，或已有 taskctl tasks/ 台账的同一需求
+-    expect:
+-      must:
+-        - 同一任务只用一套命令族
+-      must_not:
+-        - 为同一任务同时建 {task}-driver 与 tasks/TNNNN 台账
+-
+   - id: archive-driver-only
+     kind: boundary
+     judge: deterministic
+@@ -173,17 +162,6 @@
+         - 只归档 driver 自身，不做递归
+       must_not:
+         - 在 driver 归档步骤里再递归归档子 change（应收尾段已完成）
+-
+-  - id: mutually-exclusive-with-task-workflow
+-    kind: boundary
+-    judge: deterministic
+-    description: 与 task-workflow 并存但互斥
+-    given: 用户要跟进需求交付
+-    expect:
+-      must:
+-        - 点名 taskflow 或要拆多个 OpenSpec change 时走本 skill
+-      must_not:
+-        - 引入脚本或第二份任务账本
+ 
+   - id: skip-specs-regression
+     kind: regression

@@ -239,7 +239,7 @@ def sync_skills(root: Path, dry_run: bool = False) -> int:
     return 0
 
 
-SHIMS = {"taskctl": "agents/skills/task-workflow/scripts/taskctl.py"}
+SHIMS: Dict[str, str] = {}
 
 
 def install_shims(root: Path, dry_run: bool = False) -> None:

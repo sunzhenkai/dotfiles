@@ -1,4 +1,4 @@
 interface:
   display_name: "任务设计"
-  short_description: "explore 之后的可选设计；文档先留在 task 内，归档时再晋升"
-  default_prompt: "用 $task-design 在 task-explore 之后做复杂任务的全面设计。产物写入该 task 的 design/ 目录；归档时由 task-archive 晋升。"
+  short_description: "explore 之后的可选设计；文档先留在 driver 内，归档时再晋升"
+  default_prompt: "用 $task-design 在 openspec-explore 之后做复杂任务的全面设计。产物写入 {task}-driver 的 design/ 目录；归档时由 openspec-archive-change 晋升。"

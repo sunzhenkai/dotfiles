@@ -1,4 +1,0 @@
-interface:
-  display_name: "任务工作流"
-  short_description: "按 new → explore → design? → propose → apply → archive 跟踪一次交付"
-  default_prompt: "用 $task-workflow 跟踪需求：读根 SKILL.md，按 phase 路由到对应 reference，只加载当前 phase 正文；机械记账走 scripts/taskctl.py，硬门禁见 references/safety.md。"

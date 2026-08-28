@@ -2,7 +2,7 @@
 
 Phase 2 脚手架。按问题裁剪，不是每节都必填。
 
-当前只写入 `<taskRoot>/design/`；`归档落点` 等到 `task-archive` 再晋升。
+当前只写入 `<changeRoot>/design/`（`{task}-driver` 目录下）；`归档落点` 等到 `openspec-archive-change` 再晋升。
 
 ---
 
@@ -102,9 +102,9 @@ struct Foo { ... }
 | 决策（如有） | adr | 同上 | 项目 ADR 约定（如 `docs/adr/YYYY-MM-DD-<slug>.md`） |
 | 知识条目（如有） | knowledge | 同上 | concept / service / relation / pitfall |
 
-**现在不要写入上表路径。** 本文档当前位于 `tasks/.../design/<file>.md`。
+**现在不要写入上表路径。** 本文档当前位于 `{task}-driver` 的 `design/<file>.md`。
 
 ## Cross-References
 
 - **Related designs**: [兄弟文档]
-- **Downstream**: [本设计解锁的实现工作，通常是 task-propose]
+- **Downstream**: [本设计解锁的实现工作，通常是 openspec-propose]

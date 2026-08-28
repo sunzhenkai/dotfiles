@@ -1,7 +1,7 @@
 ---
 id: taskflow
 name: taskflow
-description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。与 `task-workflow`（taskctl + `tasks/` 台账）并存但互斥，同一任务只用一套。
+description: 用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。
 ---
 
 # taskflow
@@ -12,14 +12,13 @@ description: 用一个 driver change 编排一批子 change 的任务生命周�
 
 **进度只有 checkbox 一种真相。** 不建 `tasks/` 台账、不写索引文件、不引入编号体系、不带脚本。
 
-`task-workflow` 是另一套并存的工作流（taskctl + `tasks/` + status 字段）。同一任务只走一套，不要混用两个命令族。
-
 ## 阶段路由
 
 | 阶段 | 入口 | 参数 |
 |------|------|------|
 | 立项 | 本文件「脚手架」小节（command `taskflow-new`） | 任务描述 |
 | 澄清 | stock skill `openspec-explore` | `{task}-driver` |
+| 收敛（可选） | skill `task-grill` | `{task}-driver` |
 | 提案 | stock skill `openspec-propose` | `{task}-driver` |
 | 实施 | stock skill `openspec-apply-change` | `{task}-driver` |
 | 归档 | stock skill `openspec-archive-change` | `{task}-driver`（只归档 driver 自身） |

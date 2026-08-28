@@ -152,17 +152,6 @@ cases:
       must_not:
         - 缺绑定仍委托
 
-  - id: no-mix-with-task-workflow
-    kind: failure
-    judge: deterministic
-    description: 同一任务不与 task-workflow 混用
-    given: 用户已用 taskflow 立项，或已有 taskctl tasks/ 台账的同一需求
-    expect:
-      must:
-        - 同一任务只用一套命令族
-      must_not:
-        - 为同一任务同时建 {task}-driver 与 tasks/TNNNN 台账
-
   - id: archive-driver-only
     kind: boundary
     judge: deterministic
@@ -173,17 +162,6 @@ cases:
         - 只归档 driver 自身，不做递归
       must_not:
         - 在 driver 归档步骤里再递归归档子 change（应收尾段已完成）
-
-  - id: mutually-exclusive-with-task-workflow
-    kind: boundary
-    judge: deterministic
-    description: 与 task-workflow 并存但互斥
-    given: 用户要跟进需求交付
-    expect:
-      must:
-        - 点名 taskflow 或要拆多个 OpenSpec change 时走本 skill
-      must_not:
-        - 引入脚本或第二份任务账本
 
   - id: skip-specs-regression
     kind: regression

@@ -1,0 +1,4 @@
+interface:
+  display_name: "任务拷问"
+  short_description: "explore 之后、propose 之前的可选收敛访谈；结论沉淀进 driver change 的 grill.md"
+  default_prompt: "用 $task-grill 在 openspec-explore 之后、openspec-propose 之前拷问 {task}-driver，把未决决策分轮收敛成共识，沉淀到 change 目录的 grill.md。"

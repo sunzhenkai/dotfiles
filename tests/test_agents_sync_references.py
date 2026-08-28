@@ -47,8 +47,8 @@ def test_sync_references_idempotent(tmp_path: Path) -> None:
 def test_sync_copies_skill_scripts(tmp_path: Path) -> None:
     r = _run_sync(tmp_path)
     assert r.returncode == 0, r.stderr + r.stdout
-    src = ROOT / "agents" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
-    dest = tmp_path / ".agents" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
+    src = ROOT / "agents" / "skills" / "project-spec-mirror" / "scripts" / "specctl.py"
+    dest = tmp_path / ".agents" / "skills" / "project-spec-mirror" / "scripts" / "specctl.py"
     assert dest.is_file(), f"scripts 未分发: {dest}\n{r.stdout}"
     assert dest.read_bytes() == src.read_bytes()
 
@@ -61,21 +61,11 @@ def test_sync_renders_slash_placeholders(tmp_path: Path) -> None:
     assert skill.is_file(), f"skill 未同步: {skill}\n{r.stdout}"
     content = skill.read_text()
     assert "{{slash:" not in content
-    assert "/task-propose" in content
+    assert "/openspec-propose" in content
 
 
-def test_sync_installs_taskctl_shim_pointing_at_the_canonical_copy(tmp_path: Path) -> None:
+def test_sync_installs_no_taskctl_shim(tmp_path: Path) -> None:
     r = _run_sync(tmp_path)
     assert r.returncode == 0, r.stderr + r.stdout
     shim = tmp_path / ".local" / "bin" / "taskctl"
-    assert shim.is_file(), f"shim 未生成: {shim}\n{r.stdout}"
-    assert os.access(shim, os.X_OK)
-    canonical = ROOT / "agents" / "skills" / "task-workflow" / "scripts" / "taskctl.py"
-    body = shim.read_text()
-    assert str(canonical) in body
-    # 镜像副本不得成为 shim 的目标。
-    assert ".agents/skills" not in body
-
-    r2 = _run_sync(tmp_path)
-    assert r2.returncode == 0, r2.stderr + r2.stdout
-    assert f"  = {shim}" in r2.stdout
+    assert not shim.exists(), f"不应再安装 taskctl shim: {shim}"

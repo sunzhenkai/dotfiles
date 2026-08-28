@@ -1,4 +1,4 @@
-"""taskflow 的边界契约：零脚本、不新增 shim、旧工作流资产仍在。"""
+"""taskflow 的边界契约：零脚本、不新增 shim。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def test_taskflow_skill_ships_no_scripts() -> None:
 
 
 def test_sync_shims_unchanged_by_taskflow() -> None:
-    assert set(_load_sync_module().SHIMS) == {"taskctl"}
+    assert set(_load_sync_module().SHIMS) == set()
 
 
 def test_taskflow_skill_frontmatter() -> None:
@@ -34,5 +34,5 @@ def test_taskflow_skill_frontmatter() -> None:
         assert field in skill, f"SKILL.md frontmatter 缺字段: {field}"
 
 
-def test_legacy_task_workflow_assets_survive() -> None:
-    assert (AGENTS / "skills" / "task-workflow" / "SKILL.md").is_file()
+def test_task_workflow_skill_removed() -> None:
+    assert not (AGENTS / "skills" / "task-workflow").exists()
