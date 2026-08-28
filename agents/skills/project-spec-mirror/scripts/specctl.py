@@ -783,6 +783,7 @@ def create_skeleton(
         "branch": branch,
         "mode": mode,
         "scope": [],
+        "hotspots": [],
         "synced_commit": None,
         "synced_at": None,
         "updated_at": utc_now(),
@@ -826,6 +827,193 @@ def parse_name_status(text: str) -> list[dict[str, str]]:
         else:
             files.append({"status": status[0], "path": parts[-1]})
     return files
+
+
+ROOT_HEADINGS = frozenset({"根", "roots"})
+FILE_HEADINGS = frozenset({"文件", "files"})
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+
+
+def first_table_cell(row: str) -> str:
+    raw = row.strip()
+    if not raw.startswith("|"):
+        return ""
+    parts = [part.strip() for part in raw.strip("|").split("|")]
+    return parts[0] if parts else ""
+
+
+def normalize_path_cell(cell: str) -> str:
+    cell = cell.strip()
+    link = re.fullmatch(r"\[([^\]]+)\]\([^)]*\)", cell)
+    if link:
+        cell = link.group(1).strip()
+    if len(cell) >= 2 and cell.startswith("`") and cell.endswith("`"):
+        cell = cell[1:-1]
+    return cell.strip().lstrip("./")
+
+
+def parse_pipe_table(lines: list[str], start: int) -> tuple[list[str], int]:
+    i = start
+    header_skipped = False
+    sep_skipped = False
+    cells: list[str] = []
+    while i < len(lines) and lines[i].lstrip().startswith("|"):
+        row = lines[i]
+        if not header_skipped:
+            header_skipped = True
+            i += 1
+            continue
+        if not sep_skipped:
+            sep_skipped = True
+            i += 1
+            continue
+        value = normalize_path_cell(first_table_cell(row))
+        if value:
+            cells.append(value)
+        i += 1
+    return cells, i
+
+
+def parse_module_readme(text: str) -> tuple[list[str], list[str]]:
+    roots: list[str] = []
+    files: list[str] = []
+    lines = text.splitlines()
+    i = 0
+    current = ""
+    while i < len(lines):
+        match = HEADING_RE.match(lines[i])
+        if match:
+            current = match.group(2).strip().lower()
+            i += 1
+            continue
+        if lines[i].lstrip().startswith("|") and current in ROOT_HEADINGS | FILE_HEADINGS:
+            cells, i = parse_pipe_table(lines, i)
+            if current in ROOT_HEADINGS:
+                roots.extend(cells)
+            else:
+                files.extend(cells)
+            continue
+        i += 1
+    return roots, files
+
+
+def load_modules(spec_root: Path) -> list[dict[str, Any]]:
+    modules_dir = spec_root / "modules"
+    found: list[dict[str, Any]] = []
+    if not modules_dir.is_dir():
+        return found
+    for readme in sorted(modules_dir.glob("*/README.md")):
+        name = readme.parent.name
+        if name.startswith("."):
+            continue
+        roots, files = parse_module_readme(readme.read_text(encoding="utf-8"))
+        found.append(
+            {
+                "name": name,
+                "readme": f"modules/{name}/README.md",
+                "roots": roots,
+                "files": files,
+            }
+        )
+    return found
+
+
+def prefix_matches(path: str, root: str) -> bool:
+    root = root.strip().rstrip("/")
+    if not root:
+        return False
+    return path == root or path.startswith(root + "/")
+
+
+def match_file_table(path: str, modules: list[dict[str, Any]]) -> list[str]:
+    return [module["name"] for module in modules if path in module["files"]]
+
+
+def match_root_prefix(path: str, modules: list[dict[str, Any]]) -> list[str]:
+    best_len = -1
+    best: list[str] = []
+    for module in modules:
+        for root in module["roots"]:
+            if not prefix_matches(path, root):
+                continue
+            length = len(root.strip().rstrip("/"))
+            if length > best_len:
+                best_len = length
+                best = [module["name"]]
+            elif length == best_len and module["name"] not in best:
+                best.append(module["name"])
+    return best
+
+
+def match_change(
+    item: dict[str, str], modules: list[dict[str, Any]]
+) -> tuple[list[str], str]:
+    status = item.get("status", "")
+    path = item["path"]
+    from_path = item.get("from")
+    lookups = [from_path, path] if status == "R" and from_path else [path]
+    for lookup in lookups:
+        names = match_file_table(lookup, modules)
+        if names:
+            return names, "file-table"
+    for lookup in lookups:
+        names = match_root_prefix(lookup, modules)
+        if names:
+            return names, "root-prefix"
+    return [], "unmapped"
+
+
+def collect_diff_files(
+    source: Path,
+    state: dict[str, Any],
+    *,
+    branch: str | None = None,
+    from_commit: str | None = None,
+    to: str | None = None,
+    path: str | None = None,
+) -> dict[str, Any]:
+    info = git_info(source, branch or state.get("branch"))
+    if not info.get("is_git"):
+        files = inventory_files(source, path)
+        return {
+            "full": True,
+            "from": None,
+            "to": None,
+            "files": [{"status": "A", "path": item} for item in files],
+            "note": "non-git source; returning full inventory as added",
+        }
+    target = to or info.get("commit")
+    if not target:
+        raise SpecError("cannot resolve target commit", reason="unknown_ref")
+    start = from_commit or state.get("synced_commit")
+    if not start:
+        files = inventory_files(source, path)
+        return {
+            "full": True,
+            "from": None,
+            "to": target,
+            "files": [{"status": "A", "path": item} for item in files],
+        }
+    name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
+    files = parse_name_status(name_status)
+    if path:
+        prefix = path.strip().lstrip("./")
+        files = [
+            item
+            for item in files
+            if item["path"] == prefix
+            or item["path"].startswith(prefix.rstrip("/") + "/")
+            or item.get("from") == prefix
+            or (item.get("from") or "").startswith(prefix.rstrip("/") + "/")
+        ]
+    return {
+        "full": False,
+        "from": start,
+        "to": target,
+        "files": files,
+        "file_count": len(files),
+    }
+
 
 
 # --------------------------------------------------------------------------- #
@@ -1079,59 +1267,90 @@ def cmd_diff(args: argparse.Namespace) -> int:
     )
     state = load_state(spec_root)
     source = resolve_source(spec_root, state)
-    info = git_info(source, args.branch or state.get("branch"))
-    if not info.get("is_git"):
-        files = inventory_files(source, args.path)
-        return emit(
-            {
-                "ok": True,
-                "result": "diff",
-                "full": True,
-                "from": None,
-                "to": None,
-                "files": [{"status": "A", "path": item} for item in files],
-                "note": "non-git source; returning full inventory as added",
-            },
-            summary="diff: non-git full inventory",
-        )
-    target = args.to or info.get("commit")
-    if not target:
-        raise SpecError("cannot resolve target commit", reason="unknown_ref")
-    start = args.from_commit or state.get("synced_commit")
-    if not start:
-        files = inventory_files(source, args.path)
-        return emit(
-            {
-                "ok": True,
-                "result": "diff",
-                "full": True,
-                "from": None,
-                "to": target,
-                "files": [{"status": "A", "path": item} for item in files],
-            },
-            summary=f"diff: full to {target[:12]}",
-        )
-    name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
-    files = parse_name_status(name_status)
-    if args.path:
-        prefix = args.path.strip().lstrip("./")
-        files = [
-            item
-            for item in files
-            if item["path"] == prefix or item["path"].startswith(prefix.rstrip("/") + "/")
-        ]
-    return emit(
-        {
-            "ok": True,
-            "result": "diff",
-            "full": False,
-            "from": start,
-            "to": target,
-            "files": files,
-            "file_count": len(files),
-        },
-        summary=f"diff: {len(files)} files {start[:12]}..{target[:12]}",
+    payload = collect_diff_files(
+        source,
+        state,
+        branch=args.branch,
+        from_commit=args.from_commit,
+        to=args.to,
+        path=args.path,
     )
+    summary = "diff: non-git full inventory" if payload.get("note") else (
+        f"diff: full to {str(payload.get('to') or '')[:12]}"
+        if payload.get("full")
+        else f"diff: {len(payload['files'])} files {str(payload.get('from') or '')[:12]}..{str(payload.get('to') or '')[:12]}"
+    )
+    return emit({"ok": True, "result": "diff", **payload}, summary=summary)
+
+
+def cmd_route(args: argparse.Namespace) -> int:
+    cwd = Path(args.cwd).expanduser().resolve()
+    spec_root = find_spec_root(
+        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+    )
+    state = load_state(spec_root)
+    source = resolve_source(spec_root, state)
+    diff_payload = collect_diff_files(
+        source,
+        state,
+        branch=args.branch,
+        from_commit=args.from_commit,
+        to=args.to,
+        path=args.path,
+    )
+    modules = load_modules(spec_root)
+    not_built = not modules
+    changes: list[dict[str, Any]] = []
+    unmapped: list[str] = []
+    renames: list[dict[str, Any]] = []
+    hit_modules: list[str] = []
+    for item in diff_payload["files"]:
+        names, via = ([], "unmapped") if not_built else match_change(item, modules)
+        rec: dict[str, Any] = {
+            "status": item.get("status", ""),
+            "path": item["path"],
+            "modules": names,
+            "via": via,
+        }
+        if item.get("from"):
+            rec["from"] = item["from"]
+        changes.append(rec)
+        if not names:
+            unmapped.append(item["path"])
+        else:
+            for name in names:
+                if name not in hit_modules:
+                    hit_modules.append(name)
+        if item.get("status") == "R" and item.get("from"):
+            rename_rec: dict[str, Any] = {"from": item["from"], "to": item["path"]}
+            if names:
+                rename_rec["module"] = names[0]
+                if len(names) > 1:
+                    rename_rec["modules"] = names
+            renames.append(rename_rec)
+    pages = [f"modules/{name}/README.md" for name in hit_modules]
+    payload: dict[str, Any] = {
+        "ok": True,
+        "result": "route",
+        "spec_root": str(spec_root),
+        "from": diff_payload.get("from"),
+        "to": diff_payload.get("to"),
+        "full": diff_payload.get("full", False),
+        "not_built": not_built,
+        "modules": hit_modules,
+        "pages": pages,
+        "renames": renames,
+        "unmapped": unmapped,
+        "changes": changes,
+    }
+    if not_built:
+        payload["note"] = "not_built"
+    summary = (
+        f"route: not_built {len(unmapped)} unmapped"
+        if not_built
+        else f"route: {len(hit_modules)} modules {len(unmapped)} unmapped"
+    )
+    return emit(payload, summary=summary)
 
 
 def cmd_set_sync(args: argparse.Namespace) -> int:
@@ -1149,6 +1368,13 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
         state["branch"] = args.branch
     if args.scope is not None:
         state["scope"] = list(args.scope)
+    if args.hotspot is not None:
+        seen: list[str] = []
+        for item in args.hotspot:
+            rel = str(item).strip().lstrip("./")
+            if rel and rel not in seen:
+                seen.append(rel)
+        state["hotspots"] = seen
     commit = args.commit
     if commit:
         info = git_info(source, state.get("branch"))
@@ -1198,6 +1424,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
             issues.append(f"state missing {key}")
     if state.get("mode") not in {None, "concise", "detailed"}:
         issues.append(f"invalid mode {state.get('mode')!r}")
+    hotspots = state.get("hotspots", [])
+    if hotspots is None:
+        hotspots = []
+    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
+        issues.append("hotspots must be a list of strings")
     source_ok = True
     try:
         source = resolve_source(spec_root, state)
@@ -1230,6 +1461,7 @@ COMMANDS = {
     "inventory": cmd_inventory,
     "symbols": cmd_symbols,
     "diff": cmd_diff,
+    "route": cmd_route,
     "set-sync": cmd_set_sync,
     "validate": cmd_validate,
 }
@@ -1287,10 +1519,21 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--to", dest="to", default=None)
     diff.add_argument("--path", default=None)
 
+    route = add("route", help="把 diff 文件映射到模块 README")
+    route.add_argument("--from", dest="from_commit", default=None)
+    route.add_argument("--to", dest="to", default=None)
+    route.add_argument("--path", default=None)
+
     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
     set_sync.add_argument("--commit", default=None)
     set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
     set_sync.add_argument("--scope", action="append", default=None)
+    set_sync.add_argument(
+        "--hotspot",
+        action="append",
+        default=None,
+        help="热点源路径，可重复；本轮给出的列表整表写回",
+    )
 
     add("validate", help="检查金字塔骨架与状态文件")
     return parser

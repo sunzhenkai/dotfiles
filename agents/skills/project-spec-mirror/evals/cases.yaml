@@ -75,14 +75,16 @@ cases:
     given: 骨架已在，开始 build
     expect:
       must:
-        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md
+        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md、routing.md
         - 从上往下写 README / overview / facets / concepts / entities / flows / modules
+        - 模块 README 含「根」表与「文件」表
         - 切片不必等全部契约写完
-        - 粒度与 .mirror.json 的 mode 一致
+        - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
       must_not:
         - CLI 代写概述或编造流程、契约、灰度方案
         - 下层重复上层已经说清的论点
         - 用手绘 SVG/Mermaid 冒充 archify 产物
+        - 为范围内每个代码文件建 files/ 或 notes/
 
   - id: facets-and-archify
     kind: core
@@ -145,16 +147,78 @@ cases:
         - 把密钥、.env、凭据抄进 spec
         - 自动 git commit 或 push
 
-  - id: detailed-over-80-asks
-    kind: failure
+  - id: detailed-deepens-pages-not-files-tree
+    kind: core
     judge: deterministic
-    description: 详尽模式且文件数大于 80、无路径范围时先问
-    given: mode=detailed，inventory.file_count > 80，未给 scope/--path
+    description: 详尽加深模块/实体/流/契约，不为每个代码文件建页
+    given: mode=detailed，开始 build 或从 concise 升级
     expect:
       must:
-        - 先问缩小范围还是继续
+        - 加深模块 README 核心符号、实体字段、处理线步骤、可追溯契约
+        - 模块阅读叶子是 README 文件表
       must_not:
-        - 未同意就铺开每文件详页
+        - 为范围内每个代码文件建 files/ 或 notes/
+        - 把路径中的 / 拍成 __ 作为页名
+
+  - id: hotspot-notes-need-scope
+    kind: failure
+    judge: deterministic
+    description: 热点详注未给路径时先问，未同意不批量建 notes
+    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个
+    expect:
+      must:
+        - 先问范围；建议切片入口或一次 ≤15 个文件
+      must_not:
+        - 未同意就批量建 notes/
+        - 用 inventory.file_count > 80 作为是否写详页的门禁
+
+  - id: update-routes-from-diff
+    kind: core
+    judge: deterministic
+    description: update 必须用 route 映射到模块页，不按一文件一详页对号入座
+    given: 已有 synced_commit，开始 update
+    expect:
+      must:
+        - 用 $SPECCTL route 把变更文件落到模块 README
+        - 跟链接改被波及的实体/处理线/切面
+      must_not:
+        - 为每个变更源文件新建或重写 files/ 详页
+
+  - id: rename-updates-file-table
+    kind: core
+    judge: deterministic
+    description: diff status=R 时改文件表路径，不当删除加新增
+    given: diff 含 status=R 的 from/path
+    expect:
+      must:
+        - 用 from 找旧模块行，改成新 path
+        - 已有 notes/<from>.md 则改名为 notes/<path>.md
+      must_not:
+        - 把 rename 当成删除旧页再新增一页
+
+  - id: legacy-files-dir-preserved
+    kind: boundary
+    judge: deterministic
+    description: 已有 modules/*/files/ 不自动删除，本轮停更
+    given: 镜像含遗留 files/ 详页，本轮 update 或 build
+    expect:
+      must:
+        - 在模块 README 注明遗留 files/ 可能过期
+        - 停更这些详页
+      must_not:
+        - 未要求删除就删掉 files/
+        - 把遗留 files/ 全量搬成 notes/
+
+  - id: reject-per-file-catalog-request
+    kind: failure
+    judge: deterministic
+    description: 用户要每个文件一页时说明新模型，不铺全库
+    given: 用户点名每个文件一页、给每个源文件写详页
+    expect:
+      must:
+        - 说明文件不是阅读单位，改问热点范围或 detailed 加深
+      must_not:
+        - 为全库每个代码文件建 files/ 或 notes/
 
   - id: not-openspec-not-source-edit
     kind: boundary

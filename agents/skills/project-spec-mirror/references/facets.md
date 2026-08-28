@@ -56,6 +56,8 @@ build / update 识别并维护这些页。没有证据的契约页保留标题�
 
 切片是工程交付单元：从入口（路由/命令/消费者）经业务与数据到外部副作用，能单独验证。处理线（`flows/`）是给人看的业务路径；一条切片通常链 1 条处理线，不要复制流程全文。
 
+切片 ≠ 源文件。一条切片穿过多个文件；不要按文件建切片页，也不要为切片里的每个文件建 `notes/`。切片**入口**文件在模块表写不下入口协议时，可成为热点详注（见 [modes.md](modes.md)）。
+
 **生命周期**（写在切片页顶部，按事实推进，不许跳步假装完成）：
 
 ```text
@@ -82,6 +84,6 @@ identified → characterized → specified → implemented → verified → cana
 ## 维护
 
 - 新增切片：源码里能划清入口与副作用时再建页；先 identified，再补契约。
-- 更新：`diff` 波及的路由/schema/测试只改对应契约与切片，overview 只在地图变了才改。
+- 更新：`diff` 波及的路由/schema/测试按 [routing.md](routing.md) 改对应契约与切片，overview 只在地图变了才改。
 - `<!-- manual -->` 块同样不可覆盖。
 - 切面与金字塔交叉链接：切片 → flow / module / entity；契约 → 测试路径。

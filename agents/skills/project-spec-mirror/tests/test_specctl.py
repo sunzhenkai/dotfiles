@@ -228,6 +228,7 @@ class InitTest(unittest.TestCase):
             self.assertEqual(state["placement"], "in-project")
             self.assertEqual(state["source"], "..")
             self.assertEqual(state["mode"], "concise")
+            self.assertEqual(state.get("hotspots"), [])
             self.assertIsNone(state["synced_commit"])
 
     def test_occupied_spec_dir_exits_2(self) -> None:
@@ -363,6 +364,155 @@ class ValidateTest(unittest.TestCase):
         self.assertTrue(specctl.should_skip_file(".env.local"))
         self.assertTrue(specctl.should_skip_file("certs/server.pem"))
         self.assertFalse(specctl.should_skip_file("internal/order.go"))
+
+
+ORDER_README = """# order
+
+## 根
+
+| 路径前缀 | 角色 |
+|----------|------|
+| `internal` | 领域包 |
+
+## 文件
+
+| 文件 | 职责 | 核心 |
+|------|------|------|
+| `internal/order.go` | 下单与取消 | `Place`, `Cancel` |
+"""
+
+
+def write_order_module(spec: Path) -> None:
+    readme = spec / "modules" / "order" / "README.md"
+    readme.parent.mkdir(parents=True, exist_ok=True)
+    readme.write_text(ORDER_README, encoding="utf-8")
+
+
+class RouteParseTest(unittest.TestCase):
+    def test_parse_root_and_files_tables(self) -> None:
+        roots, files = specctl.parse_module_readme(ORDER_README)
+        self.assertEqual(roots, ["internal"])
+        self.assertEqual(files, ["internal/order.go"])
+
+    def test_parse_english_headings(self) -> None:
+        text = """# billing
+
+## Roots
+
+| prefix | role |
+|--------|------|
+| `internal/bill` | domain |
+
+## Files
+
+| file | duty |
+|------|------|
+| [`internal/bill/calc.go`](unused) | calc |
+"""
+        roots, files = specctl.parse_module_readme(text)
+        self.assertEqual(roots, ["internal/bill"])
+        self.assertEqual(files, ["internal/bill/calc.go"])
+
+
+class RouteTest(unittest.TestCase):
+    def test_not_built_lists_unmapped(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            code, payload = run("route", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertTrue(payload["not_built"])
+            self.assertEqual(payload["note"], "not_built")
+            self.assertEqual(payload["modules"], [])
+            self.assertIn("internal/order.go", payload["unmapped"])
+
+    def test_file_table_and_root_prefix_and_unmapped(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_order_module(root / "spec")
+            sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            self.assertEqual(
+                run("set-sync", "--cwd", str(root), "--commit", sha)[0], 0
+            )
+            (root / "internal" / "order.go").write_text(
+                "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n\nfunc Get() {}\n",
+                encoding="utf-8",
+            )
+            (root / "internal" / "extra.go").write_text(
+                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
+            )
+            (root / "scripts").mkdir()
+            (root / "scripts" / "one-off.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-q", "-m", "more files")
+            code, payload = run("route", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertFalse(payload["not_built"])
+            by_path = {item["path"]: item for item in payload["changes"]}
+            self.assertEqual(by_path["internal/order.go"]["via"], "file-table")
+            self.assertEqual(by_path["internal/order.go"]["modules"], ["order"])
+            self.assertEqual(by_path["internal/extra.go"]["via"], "root-prefix")
+            self.assertEqual(by_path["internal/extra.go"]["modules"], ["order"])
+            self.assertEqual(by_path["scripts/one-off.sh"]["via"], "unmapped")
+            self.assertIn("scripts/one-off.sh", payload["unmapped"])
+            self.assertEqual(payload["modules"], ["order"])
+            self.assertEqual(payload["pages"], ["modules/order/README.md"])
+
+    def test_rename_uses_from_file_table(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_order_module(root / "spec")
+            sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            self.assertEqual(
+                run("set-sync", "--cwd", str(root), "--commit", sha)[0], 0
+            )
+            git(root, "mv", "internal/order.go", "internal/placed.go")
+            git(root, "commit", "-q", "-m", "rename order")
+            code, payload = run("route", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["renames"][0]["from"], "internal/order.go")
+            self.assertEqual(payload["renames"][0]["to"], "internal/placed.go")
+            self.assertEqual(payload["renames"][0]["module"], "order")
+            rec = payload["changes"][0]
+            self.assertEqual(rec["via"], "file-table")
+            self.assertEqual(rec["from"], "internal/order.go")
+
+    def test_set_sync_hotspot_replaces_list(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            code, payload = run(
+                "set-sync",
+                "--cwd",
+                str(root),
+                "--hotspot",
+                "internal/order.go",
+                "--hotspot",
+                "cmd/orderd/main.go",
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(
+                payload["state"]["hotspots"],
+                ["internal/order.go", "cmd/orderd/main.go"],
+            )
+            code, payload = run(
+                "set-sync", "--cwd", str(root), "--hotspot", "internal/extra.go"
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["state"]["hotspots"], ["internal/extra.go"])
+            code, payload = run("validate", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["issues"], [])
 
 
 if __name__ == "__main__":

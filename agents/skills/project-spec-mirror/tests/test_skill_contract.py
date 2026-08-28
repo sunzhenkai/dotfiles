@@ -21,6 +21,7 @@ EXPECTED = {
     "inventory",
     "symbols",
     "diff",
+    "route",
     "set-sync",
     "validate",
 }
@@ -45,5 +46,6 @@ class ContractTest(unittest.TestCase):
             "references/knowledge.md",
             "references/facets.md",
             "references/diagrams.md",
+            "references/routing.md",
         ):
             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)

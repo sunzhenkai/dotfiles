@@ -22,9 +22,9 @@
 ├── modules/
 │   ├── INDEX.md
 │   └── <module>/
-│       ├── README.md     # 模块职责、文件与核心功能
-│       └── files/        # 仅详尽模式：每源文件一页
-│           └── <file>.md
+│       ├── README.md     # 职责、根路径、文件表、核心符号
+│       └── notes/        # 可选热点详注；init/build 默认不建
+│           └── <source-rel>.md
 ├── facets/               # 工程切面：来源 / 契约 / 切片 / 验证 / 流量
 │   ├── INDEX.md
 │   ├── source.md
@@ -36,7 +36,7 @@
     └── INDEX.md
 ```
 
-不要在金字塔和切面/图表之外再造顶层分类。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)。
+不要在金字塔和切面/图表之外再造顶层分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
 
 ## 阅读顺序（强制）
 
@@ -46,7 +46,7 @@
 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
 3. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
 4. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
-5. `modules/` — 最后：代码如何承载
+5. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
 6. `diagrams/` — 看图，不替代上文段落
 
 下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
@@ -62,6 +62,7 @@
   "branch": "main",
   "mode": "concise",
   "scope": [],
+  "hotspots": [],
   "synced_commit": null,
   "synced_at": null,
   "updated_at": "2026-01-02T00:00:00Z"
@@ -70,7 +71,8 @@
 
 - `placement`：`in-project` | `external`
 - `source`：相对本镜像根；`in-project` 时为 `..`
-- `scope`：详尽模式的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）
+- `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
+- `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。只通过 `set-sync --hotspot` 写回；模块 README「热点」表给人读
 - `synced_commit`：已写入金字塔的那个 commit；未 build 则为 `null`
 
 只通过 `init` / `set-sync` 改这个文件。
@@ -116,22 +118,65 @@
 
 1. **一句话** — 这个项目做什么
 2. **背景与目标** — 谁用、解决什么、非目标
-3. **模块地图** — 表格：模块 / 职责 / 入口路径
+3. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
 4. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
 5. **主切片** — 链到 `facets/slices/` 里正在维护的切口
 6. **关键实体与概念** — 链到对应页面，不在这里下定义
 7. **图** — 链到 `diagrams/`，没有图则省略本节
 
+## 模块如何划
+
+模块是连贯的代码边界，由 Agent 划分，**不是**一个源文件一模块。
+
+| 生态 | 优先切法 |
+|------|----------|
+| Go | package 或 `cmd/<bin>`；多个紧密 package 可合成一个模块 |
+| Python | 包目录；单文件脚本可自成模块 |
+| JS/TS | `src/` 下功能目录；组件+样式+测试算该目录下的多行，不拆成三页 |
+| Java | 领域包，不要一类一模块 |
+
+单模块文件表过长（经验：> 40 行）→ 拆模块，不要改回每文件一页。
+
+`modules/INDEX.md` 用表格：模块 / 根路径 / 一句话 / 页。
+
 ## 模块页
 
-`modules/<module>/README.md`：
+`modules/<module>/README.md` 固定结构：
 
-- 职责（相对 overview 只写本模块的）
-- 对外入口（命令、HTTP、消息、库 API）
-- 文件表：路径 / 一句话 / 核心符号（简约模式到此为止）
-- 依赖的其他模块、实体、处理线
+```markdown
+# <module>
 
-详尽模式的 `files/<file>.md` 见 [modes.md](modes.md)。文件路径中的 `/` 改成 `__` 作为页名，避免建深层目录，页内用源相对路径标明真身。
+<1–3 句：职责，相对 overview 不重复项目级论点>
+
+## 根
+
+| 路径前缀 | 角色 |
+|----------|------|
+| `internal/order` | 领域包 |
+| `cmd/orderd` | 进程入口 |
+
+## 对外入口
+
+命令、HTTP、消息、库 API。
+
+## 文件
+
+| 文件 | 职责 | 核心 |
+|------|------|------|
+| `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
+
+## 依赖
+
+链到实体、处理线、切片、其他模块。
+```
+
+- **根**：路由用的路径前缀，也给人看边界。每个模块至少一行。标题必须是 `根` 或 `Roots`。
+- **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字；详尽可在表下加「核心符号」小节（不是每文件一节）。
+- **热点**（可选）：仅当有 `notes/` 时增加一表：路径 / 为何 / 页。
+
+详尽模式如何写深、何时建 `notes/`，见 [modes.md](modes.md)。`notes/` 与源树同构，页内用源相对路径标明真身。
+
+已有镜像若含 `modules/*/files/`：视为遗留，停更、不删；在本模块 README 注明可能过期。
 
 ## changelog.md
 

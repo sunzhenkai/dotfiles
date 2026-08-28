@@ -1,0 +1,514 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+index 4b8e18d..ebc0f86 100644
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -27,6 +27,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ - 不修改目标 project 的源码、测试、构建或依赖。
+ - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
+ - 不自动 commit / push；不把密钥、`.env`、凭据写进镜像。
++- 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
+ 
+ ## 放置规则
+ 
+@@ -55,8 +56,8 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ | 阶段 | 做什么 | 先读 |
+ |------|--------|------|
+ | `init` | 探测、确认、写骨架 | 本文件 |
+-| `build` | 按粒度生成金字塔 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md) |
+-| `update` | 用 git diff 增量更新 | 同上，只加载受影响层 |
++| `build` | 按粒度生成金字塔 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md)、[routing.md](references/routing.md) |
++| `update` | 用 git diff 把变更文件路由到已有页 | 同上，只加载受影响层 |
+ | `maintain` | 改概念/实体/流/模块/切面/图中的指定条目 | 对应 reference |
+ | `status` | 只读同步状态 | 本文件 |
+ 
+@@ -70,9 +71,9 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
+ | `status` | 镜像状态 + git 新鲜度 |
+ | `inventory` | 源文件清单（已忽略构建产物与密钥类文件） |
+-| `symbols` | 从代码文件提取函数/类型/变量，供详尽模式使用 |
++| `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+-| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
++| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更；update 按 [routing.md](references/routing.md) 映射到模块页 |
+ | `set-sync` | 正文写完后回写 commit / branch / mode / 时间 |
+ | `validate` | 金字塔、切面骨架与 `.mirror.json` 完整性 |
+ 
+@@ -98,27 +99,28 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 
+ ### build
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对范围内文件跑 `symbols`）
++1. `$SPECCTL status` 与 `$SPECCTL inventory`（详尽模式再对 `scope` 内、且将写入模块表的文件跑 `symbols`）
+ 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+ 3. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 4. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified
+ 5. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+-6. 详尽模式且 `inventory` 的 `file_count` 大于 80、又没有路径范围时：先问用户是缩小范围还是继续，得到同意前不要铺开每文件详页
++6. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。用户要「每个文件一页」时说明新模型，改为热点或 detailed 加深。要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+ 7. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed>`，再 `$SPECCTL validate`
+ 8. 向用户给出镜像根路径、怎么读（先 overview 再切面/金字塔）、同步 commit
+ 
+ ### update
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL diff`（git：`synced_commit..目标分支 commit`；可加 `--from` / `--to`）
+-2. 只根据变更文件更新受影响的模块页、概念、实体、处理线、切面与相关图；上层概述若结论变了才改
++1. `$SPECCTL status` 与 `$SPECCTL diff`（git：`synced_commit..目标分支 commit`；可加 `--from` / `--to`）。有 `route` 命令则用其 JSON，否则按 [routing.md](references/routing.md) 手算同一算法
++2. 只改映射到的模块 README 与跟链接的概念、实体、处理线、切面与相关图；rename（`status=R`）改文件表路径，不当删+增。上层概述若结论变了才改
+ 3. 若缺 `facets/` 或 `diagrams/` 骨架，先补 INDEX（及切面短页），再改正文；不删已有金字塔
+ 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+-6. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
++6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
++7. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
+ 
+ ### maintain
+ 
+-用户点名改某一概念/实体/流/模块/切面/图时：只改对应文件与相关 INDEX/链接，不触发全量重写。若代码已变，先 `diff` 再改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
++用户点名改某一概念/实体/流/模块/切面/图时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：改该模块文件表对应行并跟链接；只有用户明确要详注时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+ 
+ ### status
+ 
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+index fcb3fe5..56be00a 100644
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -22,9 +22,9 @@
+ ├── modules/
+ │   ├── INDEX.md
+ │   └── <module>/
+-│       ├── README.md     # 模块职责、文件与核心功能
+-│       └── files/        # 仅详尽模式：每源文件一页
+-│           └── <file>.md
++│       ├── README.md     # 职责、根路径、文件表、核心符号
++│       └── notes/        # 可选热点详注；init/build 默认不建
++│           └── <source-rel>.md
+ ├── facets/               # 工程切面：来源 / 契约 / 切片 / 验证 / 流量
+ │   ├── INDEX.md
+ │   ├── source.md
+@@ -36,7 +36,7 @@
+     └── INDEX.md
+ ```
+ 
+-不要在金字塔和切面/图表之外再造顶层分类。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)。
++不要在金字塔和切面/图表之外再造顶层分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、第三方、测试夹具默认不进 `modules/`，除非处理线或切片必须引用。切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+ 
+ ## 阅读顺序（强制）
+ 
+@@ -46,7 +46,7 @@
+ 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
+ 3. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
+ 4. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
+-5. `modules/` — 最后：代码如何承载
++5. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
+ 6. `diagrams/` — 看图，不替代上文段落
+ 
+ 下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
+@@ -62,6 +62,7 @@
+   "branch": "main",
+   "mode": "concise",
+   "scope": [],
++  "hotspots": [],
+   "synced_commit": null,
+   "synced_at": null,
+   "updated_at": "2026-01-02T00:00:00Z"
+@@ -70,7 +71,8 @@
+ 
+ - `placement`：`in-project` | `external`
+ - `source`：相对本镜像根；`in-project` 时为 `..`
+-- `scope`：详尽模式的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）
++- `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
++- `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。无 `set-sync --hotspot` 时不要手改本文件，把路径写在模块 README「热点」表
+ - `synced_commit`：已写入金字塔的那个 commit；未 build 则为 `null`
+ 
+ 只通过 `init` / `set-sync` 改这个文件。
+@@ -116,22 +118,65 @@
+ 
+ 1. **一句话** — 这个项目做什么
+ 2. **背景与目标** — 谁用、解决什么、非目标
+-3. **模块地图** — 表格：模块 / 职责 / 入口路径
++3. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
+ 4. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
+ 5. **主切片** — 链到 `facets/slices/` 里正在维护的切口
+ 6. **关键实体与概念** — 链到对应页面，不在这里下定义
+ 7. **图** — 链到 `diagrams/`，没有图则省略本节
+ 
++## 模块如何划
++
++模块是连贯的代码边界，由 Agent 划分，**不是**一个源文件一模块。
++
++| 生态 | 优先切法 |
++|------|----------|
++| Go | package 或 `cmd/<bin>`；多个紧密 package 可合成一个模块 |
++| Python | 包目录；单文件脚本可自成模块 |
++| JS/TS | `src/` 下功能目录；组件+样式+测试算该目录下的多行，不拆成三页 |
++| Java | 领域包，不要一类一模块 |
++
++单模块文件表过长（经验：> 40 行）→ 拆模块，不要改回每文件一页。
++
++`modules/INDEX.md` 用表格：模块 / 根路径 / 一句话 / 页。
++
+ ## 模块页
+ 
+-`modules/<module>/README.md`：
++`modules/<module>/README.md` 固定结构：
++
++```markdown
++# <module>
++
++<1–3 句：职责，相对 overview 不重复项目级论点>
++
++## 根
++
++| 路径前缀 | 角色 |
++|----------|------|
++| `internal/order` | 领域包 |
++| `cmd/orderd` | 进程入口 |
++
++## 对外入口
++
++命令、HTTP、消息、库 API。
++
++## 文件
++
++| 文件 | 职责 | 核心 |
++|------|------|------|
++| `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
++
++## 依赖
++
++链到实体、处理线、切片、其他模块。
++```
++
++- **根**：路由用的路径前缀，也给人看边界。每个模块至少一行。标题必须是 `根` 或 `Roots`。
++- **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字；详尽可在表下加「核心符号」小节（不是每文件一节）。
++- **热点**（可选）：仅当有 `notes/` 时增加一表：路径 / 为何 / 页。
+ 
+-- 职责（相对 overview 只写本模块的）
+-- 对外入口（命令、HTTP、消息、库 API）
+-- 文件表：路径 / 一句话 / 核心符号（简约模式到此为止）
+-- 依赖的其他模块、实体、处理线
++详尽模式如何写深、何时建 `notes/`，见 [modes.md](modes.md)。`notes/` 与源树同构，页内用源相对路径标明真身。
+ 
+-详尽模式的 `files/<file>.md` 见 [modes.md](modes.md)。文件路径中的 `/` 改成 `__` 作为页名，避免建深层目录，页内用源相对路径标明真身。
++已有镜像若含 `modules/*/files/`：视为遗留，停更、不删；在本模块 README 注明可能过期。
+ 
+ ## changelog.md
+ 
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+index 1ccca7c..eaafa96 100644
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -1,14 +1,18 @@
+ # 简约与详尽
+ 
+-`.mirror.json` 的 `mode` 是本镜像的粒度真相。切换模式等于该层重写，不是改几个标题。默认 **concise**。用户点名「详尽 / 每个函数 / 每个变量」时才用 detailed。
++`.mirror.json` 的 `mode` 是本镜像的粒度真相。切换模式等于该层重写，不是改几个标题。默认 **concise**。
++
++**触发：** 用户点名「详尽 / 每个函数 / 每个变量」→ `detailed`（加深已有页）。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定（文件不是阅读单位），改问热点范围或改为 detailed；**禁止**全库铺 `notes/` 或重建 `files/`。
++
++文件有三种角色，详见 [routing.md](routing.md)：清单行、路由键、证据路径。第四种——`modules/<module>/notes/` 热点详注——仅 opt-in。
+ 
+ ## concise（简约）
+ 
+-只回答「有哪些文件、各自核心能力是什么」。
++只回答「有哪些文件、各自核心能力是什么」。阅读叶子是**模块 README**。
+ 
+ | 写 | 不写 |
+ |----|------|
+-| 模块职责、文件一览表 | `modules/*/files/` 详页 |
++| 模块职责、根路径、文件一览表 | `modules/*/files/` 或为每个源文件建 `notes/` |
+ | 每个文件 1 句职责 | 局部变量、逐行实现 |
+ | 核心函数/类型：名字 + 一句职责 | 每个辅助函数的分支逻辑 |
+ | 概念/实体/处理线的定义与关系 | 把函数体搬进规格 |
+@@ -26,26 +30,52 @@
+ 
+ ## detailed（详尽）
+ 
+-在简约之上，为范围内**每个代码文件**建 `files/` 页，并记录该文件中的：
++在简约之上**加深同一批页**，不复制一棵源文件树：
+ 
+-- 包/模块级变量与常量（跳过密钥和明显测试噪声）
+-- 类型/结构体字段（领域有意义的）
+-- 函数/方法：参数、返回、副作用、实现要点（分支、锁、I/O、错误如何处理）
+-- 非代码文件：该文件在构建或运行中的角色、关键键值（仍脱敏）
++| 层 | 加深什么 |
++|----|----------|
++| 模块 README | 核心符号补参数、返回、副作用、错误如何结束；文件表仍一行一个文件 |
++| 实体 | 领域字段、约束、不变式 |
++| 处理线 | 每步落到模块 + 符号 + 失败形态 |
++| 契约 | 能追溯 SOURCE；切片尽量到 specified |
++| `notes/` | **默认仍不建**。只对用户点名或符合热点条件的路径建 |
+ 
+ 实现要点写「怎么做」和「为什么这样」，不要贴大段源码。需要证据时引用符号名和相对路径。
+ 
+-`symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。
++`symbols` 只提供候选名单，用于填模块表和热点页；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。不要对全 inventory 逐文件抽符号：只对 `scope` 内、且将写入模块表的文件跑 `symbols`。
+ 
+-## 范围
++## 范围与热点
+ 
+-- 简约默认全库（仍走 inventory 忽略规则）。
+-- 详尽应对 `scope` 或 `inventory --path` 收窄；`file_count` > 80 且未收窄时先问用户。
++- `scope`：知识覆盖的源路径前缀；空表示全库（仍走 inventory 忽略规则）。与是否建 `notes/` 无关。
++- 简约默认全库。详尽应对 `scope` 或 `inventory --path` 收窄要写深的模块，而不是「详页文件清单」。
++- `inventory.file_count` 只作状态展示，**不**再作为是否生成叶子页的开关。
+ - `set-sync --mode` 与实际写成的粒度必须一致。
+ 
++### 热点 `notes/`（opt-in）
++
++路径与源树同构：`modules/<module>/notes/<source-rel>.md`（例如 `notes/internal/order/service.go.md`）。不要把 `/` 拍成 `__`。
++
++**何时建（须至少一条）：**
++
++- 用户点名文件或路径前缀；
++- 该文件是某条切片的入口（路由/命令/消费者），且模块表写不下入口协议细节；
++- 单文件承载多条处理线或非平凡状态机，表行无法说清。
++
++**何时不建：** 为了「详尽看起来完整」；inventory 里每一个代码文件；DTO/胶水/生成代码；已有对应实体页的纯结构体文件。
++
++用户要热点详注且未给路径：先问。建议切片入口，或一次 ≤ **15** 个文件。未同意、或候选将超过 15 个，不得批量建 `notes/`。
++
++页内写：真身路径、为何是热点、表里写不下的符号要点、链回模块/实体/处理线/切片。
++
++无 `set-sync --hotspot` 时不要手改 `.mirror.json`；把路径写在模块 README「热点」表。
++
+ ## 更新时
+ 
+-- 简约：diff 里的文件只改模块文件表和被波及的知识页。
+-- 详尽：变更文件重写对应 `files/` 页，并向上检查模块 README 与知识层是否仍成立。
+-- 从 concise 升到 detailed：补 `files/`，不要删简约层已有叙述。
+-- 从 detailed 降到 concise：停更 `files/`；除非用户要求删除，否则保留旧详页并在模块 README 注明「详尽页可能过期」。
++按 [routing.md](routing.md) 把 `diff` 的文件映射到模块，再跟链接改知识层与切面。
++
++- 简约：只改模块文件表和被波及的知识/切面页。
++- 详尽：同样改这些页并写深；不要为每个变更文件建或重写详页。
++- rename（`status=R`）：改文件表路径（及已有 `notes/` 文件名），不当成删除 + 新增。
++- 从 concise 升到 detailed：加深已有页；不要补全量 `files/` 或 `notes/`。
++- 从 detailed 降到 concise：停更 `notes/`；除非用户要求删除，否则保留并在模块 README 注明可能过期。
++- 遗留 `modules/*/files/`：停更、不自动删除；模块 README 注明可能过期。用户明确要求删除后再删，需要的热点按本节少量重建为 `notes/`。
+diff --git a/agents/skills/project-spec-mirror/references/knowledge.md b/agents/skills/project-spec-mirror/references/knowledge.md
+index 532f729..0f51dc3 100644
+--- a/agents/skills/project-spec-mirror/references/knowledge.md
++++ b/agents/skills/project-spec-mirror/references/knowledge.md
+@@ -38,7 +38,7 @@ INDEX 用表格：实体 / 身份 / 生命周期 / 页。正文建议小节：
+ 4. 谁读写（模块、处理线）
+ 5. 不变式与常见错误状态
+ 
+-不要把每个内部 DTO 都做成实体。胶水结构留在模块文件表即可。
++不要把每个内部 DTO 都做成实体。胶水结构留在模块文件表即可。不要为纯结构体源文件再各建一页；详尽加深本实体页。
+ 
+ ## 业务处理线（flows）
+ 
+@@ -52,7 +52,7 @@ INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
+ |----|--------|
+ | 背景 | 谁在什么场合发起 |
+ | 目标 | 成功时世界变成什么样 |
+-| 流程 | 有序步骤；每步对应模块或符号 |
++| 流程 | 有序步骤；简约到模块或核心符号名；详尽每步写模块 + 符号 + 失败形态 |
+ | 依赖 | 上游数据、服务、前置状态 |
+ | 输出 | 返回值、持久化、消息、副作用 |
+ | 失败 | 关键失败如何结束，是否可重试 |
+@@ -64,7 +64,7 @@ INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
+ | 动作 | 做法 |
+ |------|------|
+ | 新增 | 源码里稳定出现且能讲清的，补页并挂 INDEX、overview 地图 |
+-| 更新 | `diff` 波及的符号/字段/步骤只改对应页；名称变更则改文件名或在旧页写跳转 |
++| 更新 | `diff` 波及的符号/字段/步骤：先按 [routing.md](routing.md) 落到模块，再只改对应知识页；不要为每个变更源文件建详页。名称变更则改文件名或在旧页写跳转 |
+ | 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
+ | 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
+ 
+diff --git a/agents/skills/project-spec-mirror/references/facets.md b/agents/skills/project-spec-mirror/references/facets.md
+index df3d6fd..a5549ac 100644
+--- a/agents/skills/project-spec-mirror/references/facets.md
++++ b/agents/skills/project-spec-mirror/references/facets.md
+@@ -56,6 +56,8 @@ build / update 识别并维护这些页。没有证据的契约页保留标题
+ 
+ 切片是工程交付单元：从入口（路由/命令/消费者）经业务与数据到外部副作用，能单独验证。处理线（`flows/`）是给人看的业务路径；一条切片通常链 1 条处理线，不要复制流程全文。
+ 
++切片 ≠ 源文件。一条切片穿过多个文件；不要按文件建切片页，也不要为切片里的每个文件建 `notes/`。切片**入口**文件在模块表写不下入口协议时，可成为热点详注（见 [modes.md](modes.md)）。
++
+ **生命周期**（写在切片页顶部，按事实推进，不许跳步假装完成）：
+ 
+ ```text
+@@ -82,6 +84,6 @@ identified → characterized → specified → implemented → verified → cana
+ ## 维护
+ 
+ - 新增切片：源码里能划清入口与副作用时再建页；先 identified，再补契约。
+-- 更新：`diff` 波及的路由/schema/测试只改对应契约与切片，overview 只在地图变了才改。
++- 更新：`diff` 波及的路由/schema/测试按 [routing.md](routing.md) 改对应契约与切片，overview 只在地图变了才改。
+ - `<!-- manual -->` 块同样不可覆盖。
+ - 切面与金字塔交叉链接：切片 → flow / module / entity；契约 → 测试路径。
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+new file mode 100644
+index 0000000..f2c720e
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -0,0 +1,38 @@
++# 更新路由：文件 → 页
++
++源文件是 git 的变更单位，不是规格的阅读单位。`diff` 给出改了哪些路径；本文件规定如何把它们映射到已有金字塔/切面页。
++
++有 `specctl route` 时用它的 JSON（模块命中、rename、unmapped）。尚未提供该命令时，Agent **按同一算法手算**，不得改回「一变更文件一详页」。
++
++## 算法
++
++对 `$SPECCTL diff` 的每一条（`status` / `path`，rename 另有 `from`）：
++
++1. **Rename（`status` 为 `R`）**：用 `from` 找旧归属，把该模块文件表那一行改成 `path`。若已有 `notes/<from>.md`，改名为 `notes/<path>.md` 并更新真身。禁止当成删除 + 新增。
++2. **文件表精确匹配** `path`（rename 则先匹配 `from`）→ 落入含该行的模块。
++3. 未命中 → **最长前缀**匹配该模块 README「根」表第一列。
++4. 仍未命中 → 记入 `unmapped`：并入最近模块或新建模块，不得丢弃，也不得为此建文件详页。
++5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
++6. 非代码、配置、测试：优先 `facets/source.md` 与相关契约/切片，其次才是模块表。
++
++标题约定（与 [layout.md](layout.md) 一致，便于日后 CLI 解析）：「根」或 `Roots`；「文件」或 `Files`。不要靠扫全库反引号路径做路由（易误伤）。
++
++无模块 README（刚 init 未 build）→ 全部视为 `unmapped` / 未构建，进入 `build` 而不是硬编路由。
++
++## 与切面的分工
++
++| 变更像什么 | 优先改 |
++|------------|--------|
++| 领域包、入口、符号 | 模块 README 文件表；跟链接的实体/处理线 |
++| 路由 / schema / 测试名 | 契约页与切片 |
++| 配置、样本、SOURCE 证据 | `facets/source.md` |
++| 放量、灰度 | `traffic.md`（无则写「无」） |
++
++切片是垂直切口，穿过多个文件。不要为切片里的每个文件建页；入口文件成为热点的条件见 [modes.md](modes.md)。
++
++## 维护时
++
++- 每个模块 README 必须有「根」表与「文件」表，否则下一步 update 无法路由。
++- 新增源文件：先落入某模块的根前缀，再补文件表一行。
++- 源文件消失：文件表删行或标明废弃；不要默默删 `<!-- manual -->`。
++- `<!-- manual -->` 块不得覆盖。
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+index 51afca3..acb6cad 100644
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -75,14 +75,16 @@ cases:
+     given: 骨架已在，开始 build
+     expect:
+       must:
+-        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md
++        - 先读 references/layout.md、modes.md、knowledge.md、facets.md、diagrams.md、routing.md
+         - 从上往下写 README / overview / facets / concepts / entities / flows / modules
++        - 模块 README 含「根」表与「文件」表
+         - 切片不必等全部契约写完
+-        - 粒度与 .mirror.json 的 mode 一致
++        - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
+       must_not:
+         - CLI 代写概述或编造流程、契约、灰度方案
+         - 下层重复上层已经说清的论点
+         - 用手绘 SVG/Mermaid 冒充 archify 产物
++        - 为范围内每个代码文件建 files/ 或 notes/
+ 
+   - id: facets-and-archify
+     kind: core
+@@ -145,16 +147,78 @@ cases:
+         - 把密钥、.env、凭据抄进 spec
+         - 自动 git commit 或 push
+ 
+-  - id: detailed-over-80-asks
++  - id: detailed-deepens-pages-not-files-tree
++    kind: core
++    judge: deterministic
++    description: 详尽加深模块/实体/流/契约，不为每个代码文件建页
++    given: mode=detailed，开始 build 或从 concise 升级
++    expect:
++      must:
++        - 加深模块 README 核心符号、实体字段、处理线步骤、可追溯契约
++        - 模块阅读叶子是 README 文件表
++      must_not:
++        - 为范围内每个代码文件建 files/ 或 notes/
++        - 把路径中的 / 拍成 __ 作为页名
++
++  - id: hotspot-notes-need-scope
++    kind: failure
++    judge: deterministic
++    description: 热点详注未给路径时先问，未同意不批量建 notes
++    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个
++    expect:
++      must:
++        - 先问范围；建议切片入口或一次 ≤15 个文件
++      must_not:
++        - 未同意就批量建 notes/
++        - 用 inventory.file_count > 80 作为是否写详页的门禁
++
++  - id: update-routes-from-diff
++    kind: core
++    judge: deterministic
++    description: update 用 diff 映射到模块页，不按一文件一详页对号入座
++    given: 已有 synced_commit，开始 update
++    expect:
++      must:
++        - 用 diff（有 route 命令则用其 JSON，否则按 routing.md 手算）落到模块 README
++        - 跟链接改被波及的实体/处理线/切面
++      must_not:
++        - 为每个变更源文件新建或重写 files/ 详页
++
++  - id: rename-updates-file-table
++    kind: core
++    judge: deterministic
++    description: diff status=R 时改文件表路径，不当删除加新增
++    given: diff 含 status=R 的 from/path
++    expect:
++      must:
++        - 用 from 找旧模块行，改成新 path
++        - 已有 notes/<from>.md 则改名为 notes/<path>.md
++      must_not:
++        - 把 rename 当成删除旧页再新增一页
++
++  - id: legacy-files-dir-preserved
++    kind: boundary
++    judge: deterministic
++    description: 已有 modules/*/files/ 不自动删除，本轮停更
++    given: 镜像含遗留 files/ 详页，本轮 update 或 build
++    expect:
++      must:
++        - 在模块 README 注明遗留 files/ 可能过期
++        - 停更这些详页
++      must_not:
++        - 未要求删除就删掉 files/
++        - 把遗留 files/ 全量搬成 notes/
++
++  - id: reject-per-file-catalog-request
+     kind: failure
+     judge: deterministic
+-    description: 详尽模式且文件数大于 80、无路径范围时先问
+-    given: mode=detailed，inventory.file_count > 80，未给 scope/--path
++    description: 用户要每个文件一页时说明新模型，不铺全库
++    given: 用户点名每个文件一页、给每个源文件写详页
+     expect:
+       must:
+-        - 先问缩小范围还是继续
++        - 说明文件不是阅读单位，改问热点范围或 detailed 加深
+       must_not:
+-        - 未同意就铺开每文件详页
++        - 为全库每个代码文件建 files/ 或 notes/
+ 
+   - id: not-openspec-not-source-edit
+     kind: boundary
+diff --git a/agents/skills/project-spec-mirror/evals/README.md b/agents/skills/project-spec-mirror/evals/README.md
+index 0d09642..50a4106 100644
+--- a/agents/skills/project-spec-mirror/evals/README.md
++++ b/agents/skills/project-spec-mirror/evals/README.md
+@@ -1,6 +1,6 @@
+ # Evals
+ 
+-本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。
++本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。详尽不等于每源文件一页；相关 case 见 `detailed-deepens-pages-not-files-tree` 等。
+ 
+ ## 怎么跑
+ 
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+index d36875e..1b4d73b 100644
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -45,5 +45,6 @@ class ContractTest(unittest.TestCase):
+             "references/knowledge.md",
+             "references/facets.md",
+             "references/diagrams.md",
++            "references/routing.md",
+         ):
+             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
