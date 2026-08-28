@@ -1,0 +1,209 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+index 0bfca93..9debce5 100644
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -105,13 +105,13 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 
+ ### build
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`），再仅对所选范围内且将写入模块表或热点页的文件跑 `symbols`
++1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`），再对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列；测试文件不逐方法抽取
+ 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+ 3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+ 6. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理；`important` 重要文件写文件表+核心符号，其余文件写简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+ 8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+ 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+index 27a379b..68134ad 100644
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -34,8 +34,8 @@
+ 
+ | `detail_level` | 文件处理 |
+ |----------------|----------|
+-| `complete` | 完整整理所有源文件；简单文件可以合并登记，但不得遗漏任何文件 |
+-| `important`（默认） | 范围内文件都要出现在文件表：重要文件整理（职责 + 核心符号），其余写**简述**；简单文件可以合并登记，**不得整份省略** |
++| `complete` | 完整整理所有源文件与其中方法；简单文件可以合并登记，但不得遗漏任何文件。**测试方法只简述**，不梳理用例逻辑 |
++| `important`（默认） | 范围内文件都要出现：重要文件整理，其余写文件级简述。整理时：**核心方法写完整逻辑，其余方法不得漏列、可简述**；测试方法只简述 |
+ | `lightweight` | 沿用当前轻量模式：模块文件表保留必要清单，详尽主要加深模块、实体、处理线、契约和投影，不为普通文件增加详注 |
+ 
+ 三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
+@@ -44,7 +44,7 @@
+ 
+ | 层 | 加深什么 |
+ |----|----------|
+-| 模块 README | `important` 至少达到下方最低密度；`complete` 再补参数、返回、副作用、错误如何结束。文件表仍一行一个文件（或合并简述行） |
++| 模块 README | `important` 至少达到下方最低密度（核心方法写完整逻辑）；`complete` 再补参数、返回、副作用。测试方法两档都只简述 |
+ | 实体 | 领域字段、约束、不变式 |
+ | 处理线 | 每步落到模块 + 符号 + 失败形态 |
+ | 恢复投影 | 同一批 INDEX（及 `surface/config.md`）写深：邻接协议、存储差、接口目录、拓扑、可再生命令 |
+@@ -53,7 +53,21 @@
+ 
+ 实现要点写「怎么做」和「为什么这样」，不要贴大段源码。需要证据时引用符号名和相对路径。
+ 
+-`symbols` 只提供候选名单，用于填模块表和热点页；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。不要对全 inventory 逐文件抽符号：只对 `scope` 内、且将写入模块表的文件跑 `symbols`。
++`symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列。不要对全 inventory 或测试文件逐方法抽取。
++
++### 方法怎么写（important / complete）
++
++单位是方法，不是文件。concise 仍可只列核心符号、省略辅助方法；详尽的 `important` / `complete` 按下表：
++
++| 种类 | 写什么 | 适用 |
++|------|--------|------|
++| 核心方法 | **完整逻辑**：有序步骤、关键分支、成功/失败如何结束、副作用。不是一句话职责，也不是贴源码 | important 与 complete |
++| 工具/辅助方法 | 一句话简述，**必须列名** | important 与 complete |
++| 测试方法 | 只简述（覆盖什么即可）。不要写每个 `Test*` 的步骤或断言 | important 与 complete |
++
++- 核心方法：对外入口、领域不变式、处理线必经、协议编解码、状态转换。
++- 工具方法：构造函数、setter、纯校验、格式化、简单 getter、胶水。
++- 测试方法：`Test*` / `Benchmark*` / `Example*`、表驱动用例、测试辅助。测试文件在文件表一行简述即可；若列方法也只写一句覆盖范围。
+ 
+ ### important 模块页（最低密度）
+ 
+@@ -77,17 +91,33 @@
+ | `private_params.go` | 注入产品标识 `appId="demo_client"`；鉴权 `AppKey` / `SecretKey` 值 `<REDACTED>` |
+ | `http_client.go` | `Service` / `NewService` / `CheckInput` / `SetEndpoint` |
+ | `http_request.go` | `Do` + `transferByte` + `OutPut` |
+-| `http_request_test.go` | 表驱动测试 |
++| `http_request_test.go` | 表驱动测试，覆盖 Do 成功与错误码 |
+ 
+ ## 核心符号
+ 
+-- `transferByte` — 构造 `{requestId, accountId, ...}` JSON（注入 `appId`）
+-- `OutPut.GetTaskIds` — 命中的任务 ID 列表
+-- `OutPut.GetStatus` — 响应 `code == 0` 为成功
++### 整理（核心方法，完整逻辑）
++
++- `Do`
++  1. `CheckInput` 校验必填；失败直接返回
++  2. `transferByte` 组 JSON（注入 `appId`；鉴权字段值 `<REDACTED>`）
++  3. POST 到已设 endpoint；非 2xx 或超时记失败并结束
++  4. 解码为 `OutPut`；`GetStatus` 为假则业务失败，否则把 `GetTaskIds` 交给调用方
++- `transferByte`
++  1. 从输入取 `requestId`、`accountId` 等字段
++  2. 写入产品标识 `appId`
++  3. 序列化为 JSON 字节；缺字段则返回错误，不发请求
++
++### 简述（工具方法，不得漏列）
++
++- `NewService` — 构造客户端
++- `SetEndpoint` — 覆盖请求地址
++- `CheckInput` — 校验必填字段是否齐全
++- `OutPut.GetTaskIds` — 返回命中的任务 ID 列表
++- `OutPut.GetStatus` — `code == 0` 为成功
+ ```
+ 
+-「整理」= 文件表职责写清关键符号，并在「核心符号」里用一句话说清做什么、成功/失败怎么判断。
+-「简述」= 文件表一行、一句话职责（如「表驱动测试」），不要求抽符号。
++「整理」一个文件 = 文件表一行 + 列出该文件全部方法：核心方法写完整逻辑，工具方法一句话。
++「简述」一个文件 = 文件表一行，不要求抽方法。测试文件无论 important / complete 都按文件简述（或方法一句话），不写完整逻辑。
+ 不要把源码常量赋值整段贴进职责列。`AppKey` / `SecretKey` / AccessKey / token / password 等凭据字面量必须 `<REDACTED>`；可以写字段名与注入方式。
+ 
+ ## 范围与热点
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+index bc73587..034e5f8 100644
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -186,8 +186,11 @@
+ 
+ ## 核心符号
+ 
+-- `Place` — 创建订单并写入存储
+-- `Cancel` — 取消未支付订单
++- `Place` —
++  1. 校验订单字段
++  2. 写入存储
++  3. 失败则回滚并返回错误
++- `formatId` — 格式化订单号（工具方法，简述）
+ 
+ ## 依赖
+ 
+@@ -196,7 +199,7 @@
+ 
+ - **根**：路由用的路径前缀，也给人看边界。每个模块至少一行。标题必须是 `根` 或 `Roots`。
+ - **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字。`important` 范围内每个源文件至少一行（简述或整理），不得因「不重要」整份省略。
+-- **核心符号**（详尽）：表下列出对外入口与领域必经符号；`important` 最低密度见 [modes.md](modes.md)。职责列与核心符号不得抄密钥字面量。
++- **核心符号**（详尽）：核心方法写完整逻辑（步骤、分支、成败、副作用）；工具方法一句话但不得漏列；测试方法只简述（complete 亦然）。最低密度见 [modes.md](modes.md)。职责列与核心符号不得抄密钥字面量。
+ - **热点**（可选）：仅当有 `notes/` 时增加一表：路径 / 为何 / 页。
+ 
+ 详尽模式如何写深、何时建 `notes/`，见 [modes.md](modes.md)。`notes/` 与源树同构，页内用源相对路径标明真身。
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+index 2ba306b..457d82f 100644
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -171,8 +171,9 @@ cases:
+     given: mode=detailed，开始 build 或从 concise 升级
+     expect:
+       must:
+-        - 加深模块 README 核心符号、实体字段、处理线步骤、可追溯契约
++        - 加深模块 README 核心符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
+         - 模块阅读叶子是 README 文件表
++        - 测试方法只简述，complete 亦然
+       must_not:
+         - 为范围内每个代码文件建 files/ 或 notes/
+         - 把路径中的 / 拍成 __ 作为页名
+@@ -186,12 +187,14 @@ cases:
+       must:
+         - 提供 complete、important、lightweight 三个选项
+         - 未指定时使用 important
+-        - complete 整理所有源文件，简单文件可合并登记
+-        - important 对范围内文件写简述或整理，不得整份省略；重要文件写文件表加核心符号
++        - complete 整理所有源文件，简单文件可合并登记；测试方法只简述
++        - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
+         - lightweight 沿用当前轻量模式
+         - 将选择保存为 detail_level，并在后续 update 中沿用
+       must_not:
+-        - 把 important 理解为可忽略未列文件
++        - 把 important 的核心方法只写成一句话职责
++        - 漏列工具方法
++        - 为测试方法写完整逻辑
+         - 为每个文件建立独立规格页
+ 
+   - id: hotspot-notes-need-scope
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+index 7b4c0ee..862dac2 100644
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -60,6 +60,15 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("简述", skill)
+         self.assertNotIn("只能忽略无业务含义文件", skill)
+ 
++    def test_important_methods_full_logic(self) -> None:
++        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("完整逻辑", modes)
++        self.assertIn("不得漏列", modes)
++        self.assertIn("测试方法只简述", modes)
++        self.assertIn("完整逻辑", skill)
++        self.assertIn("测试方法只简述", skill)
++
+     def test_secret_literals_must_redact(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+         modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+diff --git a/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md b/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md
+new file mode 100644
+index 0000000..4191f8c
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md
+@@ -0,0 +1,16 @@
++# important 把核心方法写成一句话
++
++- Date: 2026-08-28
++- Kind: failure
++- Skill: project-spec-mirror
++- Context: detailed / important 写模块核心符号时，把方法层理解成「名字 + 一句话」
++
++## What happened
++
++Agent 补上了文件表覆盖，但仍把核心方法写成一句话职责，并漏列工具方法。测试方法在 complete 下被展开成用例步骤。
++
++## Lesson
++
++- 核心方法必须梳理完整逻辑（步骤、分支、成败、副作用），不是一句话点到为止。
++- 工具方法可以简述，但必须列名，不得漏列。
++- 测试方法只简述覆盖范围；important 与 complete 都不得写断言步骤。

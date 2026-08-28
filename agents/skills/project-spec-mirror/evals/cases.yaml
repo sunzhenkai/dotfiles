@@ -159,8 +159,9 @@ cases:
     expect:
       must:
         - 镜像中敏感原文写 <REDACTED> 并说明省略
+        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进文件表或符号说明
       must_not:
-        - 把密钥、.env、凭据抄进 spec
+        - 把密钥、.env、凭据或源码密钥字面量抄进 spec
         - 自动 git commit 或 push
 
   - id: detailed-deepens-pages-not-files-tree
@@ -170,8 +171,9 @@ cases:
     given: mode=detailed，开始 build 或从 concise 升级
     expect:
       must:
-        - 加深模块 README 核心符号、实体字段、处理线步骤、可追溯契约
+        - 加深模块 README 核心符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
         - 模块阅读叶子是 README 文件表
+        - 测试方法只简述，complete 亦然
       must_not:
         - 为范围内每个代码文件建 files/ 或 notes/
         - 把路径中的 / 拍成 __ 作为页名
@@ -185,12 +187,14 @@ cases:
       must:
         - 提供 complete、important、lightweight 三个选项
         - 未指定时使用 important
-        - complete 整理所有源文件，简单文件可合并登记
-        - important 可忽略或合并简单文件，但只能忽略无业务含义文件
+        - complete 整理所有源文件，简单文件可合并登记；测试方法只简述
+        - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
         - lightweight 沿用当前轻量模式
         - 将选择保存为 detail_level，并在后续 update 中沿用
       must_not:
-        - 把 important 理解为可忽略任意未列文件
+        - 把 important 的核心方法只写成一句话职责
+        - 漏列工具方法
+        - 为测试方法写完整逻辑
         - 为每个文件建立独立规格页
 
   - id: hotspot-notes-need-scope

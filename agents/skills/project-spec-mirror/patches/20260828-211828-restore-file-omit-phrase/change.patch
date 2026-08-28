@@ -1,0 +1,13 @@
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+index 68134ad..91bc9a6 100644
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -35,7 +35,7 @@
+ | `detail_level` | 文件处理 |
+ |----------------|----------|
+ | `complete` | 完整整理所有源文件与其中方法；简单文件可以合并登记，但不得遗漏任何文件。**测试方法只简述**，不梳理用例逻辑 |
+-| `important`（默认） | 范围内文件都要出现：重要文件整理，其余写文件级简述。整理时：**核心方法写完整逻辑，其余方法不得漏列、可简述**；测试方法只简述 |
++| `important`（默认） | 范围内文件都要出现，**不得整份省略**：重要文件整理，其余写文件级简述。整理时：**核心方法写完整逻辑，其余方法不得漏列、可简述**；测试方法只简述 |
+ | `lightweight` | 沿用当前轻量模式：模块文件表保留必要清单，详尽主要加深模块、实体、处理线、契约和投影，不为普通文件增加详注 |
+ 
+ 三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。

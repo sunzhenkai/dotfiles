@@ -50,3 +50,31 @@ class ContractTest(unittest.TestCase):
             "references/projections.md",
         ):
             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
+
+    def test_important_briefs_not_omits(self) -> None:
+        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("简述", modes)
+        self.assertIn("不得整份省略", modes)
+        self.assertNotIn("只能忽略没有业务含义的文件", modes)
+        self.assertIn("简述", skill)
+        self.assertNotIn("只能忽略无业务含义文件", skill)
+
+    def test_important_methods_full_logic(self) -> None:
+        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("完整逻辑", modes)
+        self.assertIn("不得漏列", modes)
+        self.assertIn("测试方法只简述", modes)
+        self.assertIn("完整逻辑", skill)
+        self.assertIn("测试方法只简述", skill)
+
+    def test_secret_literals_must_redact(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+        self.assertIn("<REDACTED>", skill)
+        self.assertIn("AppKey", skill)
+        self.assertIn("SecretKey", skill)
+        self.assertIn("<REDACTED>", modes)
+        self.assertIn("AppKey", modes)
+        self.assertIn("SecretKey", modes)

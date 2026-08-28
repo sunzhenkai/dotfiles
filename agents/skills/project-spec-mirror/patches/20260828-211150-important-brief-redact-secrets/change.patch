@@ -1,0 +1,213 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+index 6ebd41d..0bfca93 100644
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -27,7 +27,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ - 不是 OpenSpec / `openspec/` / 实现 change；不要把镜像写进那些目录。
+ - 不修改目标 project 的源码、测试、构建或依赖。
+ - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
+-- 不自动 commit / push；不把密钥、`.env`、凭据写进镜像。
++- 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
+ - 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
+ - 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+   - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
+@@ -92,7 +92,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
+ 4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为对 `inventory` 做全量对照并说明限制。
+ 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
+-6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。
++6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
+ 
+ ## 工作流
+ 
+@@ -111,7 +111,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+ 6. 模块地图、切片主路径、状态机等需要图时，按 [diagrams.md](references/diagrams.md) 调用 `archify`，HTML 写入 `diagrams/`
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理；`important` 只整理重要文件并忽略或合并简单文件；`lightweight` 沿用当前轻量规则。重要文件模式只能忽略无业务含义文件。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理；`important` 重要文件写文件表+核心符号，其余文件写简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+ 8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+ 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+index cb19a29..27a379b 100644
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -35,16 +35,16 @@
+ | `detail_level` | 文件处理 |
+ |----------------|----------|
+ | `complete` | 完整整理所有源文件；简单文件可以合并登记，但不得遗漏任何文件 |
+-| `important`（默认） | 只整理重要文件；简单文件可以忽略或合并，**只能忽略没有业务含义的文件** |
++| `important`（默认） | 范围内文件都要出现在文件表：重要文件整理（职责 + 核心符号），其余写**简述**；简单文件可以合并登记，**不得整份省略** |
+ | `lightweight` | 沿用当前轻量模式：模块文件表保留必要清单，详尽主要加深模块、实体、处理线、契约和投影，不为普通文件增加详注 |
+ 
+-三档均不是“一文件一页”。文件表仍可一行一个文件；`important` / `lightweight` 可以把职责相同且无独立业务含义的简单文件合并为一行或以目录范围登记，但业务入口、领域规则、状态转换、持久化和协议证据必须保留。
++三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
+ 
+ 在简约之上**加深同一批页**，不复制一棵源文件树：
+ 
+ | 层 | 加深什么 |
+ |----|----------|
+-| 模块 README | 核心符号补参数、返回、副作用、错误如何结束；文件表仍一行一个文件 |
++| 模块 README | `important` 至少达到下方最低密度；`complete` 再补参数、返回、副作用、错误如何结束。文件表仍一行一个文件（或合并简述行） |
+ | 实体 | 领域字段、约束、不变式 |
+ | 处理线 | 每步落到模块 + 符号 + 失败形态 |
+ | 恢复投影 | 同一批 INDEX（及 `surface/config.md`）写深：邻接协议、存储差、接口目录、拓扑、可再生命令 |
+@@ -55,6 +55,41 @@
+ 
+ `symbols` 只提供候选名单，用于填模块表和热点页；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。不要对全 inventory 逐文件抽符号：只对 `scope` 内、且将写入模块表的文件跑 `symbols`。
+ 
++### important 模块页（最低密度）
++
++`important` 的阅读叶子仍是模块 README，不是每文件一页。每个模块至少写到下面这个密度；少于此视为没写完。标题必须是「根」「文件」（或 `Roots` / `Files`），不要改成「根路径」「文件一览」，否则 update 路由会失效。
++
++```markdown
++# `notify-client/` 通知回调客户端（最简 JSON，无签名）
++
++把投递结果回传给上游；不含签名与对账。
++
++## 根
++
++| 路径前缀 | 角色 |
++|----------|------|
++| `internal/notify/client/` | 客户端包 |
++
++## 文件
++
++| 文件 | 职责 |
++|------|------|
++| `private_params.go` | 注入产品标识 `appId="demo_client"`；鉴权 `AppKey` / `SecretKey` 值 `<REDACTED>` |
++| `http_client.go` | `Service` / `NewService` / `CheckInput` / `SetEndpoint` |
++| `http_request.go` | `Do` + `transferByte` + `OutPut` |
++| `http_request_test.go` | 表驱动测试 |
++
++## 核心符号
++
++- `transferByte` — 构造 `{requestId, accountId, ...}` JSON（注入 `appId`）
++- `OutPut.GetTaskIds` — 命中的任务 ID 列表
++- `OutPut.GetStatus` — 响应 `code == 0` 为成功
++```
++
++「整理」= 文件表职责写清关键符号，并在「核心符号」里用一句话说清做什么、成功/失败怎么判断。
++「简述」= 文件表一行、一句话职责（如「表驱动测试」），不要求抽符号。
++不要把源码常量赋值整段贴进职责列。`AppKey` / `SecretKey` / AccessKey / token / password 等凭据字面量必须 `<REDACTED>`；可以写字段名与注入方式。
++
+ ## 范围与热点
+ 
+ `detail_level` 通过 `$SPECCTL init --detail-level ...` 或 `$SPECCTL set-sync --detail-level ...` 保存；旧镜像缺少该字段时按 `important` 解释。`mode=concise` 时该字段不改变简约模式的行为。
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+index 6db817e..bc73587 100644
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -184,13 +184,19 @@
+ |------|------|------|
+ | `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
+ 
++## 核心符号
++
++- `Place` — 创建订单并写入存储
++- `Cancel` — 取消未支付订单
++
+ ## 依赖
+ 
+ 链到实体、处理线、切片、其他模块。
+ ```
+ 
+ - **根**：路由用的路径前缀，也给人看边界。每个模块至少一行。标题必须是 `根` 或 `Roots`。
+-- **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字；详尽可在表下加「核心符号」小节（不是每文件一节）。
++- **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字。`important` 范围内每个源文件至少一行（简述或整理），不得因「不重要」整份省略。
++- **核心符号**（详尽）：表下列出对外入口与领域必经符号；`important` 最低密度见 [modes.md](modes.md)。职责列与核心符号不得抄密钥字面量。
+ - **热点**（可选）：仅当有 `notes/` 时增加一表：路径 / 为何 / 页。
+ 
+ 详尽模式如何写深、何时建 `notes/`，见 [modes.md](modes.md)。`notes/` 与源树同构，页内用源相对路径标明真身。
+diff --git a/agents/skills/project-spec-mirror/references/projections.md b/agents/skills/project-spec-mirror/references/projections.md
+index 304fe02..dd74aac 100644
+--- a/agents/skills/project-spec-mirror/references/projections.md
++++ b/agents/skills/project-spec-mirror/references/projections.md
+@@ -126,7 +126,7 @@ build / update 结束前核对这些项；任一项做不到就在页内写「
+ | 数据 | 只读 `data/` + 实体能重建存储与一致性 |
+ | 拓扑 | 只读 `runtime/` 能画出进程/端口/启动顺序 |
+ | 再生 | 只读 `build/` 能构建、迁移、启动（命令可执行或标明未知） |
+-| 脱敏 | 无密钥、连接串、`.env` 原文 |
++| 脱敏 | 无密钥、连接串、`.env` 原文，亦无 `AppKey` / `SecretKey` / token 等字面量 |
+ 
+ `validate` 只检查这六个文件存在，不判断正文是否写满。
+ 
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+index c461b2b..2ba306b 100644
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -159,8 +159,9 @@ cases:
+     expect:
+       must:
+         - 镜像中敏感原文写 <REDACTED> 并说明省略
++        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进文件表或符号说明
+       must_not:
+-        - 把密钥、.env、凭据抄进 spec
++        - 把密钥、.env、凭据或源码密钥字面量抄进 spec
+         - 自动 git commit 或 push
+ 
+   - id: detailed-deepens-pages-not-files-tree
+@@ -186,11 +187,11 @@ cases:
+         - 提供 complete、important、lightweight 三个选项
+         - 未指定时使用 important
+         - complete 整理所有源文件，简单文件可合并登记
+-        - important 可忽略或合并简单文件，但只能忽略无业务含义文件
++        - important 对范围内文件写简述或整理，不得整份省略；重要文件写文件表加核心符号
+         - lightweight 沿用当前轻量模式
+         - 将选择保存为 detail_level，并在后续 update 中沿用
+       must_not:
+-        - 把 important 理解为可忽略任意未列文件
++        - 把 important 理解为可忽略未列文件
+         - 为每个文件建立独立规格页
+ 
+   - id: hotspot-notes-need-scope
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+index 9f6a55d..7b4c0ee 100644
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -50,3 +50,22 @@ class ContractTest(unittest.TestCase):
+             "references/projections.md",
+         ):
+             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
++
++    def test_important_briefs_not_omits(self) -> None:
++        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("简述", modes)
++        self.assertIn("不得整份省略", modes)
++        self.assertNotIn("只能忽略没有业务含义的文件", modes)
++        self.assertIn("简述", skill)
++        self.assertNotIn("只能忽略无业务含义文件", skill)
++
++    def test_secret_literals_must_redact(self) -> None:
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
++        self.assertIn("<REDACTED>", skill)
++        self.assertIn("AppKey", skill)
++        self.assertIn("SecretKey", skill)
++        self.assertIn("<REDACTED>", modes)
++        self.assertIn("AppKey", modes)
++        self.assertIn("SecretKey", modes)
+diff --git a/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md b/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md
+new file mode 100644
+index 0000000..2073e65
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md
+@@ -0,0 +1,16 @@
++# 源码密钥字面量被抄进模块页
++
++- Date: 2026-08-28
++- Kind: failure
++- Skill: project-spec-mirror
++- Context: detailed / important 整理模块文件表时，源码常量含 AppKey / SecretKey 一类凭据
++
++## What happened
++
++Agent 把源码里的鉴权常量赋值写进文件表「职责」或核心符号说明，镜像因此带上密钥原文。同时 important 把非重要文件整份省略，模块页信息过少。
++
++## Lesson
++
++- important 对范围内文件写简述，不得因「不重要」漏行。
++- 凭据只写字段名与注入方式，值一律 `<REDACTED>`；产品标识不是密钥。
++- 可复用于后续 build/update；已写入 modes 与公共执行契约。
