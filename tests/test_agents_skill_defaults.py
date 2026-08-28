@@ -26,6 +26,10 @@ def test_catalog_has_archify_browser_use_frontend_design() -> None:
     assert by_skill["archify"] == "tt-a1i/archify"
     assert by_skill["browser-use"] == "browser-use/browser-use"
     assert by_skill["frontend-design"] == "anthropics/skills"
+    assert "shadcn" not in by_skill
+    assert "tailwind-css-patterns" not in by_skill
+    assert "tailwind-design-system" not in by_skill
+    assert "webapp-testing" not in by_skill
 
 
 def test_catalog_does_not_overlap_first_party() -> None:
@@ -53,10 +57,14 @@ def test_add_command_is_global_copy_without_agent_flag() -> None:
 def test_install_skips_existing_and_is_idempotent(tmp_path: Path) -> None:
     defaults = _load_defaults()
     dest = tmp_path / ".agents" / "skills"
-    (dest / "archify").mkdir(parents=True)
-    (dest / "archify" / "SKILL.md").write_text("# archify\n")
-    (dest / "browser-use").mkdir(parents=True)
-    (dest / "browser-use" / "SKILL.md").write_text("# browser-use\n")
+    existing = {"archify", "browser-use"}
+    for name in existing:
+        skill_dir = dest / name
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(f"# {name}\n")
+    expected_missing = [
+        it["skill"] for it in defaults.load_catalog(ROOT) if it["skill"] not in existing
+    ]
     calls: list[list[str]] = []
 
     def run(cmd, **kwargs):
@@ -70,8 +78,8 @@ def test_install_skips_existing_and_is_idempotent(tmp_path: Path) -> None:
         which=lambda _name: "/usr/bin/npx",
     )
     assert rc == 0
-    assert calls, "frontend-design 缺失时应调用 npx"
-    assert [c[c.index("--skill") + 1] for c in calls] == ["frontend-design"]
+    assert calls, "缺失的默认 skill 应调用 npx"
+    assert [c[c.index("--skill") + 1] for c in calls] == expected_missing
 
     rc2 = defaults.install_defaults(
         ROOT,
@@ -80,8 +88,8 @@ def test_install_skips_existing_and_is_idempotent(tmp_path: Path) -> None:
         which=lambda _name: "/usr/bin/npx",
     )
     assert rc2 == 0
-    # 第二次仍只有 frontend-design（仍未写入 SKILL.md，因为 mock 不落盘）
-    assert len(calls) == 2
+    # mock 不落盘，第二次仍会重试同一批缺失项
+    assert [c[c.index("--skill") + 1] for c in calls[len(expected_missing) :]] == expected_missing
 
 
 def test_dry_run_does_not_invoke_npx(tmp_path: Path) -> None:
