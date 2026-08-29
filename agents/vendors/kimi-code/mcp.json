@@ -13,15 +13,11 @@
       "bearerTokenEnvVar": "ZHIPU_API_KEY"
     },
     "zai-vision": {
-      "command": "npx",
+      "command": "sh",
       "args": [
-        "-y",
-        "@z_ai/mcp-server@latest"
-      ],
-      "env": {
-        "Z_AI_API_KEY": "${ZHIPU_API_KEY}",
-        "Z_AI_MODE": "ZHIPU"
-      }
+        "-c",
+        "Z_AI_API_KEY=\"$ZHIPU_API_KEY\" Z_AI_MODE=ZHIPU exec npx -y @z_ai/mcp-server@latest"
+      ]
     },
     "playwright": {
       "command": "npx",

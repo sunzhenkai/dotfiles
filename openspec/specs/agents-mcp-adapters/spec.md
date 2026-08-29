@@ -34,6 +34,12 @@ The system SHALL adapt shared MCP declarations into the configuration format use
 - **THEN** enabled MCP servers SHALL be written or merged into the `mcp` section of `~/.config/opencode/opencode.json`
 - **THEN** the generated configuration SHALL use OpenCode-compatible remote or local server syntax
 
+#### Scenario: Kimi Code stdio env maps placeholders from process environment
+- **WHEN** sync generates MCP configuration for `kimi-code` with a stdio server whose `env` values contain `${VAR}` placeholders
+- **THEN** the generated entry SHALL launch via `sh -c` so that `ZHIPU_API_KEY` is read from the Kimi process environment at spawn time and exported as `Z_AI_API_KEY`
+- **THEN** the generated configuration MUST NOT put an unexpanded `${ZHIPU_API_KEY}` into stdio `env`
+- **THEN** HTTP servers SHALL continue to use `bearerTokenEnvVar` rather than header placeholders
+
 #### Scenario: ZCode MCP configuration expands secrets locally
 - **WHEN** sync runs for `zcode`
 - **THEN** enabled MCP servers SHALL be merged into `~/.zcode/cli/config.json` under `mcp.servers`

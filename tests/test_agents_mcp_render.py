@@ -133,3 +133,49 @@ def test_vendor_zcode_template_has_placeholder_not_secret() -> None:
     assert servers["zai-vision"]["env"]["Z_AI_API_KEY"] == "${ZHIPU_API_KEY}"
     assert FAKE_KEY not in text
     assert "sh" != servers["zai-vision"]["command"]
+
+
+def test_kimi_http_uses_bearer_token_env_var() -> None:
+    entry = render_server_for_tool("web-search-prime", _http_srv(), "kimi-code")
+    assert entry == {
+        "url": "https://open.bigmodel.cn/api/mcp/web_search_prime/mcp",
+        "bearerTokenEnvVar": "ZHIPU_API_KEY",
+    }
+
+
+def test_kimi_stdio_maps_placeholder_via_shell() -> None:
+    entry = render_server_for_tool("zai-vision", _vision_srv(), "kimi-code")
+    assert entry["command"] == "sh"
+    assert entry["args"][0] == "-c"
+    script = entry["args"][1]
+    assert 'Z_AI_API_KEY="$ZHIPU_API_KEY"' in script
+    assert "Z_AI_MODE=ZHIPU" in script
+    assert "npx" in script
+    assert "@z_ai/mcp-server@latest" in script
+    assert "${ZHIPU_API_KEY}" not in script
+    assert "env" not in entry
+
+
+def test_kimi_stdio_without_placeholder_keeps_command() -> None:
+    srv = {
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest"],
+        "env": {"FOO": "bar"},
+    }
+    entry = render_server_for_tool("playwright", srv, "kimi-code")
+    assert entry["command"] == "npx"
+    assert entry["env"]["FOO"] == "bar"
+
+
+def test_vendor_kimi_vision_maps_zhipu_key_via_shell() -> None:
+    text = (ROOT / "agents" / "vendors" / "kimi-code" / "mcp.json").read_text(
+        encoding="utf-8"
+    )
+    data = json.loads(text)
+    vision = data["mcpServers"]["zai-vision"]
+    assert vision["command"] == "sh"
+    script = vision["args"][1]
+    assert 'Z_AI_API_KEY="$ZHIPU_API_KEY"' in script
+    assert "${ZHIPU_API_KEY}" not in script
+    assert FAKE_KEY not in text

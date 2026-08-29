@@ -100,12 +100,12 @@ Smoke test：
 
 ## 安全
 
-- 仓库只存变量**名**与占位符（Cursor/Claude/Kiro: `${ZHIPU_API_KEY}`；OpenCode: `{env:ZHIPU_API_KEY}`；Kimi: `bearerTokenEnvVar`）
+- 仓库只存变量**名**与占位符（Cursor/Claude/Kiro: `${ZHIPU_API_KEY}`；OpenCode: `{env:ZHIPU_API_KEY}`；Kimi HTTP: `bearerTokenEnvVar`）
 - 真实密钥只放环境变量或系统 keychain
 - **例外：ZCode 不展开 `${VAR}`**。`dotf agents -c --tool zcode` 会把 `ZHIPU_API_KEY` 展开进本机 `~/.zcode/cli/config.json`（HTTP `Authorization` 与 stdio `env`）；仓库模板仍只保留占位符。缺密钥时 sync 失败，不留下无法连接的占位符配置。
 - 本机路径只放 `local.yaml`
 - doctor 会扫描明显 secret / 内网 URL，且**永不打印** secret 值
-- Kimi Code **不会**展开 `headers` 里的 `${ENV}`；若写成字面量会收到智谱 `{"code":401,...}`（非 JSON-RPC），表现为 MCP initialize 校验失败
+- Kimi Code **不会**展开 `${ENV}`。HTTP 必须用 `bearerTokenEnvVar`（写成 headers 字面量会收到智谱 `{"code":401,...}`）；stdio `env` 里的 `${ZHIPU_API_KEY}` 会渲染成 `sh -c`，在启动时从进程环境映射为 `Z_AI_API_KEY`。
 - MiniMax：`MINIMAX_API_KEY`（本仓库 Codex 打**国内** `api.minimaxi.com`）与 Pi 海外 provider `minimax`（`api.minimax.io`）**不是一回事**；国内 key 用 Pi 须走 `minimax-cn` / `MINIMAX_CN_API_KEY`。专题：`repos/codeup/agent-data/knowledge/snippets/minimax-cn-vs-intl.md`
 - Kimi（Pi）：`KIMI_API_KEY` → 内置 provider `kimi-coding`；`dotf pi -c` 会写入 `auth.json` 的 `$KIMI_API_KEY` 引用
 

@@ -86,6 +86,11 @@ The system SHALL make generated or managed agent environment configuration audit
 - **THEN** `${ZHIPU_API_KEY}` SHALL be expanded in the home config because ZCode has no placeholder interpolation
 - **THEN** the committed vendor template SHALL still contain only the placeholder
 
+#### Scenario: Kimi Code maps ZHIPU_API_KEY at spawn without writing secrets
+- **WHEN** sync writes Kimi Code MCP configuration for a stdio server that needs `Z_AI_API_KEY`
+- **THEN** the configuration SHALL map `ZHIPU_API_KEY` from the process environment at spawn time
+- **THEN** neither the home config nor the vendor template SHALL contain the expanded secret value
+
 ### Requirement: Repository scans catch obvious sensitive leakage
 The system SHALL provide checks that catch obvious sensitive data patterns in `agents/env` source files and generated repository files.
 

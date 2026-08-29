@@ -47,9 +47,10 @@ servers:
     browser_provider: playwright
 
   # 智谱视觉理解 MCP（@z_ai/mcp-server）
-  # stdio 启动，需要 Z_AI_API_KEY；token 从 ZHIPU_API_KEY 读取。
-  # 多数客户端会展开 ${ZHIPU_API_KEY}；ZCode 不会，sync 写入 ~/.zcode/cli/config.json
-  # 时会把占位符展开成真实值（仓库模板仍保留占位符，不入库密钥）。
+  # stdio 启动，进程读 Z_AI_API_KEY；token 从 ZHIPU_API_KEY 读取，不必单独 export。
+  # Cursor/Kiro 展开 ${ZHIPU_API_KEY}；OpenCode 转成 {env:ZHIPU_API_KEY}；
+  # ZCode 由 sync 把占位符展开进 ~/.zcode/cli/config.json；
+  # Kimi 不展开 ${VAR}，stdio 渲染为 sh -c 在启动时映射 ZHIPU_API_KEY。
   zai-vision:
     transport: stdio
     command: npx

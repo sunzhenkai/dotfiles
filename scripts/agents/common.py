@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -455,16 +456,10 @@ def render_server_for_tool(
         return entry
 
     if tool == "kimi-code":
-        # Kimi 不展开 headers 里的 ${ENV}；HTTP/SSE 用 bearerTokenEnvVar
+        # Kimi 不展开 ${ENV}；HTTP/SSE 用 bearerTokenEnvVar，stdio env 用 sh -c 映射
         # 见 https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html
         if transport == "stdio":
-            entry: Dict[str, Any] = {
-                "command": srv["command"],
-                "args": list(srv.get("args") or []),
-            }
-            if srv.get("env"):
-                entry["env"] = srv["env"]
-            return entry
+            return _kimi_stdio_entry(srv)
         entry = {"url": srv["url"]}
         if env_name:
             entry["bearerTokenEnvVar"] = env_name
@@ -524,6 +519,29 @@ def render_server_for_tool(
         return entry
 
     die(f"无法为工具渲染 MCP: {tool}")
+
+
+def _kimi_stdio_entry(srv: Dict[str, Any]) -> Dict[str, Any]:
+    """Kimi 不展开 ${VAR}。stdio env 若含占位符，改成 sh -c 从进程环境映射。"""
+    command = srv["command"]
+    args = list(srv.get("args") or [])
+    env = dict(srv.get("env") or {})
+    if not env:
+        return {"command": command, "args": args}
+
+    if not any(isinstance(v, str) and PLACEHOLDER_OK.search(v) for v in env.values()):
+        return {"command": command, "args": args, "env": env}
+
+    assignments: List[str] = []
+    for key, value in env.items():
+        if isinstance(value, str) and PLACEHOLDER_OK.search(value):
+            shell_v = re.sub(r"\$\{([A-Z][A-Z0-9_]*)\}", r'"$\1"', value)
+            assignments.append(f"{key}={shell_v}")
+        else:
+            assignments.append(f"{key}={shlex.quote(str(value))}")
+    quoted_cmd = " ".join(shlex.quote(x) for x in [command, *args])
+    script = " ".join(assignments) + " exec " + quoted_cmd
+    return {"command": "sh", "args": ["-c", script]}
 
 
 def _to_opencode_env(env: Dict[str, Any]) -> Dict[str, Any]:
