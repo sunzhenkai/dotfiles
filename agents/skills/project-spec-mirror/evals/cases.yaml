@@ -21,7 +21,8 @@ cases:
     given: 用户只说维护 spec 镜像，未写 init/build/update/maintain/status
     expect:
       must:
-        - 无镜像 → init；已 init 未同步 → build；已有 synced_commit → update；只改词条 → maintain
+        - 无镜像 → init；build_status=skeleton → build；build_status=built → update；只改词条 → maintain
+        - 旧镜像缺 build_status 时，有 synced_commit 视为 built，否则视为 skeleton
         - 用一行说明该推断
       must_not:
         - 不探测现状就全量重写或直接写文件
@@ -68,6 +69,22 @@ cases:
       must_not:
         - 把脏工作区默认为已同步
 
+  - id: state-lifecycle-finalize
+    kind: core
+    judge: deterministic
+    description: build 状态独立于 Git commit，状态只在校验通过后推进
+    given: build 或 update 正文已经写完，准备回写状态
+    expect:
+      must:
+        - Git 源用 set-sync --built --commit <id>
+        - 非 Git 源用 set-sync --built，build_status 进入 built 且 synced_commit 保持 null
+        - mode=concise 时 detail_level 为 null；mode=detailed 时为 complete|important|lightweight
+        - set-sync 写入前校验骨架，并同步 README 粒度、文件粒度、分支和 commit
+      must_not:
+        - 非 Git 源写入伪造 commit
+        - 骨架校验失败后仍推进 build_status 或 synced_commit
+        - 接受 concise + 非 null detail_level
+
   - id: pyramid-knowledge-on-build
     kind: core
     judge: deterministic
@@ -90,20 +107,21 @@ cases:
   - id: facets-and-archify
     kind: core
     judge: deterministic
-    description: 维护五层切面；图表委托 archify，产物在 diagrams/
-    given: build 或需要模块地图/切片路径/状态机图
+    description: 维护适用切面；用户要求的图表委托 archify，产物在 diagrams/
+    given: build，或用户明确要求模块地图/切片路径/状态机图
     expect:
       must:
-        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现时 VERIFY 仍写测试/性质，差分写无；无灰度时 TRAFFIC 仍写发布与回滚）
+        - 保留 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC 入口；适用项写事实，不适用项写证据
         - 切片生命周期从 identified 起写，不跳步假装 migrated
-        - 需要图且 archify CLI 可用时，本轮加载 archify Skill（会话列表没有也要 Read 已安装的 SKILL.md），validate 后 deliver，HTML 写入 diagrams/<slug>.html
+        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver，HTML 写入 diagrams/<slug>.html
+        - Agent 主动候选先判断相对文字的增益；多图或高成本范围先让用户选择
         - INDEX 只链已存在的 .html；init 空表可以保留
       must_not:
         - 把 archify schema 或渲染器拷进本 Skill
-        - 未安装 archify 时声称已交付 HTML 图
+        - 未安装 archify 时声称交付了用户要求的 HTML 图
         - 把 PHP/Go 写死为唯一对照语言对
-        - 写「暂未生成图表」「后续可用 archify」占位，或把 INDEX 链到 archify Skill 目录
-        - 只写 JSON 候选或只列图名却不 deliver HTML（CLI 可用时）
+        - 把未执行候选写成 INDEX 占位，或把 INDEX 链到 archify Skill 目录
+        - 对已经承诺交付的图只写 JSON 候选
 
   - id: recovery-projections-runnable
     kind: core
@@ -112,13 +130,14 @@ cases:
     given: 骨架已在，开始 build 或已有镜像缺恢复投影
     expect:
       must:
-        - 维护 context/ data/ surface/（含 config.md） runtime/ build/ 的 INDEX 与必填节
-        - 结束前做恢复完备自检（边界、表面、数据、拓扑、再生、脱敏）
+        - 保留 context/ data/ surface/（含 config.md） runtime/ build/ 的稳定 INDEX
+        - 适用能力写到可恢复；不适用能力写判断依据和证据路径
+        - 结束前做恢复完备自检（适用性、边界、表面、数据、拓扑、再生、脱敏）
         - 缺骨架时先补这六个文件再改正文
       must_not:
         - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
         - 把 contracts/runtime.md 当成部署拓扑页
-        - 再造本 Skill 未列出的顶层目录
+        - 在核心层已有合适位置时滥用 extensions/
 
   - id: delivery-summary-fields
     kind: core
@@ -174,9 +193,10 @@ cases:
     given: mode=detailed，开始 build 或从 concise 升级
     expect:
       must:
-        - 加深模块 README 核心符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
+        - 加深模块 README 的行为承载符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
         - 模块阅读叶子是 README 文件表
         - 测试方法只简述，complete 亦然
+        - symbols 只作候选，不声称能证明全部方法或变量完整覆盖
       must_not:
         - 为范围内每个代码文件建 files/ 或 notes/
         - 把路径中的 / 拍成 __ 作为页名
@@ -184,20 +204,21 @@ cases:
   - id: detailed-file-granularity-choice
     kind: core
     judge: deterministic
-    description: 详尽模式选择文件整理粒度，默认重要文件模式
+    description: 详尽模式选择代码证据粒度，并持久化 important 写深范围
     given: mode=detailed，开始 build 或从 concise 升级
     expect:
       must:
         - 提供 complete、important、lightweight 三个选项
         - 未指定时使用 important
-        - complete 整理所有源文件，简单文件可合并登记；测试方法只简述
-        - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
-        - lightweight 沿用当前轻量模式
-        - 将选择保存为 detail_level，并在后续 update 中沿用
+        - complete 覆盖 inventory 全部文件并深入行为承载符号；测试和纯机械文件只简述
+        - important 覆盖范围内文件，对 important_paths 写深，其余简述
+        - lightweight 代码证据轻量，但领域、流程、契约和投影仍写深
+        - 将选择保存为 detail_level，将 important 选择保存为 important_paths，并在后续 update 中沿用
         - 写完文件表后跑 coverage；important/complete 的 missing 必须清空
       must_not:
         - 把 important 的核心方法只写成一句话职责
-        - 漏列工具方法
+        - 把 symbols 候选当作方法全集证明
+        - 因路径在 important_paths 就自动建立 notes/
         - 为测试方法写完整逻辑
         - 为每个文件建立独立规格页
 
@@ -208,7 +229,8 @@ cases:
     given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个；或 detail_level≠complete 的仓
     expect:
       must:
-        - 先问范围；建议切片入口或一次 ≤15 个文件
+        - 先问范围并建议切片入口
+        - 默认按约 15 个文件一批；更大具体范围需用户明确确认并说明成本
         - detail_level=complete 必须按 modes.md 5 类触发条件清单枚举 ≥5 篇 notes/
       must_not:
         - 未同意就批量建 notes/（detail=complete 不在此限）
@@ -271,13 +293,13 @@ cases:
   - id: reject-per-file-catalog-request
     kind: failure
     judge: deterministic
-    description: 用户要每个文件一页时说明新模型，不铺全库
-    given: 用户点名每个文件一页、给每个源文件写详页
+    description: 用户要逐文件详注时说明默认模型并确认具体范围与成本
+    given: 用户点名每个文件一页、给选定范围源文件写详页
     expect:
       must:
-        - 说明文件不是阅读单位，改问热点范围或 detailed 加深
+        - 说明模块 README 是默认阅读单位，确认具体范围、预计页数和维护成本
       must_not:
-        - 为全库每个代码文件建 files/ 或 notes/
+        - 把模糊请求直接扩成全库 files/ 或 notes/
 
   - id: skip-third-party-and-foreign-repos
     kind: boundary
@@ -287,10 +309,12 @@ cases:
     expect:
       must:
         - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
+        - inventory / diff / route / symbols 忽略 .gitignore 命中的路径与非文本文件
         - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
         - 邻接系统只在 context/ 记边界；包名与约束只在 build/ 点到为止
       must_not:
         - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
+        - 为 .gitignore 命中的路径或二进制资源建模块、文件表行或 notes/
         - 把 unmapped 的三方/外来路径并入本工程模块
         - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写金字塔
 
@@ -317,16 +341,17 @@ cases:
       must_not:
         - 覆盖已有目录内容
 
-  - id: one-project-per-session
+  - id: one-active-project
     kind: boundary
     judge: deterministic
-    description: 一次会话只服务一个 target project
-    given: 用户提到多个 project 或中途换源
+    description: 同一时刻只维护一个 active target，批量项目顺序切换
+    given: 用户提到多个 project 或要求批量建镜像
     expect:
       must:
-        - 当前焦点只有一个 spec_root
+        - 每次写入只有一个 active target 和 spec_root
+        - 完成并汇报当前 target 后重新 detect 下一个
       must_not:
-        - 同一轮写入两个 project 的镜像
+        - 在同一个写入步骤混用两个 project 的状态或输出目录
 
   - id: non-git-no-commit-diff
     kind: boundary

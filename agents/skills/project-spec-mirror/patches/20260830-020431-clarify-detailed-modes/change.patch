@@ -1,0 +1,369 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -76,7 +76,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
+ | `status` | 镜像状态 + git 新鲜度 |
+ | `inventory` | 源文件清单（已忽略构建产物、密钥、三方安装树与外来仓） |
+-| `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
++| `symbols` | 从代码文件提取函数/类型/变量候选，供详尽模式核对行为承载符号；不作为完备证明 |
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+ | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+@@ -105,14 +105,14 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 
+ ### build
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`），再对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列；测试文件不逐方法抽取
++1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`）。important 还要明确将写深的源相对路径或前缀；对这些路径及 complete 中的行为代码按需跑 `symbols`，再结合源码核对行为承载符号。候选为空或不完整时如实说明，不声称方法全集完备；测试文件不逐方法抽取
+ 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+ 3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+ 6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+-8. 写完先 `$SPECCTL validate`。Git 源再执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`），有热点则加 `--hotspot`
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明当前模型，改为 `complete` 或热点；要热点详注且未给路径时先问。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
++8. 写完先 `$SPECCTL validate`。Git 源再执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`
+ 9. 再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
+ 10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+@@ -127,7 +127,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 
+ ### maintain
+ 
+-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
++用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表；命中 `important_paths` 时写深模块页，但不会自动建立 `notes/`。只有用户明确要热点详注或该路径已在 `hotspots` 时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+ 
+ ### status
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -76,6 +76,7 @@
+   "mode": "concise",
+   "detail_level": null,
+   "scope": [],
++  "important_paths": [],
+   "hotspots": [],
+   "build_status": "skeleton",
+   "built_at": null,
+@@ -90,6 +91,7 @@
+ - `mode`：`concise` | `detailed`。concise 时 `detail_level` 必须为 `null`
+ - `detail_level`：仅 detailed 使用，取 `complete` | `important` | `lightweight`
+ - `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
++- `important_paths`：仅 `detailed + important` 使用；明确哪些源相对路径或前缀在模块页写深。缺字段的旧镜像视为尚未记录，下一次完成 update 时必须补齐
+ - `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。只通过 `set-sync --hotspot` 写回；模块 README「热点」表给人读
+ - `build_status`：`skeleton` | `built`，独立于是否存在 Git commit；旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton
+ - `built_at`：最近一次完成 build/update 的时间
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -1,8 +1,10 @@
+ # 简约与详尽
+ 
+-`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。合法组合只有 `concise + null`，或 `detailed + complete|important|lightweight`。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
++`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。合法组合只有 `concise + null`，或 `detailed + complete|important|lightweight`。`important_paths` 只在 important 下生效，保存写深范围。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
+ 
+-**触发：** 用户点名「详尽 / 每个函数 / 每个变量」→ `detailed`，并让用户选择文件整理粒度：`complete`、`important`（默认）或 `lightweight`。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
++**触发：** 用户点名「详尽」→ `detailed`，并选择 `complete`、`important`（默认）或 `lightweight`。用户点名「每个函数 / 每个变量」时先确认真正目标：如果要理解公开 API、领域行为或状态变化，选择 detailed；如果要机械列出全部局部变量或语法节点，说明那不是 spec 镜像目标，不承诺用 `symbols` 完成。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
++
++三档控制的是代码证据密度；detailed 的领域、处理线、契约和恢复投影都会比 concise 更深入。
+ 
+ 文件有三种角色，详见 [routing.md](routing.md)：清单行、路由键、证据路径。第四种——`modules/<module>/notes/` 热点详注——仅 opt-in。
+@@ -32,12 +34,12 @@
+ 
+ 详尽模式先选择文件整理粒度；三档都加深金字塔和切面，但决定模块文件表如何覆盖源文件：
+ 
+-| `detail_level` | 文件处理 |
+-|----------------|----------|
+-| `complete` | 完整整理所有源文件与其中方法；简单文件可以合并登记，但不得遗漏任何文件。**测试方法只简述**，不梳理用例逻辑 |
+-| `important`（默认） | 范围内文件都要出现，**不得整份省略**：重要文件整理，其余写文件级简述。整理时：**核心方法写完整逻辑，其余方法不得漏列、可简述**；测试方法只简述 |
+-| `lightweight` | 沿用当前轻量模式：模块文件表保留必要清单，详尽主要加深模块、实体、处理线、契约和投影，不为普通文件增加详注 |
++| `detail_level` | 可验证的文件处理 |
++|----------------|------------------|
++| `complete` | inventory 中每个文件都要有模块归属与说明；代码文件深入公开入口和行为承载符号，补参数、返回、关键分支与副作用。测试、生成代码和纯胶水保持文件级简述 |
++| `important`（默认） | 范围内文件都要出现，**不得整份省略**；`important_paths` 命中的文件或前缀写深行为承载符号，其余文件简述。测试只写覆盖意图 |
++| `lightweight` | 代码层只保留入口、领域规则、状态转换、持久化和协议等必要证据；普通文件可省略。领域、流程、契约和投影仍按 detailed 写深 |
+ 
+-三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
++三档均不是“一文件一页”。`complete` 与 `important` 的文件覆盖以 inventory 为准，职责相同的简单文件可以按明确目录范围合并登记；`lightweight` 只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
+ 
+ 在简约之上**加深同一批页**，不复制一棵源文件树：
+@@ -53,21 +55,21 @@
+ 
+ 实现要点写「怎么做」和「为什么这样」，不要贴大段源码。需要证据时引用符号名和相对路径。
+ 
+-`symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列。不要对全 inventory 或测试文件逐方法抽取。
++`symbols` 只提供候选，不是语言级完备索引。Agent 必须结合源码、路由、测试和调用关系识别行为承载符号并写人话，禁止把 AST/正则结果原样倒进 Markdown，也禁止仅凭候选数量声称“全部方法已覆盖”。不要对全 inventory 或测试文件机械逐方法抽取。
+ 
+ ### 方法怎么写（important / complete）
+ 
+-单位是方法，不是文件。concise 仍可只列核心符号、省略辅助方法；详尽的 `important` / `complete` 按下表：
++单位是行为，不是语法节点。concise 仍可只列核心符号；important 的选定路径与 complete 的行为代码按下表：
+ 
+ | 种类 | 写什么 | 适用 |
+ |------|--------|------|
+ | 核心方法 | **完整逻辑**：有序步骤、关键分支、成功/失败如何结束、副作用。不是一句话职责，也不是贴源码 | important 与 complete |
+-| 工具/辅助方法 | 一句话简述，**必须列名** | important 与 complete |
++| 影响行为的辅助方法 | 当它改变分支、协议、状态或副作用时列名并简述；纯 getter/setter/格式化可由所属核心逻辑概括 | important 与 complete |
+ | 测试方法 | 只简述（覆盖什么即可）。不要写每个 `Test*` 的步骤或断言 | important 与 complete |
+ 
+ - 核心方法：对外入口、领域不变式、处理线必经、协议编解码、状态转换。
+-- 工具方法：构造函数、setter、纯校验、格式化、简单 getter、胶水。
++- 辅助方法是否单列取决于行为价值，不以 public/private 或提取器是否命中作为唯一标准。
+ - 测试方法：`Test*` / `Benchmark*` / `Example*`、表驱动用例、测试辅助。测试文件在文件表一行简述即可；若列方法也只写一句覆盖范围。
+@@ -107,18 +109,17 @@
+   2. 写入产品标识 `appId`
+   3. 序列化为 JSON 字节；缺字段则返回错误，不发请求
+ 
+-### 简述（工具方法，不得漏列）
++### 简述（影响行为的辅助方法）
+ 
+ - `NewService` — 构造客户端
+ - `SetEndpoint` — 覆盖请求地址
+ - `CheckInput` — 校验必填字段是否齐全
+ - `OutPut.GetTaskIds` — 返回命中的任务 ID 列表
+ - `OutPut.GetStatus` — `code == 0` 为成功
+ ```
+ 
+-「整理」一个文件 = 文件表一行 + 列出该文件全部方法：核心方法写完整逻辑，工具方法一句话。
++「整理」一个文件 = 文件表一行 + 写清行为承载方法：核心方法写完整逻辑，影响行为的辅助方法简述；纯机械辅助可由核心逻辑概括。
+ 「简述」一个文件 = 文件表一行，不要求抽方法。测试文件无论 important / complete 都按文件简述（或方法一句话），不写完整逻辑。
+ 不要把源码常量赋值整段贴进职责列。`AppKey` / `SecretKey` / AccessKey / token / password 等凭据字面量必须 `<REDACTED>`；可以写字段名与注入方式。
+@@ -126,10 +127,15 @@
+ `detail_level` 通过 `$SPECCTL init --mode detailed --detail-level ...` 或 `$SPECCTL set-sync --mode detailed --detail-level ...` 保存；旧镜像若是 detailed 且缺少该字段，按 `important` 解释。`mode=concise` 时该字段固定为 `null`，传 `--detail-level` 属于错误。
+ 
+ - `scope`：知识覆盖的源路径前缀；空表示全库（仍走 inventory 忽略规则）。与是否建 `notes/` 无关。
++- `important_paths`：important 中写深的源相对路径或目录前缀；通过重复的 `$SPECCTL set-sync --important-path <path>` 整表写回。完成 important build/update 前必须明确，后续 update 沿用
+ - 简约默认全库。详尽应对 `scope` 或 `inventory --path` 收窄要写深的模块，而不是「详页文件清单」。
+ - `inventory.file_count` 只作状态展示，**不**再作为是否生成叶子页的开关。
+ - `set-sync --mode` 与实际写成的粒度必须一致；完成 build/update 时同时传 `--built`，CLI 会先校验骨架再推进状态。
+ 
++`important_paths` 与 `hotspots` 相互独立：前者决定模块 README 哪些代码证据写深，后者才允许建立 `notes/`。路径命中 important 不会自动创建详注页。
++
++旧镜像处于 `detailed + important` 且缺少 `important_paths` 时可以读取；下一次完成 update 时必须让用户确认并写回，不能继续靠 Agent 临时猜测。
++
+ ### 热点 `notes/`（opt-in）
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -870,6 +870,7 @@ def create_skeleton(
+         "mode": mode,
+         "detail_level": detail_level,
+         "scope": [],
++        "important_paths": [],
+         "hotspots": [],
+         "build_status": "skeleton",
+         "built_at": None,
+@@ -1574,6 +1575,18 @@ def readme_metadata(text: str) -> dict[str, str]:
+     return result
+ 
+ 
++def normalize_source_paths(values: list[str], label: str) -> list[str]:
++    normalized: list[str] = []
++    for value in values:
++        rel = str(value).strip().replace("\\", "/").lstrip("./")
++        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
++            raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
++        if rel not in normalized:
++            normalized.append(rel)
++    return normalized
++
++
+ def validation_issues(
+     spec_root: Path,
+     state: dict[str, Any],
+@@ -1597,6 +1610,17 @@ def validation_issues(
+     explicit_build_status = state.get("build_status")
+     if explicit_build_status is not None and explicit_build_status not in {"skeleton", "built"}:
+         issues.append(f"invalid build_status {explicit_build_status!r}")
++    important_paths = state.get("important_paths", [])
++    if important_paths is None:
++        important_paths = []
++    if not isinstance(important_paths, list) or any(
++        not isinstance(item, str) for item in important_paths
++    ):
++        issues.append("important_paths must be a list of strings")
++    elif mode != "detailed" or detail_level != "important":
++        if important_paths:
++            issues.append("important_paths require detailed + important")
+     hotspots = state.get("hotspots", [])
+     if hotspots is None:
+         hotspots = []
+@@ -1634,10 +1658,28 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
+                 reason="invalid_mode_combination",
+             )
+         state["detail_level"] = None
++        state["important_paths"] = []
+     elif mode == "detailed":
+         state["detail_level"] = args.detail_level or state.get("detail_level") or "important"
++        if state["detail_level"] != "important":
++            if args.important_path is not None:
++                raise SpecError(
++                    "--important-path requires --detail-level important",
++                    reason="invalid_mode_combination",
++                )
++            state["important_paths"] = []
+     if args.branch:
+         state["branch"] = args.branch
+     if args.scope is not None:
+         state["scope"] = list(args.scope)
++    if args.important_path is not None:
++        state["important_paths"] = normalize_source_paths(
++            list(args.important_path), "important"
++        )
++    elif "important_paths" not in state:
++        state["important_paths"] = []
++    if (
++        args.built
++        and mode == "detailed"
++        and state.get("detail_level") == "important"
++        and not state.get("important_paths")
++    ):
++        raise SpecError(
++            "detailed important build requires --important-path",
++            reason="important_paths_required",
++        )
+     if args.hotspot is not None:
+         seen: list[str] = []
+         for item in args.hotspot:
+@@ -1725,6 +1767,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
+         "mode": mode,
+         "detail_level": detail_level,
+         "build_status": effective_build_status(state),
++        "important_paths": state.get("important_paths", []),
+     }
+     return emit(
+         payload,
+@@ -1807,6 +1850,12 @@ def build_parser() -> argparse.ArgumentParser:
+     set_sync.add_argument("--commit", default=None)
+     set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
+     set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
++    set_sync.add_argument(
++        "--important-path",
++        action="append",
++        default=None,
++        help="important 模式写深的源相对路径或前缀，可重复；整表写回",
++    )
+     set_sync.add_argument("--scope", action="append", default=None)
+     set_sync.add_argument(
+         "--hotspot",
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -173,15 +173,16 @@ cases:
+     given: mode=detailed，开始 build 或从 concise 升级
+     expect:
+       must:
+-        - 加深模块 README 核心符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
++        - 加深模块 README 的行为承载符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
+         - 模块阅读叶子是 README 文件表
+         - 测试方法只简述，complete 亦然
++        - symbols 只作候选，不声称能证明全部方法或变量完整覆盖
+       must_not:
+         - 为范围内每个代码文件建 files/ 或 notes/
+         - 把路径中的 / 拍成 __ 作为页名
+ 
+   - id: detailed-file-granularity-choice
+     kind: core
+     judge: deterministic
+-    description: 详尽模式选择文件整理粒度，默认重要文件模式
++    description: 详尽模式选择代码证据粒度，并持久化 important 写深范围
+     given: mode=detailed，开始 build 或从 concise 升级
+     expect:
+       must:
+@@ -189,15 +190,17 @@ cases:
+         - 提供 complete、important、lightweight 三个选项
+         - 未指定时使用 important
+-        - complete 整理所有源文件，简单文件可合并登记；测试方法只简述
+-        - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
+-        - lightweight 沿用当前轻量模式
+-        - 将选择保存为 detail_level，并在后续 update 中沿用
++        - complete 覆盖 inventory 全部文件并深入行为承载符号；测试和纯机械文件只简述
++        - important 覆盖范围内文件，对 important_paths 写深，其余简述
++        - lightweight 代码证据轻量，但领域、流程、契约和投影仍写深
++        - 将选择保存为 detail_level，将 important 选择保存为 important_paths，并在后续 update 中沿用
+       must_not:
+         - 把 important 的核心方法只写成一句话职责
+-        - 漏列工具方法
++        - 把 symbols 候选当作方法全集证明
++        - 因路径在 important_paths 就自动建立 notes/
+         - 为测试方法写完整逻辑
+         - 为每个文件建立独立规格页
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -61,13 +61,15 @@ class ContractTest(unittest.TestCase):
+         self.assertNotIn("只能忽略无业务含义文件", skill)
+ 
+-    def test_important_methods_full_logic(self) -> None:
++    def test_important_behavior_is_deep_but_not_fake_complete(self) -> None:
+         modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+         self.assertIn("完整逻辑", modes)
+-        self.assertIn("不得漏列", modes)
++        self.assertIn("important_paths", modes)
++        self.assertIn("不是语言级完备索引", modes)
+         self.assertIn("测试方法只简述", modes)
+         self.assertIn("完整逻辑", skill)
+-        self.assertIn("测试方法只简述", skill)
++        self.assertIn("不作为完备证明", skill)
++        self.assertNotIn("用返回名单核对方法不得漏列", skill)
+ 
+     def test_secret_literals_must_redact(self) -> None:
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -237,6 +237,7 @@ class InitTest(unittest.TestCase):
+             self.assertEqual(state["mode"], "concise")
+             self.assertIsNone(state["detail_level"])
+             self.assertEqual(state.get("hotspots"), [])
++            self.assertEqual(state.get("important_paths"), [])
+             self.assertEqual(state["build_status"], "skeleton")
+             self.assertIsNone(state["built_at"])
+             self.assertIsNone(state["synced_commit"])
+@@ -386,6 +387,42 @@ class GitAndSyncTest(unittest.TestCase):
+             self.assertEqual(state["build_status"], "skeleton")
+             self.assertIsNone(state["synced_commit"])
+ 
++    def test_important_paths_required_and_persisted(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(
++                run(
++                    "init",
++                    "--cwd",
++                    str(root),
++                    "--mode",
++                    "detailed",
++                    "--confirm",
++                )[0],
++                0,
++            )
++            sha = git(root, "rev-parse", "HEAD").stdout.strip()
++            code, payload = run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", sha
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["reason"], "important_paths_required")
++
++            code, payload = run(
++                "set-sync",
++                "--cwd",
++                str(root),
++                "--built",
++                "--commit",
++                sha,
++                "--important-path",
++                "internal/order.go",
++            )
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(
++                payload["state"]["important_paths"], ["internal/order.go"]
++            )
++            self.assertEqual(run("validate", "--cwd", str(root))[0], 0)
++
+     def test_inventory_skips_secrets_and_vendor(self) -> None:
+         import tempfile

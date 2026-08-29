@@ -2,18 +2,18 @@
 id: project-spec-mirror
 name: project-spec-mirror
 description: >-
-  为项目维护给人读的 spec 孪生目录：金字塔、恢复投影（上下文/数据/表面/运行时/构建）、
-  工程切面（来源/契约/切片/验证/流量）、简约/详尽模式及详尽下的文件整理粒度，并用 git commit 做增量更新。
-  图表委托 archify。验收是只凭镜像能重建可运行系统。在用户要求创建或更新 project spec
-  镜像、spec 孪生、可读规格目录、工程切面，或点名 project-spec-mirror 时使用。
-  不要用于 OpenSpec change、实现代码或只读问答。
+  创建或增量维护给人读的 project spec 镜像，包含金字塔、适用的恢复投影与工程切面，
+  支持 concise/detailed 及代码证据粒度；Git 源按 commit 更新，非 Git 源按 coverage 对照文件表。
+  在用户要求 project spec 镜像、spec 孪生、可读规格目录、工程切面或恢复项目运行知识时使用。
+  不用于 OpenSpec change、实现代码或只读问答；用户要求图表时委托 archify。
+compatibility: Requires Python 3.10+; Git is required for commit-diff updates. Requested diagrams additionally require Node.js and an installed archify skill.
 ---
 
 # Project Spec Mirror
 
 面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
 
-为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收档 C：只凭镜像能重建可运行系统。需要结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
+为目标 project 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收目标：只凭镜像能重建该项目**实际具备**的可运行能力；不适用能力要有证据地标明。用户明确要求结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
 
 ```bash
 SPECCTL=$(command -v specctl || echo "python3 <this-skill>/scripts/specctl.py")
@@ -28,9 +28,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 - 不修改目标 project 的源码、测试、构建或依赖。
 - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
 - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
-- 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
-- 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；notes/ 的命名是 topic（易踩坑的概念），不是源相对路径。已落地的源文件级 notes/ 路径（`notes/<source-rel>.md`）继续受 [modes.md](references/modes.md) 的热点清单约束，与 topic 命名并列存在。
+- 默认不把每个源文件做成规格页；文件主要作为清单行、路由键和证据路径。
+- 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；topic notes（易踩坑的概念）与源文件级 `notes/<source-rel>.md` 并列。后者仅热点清单约束；前者在 `detail_level=complete` 下必建，其余模式仅用户明确接受维护成本后才建，不把它误称为默认 detailed 行为。
 - 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+- 只梳理文本文件；跳过 `.gitignore` 当前忽略的路径、已知二进制扩展和内容检测为二进制的文件。inventory、diff、route 与 symbols 使用同一边界。
   - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
   - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
   - 不要为三方或外来仓建模块、文件表行、`notes/`、概念或切片。需要给那个仓做镜像时，另开一次会话并显式 `--source`。
@@ -57,7 +58,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ## 阶段
 
-未点名阶段时按现状推断，并用一行说明：无镜像 → `init`；已 init 未同步 → `build`；已有 `synced_commit` → `update`；只改某一词条 → `maintain`。
+未点名阶段时按现状推断，并用一行说明：无镜像 → `init`；`build_status=skeleton` → `build`；`build_status=built` → `update`；只改某一词条 → `maintain`。旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton。
 
 | 阶段 | 做什么 | 先读 |
 |------|--------|------|
@@ -67,7 +68,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `maintain` | 改概念/实体/流/模块/切面/图/恢复投影中的指定条目 | 对应 reference |
 | `status` | 只读同步状态 | 本文件 |
 
-一次会话只服务**一个** target project。
+同一时刻只维护**一个 active target** 和一个 `spec_root`。用户要求批量项目时可顺序处理：完成并汇报当前 target 后重新 `detect` 下一个；禁止在一次写入步骤中混用两个项目的状态或输出目录。
 
 ## specctl
 
@@ -77,12 +78,12 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
 | `status` | 镜像状态 + git 新鲜度 |
 | `inventory` | 源文件清单（已忽略构建产物、密钥、三方安装树与外来仓） |
-| `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
+| `symbols` | 从代码文件提取函数/类型/变量候选，供详尽模式核对行为承载符号；不作为完备证明 |
 | `git-info` | 是否 git、默认分支、指定分支的 commit |
 | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
 | `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
 | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
-| `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
+| `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / scope / hotspots / 时间，并同步 README 状态表 |
 | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
 
 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
@@ -92,7 +93,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 1. 任何写入阶段都先 `detect`（或 `status`）。不要手建目录绕过 `init`。
 2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
-4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 对照文件表并说明限制。
+4. 非 git 源：仍可 init/build/maintain；完成 build 后用 `set-sync --built` 写 `build_status=built`，不得伪造 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 对照文件表并说明限制。
 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
 6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
 7. 核对模块文件表覆盖必须跑 `$SPECCTL coverage`，不要手对 `inventory`。只要求代码文件（`CODE_EXTS`）出现在「文件」表；配置/CI/compose 等走恢复投影。`detailed` 且 `important`/`complete` 时 `enforce` 为真，`missing` 必须清空才能 `set-sync`。concise / lightweight 把 `missing` 当提示。文件表可用精确路径或目录范围。
@@ -108,17 +109,15 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ### build
 
-1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`），再对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列；测试文件不逐方法抽取
+1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`）。important 还要明确将写深的源相对路径或前缀；对这些路径及 complete 中的行为代码按需跑 `symbols`，再结合源码核对行为承载符号。候选为空或不完整时如实说明，不声称方法全集完备；测试文件不逐方法抽取
 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
-3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
+3. 识别项目实际能力并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。适用层写到可恢复；不适用层保留 INDEX 并写判断证据。结束前做恢复完备自检
 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
-5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
-6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。**build 前先 grep 同 group 已镜像仓的 `modules/*/notes/` 主题列表做参考**（不复制内容，仅对齐主题维度）。`detail_level=complete` 下 `notes/` 不是 opt-in，见 8.5
-
-8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径。
-
-9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+5. 识别并维护适用的工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 至少写现有测试/性质；完全没有部署或流量切换能力时，TRAFFIC 写 `不适用` 与证据，不编发布方案
+6. 用户明确要求图表时，按 [diagrams.md](references/diagrams.md) 在本轮调用 `archify` 交付 HTML。Agent 主动识别出的候选先判断是否比表格显著增益；低价值候选直接省略，高成本候选先征求用户，不因候选未画自动阻塞 build
+7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要源文件级热点详注且未给路径：先问（建议切片入口或分批），未同意不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。**build 前先 grep 同 group 已镜像仓的 `modules/*/notes/` 主题列表做参考**（不复制内容，仅对齐主题维度）。`detail_level=complete` 下 topic `notes/` 不是 opt-in，见下一步
+8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
 10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
 
 ### update
@@ -129,11 +128,11 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
-7. 改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再 `set-sync` + `validate`，changelog 追加本轮摘要
+7. changelog 追加本轮摘要；改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再先 `validate`，再按 build 的 Git / 非 Git 规则执行 `set-sync --built`，最后再次 `validate`
 
 ### maintain
 
-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表，再跑 `$SPECCTL coverage`；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表，再跑 `$SPECCTL coverage`；命中 `important_paths` 时写深模块页，但不会自动建立 `notes/`。只有用户明确要热点详注或该路径已在 `hotspots` 时才建或改源文件级 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
 
 ### status
 
@@ -151,90 +150,12 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 - 变更：<改了哪些层>
 ```
 
----
+## 质量检查
 
-## Self-evolution
+完成镜像任务前：
 
-本 Skill 具备经验积累、评估与持续进化能力。目录（均相对本 Skill 根目录）：
+1. 读取 [evals/README.md](evals/README.md)，选择与本次阶段和模式相关的 `evals/cases.yaml` 条目核对。
+2. 运行 `specctl validate`；修改了本 Skill 代码时再运行 `python3 -m unittest discover -s agents/skills/project-spec-mirror/tests`。
+3. Eval 或测试失败时修正镜像输出，不带着失败声称完成。
 
-```text
-agents/skills/project-spec-mirror/
-├── SKILL.md
-├── examples/      # 经过验证的优秀执行案例
-├── evals/         # 可验证成功标准
-└── experience/    # 真实失败 / 成功 / 规律
-```
-
-不要为了自进化而破坏上文已规定的目标、流程、工具用法、输出与约束。
-
-### Examples
-
-执行复杂任务前：
-
-1. 检查 `examples/`
-2. 找到与当前任务相关的成功案例
-3. 优先复用已经验证的方法
-
-没有相关案例时按上文正常执行，不要编造案例。
-
-### Evaluation
-
-任务完成前：
-
-1. 检查相关 `evals/`
-2. 验证关键输出
-3. 检查是否违反 Skill 约束
-4. 尽可能运行相关 Eval Cases（见 `evals/cases.yaml`）
-
-优先确定性 Eval；无法确定性判断时再用 LLM Judge。Eval 失败则先修输出，不要带着失败交卷。
-
-### Experience
-
-任务完成后，出现以下情况才写入 `experience/`：
-
-- 失败
-- 用户纠正
-- 明显成功
-- 新的有效执行方法
-- 可复用的经验
-
-不要记录 trivial information。不要伪造条目。密钥、内部 URL、凭据不得写入。
-
-单次失败 → `experience/failures/`。重复出现的规律 → `experience/patterns/`（至少两次同类证据）。
-
-### Evolution
-
-只有当 Experience 暴露出**可复用、稳定的问题或模式**时，才考虑修改本 Skill。
-
-遵循：
-
-```text
-Experience
-    ↓
-Repeated Pattern
-    ↓
-Improvement Proposal
-    ↓
-Eval
-    ↓
-Pass
-    ↓
-Update Skill
-```
-
-禁止：
-
-```text
-Single Failure
-    ↓
-Directly modify SKILL.md
-```
-
-进入 Skill 正文的 Experience 必须同时满足：可复用于多个类似任务、有足够证据、能明确改善结果、不破坏已有能力、可通过 Eval 验证。一次性特殊情况只留 Experience，不改 Skill。
-
-实际更新生产 `SKILL.md` 时：
-
-1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
-2. 若改动来自**真实执行经验**：优先委托 `skill-evolver`（`evolutions/` → 验证 → 晋升），不要本 Skill 自己改生产稿。
-3. 若只是结构/规则的显式修订且环境有 `skill-upgrader`：走其 `update` 模式（`agents/skills/project-spec-mirror/patches/`），仍须先提案再应用。
-4. 未展示 Proposal 并获得用户确认前，不改生产 Skill。
+`examples/`、`evals/` 与 `experience/` 是 Skill 维护资产。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。

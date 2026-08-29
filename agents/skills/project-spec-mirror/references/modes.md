@@ -1,8 +1,10 @@
 # 简约与详尽
 
-`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
+`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。合法组合只有 `concise + null`，或 `detailed + complete|important|lightweight`。`important_paths` 只在 important 下生效，保存写深范围。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
 
-**触发：** 用户点名「详尽 / 每个函数 / 每个变量」→ `detailed`，并让用户选择文件整理粒度：`complete`、`important`（默认）或 `lightweight`。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
+**触发：** 用户点名「详尽」→ `detailed`，并选择 `complete`、`important`（默认）或 `lightweight`。用户点名「每个函数 / 每个变量」时先确认真正目标：如果要理解公开 API、领域行为或状态变化，选择 detailed；如果要机械列出全部局部变量或语法节点，说明那不是 spec 镜像目标，不承诺用 `symbols` 完成。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
+
+三档控制的是代码证据密度；detailed 的领域、处理线、契约和恢复投影都会比 concise 更深入。
 
 文件有三种角色，详见 [routing.md](routing.md)：清单行、路由键、证据路径。第四种——`modules/<module>/notes/` 热点详注——仅 opt-in。
 
@@ -32,13 +34,13 @@
 
 详尽模式先选择文件整理粒度；三档都加深金字塔和切面，但决定模块文件表如何覆盖源文件：
 
-| `detail_level` | 文件处理 |
-|----------------|----------|
-| `complete` | 完整整理所有源文件与其中方法；简单文件可以合并登记，但不得遗漏任何文件。**测试方法只简述**，不梳理用例逻辑 |
-| `important`（默认） | 范围内文件都要出现，**不得整份省略**：重要文件整理，其余写文件级简述。整理时：**核心方法写完整逻辑，其余方法不得漏列、可简述**；测试方法只简述 |
-| `lightweight` | 沿用当前轻量模式：模块文件表保留必要清单，详尽主要加深模块、实体、处理线、契约和投影，不为普通文件增加详注 |
+| `detail_level` | 可验证的文件处理 |
+|----------------|------------------|
+| `complete` | inventory 中每个文件都要有模块归属与说明；代码文件深入公开入口和行为承载符号，补参数、返回、关键分支与副作用。测试、生成代码和纯胶水保持文件级简述 |
+| `important`（默认） | 范围内文件都要出现，**不得整份省略**；`important_paths` 命中的文件或前缀写深行为承载符号，其余文件简述。测试只写覆盖意图 |
+| `lightweight` | 代码层只保留入口、领域规则、状态转换、持久化和协议等必要证据；普通文件可省略。领域、流程、契约和投影仍按 detailed 写深 |
 
-三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
+三档均不是“一文件一页”。`complete` 与 `important` 的文件覆盖以 inventory 为准，职责相同的简单文件可以按明确目录范围合并登记；`lightweight` 只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
 
 写完文件表后跑 `$SPECCTL coverage`，不要手对 `inventory`。`missing` 只针对范围内代码文件；目录范围行可以覆盖其子路径。`enforce` 为真时必须清掉 `missing`。
 
@@ -67,20 +69,20 @@ notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequen
 
 
 
-`symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列。不要对全 inventory 或测试文件逐方法抽取。
+`symbols` 只提供候选，不是语言级完备索引。Agent 必须结合源码、路由、测试和调用关系识别行为承载符号并写人话，禁止把 AST/正则结果原样倒进 Markdown，也禁止仅凭候选数量声称“全部方法已覆盖”。不要对全 inventory 或测试文件机械逐方法抽取。
 
 ### 方法怎么写（important / complete）
 
-单位是方法，不是文件。concise 仍可只列核心符号、省略辅助方法；详尽的 `important` / `complete` 按下表：
+单位是行为，不是语法节点。concise 仍可只列核心符号；important 的选定路径与 complete 的行为代码按下表：
 
 | 种类 | 写什么 | 适用 |
 |------|--------|------|
 | 核心方法 | **完整逻辑**：有序步骤、关键分支、成功/失败如何结束、副作用。不是一句话职责，也不是贴源码 | important 与 complete |
-| 工具/辅助方法 | 一句话简述，**必须列名** | important 与 complete |
+| 影响行为的辅助方法 | 当它改变分支、协议、状态或副作用时列名并简述；纯 getter/setter/格式化可由所属核心逻辑概括 | important 与 complete |
 | 测试方法 | 只简述（覆盖什么即可）。不要写每个 `Test*` 的步骤或断言 | important 与 complete |
 
 - 核心方法：对外入口、领域不变式、处理线必经、协议编解码、状态转换。
-- 工具方法：构造函数、setter、纯校验、格式化、简单 getter、胶水。
+- 辅助方法是否单列取决于行为价值，不以 public/private 或提取器是否命中作为唯一标准。
 - 测试方法：`Test*` / `Benchmark*` / `Example*`、表驱动用例、测试辅助。测试文件在文件表一行简述即可；若列方法也只写一句覆盖范围。
 
 ### important 模块页（最低密度）
@@ -121,7 +123,7 @@ notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequen
   2. 写入产品标识 `appId`
   3. 序列化为 JSON 字节；缺字段则返回错误，不发请求
 
-### 简述（工具方法，不得漏列）
+### 简述（影响行为的辅助方法）
 
 - `NewService` — 构造客户端
 - `SetEndpoint` — 覆盖请求地址
@@ -130,18 +132,23 @@ notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequen
 - `OutPut.GetStatus` — `code == 0` 为成功
 ```
 
-「整理」一个文件 = 文件表一行 + 列出该文件全部方法：核心方法写完整逻辑，工具方法一句话。
+「整理」一个文件 = 文件表一行 + 写清行为承载方法：核心方法写完整逻辑，影响行为的辅助方法简述；纯机械辅助可由核心逻辑概括。
 「简述」一个文件 = 文件表一行，不要求抽方法。测试文件无论 important / complete 都按文件简述（或方法一句话），不写完整逻辑。
 不要把源码常量赋值整段贴进职责列。`AppKey` / `SecretKey` / AccessKey / token / password 等凭据字面量必须 `<REDACTED>`；可以写字段名与注入方式。
 
 ## 范围与热点
 
-`detail_level` 通过 `$SPECCTL init --detail-level ...` 或 `$SPECCTL set-sync --detail-level ...` 保存；旧镜像缺少该字段时按 `important` 解释。`mode=concise` 时该字段不改变简约模式的行为。
+`detail_level` 通过 `$SPECCTL init --mode detailed --detail-level ...` 或 `$SPECCTL set-sync --mode detailed --detail-level ...` 保存；旧镜像若是 detailed 且缺少该字段，按 `important` 解释。`mode=concise` 时该字段固定为 `null`，传 `--detail-level` 属于错误。
 
 - `scope`：知识覆盖的源路径前缀；空表示全库（仍走 inventory 忽略规则）。与是否建 `notes/` 无关。
+- `important_paths`：important 中写深的源相对路径或目录前缀；通过重复的 `$SPECCTL set-sync --important-path <path>` 整表写回。完成 important build/update 前必须明确，后续 update 沿用
 - 简约默认全库。详尽应对 `scope` 或 `inventory --path` 收窄要写深的模块，而不是「详页文件清单」。
 - `inventory.file_count` 只作状态展示，**不**再作为是否生成叶子页的开关。
-- `set-sync --mode` 与实际写成的粒度必须一致。
+- `set-sync --mode` 与实际写成的粒度必须一致；完成 build/update 时同时传 `--built`，CLI 会先校验骨架再推进状态。
+
+`important_paths` 与 `hotspots` 相互独立：前者决定模块 README 哪些代码证据写深，后者才允许建立 `notes/`。路径命中 important 不会自动创建详注页。
+
+旧镜像处于 `detailed + important` 且缺少 `important_paths` 时可以读取；下一次完成 update 时必须让用户确认并写回，不能继续靠 Agent 临时猜测。
 
 ### 热点 `notes/`（opt-in）
 
@@ -155,7 +162,7 @@ notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequen
 
 **何时不建：** 为了「详尽看起来完整」；inventory 里每一个代码文件；DTO/胶水/生成代码；已有对应实体页的纯结构体文件。
 
-用户要热点详注且未给路径：先问。建议切片入口，或一次 ≤ **15** 个文件。未同意、或候选将超过 15 个，不得批量建 `notes/`。
+用户要热点详注且未给路径时先问，优先建议切片入口。默认每批不超过约 **15** 个文件，便于审阅和回滚；用户明确确认更大的具体范围后可以执行，但先说明预计页数和维护成本。不得把模糊的“详细一点”解释为全库批量 `notes/`。
 
 页内写：真身路径、为何是热点、表里写不下的符号要点、链回模块/实体/处理线/切片。
 

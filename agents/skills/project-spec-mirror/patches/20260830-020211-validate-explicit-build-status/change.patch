@@ -1,0 +1,43 @@
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -1594,9 +1594,10 @@ def validation_issues(
+         issues.append("concise mode requires detail_level null")
+     elif mode == "detailed" and (detail_level or "important") not in DETAIL_LEVELS:
+         issues.append(f"invalid detail_level {detail_level!r}")
+-    build_status = effective_build_status(state)
+-    if build_status not in {"skeleton", "built"}:
+-        issues.append(f"invalid build_status {build_status!r}")
++    explicit_build_status = state.get("build_status")
++    if explicit_build_status is not None and explicit_build_status not in {"skeleton", "built"}:
++        issues.append(f"invalid build_status {explicit_build_status!r}")
+     hotspots = state.get("hotspots", [])
+     if hotspots is None:
+         hotspots = []
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -407,6 +407,22 @@ class ValidateTest(unittest.TestCase):
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["issues"], [])
+ 
++    def test_validate_rejects_explicit_invalid_build_status(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            run("init", "--cwd", str(root), "--confirm")
++            state_path = root / "spec" / ".mirror.json"
++            state = json.loads(state_path.read_text(encoding="utf-8"))
++            state["build_status"] = "unknown"
++            state_path.write_text(
++                json.dumps(state, ensure_ascii=False, indent=2) + "\n",
++                encoding="utf-8",
++            )
++            code, payload = run("validate", "--cwd", str(root))
++            self.assertEqual(code, 1, payload)
++            self.assertIn("invalid build_status 'unknown'", payload["issues"])
++
+     def test_direct_helpers_secret_skip(self) -> None:
+         self.assertTrue(specctl.should_skip_file(".env.local"))
+         self.assertTrue(specctl.should_skip_file("certs/server.pem"))

@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -583,7 +584,81 @@ def looks_binary(path: Path) -> bool:
         chunk = path.read_bytes()[:8192]
     except OSError:
         return True
-    return b"\0" in chunk
+    if b"\0" in chunk:
+        return True
+    if not chunk:
+        return False
+    allowed_controls = {8, 9, 10, 12, 13, 27}
+    controls = sum(
+        1 for byte in chunk if byte < 32 and byte not in allowed_controls
+    )
+    return controls / len(chunk) > 0.05
+
+
+def ignored_paths(source: Path, paths: list[str]) -> frozenset[str]:
+    if not paths:
+        return frozenset()
+    payload = "\0".join(paths) + "\0"
+    root = find_git_root(source)
+    temp: tempfile.TemporaryDirectory[str] | None = None
+    if root is not None:
+        command = ["git", "check-ignore", "--no-index", "-z", "--stdin"]
+        cwd = source
+    else:
+        temp = tempfile.TemporaryDirectory(prefix="specctl-ignore-")
+        git_dir = Path(temp.name) / "repo.git"
+        init = subprocess.run(
+            ["git", "init", "--bare", "-q", str(git_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if init.returncode != 0:
+            temp.cleanup()
+            raise SpecError(
+                f"cannot initialize temporary ignore matcher: {init.stderr.strip()}",
+                reason="gitignore_failed",
+            )
+        command = [
+            "git",
+            f"--git-dir={git_dir}",
+            f"--work-tree={source.resolve()}",
+            "check-ignore",
+            "--no-index",
+            "-z",
+            "--stdin",
+        ]
+        cwd = source
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=cwd,
+            input=payload,
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+        if proc.returncode not in {0, 1}:
+            raise SpecError(
+                f"git check-ignore failed: {proc.stderr.strip()}",
+                reason="gitignore_failed",
+            )
+        return frozenset(
+            item.replace("\\", "/").lstrip("./")
+            for item in proc.stdout.split("\0")
+            if item
+        )
+    finally:
+        if temp is not None:
+            temp.cleanup()
+
+
+def text_path(source: Path, rel: str, *, allow_missing: bool = False) -> bool:
+    path = source / rel
+    if not path.exists():
+        return allow_missing and Path(rel).suffix.lower() not in BINARY_EXTS
+    return path.is_file() and not looks_binary(path)
 
 
 def list_git_files(source: Path) -> list[str]:
@@ -599,10 +674,14 @@ def list_git_files(source: Path) -> list[str]:
         except ValueError:
             prefix = ""
     staged, gitlinks = parse_ls_files_stage(out, prefix)
+    candidates = [
+        rel for rel in staged if not skip_inventory_path(source, rel, gitlinks=gitlinks)
+    ]
+    ignored = ignored_paths(source, candidates)
     return sorted(
         rel
-        for rel in staged
-        if not skip_inventory_path(source, rel, gitlinks=gitlinks)
+        for rel in candidates
+        if rel not in ignored and text_path(source, rel)
     )
 
 
@@ -624,7 +703,12 @@ def walk_files(source: Path) -> list[str]:
             if skip_inventory_path(source, rel):
                 continue
             files.append(rel)
-    return sorted(files)
+    ignored = ignored_paths(source, files)
+    return sorted(
+        rel
+        for rel in files
+        if rel not in ignored and text_path(source, rel)
+    )
 
 
 def inventory_files(source: Path, path_prefix: str | None = None) -> list[str]:
@@ -857,7 +941,7 @@ def create_skeleton(
     source: Path,
     branch: str | None,
     mode: str,
-    detail_level: str,
+    detail_level: str | None,
 ) -> None:
     spec_root.mkdir(parents=True, exist_ok=True)
     source_rel = rel_to(source, spec_root)
@@ -870,7 +954,10 @@ def create_skeleton(
         "mode": mode,
         "detail_level": detail_level,
         "scope": [],
+        "important_paths": [],
         "hotspots": [],
+        "build_status": "skeleton",
+        "built_at": None,
         "synced_commit": None,
         "synced_at": None,
         "updated_at": utc_now(),
@@ -1198,10 +1285,20 @@ def collect_diff_files(
     name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
     files = parse_name_status(name_status)
     gitlinks = list_gitlinks(source)
-    files = [
+    candidates = [
         item
         for item in files
         if not skip_inventory_path(source, item["path"], gitlinks=gitlinks)
+    ]
+    ignored = ignored_paths(
+        source,
+        [item["path"] for item in candidates],
+    )
+    files = [
+        item
+        for item in candidates
+        if item["path"] not in ignored
+        and text_path(source, item["path"], allow_missing=item.get("status") == "D")
     ]
     if path:
         prefix = path.strip().lstrip("./")
@@ -1287,11 +1384,18 @@ def cmd_init(args: argparse.Namespace) -> int:
             summary=f"init: occupied {spec_root}",
         )
     mode = args.mode
-    detail_level = args.detail_level
+    if mode == "concise" and args.detail_level is not None:
+        raise SpecError(
+            "--detail-level is only valid with --mode detailed",
+            reason="invalid_mode_combination",
+        )
+    detail_level = args.detail_level or ("important" if mode == "detailed" else None)
     info = git_info(source, args.branch)
     branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
     if not args.confirm:
-        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode, "--detail-level", detail_level]
+        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
+        if detail_level:
+            confirm_args.extend(["--detail-level", detail_level])
         if args.project:
             confirm_args.extend(["--project", args.project])
         if args.source:
@@ -1357,6 +1461,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     source = resolve_source(spec_root, state)
     branch = args.branch or state.get("branch")
     info = git_info(source, branch)
+    build_status = effective_build_status(state)
     synced = state.get("synced_commit")
     freshness: dict[str, Any] = {"kind": "none"}
     if info.get("is_git") and info.get("commit"):
@@ -1375,12 +1480,18 @@ def cmd_status(args: argparse.Namespace) -> int:
             )
             freshness["is_ancestor"] = proc.returncode == 0
     elif not info.get("is_git"):
-        freshness = {"kind": "non-git", "note": "no commit diff; compare inventory"}
+        freshness = {
+            "kind": "non-git",
+            "in_sync": build_status == "built",
+            "note": "no commit diff; compare inventory",
+        }
     payload = {
         "ok": True,
         "result": "status",
         "spec_root": str(spec_root),
         "state": state,
+        "build_status": build_status,
+        "phase": "update" if build_status == "built" else "build",
         "source": str(source),
         "git": info,
         "freshness": freshness,
@@ -1443,6 +1554,7 @@ def cmd_symbols(args: argparse.Namespace) -> int:
     if not targets:
         raise SpecError("symbols requires one or more --file", reason="usage")
     gitlinks = list_gitlinks(source)
+    ignored = ignored_paths(source, targets)
     files_out: list[dict[str, Any]] = []
     for rel in targets:
         path = (source / rel).resolve()
@@ -1450,9 +1562,19 @@ def cmd_symbols(args: argparse.Namespace) -> int:
             path.relative_to(source.resolve())
         except ValueError as exc:
             raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
+        if rel in ignored:
+            files_out.append(
+                {"path": rel, "skipped": True, "reason": "ignored", "symbols": []}
+            )
+            continue
         if skip_inventory_path(source, rel, gitlinks=gitlinks):
             files_out.append(
                 {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
+            )
+            continue
+        if not text_path(source, rel):
+            files_out.append(
+                {"path": rel, "skipped": True, "reason": "non_text", "symbols": []}
             )
             continue
         if not path.is_file():
@@ -1587,23 +1709,209 @@ def cmd_route(args: argparse.Namespace) -> int:
     return emit(payload, summary=summary)
 
 
+REQUIRED_MIRROR_FILES = (
+    "README.md",
+    "overview.md",
+    "changelog.md",
+    "concepts/INDEX.md",
+    "entities/INDEX.md",
+    "flows/INDEX.md",
+    "modules/INDEX.md",
+    "facets/INDEX.md",
+    "facets/source.md",
+    "facets/contracts/INDEX.md",
+    "facets/slices/INDEX.md",
+    "facets/verify.md",
+    "facets/traffic.md",
+    "context/INDEX.md",
+    "data/INDEX.md",
+    "surface/INDEX.md",
+    "surface/config.md",
+    "runtime/INDEX.md",
+    "build/INDEX.md",
+    "diagrams/INDEX.md",
+)
+
+
+def effective_build_status(state: dict[str, Any]) -> str:
+    value = state.get("build_status")
+    if value in {"skeleton", "built"}:
+        return value
+    return "built" if state.get("synced_commit") else "skeleton"
+
+
+def render_readme_metadata(text: str, state: dict[str, Any]) -> str:
+    mode = state.get("mode")
+    detail = state.get("detail_level") if mode == "detailed" else "不适用"
+    branch = state.get("branch") or "（无）"
+    commit = state.get("synced_commit")
+    commit_text = f"`{commit[:12]}`" if commit else "尚未同步"
+    replacements = {
+        "粒度": str(mode),
+        "文件粒度": str(detail),
+        "分支": str(branch),
+        "同步 commit": commit_text,
+    }
+    lines = text.splitlines()
+    found: set[str] = set()
+    mode_index: int | None = None
+    for index, line in enumerate(lines):
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2 or cells[0] not in replacements:
+            continue
+        key = cells[0]
+        lines[index] = f"| {key} | {replacements[key]} |"
+        found.add(key)
+        if key == "粒度":
+            mode_index = index
+    if "文件粒度" not in found and mode_index is not None:
+        lines.insert(mode_index + 1, f"| 文件粒度 | {replacements['文件粒度']} |")
+    return "\n".join(lines) + "\n"
+
+
+def readme_metadata(text: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) >= 2 and cells[0] in {"粒度", "文件粒度", "分支", "同步 commit"}:
+            result[cells[0]] = cells[1].strip("`")
+    return result
+
+
+def normalize_source_path(value: str, label: str) -> str:
+    raw = str(value).strip().replace("\\", "/")
+    if not raw or raw.startswith("/") or re.match(r"^[A-Za-z]:/", raw):
+        raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
+    while raw.startswith("./"):
+        raw = raw[2:]
+    if not raw or ".." in Path(raw).parts:
+        raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
+    return raw
+
+
+def normalize_source_paths(values: list[str], label: str) -> list[str]:
+    normalized: list[str] = []
+    for value in values:
+        rel = normalize_source_path(value, label)
+        if rel not in normalized:
+            normalized.append(rel)
+    return normalized
+
+
+def validation_issues(
+    spec_root: Path,
+    state: dict[str, Any],
+    *,
+    readme_text: str | None = None,
+) -> list[str]:
+    missing = [rel for rel in REQUIRED_MIRROR_FILES if not (spec_root / rel).is_file()]
+    issues = ["missing: " + ", ".join(missing)] if missing else []
+    for key in ("version", "project", "placement", "source", "mode"):
+        if key not in state:
+            issues.append(f"state missing {key}")
+    mode = state.get("mode")
+    detail_level = state.get("detail_level")
+    if mode not in {"concise", "detailed"}:
+        issues.append(f"invalid mode {mode!r}")
+    elif mode == "concise" and detail_level is not None:
+        issues.append("concise mode requires detail_level null")
+    elif mode == "detailed" and (detail_level or "important") not in DETAIL_LEVELS:
+        issues.append(f"invalid detail_level {detail_level!r}")
+    explicit_build_status = state.get("build_status")
+    if explicit_build_status is not None and explicit_build_status not in {"skeleton", "built"}:
+        issues.append(f"invalid build_status {explicit_build_status!r}")
+    important_paths = state.get("important_paths", [])
+    if important_paths is None:
+        important_paths = []
+    if not isinstance(important_paths, list) or any(
+        not isinstance(item, str) for item in important_paths
+    ):
+        issues.append("important_paths must be a list of strings")
+    else:
+        for item in important_paths:
+            try:
+                normalized = normalize_source_path(item, "important")
+            except SpecError as exc:
+                issues.append(str(exc))
+                continue
+            if normalized != item:
+                issues.append(f"important path is not normalized: {item!r}")
+    if important_paths and (mode != "detailed" or detail_level != "important"):
+        issues.append("important_paths require detailed + important")
+    hotspots = state.get("hotspots", [])
+    if hotspots is None:
+        hotspots = []
+    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
+        issues.append("hotspots must be a list of strings")
+    if readme_text is None and (spec_root / "README.md").is_file():
+        readme_text = (spec_root / "README.md").read_text(encoding="utf-8")
+    if readme_text is not None:
+        metadata = readme_metadata(readme_text)
+        expected = {
+            "粒度": str(mode),
+            "文件粒度": str(detail_level if mode == "detailed" else "不适用"),
+            "分支": str(state.get("branch") or "（无）"),
+            "同步 commit": str(state.get("synced_commit") or "尚未同步")[:12],
+        }
+        for key, value in expected.items():
+            if key in metadata and metadata[key] != value:
+                issues.append(f"README {key} mismatch: {metadata[key]!r} != {value!r}")
+    return issues
+
+
 def cmd_set_sync(args: argparse.Namespace) -> int:
     cwd = Path(args.cwd).expanduser().resolve()
     spec_root = find_spec_root(
         cwd, Path(args.spec).expanduser() if args.spec else None, args.project
     )
-    state = load_state(spec_root)
-    source = resolve_source(spec_root, state)
+    current = load_state(spec_root)
+    source = resolve_source(spec_root, current)
+    state = dict(current)
+    state["build_status"] = effective_build_status(current)
     if args.mode:
-        if args.mode not in {"concise", "detailed"}:
-            raise SpecError("mode must be concise or detailed", reason="usage")
         state["mode"] = args.mode
-    if args.detail_level:
-        state["detail_level"] = args.detail_level
+    mode = state.get("mode")
+    if mode == "concise":
+        if args.detail_level is not None:
+            raise SpecError(
+                "--detail-level is only valid with --mode detailed",
+                reason="invalid_mode_combination",
+            )
+        state["detail_level"] = None
+        state["important_paths"] = []
+    elif mode == "detailed":
+        state["detail_level"] = args.detail_level or state.get("detail_level") or "important"
+        if state["detail_level"] != "important":
+            if args.important_path is not None:
+                raise SpecError(
+                    "--important-path requires --detail-level important",
+                    reason="invalid_mode_combination",
+                )
+            state["important_paths"] = []
     if args.branch:
         state["branch"] = args.branch
     if args.scope is not None:
         state["scope"] = list(args.scope)
+    if args.important_path is not None:
+        state["important_paths"] = normalize_source_paths(
+            list(args.important_path), "important"
+        )
+    elif "important_paths" not in state:
+        state["important_paths"] = []
+    if (
+        args.built
+        and mode == "detailed"
+        and state.get("detail_level") == "important"
+        and not state.get("important_paths")
+    ):
+        raise SpecError(
+            "detailed important build requires --important-path",
+            reason="important_paths_required",
+        )
     if args.hotspot is not None:
         seen: list[str] = []
         for item in args.hotspot:
@@ -1611,17 +1919,47 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
             if rel and rel not in seen:
                 seen.append(rel)
         state["hotspots"] = seen
-    commit = args.commit
-    if commit:
-        info = git_info(source, state.get("branch"))
-        if info.get("is_git"):
-            commit = commit_of(source, commit)
-        state["synced_commit"] = commit
-        state["synced_at"] = utc_now()
-    elif args.commit == "":
+    info = git_info(source, state.get("branch"))
+    if info.get("is_git"):
+        if args.built and args.commit is None:
+            raise SpecError(
+                "Git source requires --commit when using --built",
+                reason="commit_required",
+            )
+        if args.commit:
+            state["synced_commit"] = commit_of(source, args.commit)
+            state["synced_at"] = utc_now()
+        elif args.commit == "":
+            state["synced_commit"] = None
+            state["synced_at"] = None
+    else:
+        if args.commit not in {None, ""}:
+            raise SpecError(
+                "non-Git source cannot record a commit",
+                reason="commit_not_supported",
+            )
         state["synced_commit"] = None
         state["synced_at"] = None
+    if args.commit is not None and not args.built and state["build_status"] == "skeleton":
+        raise SpecError(
+            "initial sync requires --built",
+            reason="build_status_required",
+        )
+    if args.built:
+        state["build_status"] = "built"
+        state["built_at"] = utc_now()
     state["updated_at"] = utc_now()
+    readme_path = spec_root / "README.md"
+    readme = readme_path.read_text(encoding="utf-8") if readme_path.is_file() else ""
+    rendered_readme = render_readme_metadata(readme, state)
+    issues = validation_issues(spec_root, state, readme_text=rendered_readme)
+    if issues:
+        raise SpecError(
+            "mirror validation failed before set-sync",
+            reason="invalid_mirror",
+            issues=issues,
+        )
+    write_text(readme_path, rendered_readme)
     write_state(spec_root, state)
     return emit(
         {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
@@ -1635,45 +1973,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
         cwd, Path(args.spec).expanduser() if args.spec else None, args.project
     )
     state = load_state(spec_root)
-    required_files = [
-        "README.md",
-        "overview.md",
-        "changelog.md",
-        "concepts/INDEX.md",
-        "entities/INDEX.md",
-        "flows/INDEX.md",
-        "modules/INDEX.md",
-        "facets/INDEX.md",
-        "facets/source.md",
-        "facets/contracts/INDEX.md",
-        "facets/slices/INDEX.md",
-        "facets/verify.md",
-        "facets/traffic.md",
-        "context/INDEX.md",
-        "data/INDEX.md",
-        "surface/INDEX.md",
-        "surface/config.md",
-        "runtime/INDEX.md",
-        "build/INDEX.md",
-        "diagrams/INDEX.md",
-    ]
-    missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
-    issues: list[str] = []
-    if missing:
-        issues.append("missing: " + ", ".join(missing))
-    for key in ("version", "project", "placement", "source", "mode"):
-        if key not in state:
-            issues.append(f"state missing {key}")
-    if state.get("mode") not in {None, "concise", "detailed"}:
-        issues.append(f"invalid mode {state.get('mode')!r}")
-    detail_level = state.get("detail_level", "important")
-    if detail_level not in DETAIL_LEVELS:
-        issues.append(f"invalid detail_level {detail_level!r}")
-    hotspots = state.get("hotspots", [])
-    if hotspots is None:
-        hotspots = []
-    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
-        issues.append("hotspots must be a list of strings")
+    issues = validation_issues(spec_root, state)
+    mode = state.get("mode")
+    detail_level = state.get("detail_level")
     source_ok = True
     try:
         source = resolve_source(spec_root, state)
@@ -1689,8 +1991,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
         "issues": issues,
         "source_ok": source_ok,
         "source": str(source) if source else None,
-        "mode": state.get("mode"),
+        "mode": mode,
         "detail_level": detail_level,
+        "build_status": effective_build_status(state),
+        "important_paths": state.get("important_paths", []),
     }
     return emit(
         payload,
@@ -1750,7 +2054,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("concise", "detailed"),
         default="concise",
     )
-    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default="important")
+    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
 
     add("status", help="镜像状态与 git 新鲜度")
     add("git-info", help="源仓库分支与 commit")
@@ -1776,9 +2080,16 @@ def build_parser() -> argparse.ArgumentParser:
     route.add_argument("--path", default=None)
 
     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
+    set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
     set_sync.add_argument("--commit", default=None)
     set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
     set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+    set_sync.add_argument(
+        "--important-path",
+        action="append",
+        default=None,
+        help="important 模式写深的源相对路径或前缀，可重复；整表写回",
+    )
     set_sync.add_argument("--scope", action="append", default=None)
     set_sync.add_argument(
         "--hotspot",

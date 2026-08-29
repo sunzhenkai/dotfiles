@@ -1,0 +1,98 @@
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -1576,15 +1576,25 @@ def readme_metadata(text: str) -> dict[str, str]:
+     return result
+ 
+ 
++def normalize_source_path(value: str, label: str) -> str:
++    raw = str(value).strip().replace("\\", "/")
++    if not raw or raw.startswith("/") or re.match(r"^[A-Za-z]:/", raw):
++        raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
++    while raw.startswith("./"):
++        raw = raw[2:]
++    if not raw or ".." in Path(raw).parts:
++        raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
++    return raw
++
++
+ def normalize_source_paths(values: list[str], label: str) -> list[str]:
+     normalized: list[str] = []
+     for value in values:
+-        rel = str(value).strip().replace("\\", "/").lstrip("./")
+-        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+-            raise SpecError(f"invalid {label} path: {value!r}", reason="invalid_source_path")
++        rel = normalize_source_path(value, label)
+         if rel not in normalized:
+             normalized.append(rel)
+     return normalized
+@@ -1612,12 +1622,21 @@ def validation_issues(
+     important_paths = state.get("important_paths", [])
+     if important_paths is None:
+         important_paths = []
+     if not isinstance(important_paths, list) or any(
+         not isinstance(item, str) for item in important_paths
+     ):
+         issues.append("important_paths must be a list of strings")
+-    elif mode != "detailed" or detail_level != "important":
+-        if important_paths:
+-            issues.append("important_paths require detailed + important")
++    else:
++        for item in important_paths:
++            try:
++                normalized = normalize_source_path(item, "important")
++            except SpecError as exc:
++                issues.append(str(exc))
++                continue
++            if normalized != item:
++                issues.append(f"important path is not normalized: {item!r}")
++    if important_paths and (mode != "detailed" or detail_level != "important"):
++        issues.append("important_paths require detailed + important")
+     hotspots = state.get("hotspots", [])
+     if hotspots is None:
+         hotspots = []
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -423,6 +423,22 @@ class GitAndSyncTest(unittest.TestCase):
+             )
+             self.assertEqual(run("validate", "--cwd", str(root))[0], 0)
+ 
++            code, payload = run(
++                "set-sync",
++                "--cwd",
++                str(root),
++                "--built",
++                "--commit",
++                sha,
++                "--important-path",
++                "/etc/passwd",
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["reason"], "invalid_source_path")
++
+     def test_inventory_skips_secrets_and_vendor(self) -> None:
+         import tempfile
+@@ -451,6 +467,23 @@ class ValidateTest(unittest.TestCase):
+             self.assertEqual(code, 1, payload)
+             self.assertIn("invalid build_status 'unknown'", payload["issues"])
+ 
++    def test_validate_rejects_unsafe_important_path_state(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            run("init", "--cwd", str(root), "--mode", "detailed", "--confirm")
++            state_path = root / "spec" / ".mirror.json"
++            state = json.loads(state_path.read_text(encoding="utf-8"))
++            state["important_paths"] = ["../other"]
++            state_path.write_text(
++                json.dumps(state, ensure_ascii=False, indent=2) + "\n",
++                encoding="utf-8",
++            )
++            code, payload = run("validate", "--cwd", str(root))
++            self.assertEqual(code, 1, payload)
++            self.assertIn("invalid important path: '../other'", payload["issues"])
++
+     def test_direct_helpers_secret_skip(self) -> None:
+         self.assertTrue(specctl.should_skip_file(".env.local"))

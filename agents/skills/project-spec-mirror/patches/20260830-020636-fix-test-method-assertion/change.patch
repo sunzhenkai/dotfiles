@@ -1,0 +1,12 @@
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -66,7 +66,7 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("完整逻辑", modes)
+         self.assertIn("important_paths", modes)
+         self.assertIn("不是语言级完备索引", modes)
+-        self.assertIn("测试方法只简述", modes)
++        self.assertRegex(modes, r"测试方法\s*\|\s*只简述")
+         self.assertIn("完整逻辑", skill)
+         self.assertIn("不作为完备证明", skill)
+         self.assertNotIn("用返回名单核对方法不得漏列", skill)

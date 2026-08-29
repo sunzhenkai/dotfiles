@@ -1,0 +1,296 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -14,7 +14,7 @@
+ 
+ 面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
+ 
+-为**一个目标 project** 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收档 C：只凭镜像能重建可运行系统。需要结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
++为目标 project 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收目标：只凭镜像能重建该项目**实际具备**的可运行能力；不适用能力要有证据地标明。用户明确要求结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
+ 
+ ```bash
+@@ -28,7 +28,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ - 不修改目标 project 的源码、测试、构建或依赖。
+ - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
+ - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
+-- 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
++- 默认不把每个源文件做成规格页；文件主要作为清单行、路由键和证据路径。用户明确接受维护成本时，可对已确认的选定范围建立 `notes/`，但不把它误称为默认 detailed 行为。
+ - 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+@@ -66,7 +66,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ | `maintain` | 改概念/实体/流/模块/切面/图/恢复投影中的指定条目 | 对应 reference |
+ | `status` | 只读同步状态 | 本文件 |
+ 
+-一次会话只服务**一个** target project。
++同一时刻只维护**一个 active target** 和一个 `spec_root`。用户要求批量项目时可顺序处理：完成并汇报当前 target 后重新 `detect` 下一个；禁止在一次写入步骤中混用两个项目的状态或输出目录。
+ 
+ ## specctl
+@@ -108,10 +108,10 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`）。important 还要明确将写深的源相对路径或前缀；对这些路径及 complete 中的行为代码按需跑 `symbols`，再结合源码核对行为承载符号。候选为空或不完整时如实说明，不声称方法全集完备；测试文件不逐方法抽取
+ 2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+-3. 识别并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。结束前做恢复完备自检
++3. 识别项目实际能力并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。适用层写到可恢复；不适用层保留 INDEX 并写判断证据。结束前做恢复完备自检
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+-5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+-6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明当前模型，改为 `complete` 或热点；要热点详注且未给路径时先问。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
++5. 识别并维护适用的工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 至少写现有测试/性质；完全没有部署或流量切换能力时，TRAFFIC 写 `不适用` 与证据，不编发布方案
++6. 用户明确要求图表时，按 [diagrams.md](references/diagrams.md) 在本轮调用 `archify` 交付 HTML。Agent 主动识别出的候选先判断是否比表格显著增益；低价值候选直接省略，高成本候选先征求用户，不因候选未画自动阻塞 build
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户明确要求选定范围的逐文件详注时，确认范围与成本后写 `notes/`；未给范围时先建议入口或分批。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+ 8. 写完先 `$SPECCTL validate`。Git 源再执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -44,19 +44,23 @@
+ │   └── traffic.md
+ └── diagrams/             # archify HTML（及同 slug 的 JSON 候选）
+     └── INDEX.md
++extensions/               # 可选；用户明确需要且核心层无法表达的领域附加内容
++└── <name>/
++    └── INDEX.md
+ ```
+ 
+-顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
++核心顶层目录保持固定，以便导航和工具验证。只有用户明确需要、且现有层无法自然表达的领域内容才放 `extensions/<name>/`；不要为风格偏好另造平行分类。`notes/` 挂在模块下，不是新的顶层。默认不用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+ 
+-## 阅读顺序（强制）
++## 推荐阅读顺序
+ 
+-从上往下写，也从上往下给人看：
++默认从上往下写和阅读；维护单个条目或用户有明确入口时可直接进入对应层：
+ 
+ 1. `README.md` — 30 秒：这是什么镜像、当前版本、地图入口
+@@ -155,7 +159,7 @@ INDEX 用表格，一篇正文一个主题。
+ | JS/TS | `src/` 下功能目录；组件+样式+测试算该目录下的多行，不拆成三页 |
+ | Java | 领域包，不要一类一模块 |
+ 
+-单模块文件表过长（经验：> 40 行）→ 拆模块，不要改回每文件一页。
++单模块文件表超过约 40 行是考虑拆模块的信号，不是机械阈值；优先按连贯职责拆分，若项目天然是单包则保留并改善分组。
+ 
+ `modules/INDEX.md` 用表格：模块 / 根路径 / 一句话 / 页。
+diff --git a/agents/skills/project-spec-mirror/references/projections.md b/agents/skills/project-spec-mirror/references/projections.md
+--- a/agents/skills/project-spec-mirror/references/projections.md
++++ b/agents/skills/project-spec-mirror/references/projections.md
+@@ -1,6 +1,6 @@
+ # 恢复投影（可运行系统）
+ 
+-金字塔回答「这是什么」。切面回答「怎样可验证地改、迁、验」。本文件的五层顶层回答「只凭镜像能否重建可运行系统」。三者并存，不互相替代。
++金字塔回答「这是什么」。切面回答「怎样可验证地改、迁、验」。本文件的五层顶层回答「只凭镜像能否重建项目实际具备的可运行能力」。三者并存，不互相替代。
+ 
+-验收档 **C**：不读源码也应能（1）说明系统边界与邻接，（2）对上对外表面与配置键，（3）重建存储与一致性，（4）画出进程/部署拓扑，（5）从零构建、迁移、启动。不是源码逐行副本，也不是把测试正文抄进 Spec。
++适用能力应达到恢复档 C；不适用能力不要求虚构内容，而要写 `不适用`、判断依据和证据路径。例如纯库通常没有独立部署拓扑，静态站点通常没有业务存储迁移。不是源码逐行副本，也不是把测试正文抄进 Spec。
+ 
+ ## 目录
+@@ -23,7 +23,15 @@
+     └── INDEX.md           # 构建 / 测试 / 迁移 / 启动
+ ```
+ 
+-INDEX 是该层的阅读叶子。仅当 INDEX 放不下时再加页：多个邻接系统、多个存储、多个协议族。不要为每个源文件或每张表建页。
++核心 INDEX 始终存在，便于稳定导航。先根据清单、入口和部署证据判定适用性：
++
++| 项目形态 | 通常重点 | 可能不适用 |
++|----------|----------|------------|
++| 服务 / worker | context、surface、data、runtime、build | 无 |
++| 库 / SDK | context、surface、build | 独立 data、runtime |
++| CLI | surface、build，按需 data/runtime | traffic、独立拓扑 |
++| 静态站点 / 文档 | surface、build | data、服务端 runtime |
++
++这只是判断起点，以实际证据为准。适用层写到可恢复；不适用层在 INDEX 用短段记录理由与来源，不扩写空表。仅当 INDEX 放不下时再加页。不要为每个源文件或每张表建页。
+ 
+ `init` 必须创建上列六个文件；已有镜像在 update 时若缺则先补骨架再改正文。
+@@ -118,7 +126,7 @@ INDEX 最少包含：
+ 
+ ## 恢复完备自检
+ 
+-build / update 结束前核对这些项；任一项做不到就在页内写「未知」与缺口，不要假装可恢复：
++build / update 结束前核对这些项；适用能力做不到就在页内写「未知」与缺口，不要假装可恢复；不适用能力写判断证据：
+ 
+ | 检查 | 通过标准 |
+@@ -127,6 +135,7 @@ build / update 结束前核对这些项；任一项做不到就在页内写「未知
+ | 拓扑 | 只读 `runtime/` 能画出进程/端口/启动顺序 |
+ | 再生 | 只读 `build/` 能构建、迁移、启动（命令可执行或标明未知） |
+ | 脱敏 | 无密钥、连接串、`.env` 原文，亦无 `AppKey` / `SecretKey` / token 等字面量 |
++| 适用性 | 标为 `不适用` 的层有项目类型或源码/清单证据，不是为了省略工作 |
+ 
+ `validate` 只检查这六个文件存在，不判断正文是否写满。
+diff --git a/agents/skills/project-spec-mirror/references/facets.md b/agents/skills/project-spec-mirror/references/facets.md
+--- a/agents/skills/project-spec-mirror/references/facets.md
++++ b/agents/skills/project-spec-mirror/references/facets.md
+@@ -22,7 +22,7 @@
+ └── traffic.md             # TRAFFIC 影子、灰度、切换、回滚（不适用则写「无」）
+ ```
+ 
+-build / update 识别并维护这些页。没有证据的契约页保留标题并写「未知」，不要编造 OpenAPI 或灰度方案。
++build / update 保留这些稳定入口并维护适用切面。没有证据的契约页写「未知」和缺口；项目确实没有该能力时写 `不适用` 与证据。不要编造 OpenAPI、迁移阶段或灰度方案。
+ 
+ ## 五层切面
+@@ -36,7 +36,7 @@ build / update 识别并维护这些页。没有证据的契约页保留标题并写
+ | VERIFY | `verify.md` | 如何证明行为仍真（测试、性质、对照差分） |
+ | TRAFFIC | `traffic.md` | 如何发布与回滚（含影子 / 灰度；没有则写「无」） |
+ 
+-`facets/INDEX.md` 用表格链到上列五层。没有对照实现时，VERIFY 仍须写用哪些测试或性质证明行为，差分一行写「无」；不要整页「不适用」。没有灰度时，TRAFFIC 仍须写发布步骤与回滚；完全没有发布机制才写「无」。
++`facets/INDEX.md` 用表格链到上列五层。没有对照实现时，VERIFY 仍写现有测试、静态检查或可验证性质，差分写 `不适用`；完全没有可执行验证时写缺口。没有灰度但存在部署时，TRAFFIC 写实际发布与回滚；库、纯文档等没有部署/流量生命周期的项目可写 `不适用` 与证据。
+ 
+ ## 契约种类
+diff --git a/agents/skills/project-spec-mirror/references/diagrams.md b/agents/skills/project-spec-mirror/references/diagrams.md
+--- a/agents/skills/project-spec-mirror/references/diagrams.md
++++ b/agents/skills/project-spec-mirror/references/diagrams.md
+@@ -9,12 +9,19 @@
+ 
+ ## 何时画
+ 
+-仅当表格说不清关系时：系统上下文、模块地图、部署/进程拓扑、切片主路径、对照实现差分、状态机、一次请求调用链、数据管道。overview 与切片页用一句话说明「看哪张图」，不要在 Markdown 里再画一遍。
++图表是解释复杂关系的手段，不是完成度装饰。候选包括：系统上下文、模块地图、部署/进程拓扑、切片主路径、对照实现差分、状态机、一次请求调用链、数据管道。
+ 
+-识别出需要某张图，就等于**本轮必须交付**该图的 HTML。详尽模式尤其如此：已经列出序列图 / 架构图 / 状态机 / 数据流候选，却不 `deliver`，视为 build 未完成。
++按请求来源决策：
++
++- 用户明确要求某张图或“把架构/流程可视化”时：该图属于本轮交付，按 archify 流程生成 HTML；依赖缺失则明确报告阻塞。
++- Agent 主动发现图表可能有帮助时：先比较表格/短流程是否已经足够。一个明显高价值、低额外成本的图可随 build 交付；多个图或高成本图先给候选、价值和范围，请用户选择。
++- 用户没有要求且文字已清楚时：省略图表，不写占位，也不把“没有图”当作 build 失败。
++
++overview 与切片页只链接已存在的图，不在 Markdown 里重复绘制。
+ 
+ ## 执行
+@@ -25,8 +32,8 @@
+ 
+    质量档次、参数以 archify Skill 为准。非零退出不得称为已交付。
+-4. **未安装**的唯一判定：找不到 `archify/SKILL.md`，或找不到可执行的 `bin/archify.mjs`（`node` 跑该文件失败也算）。此时在**对用户的完成摘要**里写明缺口，INDEX 用表格列关系兜底，保持空骨架或已有 HTML。不要生成假 HTML。
+-5. 禁止把「未安装」兜底用在 CLI 实际存在的环境。尤其禁止写「详细模式暂未生成图表」「后续可用 archify 生成」这类占位，以及只抄「同 slug JSON 候选存放在同目录」却不落文件。
++4. 用户要求图表时，**未安装**的判定是找不到 `archify/SKILL.md`、找不到 `bin/archify.mjs`，或 node 无法运行。此时在完成摘要写明阻塞，INDEX 保持空表或已有 HTML；不要生成假 HTML。
++5. Agent 候选若本轮不做，不要往 INDEX 或正文写“暂未生成”占位；只在对话中说明取舍。已经承诺交付的图必须有 HTML，不能只留 JSON。
+ 
+ ## 与切面的对应
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -149,7 +149,7 @@
+ 
+ **何时不建：** 为了「详尽看起来完整」；inventory 里每一个代码文件；DTO/胶水/生成代码；已有对应实体页的纯结构体文件。
+ 
+-用户要热点详注且未给路径：先问。建议切片入口，或一次 ≤ **15** 个文件。未同意、或候选将超过 15 个，不得批量建 `notes/`。
++用户要热点详注且未给路径时先问，优先建议切片入口。默认每批不超过约 **15** 个文件，便于审阅和回滚；用户明确确认更大的具体范围后可以执行，但先说明预计页数和维护成本。不得把模糊的“详细一点”解释为全库批量 `notes/`。
+ 
+ 页内写：真身路径、为何是热点、表里写不下的符号要点、链回模块/实体/处理线/切片。
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -89,19 +89,20 @@ cases:
+   - id: facets-and-archify
+     kind: core
+     judge: deterministic
+-    description: 维护五层切面；图表委托 archify，产物在 diagrams/
+-    given: build 或需要模块地图/切片路径/状态机图
++    description: 维护适用切面；用户要求的图表委托 archify，产物在 diagrams/
++    given: build，或用户明确要求模块地图/切片路径/状态机图
+     expect:
+       must:
+-        - 维护 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC（无对照实现时 VERIFY 仍写测试/性质，差分写无；无灰度时 TRAFFIC 仍写发布与回滚）
++        - 保留 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC 入口；适用项写事实，不适用项写证据
+         - 切片生命周期从 identified 起写，不跳步假装 migrated
+-        - 需要图且 archify CLI 可用时，本轮加载 archify Skill（会话列表没有也要 Read 已安装的 SKILL.md），validate 后 deliver，HTML 写入 diagrams/<slug>.html
++        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver，HTML 写入 diagrams/<slug>.html
++        - Agent 主动候选先判断相对文字的增益；多图或高成本范围先让用户选择
+         - INDEX 只链已存在的 .html；init 空表可以保留
+       must_not:
+         - 把 archify schema 或渲染器拷进本 Skill
+-        - 未安装 archify 时声称已交付 HTML 图
++        - 未安装 archify 时声称交付了用户要求的 HTML 图
+         - 把 PHP/Go 写死为唯一对照语言对
+-        - 写「暂未生成图表」「后续可用 archify」占位，或把 INDEX 链到 archify Skill 目录
+-        - 只写 JSON 候选或只列图名却不 deliver HTML（CLI 可用时）
++        - 把未执行候选写成 INDEX 占位，或把 INDEX 链到 archify Skill 目录
++        - 对已经承诺交付的图只写 JSON 候选
+ 
+   - id: recovery-projections-runnable
+     kind: core
+@@ -112,10 +113,11 @@ cases:
+     expect:
+       must:
+-        - 维护 context/ data/ surface/（含 config.md） runtime/ build/ 的 INDEX 与必填节
+-        - 结束前做恢复完备自检（边界、表面、数据、拓扑、再生、脱敏）
++        - 保留 context/ data/ surface/（含 config.md） runtime/ build/ 的稳定 INDEX
++        - 适用能力写到可恢复；不适用能力写判断依据和证据路径
++        - 结束前做恢复完备自检（适用性、边界、表面、数据、拓扑、再生、脱敏）
+         - 缺骨架时先补这六个文件再改正文
+       must_not:
+         - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
+         - 把 contracts/runtime.md 当成部署拓扑页
+-        - 再造本 Skill 未列出的顶层目录
++        - 在核心层已有合适位置时滥用 extensions/
+ 
+   - id: delivery-summary-fields
+@@ -207,10 +209,11 @@ cases:
+     expect:
+       must:
+-        - 先问范围；建议切片入口或一次 ≤15 个文件
++        - 先问范围并建议切片入口
++        - 默认按约 15 个文件一批；更大具体范围需用户明确确认并说明成本
+       must_not:
+         - 未同意就批量建 notes/
+         - 用 inventory.file_count > 80 作为是否写详页的门禁
+@@ -253,13 +256,13 @@ cases:
+   - id: reject-per-file-catalog-request
+     kind: failure
+     judge: deterministic
+-    description: 用户要每个文件一页时说明新模型，不铺全库
+-    given: 用户点名每个文件一页、给每个源文件写详页
++    description: 用户要逐文件详注时说明默认模型并确认具体范围与成本
++    given: 用户点名每个文件一页、给选定范围源文件写详页
+     expect:
+       must:
+-        - 说明文件不是阅读单位，改问热点范围或 detailed 加深
++        - 说明模块 README 是默认阅读单位，确认具体范围、预计页数和维护成本
+       must_not:
+-        - 为全库每个代码文件建 files/ 或 notes/
++        - 把模糊请求直接扩成全库 files/ 或 notes/
+ 
+   - id: skip-third-party-and-foreign-repos
+@@ -301,13 +304,14 @@ cases:
+-  - id: one-project-per-session
++  - id: one-active-project
+     kind: boundary
+     judge: deterministic
+-    description: 一次会话只服务一个 target project
+-    given: 用户提到多个 project 或中途换源
++    description: 同一时刻只维护一个 active target，批量项目顺序切换
++    given: 用户提到多个 project 或要求批量建镜像
+     expect:
+       must:
+-        - 当前焦点只有一个 spec_root
++        - 每次写入只有一个 active target 和 spec_root
++        - 完成并汇报当前 target 后重新 detect 下一个
+       must_not:
+-        - 同一轮写入两个 project 的镜像
++        - 在同一个写入步骤混用两个 project 的状态或输出目录
+ 
+   - id: non-git-no-commit-diff
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -82,12 +82,18 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("SecretKey", modes)
+ 
+-    def test_diagrams_must_deliver_html_this_session(self) -> None:
++    def test_diagrams_are_request_driven_without_fake_delivery(self) -> None:
+         diagrams = (SKILL_ROOT / "references" / "diagrams.md").read_text(encoding="utf-8")
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+         evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
+-        self.assertIn("本轮必须交付", diagrams)
+-        self.assertIn("暂未生成图表", diagrams)
+-        self.assertIn("在本轮", skill)
+-        self.assertIn("后续用 archify", skill)
+-        self.assertIn("暂未生成图表", evals)
+-        self.assertIn("只写 JSON 候选", evals)
++        self.assertIn("用户明确要求", diagrams)
++        self.assertIn("不把“没有图”当作 build 失败", diagrams)
++        self.assertIn("不能只留 JSON", diagrams)
++        self.assertIn("用户明确要求图表时", skill)
++        self.assertIn("不因候选未画自动阻塞 build", skill)
++        self.assertIn("用户明确要求图", evals)
++
++    def test_hard_safety_boundaries_remain(self) -> None:
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        self.assertIn("不自动 commit / push", skill)
++        self.assertIn("<REDACTED>", skill)
++        self.assertIn("不得覆盖", skill)
++        self.assertIn("外来仓", skill)

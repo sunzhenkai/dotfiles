@@ -45,13 +45,16 @@
 │   └── traffic.md
 └── diagrams/             # archify HTML（及同 slug 的 JSON 候选）
     └── INDEX.md
+extensions/               # 可选；用户明确需要且核心层无法表达的领域附加内容
+└── <name>/
+    └── INDEX.md
 ```
 
-顶层仅限本文件列出的目录，不要再另造分类。`notes/` 挂在模块下，不是新的顶层。不要用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
+核心顶层目录保持固定，以便导航和工具验证。只有用户明确需要、且现有层无法自然表达的领域内容才放 `extensions/<name>/`；不要为风格偏好另造平行分类。`notes/` 挂在模块下，不是新的顶层。默认不用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
 
-## 阅读顺序（强制）
+## 推荐阅读顺序
 
-从上往下写，也从上往下给人看：
+默认从上往下写和阅读；维护单个条目或用户有明确入口时可直接进入对应层：
 
 1. `README.md` — 30 秒：这是什么镜像、当前版本、地图入口
 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
@@ -73,8 +76,12 @@
   "source": "..",
   "branch": "main",
   "mode": "concise",
+  "detail_level": null,
   "scope": [],
+  "important_paths": [],
   "hotspots": [],
+  "build_status": "skeleton",
+  "built_at": null,
   "synced_commit": null,
   "synced_at": null,
   "updated_at": "2026-01-02T00:00:00Z"
@@ -83,9 +90,14 @@
 
 - `placement`：`in-project` | `external`
 - `source`：相对本镜像根；`in-project` 时为 `..`
+- `mode`：`concise` | `detailed`。concise 时 `detail_level` 必须为 `null`
+- `detail_level`：仅 detailed 使用，取 `complete` | `important` | `lightweight`
 - `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
+- `important_paths`：仅 `detailed + important` 使用；明确哪些源相对路径或前缀在模块页写深。缺字段的旧镜像视为尚未记录，下一次完成 update 时必须补齐
 - `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。只通过 `set-sync --hotspot` 写回；模块 README「热点」表给人读
-- `synced_commit`：已写入金字塔的那个 commit；未 build 则为 `null`
+- `build_status`：`skeleton` | `built`，独立于是否存在 Git commit；旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton
+- `built_at`：最近一次完成 build/update 的时间
+- `synced_commit`：Git 源已写入金字塔的那个 commit；非 Git 源始终为 `null`
 
 只通过 `init` / `set-sync` 改这个文件。
 
@@ -101,6 +113,7 @@
 | 项 | 值 |
 |----|-----|
 | 粒度 | concise |
+| 文件粒度 | 不适用 |
 | 分支 | main |
 | 同步 commit | `abc1234`（尚未同步则写「尚未同步」） |
 | 源 | git（或「非 git」） |
@@ -154,7 +167,7 @@
 | JS/TS | `src/` 下功能目录；组件+样式+测试算该目录下的多行，不拆成三页 |
 | Java | 领域包，不要一类一模块 |
 
-单模块文件表过长（经验：> 40 行）→ 拆模块，不要改回每文件一页。
+单模块文件表超过约 40 行是考虑拆模块的信号，不是机械阈值；优先按连贯职责拆分，若项目天然是单包则保留并改善分组。
 
 `modules/INDEX.md` 用表格：模块 / 根路径 / 一句话 / 页。
 

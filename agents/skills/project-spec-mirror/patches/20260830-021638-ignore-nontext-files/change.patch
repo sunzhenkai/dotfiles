@@ -1,0 +1,266 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -31,7 +31,8 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
+ - 默认不把每个源文件做成规格页；文件主要作为清单行、路由键和证据路径。用户明确接受维护成本时，可对已确认的选定范围建立 `notes/`，但不把它误称为默认 detailed 行为。
+ - 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
++- 只梳理文本文件；跳过 `.gitignore` 当前忽略的路径、已知二进制扩展和内容检测为二进制的文件。inventory、diff、route 与 symbols 使用同一边界。
+   - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+--- a/agents/skills/project-spec-mirror/references/routing.md
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -3,7 +3,7 @@
+ 
+ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
+ 
+-`diff` / `inventory` / `route` 已丢弃三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是本工程代码：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时另开会话并给 `--source`。
++`diff` / `inventory` / `route` 已丢弃 `.gitignore` 当前忽略的路径、非文本文件、三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是镜像输入：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时切换 active target 并给 `--source`。
+ 
+ ## 算法
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -14,6 +14,7 @@ import re
+ import subprocess
+ import sys
++import tempfile
+ from datetime import datetime, timezone
+ from pathlib import Path
+ from typing import Any
+@@ -579,13 +580,74 @@ def looks_binary(path: Path) -> bool:
+     try:
+         chunk = path.read_bytes()[:8192]
+     except OSError:
+         return True
+-    return b"\0" in chunk
++    if b"\0" in chunk:
++        return True
++    if not chunk:
++        return False
++    allowed_controls = {8, 9, 10, 12, 13, 27}
++    controls = sum(
++        1 for byte in chunk if byte < 32 and byte not in allowed_controls
++    )
++    return controls / len(chunk) > 0.05
++
++
++def ignored_paths(source: Path, paths: list[str]) -> frozenset[str]:
++    if not paths:
++        return frozenset()
++    payload = "\0".join(paths) + "\0"
++    root = find_git_root(source)
++    temp: tempfile.TemporaryDirectory[str] | None = None
++    if root is not None:
++        command = ["git", "check-ignore", "--no-index", "-z", "--stdin"]
++        cwd = source
++    else:
++        temp = tempfile.TemporaryDirectory(prefix="specctl-ignore-")
++        git_dir = Path(temp.name) / "repo.git"
++        init = subprocess.run(
++            ["git", "init", "--bare", "-q", str(git_dir)],
++            capture_output=True,
++            text=True,
++            check=False,
++        )
++        if init.returncode != 0:
++            temp.cleanup()
++            raise SpecError(
++                f"cannot initialize temporary ignore matcher: {init.stderr.strip()}",
++                reason="gitignore_failed",
++            )
++        command = [
++            "git",
++            f"--git-dir={git_dir}",
++            f"--work-tree={source.resolve()}",
++            "check-ignore",
++            "--no-index",
++            "-z",
++            "--stdin",
++        ]
++        cwd = source
++    try:
++        proc = subprocess.run(
++            command,
++            cwd=cwd,
++            input=payload,
++            capture_output=True,
++            text=True,
++            check=False,
++            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
++        )
++        if proc.returncode not in {0, 1}:
++            raise SpecError(
++                f"git check-ignore failed: {proc.stderr.strip()}",
++                reason="gitignore_failed",
++            )
++        return frozenset(
++            item.replace("\\", "/").lstrip("./")
++            for item in proc.stdout.split("\0")
++            if item
++        )
++    finally:
++        if temp is not None:
++            temp.cleanup()
++
++
++def text_path(source: Path, rel: str, *, allow_missing: bool = False) -> bool:
++    path = source / rel
++    if not path.exists():
++        return allow_missing and Path(rel).suffix.lower() not in BINARY_EXTS
++    return path.is_file() and not looks_binary(path)
+ 
+ 
+ def list_git_files(source: Path) -> list[str]:
+@@ -602,11 +664,15 @@ def list_git_files(source: Path) -> list[str]:
+             prefix = ""
+     staged, gitlinks = parse_ls_files_stage(out, prefix)
++    candidates = [
++        rel for rel in staged if not skip_inventory_path(source, rel, gitlinks=gitlinks)
++    ]
++    ignored = ignored_paths(source, candidates)
+     return sorted(
+         rel
+-        for rel in staged
+-        if not skip_inventory_path(source, rel, gitlinks=gitlinks)
++        for rel in candidates
++        if rel not in ignored and text_path(source, rel)
+     )
+@@ -624,7 +690,12 @@ def walk_files(source: Path) -> list[str]:
+                 continue
+             files.append(rel)
+-    return sorted(files)
++    ignored = ignored_paths(source, files)
++    return sorted(
++        rel
++        for rel in files
++        if rel not in ignored and text_path(source, rel)
++    )
+ 
+ 
+ def inventory_files(source: Path, path_prefix: str | None = None) -> list[str]:
+@@ -1113,12 +1184,18 @@ def collect_diff_files(
+     name_status = git(["diff", "--name-status", f"{start}..{target}"], source)
+     files = parse_name_status(name_status)
+     gitlinks = list_gitlinks(source)
++    candidates = [
++        item
++        for item in files
++        if not skip_inventory_path(source, item["path"], gitlinks=gitlinks)
++    ]
++    ignored = ignored_paths(
++        source,
++        [item["path"] for item in candidates],
++    )
+     files = [
+         item
+-        for item in files
+-        if not skip_inventory_path(source, item["path"], gitlinks=gitlinks)
++        for item in candidates
++        if item["path"] not in ignored
++        and text_path(source, item["path"], allow_missing=item.get("status") == "D")
+     ]
+@@ -1390,6 +1467,7 @@ def cmd_symbols(args: argparse.Namespace) -> int:
+         raise SpecError("symbols requires one or more --file", reason="usage")
+     gitlinks = list_gitlinks(source)
++    ignored = ignored_paths(source, targets)
+     files_out: list[dict[str, Any]] = []
+     for rel in targets:
+         path = (source / rel).resolve()
+@@ -1399,10 +1477,17 @@ def cmd_symbols(args: argparse.Namespace) -> int:
+         except ValueError as exc:
+             raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
+-        if skip_inventory_path(source, rel, gitlinks=gitlinks):
++        if rel in ignored:
++            files_out.append(
++                {"path": rel, "skipped": True, "reason": "ignored", "symbols": []}
++            )
++            continue
++        if skip_inventory_path(source, rel, gitlinks=gitlinks) or not text_path(source, rel):
+             files_out.append(
+-                {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
++                {"path": rel, "skipped": True, "reason": "non_text_or_excluded", "symbols": []}
+             )
+             continue
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -286,6 +286,7 @@ cases:
+       must:
+         - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
++        - inventory / diff / route / symbols 忽略 .gitignore 命中的路径与非文本文件
+         - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
+@@ -294,6 +295,8 @@ cases:
+         - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
++        - 为 .gitignore 命中的路径或二进制资源建模块、文件表行或 notes/
+         - 把 unmapped 的三方/外来路径并入本工程模块
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -443,6 +443,35 @@ class GitAndSyncTest(unittest.TestCase):
+             self.assertTrue(all(not item.startswith("node_modules/") for item in names))
+             self.assertIn("internal/order.go", names)
++
++    def test_inventory_skips_tracked_ignored_and_non_text_files(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            (root / "ignored.log").write_text("ignored\n", encoding="utf-8")
++            (root / "opaque.data").write_bytes(b"plain\0binary")
++            git(root, "add", "ignored.log", "opaque.data")
++            git(root, "commit", "-q", "-m", "add generated artifacts")
++            (root / ".gitignore").write_text(
++                "ignored.log\n",
++                encoding="utf-8",
++            )
++            git(root, "add", ".gitignore")
++            git(root, "commit", "-q", "-m", "ignore generated log")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("inventory", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertNotIn("ignored.log", payload["files"])
++            self.assertNotIn("opaque.data", payload["files"])
++            self.assertIn(".gitignore", payload["files"])
++
++            code, symbols = run(
++                "symbols", "--cwd", str(root), "--file", "ignored.log"
++            )
++            self.assertEqual(code, 0, symbols)
++            self.assertEqual(symbols["files"][0]["reason"], "ignored")
+ 
+ 
+ class SymbolsTest(unittest.TestCase):
+@@ -542,10 +571,36 @@ class ValidateTest(unittest.TestCase):
+     def test_direct_helpers_secret_skip(self) -> None:
+         self.assertTrue(specctl.should_skip_file(".env.local"))
+         self.assertTrue(specctl.should_skip_file("certs/server.pem"))
+         self.assertTrue(specctl.should_skip_file("vendor/github.com/foo/lib.go"))
+         self.assertTrue(specctl.should_skip_file("node_modules/pkg/index.js"))
+         self.assertFalse(specctl.should_skip_file("internal/order.go"))
+         self.assertFalse(specctl.should_skip_file("src/App.php"))
++
++    def test_non_git_inventory_respects_gitignore_and_text_content(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = Path(raw) / "app"
++            root.mkdir()
++            (root / "pyproject.toml").write_text("[project]\nname='app'\n", encoding="utf-8")
++            (root / ".gitignore").write_text("cache/\n", encoding="utf-8")
++            (root / "cache").mkdir()
++            (root / "cache" / "generated.txt").write_text(
++                "generated\n",
++                encoding="utf-8",
++            )
++            (root / "app.py").write_text("print('ok')\n", encoding="utf-8")
++            (root / "blob").write_bytes(b"\x00\x01\x02")
++            run("init", "--cwd", str(root), "--confirm")
++            code, payload = run("inventory", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertIn("app.py", payload["files"])
++            self.assertIn(".gitignore", payload["files"])
++            self.assertNotIn("cache/generated.txt", payload["files"])
++            self.assertNotIn("blob", payload["files"])
+ 
+     def test_diff_skips_vendor_changes(self) -> None:

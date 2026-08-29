@@ -1,6 +1,8 @@
 # Experience
 
-真实执行中的失败、成功与可复用规律。不要记录 trivial information。
+供 Skill 维护者记录真实执行中的失败、成功与可复用规律。不要记录 trivial information。
+
+普通 project spec 镜像任务不得自动写入本目录；只有用户明确要求维护或演进本 Skill 时，才由当前仓库约定的维护流程创建记录和生产变更。
 
 ```text
 failures/  → 失败案例

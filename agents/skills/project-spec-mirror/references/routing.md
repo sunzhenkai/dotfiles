@@ -4,7 +4,7 @@
 
 update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
 
-`diff` / `inventory` / `route` 已丢弃三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是本工程代码：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时另开会话并给 `--source`。
+`diff` / `inventory` / `route` 已丢弃 `.gitignore` 当前忽略的路径、非文本文件、三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是镜像输入：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时切换 active target 并给 `--source`。
 
 ## 算法
 

@@ -1,0 +1,14 @@
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -67,9 +67,10 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("important_paths", modes)
+         self.assertIn("不是语言级完备索引", modes)
+         self.assertRegex(modes, r"测试方法\s*\|\s*只简述")
+-        self.assertIn("完整逻辑", skill)
++        self.assertIn("深入行为承载符号", skill)
++        self.assertIn("测试只写覆盖意图", skill)
+         self.assertIn("不作为完备证明", skill)
+         self.assertNotIn("用返回名单核对方法不得漏列", skill)
+ 
+     def test_secret_literals_must_redact(self) -> None:

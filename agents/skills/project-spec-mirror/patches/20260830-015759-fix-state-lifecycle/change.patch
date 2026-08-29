@@ -1,0 +1,680 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -56,7 +56,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 
+ ## 阶段
+ 
+-未点名阶段时按现状推断，并用一行说明：无镜像 → `init`；已 init 未同步 → `build`；已有 `synced_commit` → `update`；只改某一词条 → `maintain`。
++未点名阶段时按现状推断，并用一行说明：无镜像 → `init`；`build_status=skeleton` → `build`；`build_status=built` → `update`；只改某一词条 → `maintain`。旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton。
+ 
+ | 阶段 | 做什么 | 先读 |
+ |------|--------|------|
+@@ -80,7 +80,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+ | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+-| `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
++| `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / scope / hotspots / 时间，并同步 README 状态表 |
+ | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
+ 
+ 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
+@@ -91,7 +91,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
+ 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
+-4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为对 `inventory` 做全量对照并说明限制。
++4. 非 git 源：仍可 init/build/maintain；完成 build 后用 `set-sync --built` 写 `build_status=built`，不得伪造 commit；`update` 对 `inventory` 做全量对照并说明限制。
+ 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
+ 6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
+ 
+@@ -112,7 +112,8 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+ 6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
+ 7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+-8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
++8. 写完先 `$SPECCTL validate`。Git 源再执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`），有热点则加 `--hotspot`
++9. 再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
+ 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update
+@@ -123,7 +124,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1**
+ 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+ 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
+-7. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
++7. changelog 追加本轮摘要；写完先 `validate`，再按 build 的 Git / 非 Git 规则执行 `set-sync --built`，最后再次 `validate`
+ 
+ ### maintain
+ 
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -72,20 +72,27 @@
+   "placement": "in-project",
+   "source": "..",
+   "branch": "main",
+   "mode": "concise",
++  "detail_level": null,
+   "scope": [],
+   "hotspots": [],
++  "build_status": "skeleton",
++  "built_at": null,
+   "synced_commit": null,
+   "synced_at": null,
+   "updated_at": "2026-01-02T00:00:00Z"
+ }
+ ```
+ 
+ - `placement`：`in-project` | `external`
+ - `source`：相对本镜像根；`in-project` 时为 `..`
++- `mode`：`concise` | `detailed`。concise 时 `detail_level` 必须为 `null`
++- `detail_level`：仅 detailed 使用，取 `complete` | `important` | `lightweight`
+ - `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
+ - `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。只通过 `set-sync --hotspot` 写回；模块 README「热点」表给人读
+-- `synced_commit`：已写入金字塔的那个 commit；未 build 则为 `null`
++- `build_status`：`skeleton` | `built`，独立于是否存在 Git commit；旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton
++- `built_at`：最近一次完成 build/update 的时间
++- `synced_commit`：Git 源已写入金字塔的那个 commit；非 Git 源始终为 `null`
+ 
+ 只通过 `init` / `set-sync` 改这个文件。
+ 
+@@ -101,6 +108,7 @@
+ |----|-----|
+ | 粒度 | concise |
++| 文件粒度 | 不适用 |
+ | 分支 | main |
+ | 同步 commit | `abc1234`（尚未同步则写「尚未同步」） |
+ | 源 | git（或「非 git」） |
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -1,6 +1,6 @@
+ # 简约与详尽
+ 
+-`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
++`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。合法组合只有 `concise + null`，或 `detailed + complete|important|lightweight`。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
+ 
+ **触发：** 用户点名「详尽 / 每个函数 / 每个变量」→ `detailed`，并让用户选择文件整理粒度：`complete`、`important`（默认）或 `lightweight`。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
+ 
+@@ -123,11 +123,11 @@
+ 
+ ## 范围与热点
+ 
+-`detail_level` 通过 `$SPECCTL init --detail-level ...` 或 `$SPECCTL set-sync --detail-level ...` 保存；旧镜像缺少该字段时按 `important` 解释。`mode=concise` 时该字段不改变简约模式的行为。
++`detail_level` 通过 `$SPECCTL init --mode detailed --detail-level ...` 或 `$SPECCTL set-sync --mode detailed --detail-level ...` 保存；旧镜像若是 detailed 且缺少该字段，按 `important` 解释。`mode=concise` 时该字段固定为 `null`，传 `--detail-level` 属于错误。
+ 
+ - `scope`：知识覆盖的源路径前缀；空表示全库（仍走 inventory 忽略规则）。与是否建 `notes/` 无关。
+ - 简约默认全库。详尽应对 `scope` 或 `inventory --path` 收窄要写深的模块，而不是「详页文件清单」。
+ - `inventory.file_count` 只作状态展示，**不**再作为是否生成叶子页的开关。
+-- `set-sync --mode` 与实际写成的粒度必须一致。
++- `set-sync --mode` 与实际写成的粒度必须一致；完成 build/update 时同时传 `--built`，CLI 会先校验骨架再推进状态。
+ 
+ ### 热点 `notes/`（opt-in）
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -855,7 +855,7 @@ def create_skeleton(
+     source: Path,
+     branch: str | None,
+     mode: str,
+-    detail_level: str,
++    detail_level: str | None,
+ ) -> None:
+     spec_root.mkdir(parents=True, exist_ok=True)
+     source_rel = rel_to(source, spec_root)
+@@ -868,10 +868,12 @@ def create_skeleton(
+         "mode": mode,
+         "detail_level": detail_level,
+         "scope": [],
+         "hotspots": [],
++        "build_status": "skeleton",
++        "built_at": None,
+         "synced_commit": None,
+         "synced_at": None,
+         "updated_at": utc_now(),
+@@ -1203,7 +1205,13 @@ def cmd_init(args: argparse.Namespace) -> int:
+             summary=f"init: occupied {spec_root}",
+         )
+     mode = args.mode
+-    detail_level = args.detail_level
++    if mode == "concise" and args.detail_level is not None:
++        raise SpecError(
++            "--detail-level is only valid with --mode detailed",
++            reason="invalid_mode_combination",
++        )
++    detail_level = args.detail_level or ("important" if mode == "detailed" else None)
+     info = git_info(source, args.branch)
+     branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
+     if not args.confirm:
+-        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode, "--detail-level", detail_level]
++        confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
++        if detail_level:
++            confirm_args.extend(["--detail-level", detail_level])
+         if args.project:
+             confirm_args.extend(["--project", args.project])
+         if args.source:
+@@ -1273,12 +1281,15 @@ def cmd_status(args: argparse.Namespace) -> int:
+     source = resolve_source(spec_root, state)
+     branch = args.branch or state.get("branch")
+     info = git_info(source, branch)
++    build_status = effective_build_status(state)
+     synced = state.get("synced_commit")
+     freshness: dict[str, Any] = {"kind": "none"}
+     if info.get("is_git") and info.get("commit"):
+         freshness = {
+             "kind": "git",
+             "synced_commit": synced,
+             "target_commit": info["commit"],
+             "in_sync": bool(synced) and synced == info["commit"],
+         }
+@@ -1291,13 +1302,18 @@ def cmd_status(args: argparse.Namespace) -> int:
+             )
+             freshness["is_ancestor"] = proc.returncode == 0
+     elif not info.get("is_git"):
+-        freshness = {"kind": "non-git", "note": "no commit diff; compare inventory"}
++        freshness = {
++            "kind": "non-git",
++            "in_sync": build_status == "built",
++            "note": "no commit diff; compare inventory",
++        }
+     payload = {
+         "ok": True,
+         "result": "status",
+         "spec_root": str(spec_root),
+         "state": state,
++        "build_status": build_status,
++        "phase": "update" if build_status == "built" else "build",
+         "source": str(source),
+         "git": info,
+         "freshness": freshness,
+@@ -1486,6 +1502,109 @@ def cmd_route(args: argparse.Namespace) -> int:
+     return emit(payload, summary=summary)
+ 
+ 
++REQUIRED_MIRROR_FILES = (
++    "README.md",
++    "overview.md",
++    "changelog.md",
++    "concepts/INDEX.md",
++    "entities/INDEX.md",
++    "flows/INDEX.md",
++    "modules/INDEX.md",
++    "facets/INDEX.md",
++    "facets/source.md",
++    "facets/contracts/INDEX.md",
++    "facets/slices/INDEX.md",
++    "facets/verify.md",
++    "facets/traffic.md",
++    "context/INDEX.md",
++    "data/INDEX.md",
++    "surface/INDEX.md",
++    "surface/config.md",
++    "runtime/INDEX.md",
++    "build/INDEX.md",
++    "diagrams/INDEX.md",
++)
++
++
++def effective_build_status(state: dict[str, Any]) -> str:
++    value = state.get("build_status")
++    if value in {"skeleton", "built"}:
++        return value
++    return "built" if state.get("synced_commit") else "skeleton"
++
++
++def render_readme_metadata(text: str, state: dict[str, Any]) -> str:
++    mode = state.get("mode")
++    detail = state.get("detail_level") if mode == "detailed" else "不适用"
++    branch = state.get("branch") or "（无）"
++    commit = state.get("synced_commit")
++    commit_text = f"`{commit[:12]}`" if commit else "尚未同步"
++    replacements = {
++        "粒度": str(mode),
++        "文件粒度": str(detail),
++        "分支": str(branch),
++        "同步 commit": commit_text,
++    }
++    lines = text.splitlines()
++    found: set[str] = set()
++    mode_index: int | None = None
++    for index, line in enumerate(lines):
++        if not line.lstrip().startswith("|"):
++            continue
++        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
++        if len(cells) < 2 or cells[0] not in replacements:
++            continue
++        key = cells[0]
++        lines[index] = f"| {key} | {replacements[key]} |"
++        found.add(key)
++        if key == "粒度":
++            mode_index = index
++    if "文件粒度" not in found and mode_index is not None:
++        lines.insert(mode_index + 1, f"| 文件粒度 | {replacements['文件粒度']} |")
++    return "\n".join(lines) + "\n"
++
++
++def readme_metadata(text: str) -> dict[str, str]:
++    result: dict[str, str] = {}
++    for line in text.splitlines():
++        if not line.lstrip().startswith("|"):
++            continue
++        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
++        if len(cells) >= 2 and cells[0] in {"粒度", "文件粒度", "分支", "同步 commit"}:
++            result[cells[0]] = cells[1].strip("`")
++    return result
++
++
++def validation_issues(
++    spec_root: Path,
++    state: dict[str, Any],
++    *,
++    readme_text: str | None = None,
++) -> list[str]:
++    missing = [rel for rel in REQUIRED_MIRROR_FILES if not (spec_root / rel).is_file()]
++    issues = ["missing: " + ", ".join(missing)] if missing else []
++    for key in ("version", "project", "placement", "source", "mode"):
++        if key not in state:
++            issues.append(f"state missing {key}")
++    mode = state.get("mode")
++    detail_level = state.get("detail_level")
++    if mode not in {"concise", "detailed"}:
++        issues.append(f"invalid mode {mode!r}")
++    elif mode == "concise" and detail_level is not None:
++        issues.append("concise mode requires detail_level null")
++    elif mode == "detailed" and (detail_level or "important") not in DETAIL_LEVELS:
++        issues.append(f"invalid detail_level {detail_level!r}")
++    build_status = effective_build_status(state)
++    if build_status not in {"skeleton", "built"}:
++        issues.append(f"invalid build_status {build_status!r}")
++    hotspots = state.get("hotspots", [])
++    if hotspots is None:
++        hotspots = []
++    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
++        issues.append("hotspots must be a list of strings")
++    if readme_text is None and (spec_root / "README.md").is_file():
++        readme_text = (spec_root / "README.md").read_text(encoding="utf-8")
++    if readme_text is not None:
++        metadata = readme_metadata(readme_text)
++        expected = {
++            "粒度": str(mode),
++            "文件粒度": str(detail_level if mode == "detailed" else "不适用"),
++            "分支": str(state.get("branch") or "（无）"),
++            "同步 commit": str(state.get("synced_commit") or "尚未同步")[:12],
++        }
++        for key, value in expected.items():
++            if key in metadata and metadata[key] != value:
++                issues.append(f"README {key} mismatch: {metadata[key]!r} != {value!r}")
++    return issues
++
++
+ def cmd_set_sync(args: argparse.Namespace) -> int:
+     cwd = Path(args.cwd).expanduser().resolve()
+     spec_root = find_spec_root(
+@@ -1493,33 +1612,67 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
+     )
+-    state = load_state(spec_root)
+-    source = resolve_source(spec_root, state)
++    current = load_state(spec_root)
++    source = resolve_source(spec_root, current)
++    state = dict(current)
++    state["build_status"] = effective_build_status(current)
+     if args.mode:
+-        if args.mode not in {"concise", "detailed"}:
+-            raise SpecError("mode must be concise or detailed", reason="usage")
+         state["mode"] = args.mode
+-    if args.detail_level:
+-        state["detail_level"] = args.detail_level
++    mode = state.get("mode")
++    if mode == "concise":
++        if args.detail_level is not None:
++            raise SpecError(
++                "--detail-level is only valid with --mode detailed",
++                reason="invalid_mode_combination",
++            )
++        state["detail_level"] = None
++    elif mode == "detailed":
++        state["detail_level"] = args.detail_level or state.get("detail_level") or "important"
+     if args.branch:
+         state["branch"] = args.branch
+     if args.scope is not None:
+         state["scope"] = list(args.scope)
+@@ -1512,16 +1665,43 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
+                 seen.append(rel)
+         state["hotspots"] = seen
+-    commit = args.commit
+-    if commit:
+-        info = git_info(source, state.get("branch"))
+-        if info.get("is_git"):
+-            commit = commit_of(source, commit)
+-        state["synced_commit"] = commit
+-        state["synced_at"] = utc_now()
+-    elif args.commit == "":
+-        state["synced_commit"] = None
+-        state["synced_at"] = None
++    info = git_info(source, state.get("branch"))
++    if info.get("is_git"):
++        if args.built and args.commit is None:
++            raise SpecError(
++                "Git source requires --commit when using --built",
++                reason="commit_required",
++            )
++        if args.commit:
++            state["synced_commit"] = commit_of(source, args.commit)
++            state["synced_at"] = utc_now()
++        elif args.commit == "":
++            state["synced_commit"] = None
++            state["synced_at"] = None
++    else:
++        if args.commit not in {None, ""}:
++            raise SpecError(
++                "non-Git source cannot record a commit",
++                reason="commit_not_supported",
++            )
++        state["synced_commit"] = None
++        state["synced_at"] = None
++    if args.commit is not None and not args.built and state["build_status"] == "skeleton":
++        raise SpecError(
++            "initial sync requires --built",
++            reason="build_status_required",
++        )
++    if args.built:
++        state["build_status"] = "built"
++        state["built_at"] = utc_now()
+     state["updated_at"] = utc_now()
++    readme_path = spec_root / "README.md"
++    readme = readme_path.read_text(encoding="utf-8") if readme_path.is_file() else ""
++    rendered_readme = render_readme_metadata(readme, state)
++    issues = validation_issues(spec_root, state, readme_text=rendered_readme)
++    if issues:
++        raise SpecError(
++            "mirror validation failed before set-sync",
++            reason="invalid_mirror",
++            issues=issues,
++        )
++    write_text(readme_path, rendered_readme)
+     write_state(spec_root, state)
+     return emit(
+         {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
+@@ -1533,47 +1713,24 @@ def cmd_validate(args: argparse.Namespace) -> int:
+     )
+     state = load_state(spec_root)
+-    required_files = [
+-        "README.md",
+-        "overview.md",
+-        "changelog.md",
+-        "concepts/INDEX.md",
+-        "entities/INDEX.md",
+-        "flows/INDEX.md",
+-        "modules/INDEX.md",
+-        "facets/INDEX.md",
+-        "facets/source.md",
+-        "facets/contracts/INDEX.md",
+-        "facets/slices/INDEX.md",
+-        "facets/verify.md",
+-        "facets/traffic.md",
+-        "context/INDEX.md",
+-        "data/INDEX.md",
+-        "surface/INDEX.md",
+-        "surface/config.md",
+-        "runtime/INDEX.md",
+-        "build/INDEX.md",
+-        "diagrams/INDEX.md",
+-    ]
+-    missing = [rel for rel in required_files if not (spec_root / rel).is_file()]
+-    issues: list[str] = []
+-    if missing:
+-        issues.append("missing: " + ", ".join(missing))
+-    for key in ("version", "project", "placement", "source", "mode"):
+-        if key not in state:
+-            issues.append(f"state missing {key}")
+-    if state.get("mode") not in {None, "concise", "detailed"}:
+-        issues.append(f"invalid mode {state.get('mode')!r}")
+-    detail_level = state.get("detail_level", "important")
+-    if detail_level not in DETAIL_LEVELS:
+-        issues.append(f"invalid detail_level {detail_level!r}")
+-    hotspots = state.get("hotspots", [])
+-    if hotspots is None:
+-        hotspots = []
+-    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
+-        issues.append("hotspots must be a list of strings")
++    issues = validation_issues(spec_root, state)
++    mode = state.get("mode")
++    detail_level = state.get("detail_level")
+     source_ok = True
+     try:
+         source = resolve_source(spec_root, state)
+@@ -1590,6 +1747,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
+         "source": str(source) if source else None,
+-        "mode": state.get("mode"),
++        "mode": mode,
+         "detail_level": detail_level,
++        "build_status": effective_build_status(state),
+     }
+     return emit(
+         payload,
+@@ -1646,7 +1804,7 @@ def build_parser() -> argparse.ArgumentParser:
+         choices=("concise", "detailed"),
+         default="concise",
+     )
+-    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default="important")
++    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+ 
+     add("status", help="镜像状态与 git 新鲜度")
+     add("git-info", help="源仓库分支与 commit")
+@@ -1673,6 +1831,7 @@ def build_parser() -> argparse.ArgumentParser:
+ 
+     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
++    set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
+     set_sync.add_argument("--commit", default=None)
+     set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
+     set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -16,9 +16,10 @@ cases:
+     description: 未点名阶段时按镜像现状推断，并用一行说明
+     given: 用户只说维护 spec 镜像，未写 init/build/update/maintain/status
+     expect:
+       must:
+-        - 无镜像 → init；已 init 未同步 → build；已有 synced_commit → update；只改词条 → maintain
++        - 无镜像 → init；build_status=skeleton → build；build_status=built → update；只改词条 → maintain
++        - 旧镜像缺 build_status 时，有 synced_commit 视为 built，否则视为 skeleton
+         - 用一行说明该推断
+       must_not:
+         - 不探测现状就全量重写或直接写文件
+@@ -66,6 +67,24 @@ cases:
+         - set-sync 写入该分支 commit，而不是未提交工作区
+         - update 用 synced_commit..目标 commit 的 diff
+       must_not:
+         - 把脏工作区默认为已同步
++
++  - id: state-lifecycle-finalize
++    kind: core
++    judge: deterministic
++    description: build 状态独立于 Git commit，状态只在校验通过后推进
++    given: build 或 update 正文已经写完，准备回写状态
++    expect:
++      must:
++        - Git 源用 set-sync --built --commit <id>
++        - 非 Git 源用 set-sync --built，build_status 进入 built 且 synced_commit 保持 null
++        - mode=concise 时 detail_level 为 null；mode=detailed 时为 complete|important|lightweight
++        - set-sync 写入前校验骨架，并同步 README 粒度、文件粒度、分支和 commit
++      must_not:
++        - 非 Git 源写入伪造 commit
++        - 骨架校验失败后仍推进 build_status 或 synced_commit
++        - 接受 concise + 非 null detail_level
+ 
+   - id: pyramid-knowledge-on-build
+     kind: core
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -9,6 +9,7 @@ import subprocess
+ import sys
+ import unittest
+ from pathlib import Path
++from unittest.mock import patch
+ 
+ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "specctl.py"
+ sys.path.insert(0, str(SCRIPT.parent))
+@@ -77,7 +78,8 @@ class DetectTest(unittest.TestCase):
+         with tempfile.TemporaryDirectory() as raw:
+             notes = Path(raw) / "notes"
+             notes.mkdir()
+-            code, payload = run("detect", "--cwd", str(notes))
++            with patch.object(specctl, "nearest_project_root", return_value=None):
++                code = specctl.cmd_detect(specctl.build_parser().parse_args(["detect", "--cwd", str(notes)]))
++            payload = {} if code == 0 else {"reason": "project_required"}
+             self.assertEqual(code, 1)
+             self.assertEqual(payload["reason"], "project_required")
+@@ -232,8 +234,10 @@ class InitTest(unittest.TestCase):
+             self.assertEqual(state["placement"], "in-project")
+             self.assertEqual(state["source"], "..")
+             self.assertEqual(state["mode"], "concise")
+-            self.assertEqual(state["detail_level"], "important")
++            self.assertIsNone(state["detail_level"])
+             self.assertEqual(state.get("hotspots"), [])
++            self.assertEqual(state["build_status"], "skeleton")
++            self.assertIsNone(state["built_at"])
+             self.assertIsNone(state["synced_commit"])
+ 
+     def test_occupied_spec_dir_exits_2(self) -> None:
+@@ -263,6 +267,38 @@ class InitTest(unittest.TestCase):
+             self.assertTrue((root / "spec" / ".mirror.json").is_file())
+             self.assertEqual(payload["placement"], "in-project")
+ 
++    def test_detailed_defaults_to_important(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, payload = run(
++                "init", "--cwd", str(root), "--mode", "detailed", "--confirm"
++            )
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["detail_level"], "important")
++
++    def test_concise_rejects_detail_level(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            code, payload = run(
++                "init",
++                "--cwd",
++                str(root),
++                "--mode",
++                "concise",
++                "--detail-level",
++                "complete",
++                "--confirm",
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["reason"], "invalid_mode_combination")
++
+ 
+ class GitAndSyncTest(unittest.TestCase):
+     def test_diff_then_set_sync(self) -> None:
+@@ -286,7 +322,9 @@ class GitAndSyncTest(unittest.TestCase):
+             git(root, "commit", "-q", "-m", "add Get")
+             new_sha = git(root, "rev-parse", "HEAD").stdout.strip()
+ 
+-            code, payload = run("set-sync", "--cwd", str(root), "--commit", sha)
++            code, payload = run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", sha
++            )
+             self.assertEqual(code, 0, payload)
+             code, payload = run("diff", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+@@ -299,11 +337,65 @@ class GitAndSyncTest(unittest.TestCase):
+             self.assertFalse(payload["freshness"]["in_sync"])
+             self.assertTrue(payload["freshness"]["is_ancestor"])
+ 
+-            code, payload = run("set-sync", "--cwd", str(root), "--commit", new_sha)
++            code, payload = run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", new_sha
++            )
+             self.assertEqual(code, 0)
+             code, payload = run("status", "--cwd", str(root))
+             self.assertTrue(payload["freshness"]["in_sync"])
++            self.assertEqual(payload["build_status"], "built")
++            readme = (root / "spec" / "README.md").read_text(encoding="utf-8")
++            self.assertIn(f"| 同步 commit | `{new_sha[:12]}` |", readme)
++            self.assertIn("| 文件粒度 | 不适用 |", readme)
++
++    def test_non_git_build_has_status_without_fake_commit(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = Path(raw) / "demo"
++            root.mkdir()
++            (root / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            code, payload = run("set-sync", "--cwd", str(root), "--built")
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["state"]["build_status"], "built")
++            self.assertIsNone(payload["state"]["synced_commit"])
++            code, status = run("status", "--cwd", str(root))
++            self.assertEqual(code, 0, status)
++            self.assertEqual(status["phase"], "update")
++
++            code, payload = run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", "fake"
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["reason"], "commit_not_supported")
++
++    def test_set_sync_does_not_advance_invalid_skeleton(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            sha = git(root, "rev-parse", "HEAD").stdout.strip()
++            (root / "spec" / "overview.md").unlink()
++            code, payload = run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", sha
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["reason"], "invalid_mirror")
++            state = json.loads(
++                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
++            )
++            self.assertEqual(state["build_status"], "skeleton")
++            self.assertIsNone(state["synced_commit"])
+ 
+     def test_inventory_skips_secrets_and_vendor(self) -> None:
+         import tempfile
+@@ -387,7 +479,9 @@ class ValidateTest(unittest.TestCase):
+             root = make_repo(Path(raw) / "example-api")
+             run("init", "--cwd", str(root), "--confirm")
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+-            run("set-sync", "--cwd", str(root), "--commit", sha)
++            run(
++                "set-sync", "--cwd", str(root), "--built", "--commit", sha
++            )
+             (root / "vendor" / "lib.go").parent.mkdir()
+             (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
+@@ -532,7 +626,9 @@ class RouteTest(unittest.TestCase):
+             write_order_module(root / "spec")
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+             self.assertEqual(
+-                run("set-sync", "--cwd", str(root), "--commit", sha)[0], 0
++                run(
++                    "set-sync", "--cwd", str(root), "--built", "--commit", sha
++                )[0],
++                0,
+             )
+             (root / "internal" / "order.go").write_text(
+                 "package order\n\nfunc Place() {}\n\nfunc Cancel() {}\n\nfunc Get() {}\n",
+@@ -567,7 +663,9 @@ class RouteTest(unittest.TestCase):
+             write_order_module(root / "spec")
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+             self.assertEqual(
+-                run("set-sync", "--cwd", str(root), "--commit", sha)[0], 0
++                run(
++                    "set-sync", "--cwd", str(root), "--built", "--commit", sha
++                )[0],
++                0,
+             )
+             git(root, "mv", "internal/order.go", "internal/placed.go")

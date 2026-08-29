@@ -1,0 +1,18 @@
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -79,10 +79,10 @@ class DetectTest(unittest.TestCase):
+         with tempfile.TemporaryDirectory() as raw:
+             notes = Path(raw) / "notes"
+             notes.mkdir()
+             with patch.object(specctl, "nearest_project_root", return_value=None):
+-                code = specctl.cmd_detect(specctl.build_parser().parse_args(["detect", "--cwd", str(notes)]))
+-            payload = {} if code == 0 else {"reason": "project_required"}
+-            self.assertEqual(code, 1)
+-            self.assertEqual(payload["reason"], "project_required")
++                with self.assertRaises(specctl.SpecError) as raised:
++                    specctl.detect_layout(notes)
++            self.assertEqual(raised.exception.reason, "project_required")
+ 
+     def test_external_placement_uses_project_slug(self) -> None:
+         import tempfile

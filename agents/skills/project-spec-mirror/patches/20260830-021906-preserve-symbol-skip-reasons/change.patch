@@ -1,0 +1,34 @@
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -1483,10 +1483,15 @@ def cmd_symbols(args: argparse.Namespace) -> int:
+             )
+             continue
+-        if skip_inventory_path(source, rel, gitlinks=gitlinks) or not text_path(source, rel):
++        if skip_inventory_path(source, rel, gitlinks=gitlinks):
+             files_out.append(
+-                {"path": rel, "skipped": True, "reason": "non_text_or_excluded", "symbols": []}
++                {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
+             )
+             continue
++        if not text_path(source, rel):
++            files_out.append(
++                {"path": rel, "skipped": True, "reason": "non_text", "symbols": []}
++            )
++            continue
+         if not path.is_file():
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -489,6 +489,11 @@ class GitAndSyncTest(unittest.TestCase):
+             )
+             self.assertEqual(code, 0, symbols)
+             self.assertEqual(symbols["files"][0]["reason"], "ignored")
++            code, symbols = run(
++                "symbols", "--cwd", str(root), "--file", "opaque.data"
++            )
++            self.assertEqual(code, 0, symbols)
++            self.assertEqual(symbols["files"][0]["reason"], "non_text")
+ 
+ 
+ class SymbolsTest(unittest.TestCase):
