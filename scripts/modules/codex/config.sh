@@ -9,8 +9,11 @@ codex_profile=""
 while [ $# -gt 0 ]; do
   case "$1" in
   -f | --profile | --codex-profile)
-    if [ -z "${2:-}" ]; then
+    if [ -z "${2:-}" ] || [[ "${2}" == -* ]]; then
       echo "错误: $1 需要 Codex profile 名称" >&2
+      python3 "$DOTFILES_ROOT/scripts/modules/codex/merge_config.py" \
+        --vendor-dir "$DOTFILES_ROOT/agents/vendors/codex" \
+        --describe-profiles >&2 || true
       dotf_result_failed "missing Codex profile name"
       exit 1
     fi

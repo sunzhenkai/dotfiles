@@ -88,8 +88,43 @@ def list_profiles(vendor_dir: Path) -> list[str]:
 
 def profile_path(vendor_dir: Path, name: str) -> Path:
     resolved = resolve_profile_name(name)
-    path = vendor_dir / f"{resolved}.config.toml"
-    return path
+    return vendor_dir / f"{resolved}.config.toml"
+
+
+def profile_default_model(path: Path) -> str:
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = ASSIGN_RE.match(line)
+        if match and match.group(1) == "model":
+            value = line.split("=", 1)[1].strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            return value
+    return ""
+
+
+def alias_names(canonical: str) -> list[str]:
+    return sorted(alias for alias, target in ALIASES.items() if target == canonical)
+
+
+def describe_profiles(vendor_dir: Path, current: str | None = None) -> str:
+    names = list_profiles(vendor_dir)
+    if current:
+        current = resolve_profile_name(current)
+    lines = [
+        "可用 Codex profile:",
+        "",
+        f"  {'NAME':<10} {'DEFAULT MODEL':<28} ALIAS",
+    ]
+    for name in names:
+        model = profile_default_model(profile_path(vendor_dir, name))
+        mark = "*" if current and name == current else " "
+        aliases = ", ".join(alias_names(name))
+        lines.append(f"{mark} {name:<10} {model:<28} {aliases}".rstrip())
+    lines.append("")
+    if current:
+        lines.append(f"当前默认: {current}")
+    lines.append("用法: dotf codex -f <profile>")
+    return "\n".join(lines) + "\n"
 
 
 def merge(base: str, profile: str | None, local: str | None) -> str:
@@ -107,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Merge Codex base + profile + local")
     parser.add_argument("--vendor-dir", type=Path, default=None)
     parser.add_argument("--list-profiles", action="store_true")
+    parser.add_argument("--describe-profiles", action="store_true")
+    parser.add_argument("--current", default=None, help="当前默认 profile（describe 时标记）")
     parser.add_argument("--resolve", metavar="NAME", default=None)
     parser.add_argument("--base", type=Path, default=None)
     parser.add_argument("--profile", type=Path, default=None)
@@ -114,10 +151,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    if args.list_profiles:
+    if args.list_profiles or args.describe_profiles:
         if args.vendor_dir is None:
-            parser.error("--list-profiles 需要 --vendor-dir")
-        print("\n".join(list_profiles(args.vendor_dir)))
+            parser.error("--list-profiles / --describe-profiles 需要 --vendor-dir")
+        if args.describe_profiles:
+            sys.stdout.write(describe_profiles(args.vendor_dir, args.current))
+        else:
+            print("\n".join(list_profiles(args.vendor_dir)))
         return 0
 
     if args.resolve is not None:
@@ -125,11 +165,9 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--resolve 需要 --vendor-dir")
         resolved = resolve_profile_name(args.resolve)
         path = profile_path(args.vendor_dir, resolved)
-        names = list_profiles(args.vendor_dir)
-        extra = sorted(set(ALIASES) - set(names))
-        allowed = ", ".join(names + extra)
         if not path.is_file():
-            print(f"未知 Codex profile: {args.resolve}（可用: {allowed}）", file=sys.stderr)
+            print(f"未知 Codex profile: {args.resolve}", file=sys.stderr)
+            sys.stderr.write(describe_profiles(args.vendor_dir))
             return 2
         print(resolved)
         print(path)

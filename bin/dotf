@@ -8,6 +8,17 @@
 # scripts/{config,install,doctor}.sh 会各自 export 自己的一份。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+codex_print_profiles() {
+  local current="minimax"
+  if [ -f "${HOME}/.codex/.dotf-profile" ]; then
+    current="$(tr -d '[:space:]' <"${HOME}/.codex/.dotf-profile")"
+  fi
+  python3 "$SCRIPT_DIR/scripts/modules/codex/merge_config.py" \
+    --vendor-dir "$SCRIPT_DIR/agents/vendors/codex" \
+    --describe-profiles \
+    --current "$current"
+}
+
 codex_normalize_profile() {
   case "$1" in
   bigmodel | zai) printf '%s\n' "zhipu" ;;
@@ -644,6 +655,7 @@ show_help() {
   echo "  dotf sdk -i --dry-run       # 预览安装计划"
   echo "  dotf nvim -c --yes          # 非交互配置"
   echo "  dotf init --dry-run         # 预览 init 计划"
+  echo "  dotf codex -f               # 列出可用 Codex provider"
   echo "  dotf codex -f kimi          # 切换 Codex 默认 provider（隐含 -c）"
   echo "  dotf codex -c --profile scnet"
 }
@@ -807,9 +819,9 @@ main() {
       ;;
     -f | --codex-profile)
       shift
-      if [ -z "${1:-}" ]; then
-        echo "错误: -f/--codex-profile 需要 Codex provider 名称"
-        exit 1
+      if [ -z "${1:-}" ] || [[ "${1}" == -* ]]; then
+        codex_print_profiles
+        exit 0
       fi
       config_extra+=("--codex-profile" "$1")
       ;;
@@ -872,7 +884,9 @@ main() {
         [ "$x" = "codex" ] && has_codex_mod=1
       done
       if [ "$has_codex_mod" -eq 0 ]; then
-        echo "错误: -f/--profile <provider> 仅支持 dotf codex（可用: minimax nativex kimi zhipu scnet）"
+        echo "错误: -f/--profile <provider> 仅支持 dotf codex"
+        echo ""
+        codex_print_profiles
         exit 1
       fi
     fi

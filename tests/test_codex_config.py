@@ -100,6 +100,7 @@ install_codex
         tmp_home / ".codex" / "kimi.config.toml"
     ).is_symlink()
     assert (tmp_home / ".codex" / "model-catalogs" / "scnet-catalog.json").exists()
+    assert (tmp_home / ".codex" / "model-catalogs" / "minimax-catalog.json").exists()
 
 
 def test_cli_codex_f_dry_run() -> None:
@@ -144,3 +145,32 @@ def test_unknown_profile_resolve_fails() -> None:
     )
     assert rc.returncode == 2
     assert "未知" in rc.stderr
+    assert "kimi" in rc.stderr
+
+
+def test_cli_codex_f_lists_profiles() -> None:
+    r = subprocess.run(
+        ["bash", str(ROOT / "bin" / "dotf"), "codex", "-f"],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    out = r.stdout
+    assert "可用 Codex profile" in out
+    for name in ("minimax", "nativex", "kimi", "zhipu", "scnet"):
+        assert name in out
+    assert "kimi-for-coding" in out
+    assert "DeepSeek-V4-Flash-0731" in out
+    assert "glm-5.3" in out
+    assert "用法: dotf codex -f <profile>" in out
+
+
+def test_describe_profiles_marks_current_and_aliases() -> None:
+    from merge_config import describe_profiles
+
+    text = describe_profiles(VENDOR, current="bigmodel")
+    assert "* zhipu" in text
+    assert "bigmodel" in text
+    assert "当前默认: zhipu" in text

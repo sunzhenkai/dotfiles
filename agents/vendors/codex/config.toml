@@ -21,9 +21,9 @@ model = "MiniMax-M3"
 model_provider = "minimax"
 model_context_window = 1000000
 # 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
-# 安装后位于 ~/.codex/model-catalogs/custom-catalog.json（symlink 到本仓库文件）。
+# 安装后位于 ~/.codex/model-catalogs/minimax-catalog.json（symlink 到本仓库文件）。
 # 切回 NativeX 时由 nativex profile 覆盖为 nativex-catalog.json。
-model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"
+model_catalog_json = "~/.codex/model-catalogs/minimax-catalog.json"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"

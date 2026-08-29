@@ -8,6 +8,7 @@
 
 ```shell
 dotf codex -c                    # 按上次选择（或默认 MiniMax）重装配置
+dotf codex -f                    # 列出可用 provider
 dotf codex -f kimi               # 切换默认 provider（隐含 -c）
 dotf codex -c --profile zhipu    # 同上；bigmodel 是 zhipu 的别名
 dotf codex -f scnet
@@ -20,7 +21,7 @@ codex --profile scnet            # 仅本次会话走 SCNet
 
 | profile | 端点 | 鉴权 | 默认模型 | catalog |
 | --- | --- | --- | --- | --- |
-| `minimax` | `https://api.minimaxi.com/v1` | `MINIMAX_API_KEY` | `MiniMax-M3` | `custom-catalog.json` |
+| `minimax` | `https://api.minimaxi.com/v1` | `MINIMAX_API_KEY` | `MiniMax-M3` | `minimax-catalog.json` |
 | `nativex` | `https://ailink.nativex.com/v1` | `NATIVEX_API_KEY` | `gpt-5.6-luna` | `nativex-catalog.json` |
 | `kimi` | `https://api.kimi.com/coding/v1` | `KIMI_API_KEY` | `kimi-for-coding` | `kimi-catalog.json` |
 | `zhipu`（别名 `bigmodel`） | `https://open.bigmodel.cn/api/v1` | `ZHIPU_API_KEY` | `glm-5.3` | `zhipu-catalog.json` |
@@ -99,7 +100,7 @@ dotf codex -c
 
 通过 `model_catalog_json` 声明当前 provider 各模型的 reasoning level、system prompt、工具类型等。配置完成后，在 Codex CLI 中输入 `/model`，即可在列表中切换模型与 reasoning level。
 
-`custom-catalog.json` 常用字段：
+`minimax-catalog.json`（及其他 `*-catalog.json`）常用字段：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -164,7 +165,7 @@ codex exec -m glm-5.3 "..."        # 指定模型（须属于当前 catalog）
 
 ### 智谱 GLM Coding Plan（open.bigmodel.cn）
 
-官方 Codex 端点已是 OpenAI Responses：`https://open.bigmodel.cn/api/v1`（不要用 Chat Completions 的 `/api/coding/paas/v4`）。默认 `glm-5.3`；`/model` 还可切 `glm-5-turbo` / `glm-5.2` / `glm-5.1` / `glm-5`。`dotf codex -f bigmodel` 与 `-f zhipu` 相同。
+官方 Codex 端点已是 OpenAI Responses：`https://open.bigmodel.cn/api/v1`（不要用 Chat Completions 的 `/api/coding/paas/v4`）。默认 `glm-5.3`；`/model` 还可切 `glm-5.3-flash`（原生多模态、Coding Plan 额度约为 5.3 的 3 倍）/ `glm-5-turbo` / `glm-5.2` / `glm-5.1` / `glm-5`。`dotf codex -f bigmodel` 与 `-f zhipu` 相同。
 
 ### SCNet
 

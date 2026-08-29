@@ -2,4 +2,4 @@
 model = "MiniMax-M3"
 model_provider = "minimax"
 model_context_window = 1000000
-model_catalog_json = "~/.codex/model-catalogs/custom-catalog.json"
+model_catalog_json = "~/.codex/model-catalogs/minimax-catalog.json"
