@@ -1,0 +1,26 @@
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -49,9 +49,21 @@
+ | 处理线 | 每步落到模块 + 符号 + 失败形态 |
+ | 恢复投影 | 同一批 INDEX（及 `surface/config.md`）写深：邻接协议、存储差、接口目录、拓扑、可再生命令 |
+ | 契约 | 能追溯 SOURCE；切片尽量到 specified |
+-| `notes/` | **默认仍不建**。只对用户点名或符合热点条件的路径建 |
++| `notes/` | 分档位：`concise` / `lightweight` 不建；`detail_level=important` 默认不建、用户点名才建；`detail_level=complete` **必建** ≥5 篇，按下方 5 类触发条件清单枚举（满足任一类即建 1 篇） |
++
++### `detail_level=complete` 下 notes/ 的 5 类触发条件
++
++满足**任一**类即建 1 篇 notes/，整体 ≥5 篇、覆盖 ≥3 个模块：
++
++1. **跨文件契约**（builder 配对、init→extract 时序、依赖注入矩阵、shared l0_rfm 共享）—— 这些契约写在任何单个模块 README 都会破坏层级。
++2. **一致性失败路径与正常路径不同**（parse 失败 ≠ throw、L1 抽 vs L0/L2 不抛、silent corruption）—— 失败处理是"正确性契约"，不写出来下游会按 happy path 假设。
++3. **并发/锁的 race 分析**（shared_mutex double-check、is_done_ 标记、`lock_guard`+double-check 防 race）—— 阅读源码看不出"为什么要写两遍 if"。
++4. **监控盲区**（声明了 bvar 但未 <<1、FE_ERROR 无对应 counter、`AddCounter` 接错 msg 维度）—— 运维看不到失败率。
++5. **框架/预处理器的使用约束**（BOOST_PP_SEQ_FOR_EACH 宏展开顺序、字段名规范、ABI 兼容性、`--ff-only` 而非默认 pull）—— 写入宏展开顺序的硬规则，下次扩展不会破 ABI。
++
++notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequencing.md` / `md5-cluster-id-gen.md`），不是源相对路径。源路径仅在 notes/ 页内 `真身路径` 一栏标注，与 [routing.md](routing.md) 的 `notes/<source-rel>.md` 命名并列存在，按需选用。`complete` 模式下两种命名都允许，topic 是默认推荐。
++
+ 
+-实现要点写「怎么做」和「为什么这样」，不要贴大段源码。需要证据时引用符号名和相对路径。
+ 
+ `symbols` 只提供候选名单；Agent 必须对照源文件写人话，禁止把 AST 原样倒进 Markdown。对将整理的非测试文件跑 `symbols`，用返回名单核对方法不得漏列。不要对全 inventory 或测试文件逐方法抽取。
+ 

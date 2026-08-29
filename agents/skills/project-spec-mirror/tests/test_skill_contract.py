@@ -21,6 +21,7 @@ EXPECTED = {
     "inventory",
     "symbols",
     "diff",
+    "coverage",
     "route",
     "set-sync",
     "validate",

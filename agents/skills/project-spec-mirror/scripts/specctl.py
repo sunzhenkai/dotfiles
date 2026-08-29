@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """specctl — project-spec-mirror 的机械管理工作。
 
-只做路径探测、目录骨架、git 版本、文件清单、符号提取与镜像状态。
+只做路径探测、目录骨架、git 版本、文件清单、符号提取、文件表覆盖与镜像状态。
 给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
 
 stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
@@ -1042,6 +1042,90 @@ def prefix_matches(path: str, root: str) -> bool:
     return path == root or path.startswith(root + "/")
 
 
+def normalize_scope(raw: object) -> list[str]:
+    if not raw:
+        return []
+    if not isinstance(raw, list):
+        return []
+    seen: list[str] = []
+    for item in raw:
+        rel = str(item).strip().lstrip("./")
+        if rel and rel not in seen:
+            seen.append(rel)
+    return seen
+
+
+def in_scope(path: str, prefixes: list[str]) -> bool:
+    if not prefixes:
+        return True
+    return any(prefix_matches(path, prefix) for prefix in prefixes)
+
+
+def is_code_file(rel: str) -> bool:
+    return Path(rel).suffix.lower() in CODE_EXTS
+
+
+def collect_file_table_entries(modules: list[dict[str, Any]]) -> list[str]:
+    entries: list[str] = []
+    seen: set[str] = set()
+    for module in modules:
+        for rel in module.get("files") or []:
+            if rel and rel not in seen:
+                seen.add(rel)
+                entries.append(rel)
+    return entries
+
+
+def collect_coverage(
+    spec_root: Path,
+    source: Path,
+    state: dict[str, Any],
+    *,
+    path: str | None = None,
+) -> dict[str, Any]:
+    scope = normalize_scope(state.get("scope"))
+    files = inventory_files(source, path)
+    code_files = [item for item in files if is_code_file(item)]
+    modules = load_modules(spec_root)
+    entries = collect_file_table_entries(modules)
+    required = [item for item in code_files if in_scope(item, scope)]
+    unscoped = [item for item in code_files if item not in required]
+    missing = [
+        item
+        for item in required
+        if not any(prefix_matches(item, entry) for entry in entries)
+    ]
+    extra = [
+        entry
+        for entry in entries
+        if not any(prefix_matches(item, entry) for item in files)
+    ]
+    mode = state.get("mode") or "concise"
+    detail_level = state.get("detail_level", "important")
+    if detail_level not in DETAIL_LEVELS:
+        detail_level = "important"
+    enforce = mode == "detailed" and detail_level in {"important", "complete"}
+    ok = not (enforce and missing)
+    return {
+        "ok": ok,
+        "result": "coverage",
+        "spec_root": str(spec_root),
+        "mode": mode,
+        "detail_level": detail_level,
+        "enforce": enforce,
+        "scope": scope,
+        "path": path,
+        "inventory_count": len(files),
+        "code_file_count": len(code_files),
+        "required_count": len(required),
+        "covered_count": len(required) - len(missing),
+        "missing": missing,
+        "extra": extra,
+        "unscoped": unscoped,
+        "not_built": not bool(modules),
+    }
+
+
 def match_file_table(path: str, modules: list[dict[str, Any]]) -> list[str]:
     return [module["name"] for module in modules if path in module["files"]]
 
@@ -1416,6 +1500,23 @@ def cmd_diff(args: argparse.Namespace) -> int:
     return emit({"ok": True, "result": "diff", **payload}, summary=summary)
 
 
+def cmd_coverage(args: argparse.Namespace) -> int:
+    cwd = Path(args.cwd).expanduser().resolve()
+    spec_root = find_spec_root(
+        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+    )
+    state = load_state(spec_root)
+    source = resolve_source(spec_root, state)
+    payload = collect_coverage(spec_root, source, state, path=args.path)
+    missing_n = len(payload["missing"])
+    extra_n = len(payload["extra"])
+    summary = (
+        f"coverage: {payload['covered_count']}/{payload['required_count']} "
+        f"missing={missing_n} extra={extra_n}"
+    )
+    return emit(payload, code=0 if payload["ok"] else 1, summary=summary)
+
+
 def cmd_route(args: argparse.Namespace) -> int:
     cwd = Path(args.cwd).expanduser().resolve()
     spec_root = find_spec_root(
@@ -1606,6 +1707,7 @@ COMMANDS = {
     "inventory": cmd_inventory,
     "symbols": cmd_symbols,
     "diff": cmd_diff,
+    "coverage": cmd_coverage,
     "route": cmd_route,
     "set-sync": cmd_set_sync,
     "validate": cmd_validate,
@@ -1664,6 +1766,9 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--from", dest="from_commit", default=None)
     diff.add_argument("--to", dest="to", default=None)
     diff.add_argument("--path", default=None)
+
+    coverage = add("coverage", help="对照 inventory 与模块文件表")
+    coverage.add_argument("--path", default=None, help="仅核对此前缀下的文件")
 
     route = add("route", help="把 diff 文件映射到模块 README")
     route.add_argument("--from", dest="from_commit", default=None)

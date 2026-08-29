@@ -80,7 +80,6 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
 | `git-info` | 是否 git、默认分支、指定分支的 commit |
 | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
-| `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
 | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
 | `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
 | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
@@ -92,10 +91,9 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 1. 任何写入阶段都先 `detect`（或 `status`）。不要手建目录绕过 `init`。
 2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
-4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 对照文件表并说明限制。
+4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为对 `inventory` 做全量对照并说明限制。
 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
 6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
-7. 核对模块文件表覆盖必须跑 `$SPECCTL coverage`，不要手对 `inventory`。只要求代码文件（`CODE_EXTS`）出现在「文件」表；配置/CI/compose 等走恢复投影。`detailed` 且 `important`/`complete` 时 `enforce` 为真，`missing` 必须清空才能 `set-sync`。concise / lightweight 把 `missing` 当提示。文件表可用精确路径或目录范围。
 
 ## 工作流
 
@@ -118,8 +116,8 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径。
 
-9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
-10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+9. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
 
 ### update
 
@@ -129,11 +127,11 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
-7. 改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再 `set-sync` + `validate`，changelog 追加本轮摘要
+7. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
 
 ### maintain
 
-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表，再跑 `$SPECCTL coverage`；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
 
 ### status
 

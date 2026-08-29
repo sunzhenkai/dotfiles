@@ -1,0 +1,408 @@
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env python3
+ """specctl — project-spec-mirror 的机械管理工作。
+ 
+-只做路径探测、目录骨架、git 版本、文件清单、符号提取与镜像状态。
++只做路径探测、目录骨架、git 版本、文件清单、符号提取、文件表覆盖与镜像状态。
+ 给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
+ 
+ stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
+@@ -1042,6 +1042,90 @@
+     return path == root or path.startswith(root + "/")
+ 
+ 
++def normalize_scope(raw: object) -> list[str]:
++    if not raw:
++        return []
++    if not isinstance(raw, list):
++        return []
++    seen: list[str] = []
++    for item in raw:
++        rel = str(item).strip().lstrip("./")
++        if rel and rel not in seen:
++            seen.append(rel)
++    return seen
++
++
++def in_scope(path: str, prefixes: list[str]) -> bool:
++    if not prefixes:
++        return True
++    return any(prefix_matches(path, prefix) for prefix in prefixes)
++
++
++def is_code_file(rel: str) -> bool:
++    return Path(rel).suffix.lower() in CODE_EXTS
++
++
++def collect_file_table_entries(modules: list[dict[str, Any]]) -> list[str]:
++    entries: list[str] = []
++    seen: set[str] = set()
++    for module in modules:
++        for rel in module.get("files") or []:
++            if rel and rel not in seen:
++                seen.add(rel)
++                entries.append(rel)
++    return entries
++
++
++def collect_coverage(
++    spec_root: Path,
++    source: Path,
++    state: dict[str, Any],
++    *,
++    path: str | None = None,
++) -> dict[str, Any]:
++    scope = normalize_scope(state.get("scope"))
++    files = inventory_files(source, path)
++    code_files = [item for item in files if is_code_file(item)]
++    modules = load_modules(spec_root)
++    entries = collect_file_table_entries(modules)
++    required = [item for item in code_files if in_scope(item, scope)]
++    unscoped = [item for item in code_files if item not in required]
++    missing = [
++        item
++        for item in required
++        if not any(prefix_matches(item, entry) for entry in entries)
++    ]
++    extra = [
++        entry
++        for entry in entries
++        if not any(prefix_matches(item, entry) for item in files)
++    ]
++    mode = state.get("mode") or "concise"
++    detail_level = state.get("detail_level", "important")
++    if detail_level not in DETAIL_LEVELS:
++        detail_level = "important"
++    enforce = mode == "detailed" and detail_level in {"important", "complete"}
++    ok = not (enforce and missing)
++    return {
++        "ok": ok,
++        "result": "coverage",
++        "spec_root": str(spec_root),
++        "mode": mode,
++        "detail_level": detail_level,
++        "enforce": enforce,
++        "scope": scope,
++        "path": path,
++        "inventory_count": len(files),
++        "code_file_count": len(code_files),
++        "required_count": len(required),
++        "covered_count": len(required) - len(missing),
++        "missing": missing,
++        "extra": extra,
++        "unscoped": unscoped,
++        "not_built": not bool(modules),
++    }
++
++
+ def match_file_table(path: str, modules: list[dict[str, Any]]) -> list[str]:
+     return [module["name"] for module in modules if path in module["files"]]
+ 
+@@ -1416,6 +1500,23 @@
+     return emit({"ok": True, "result": "diff", **payload}, summary=summary)
+ 
+ 
++def cmd_coverage(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = load_state(spec_root)
++    source = resolve_source(spec_root, state)
++    payload = collect_coverage(spec_root, source, state, path=args.path)
++    missing_n = len(payload["missing"])
++    extra_n = len(payload["extra"])
++    summary = (
++        f"coverage: {payload['covered_count']}/{payload['required_count']} "
++        f"missing={missing_n} extra={extra_n}"
++    )
++    return emit(payload, code=0 if payload["ok"] else 1, summary=summary)
++
++
+ def cmd_route(args: argparse.Namespace) -> int:
+     cwd = Path(args.cwd).expanduser().resolve()
+     spec_root = find_spec_root(
+@@ -1606,6 +1707,7 @@
+     "inventory": cmd_inventory,
+     "symbols": cmd_symbols,
+     "diff": cmd_diff,
++    "coverage": cmd_coverage,
+     "route": cmd_route,
+     "set-sync": cmd_set_sync,
+     "validate": cmd_validate,
+@@ -1665,6 +1767,9 @@
+     diff.add_argument("--to", dest="to", default=None)
+     diff.add_argument("--path", default=None)
+ 
++    coverage = add("coverage", help="对照 inventory 与模块文件表")
++    coverage.add_argument("--path", default=None, help="仅核对此前缀下的文件")
++
+     route = add("route", help="把 diff 文件映射到模块 README")
+     route.add_argument("--from", dest="from_commit", default=None)
+     route.add_argument("--to", dest="to", default=None)
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -80,6 +80,7 @@
+ | `symbols` | 从代码文件提取函数/类型/变量，供详尽模式填写模块表与热点页 |
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+ | `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
++| `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+ | `set-sync` | 正文写完后回写 commit / branch / mode / scope / hotspots / 时间 |
+ | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
+@@ -91,9 +92,10 @@
+ 1. 任何写入阶段都先 `detect`（或 `status`）。不要手建目录绕过 `init`。
+ 2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
+ 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
+-4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为对 `inventory` 做全量对照并说明限制。
++4. 非 git 源：仍可 init/build/maintain；`status` 标明无 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 对照文件表并说明限制。
+ 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
+ 6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
++7. 核对模块文件表覆盖必须跑 `$SPECCTL coverage`，不要手对 `inventory`。只要求代码文件（`CODE_EXTS`）出现在「文件」表；配置/CI/compose 等走恢复投影。`detailed` 且 `important`/`complete` 时 `enforce` 为真，`missing` 必须清空才能 `set-sync`。concise / lightweight 把 `missing` 当提示。文件表可用精确路径或目录范围。
+ 
+ ## 工作流
+ 
+@@ -116,8 +118,8 @@
+ 
+ 8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径。
+ 
+-9. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+-9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
++9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
++10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update
+ 
+@@ -127,11 +129,11 @@
+ 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+ 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
+-7. 写完 `set-sync` + `validate`，changelog 追加本轮摘要
++7. 改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再 `set-sync` + `validate`，changelog 追加本轮摘要
+ 
+ ### maintain
+ 
+-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
++用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表，再跑 `$SPECCTL coverage`；只有用户明确要详注或该文件属于选定的重要文件范围时才建或改 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+ 
+ ### status
+ 
+diff --git a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+--- a/agents/skills/project-spec-mirror/references/modes.md
++++ b/agents/skills/project-spec-mirror/references/modes.md
+@@ -40,6 +40,8 @@
+ 
+ 三档均不是“一文件一页”。文件表仍可一行一个文件。`important` 不得因为「不重要」而漏行：无独立业务含义的文件用一句话简述（测试、胶水、生成代码均可一行）；职责相同的简单文件可以合并为一行或以目录范围登记。`lightweight` 仍可只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
+ 
++写完文件表后跑 `$SPECCTL coverage`，不要手对 `inventory`。`missing` 只针对范围内代码文件；目录范围行可以覆盖其子路径。`enforce` 为真时必须清掉 `missing`。
++
+ 在简约之上**加深同一批页**，不复制一棵源文件树：
+ 
+ | 层 | 加深什么 |
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+--- a/agents/skills/project-spec-mirror/references/routing.md
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -42,4 +42,5 @@
+ - 每个模块 README 必须有「根」表与「文件」表，否则下一步 update 无法路由。
+ - 新增源文件：先落入某模块的根前缀，再补文件表一行。
+ - 源文件消失：文件表删行或标明废弃；不要默默删 `<!-- manual -->`。
++- 增删后跑 `$SPECCTL coverage`；`missing` / `extra` 以 CLI 为准，不要手对清单。
+ - `<!-- manual -->` 块不得覆盖。
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -5,7 +5,7 @@
+     kind: basic
+     judge: deterministic
+     description: 机械工作只通过 specctl；stdout JSON，退出码 0/1/2
+-    given: 需要探测、init、清单、diff、回写同步指针或校验骨架
++    given: 需要探测、init、清单、coverage、diff、回写同步指针或校验骨架
+     expect:
+       must:
+         - 使用 $SPECCTL（PATH 上的 specctl 或 scripts/specctl.py）
+@@ -35,7 +35,7 @@
+       must:
+         - 先跑 init 且不带 --confirm
+         - 退出码 2 时展示 spec_root / source / placement，用返回的 confirm_args 重跑
+-        - 骨架完成后进入 build，再 set-sync 与 validate
++        - 骨架完成后进入 build，写完文件表后跑 coverage，再 set-sync 与 validate
+       must_not:
+         - 把空骨架当成已完成镜像
+         - 未确认就创建 spec 目录
+@@ -194,6 +194,7 @@
+         - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
+         - lightweight 沿用当前轻量模式
+         - 将选择保存为 detail_level，并在后续 update 中沿用
++        - 写完文件表后跑 coverage；important/complete 的 missing 必须清空
+       must_not:
+         - 把 important 的核心方法只写成一句话职责
+         - 漏列工具方法
+@@ -222,6 +223,7 @@
+       must:
+         - 用 $SPECCTL route 把变更文件落到模块 README
+         - 跟链接改被波及的实体/处理线/切面
++        - 改完文件表后跑 coverage
+       must_not:
+         - 为每个变更源文件新建或重写 files/ 详页
+ 
+@@ -334,10 +336,24 @@
+     expect:
+       must:
+         - 仍可 init/build/maintain
+-        - update 用 inventory 全量对照并说明限制
++        - update 跑 coverage 对照文件表并说明限制
+       must_not:
+         - 伪造 synced_commit 或假装有分支 diff
+ 
++  - id: coverage-file-table-vs-inventory
++    kind: core
++    judge: deterministic
++    description: 用 coverage 对照 inventory 与模块文件表，不手对清单
++    given: build 或 update 已写模块文件表，或非 git 源要做 update
++    expect:
++      must:
++        - 跑 $SPECCTL coverage
++        - detailed + important/complete 时 missing 必须为空再 set-sync
++        - missing 只要求范围内代码文件；可用目录范围覆盖子路径
++      must_not:
++        - 手对 inventory 与文件表
++        - 因 README、go.mod、CI、compose 未进文件表而失败
++
+   - id: specctl-unit-tests
+     kind: regression
+     judge: deterministic
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -612,5 +612,116 @@
+             self.assertEqual(payload["issues"], [])
+ 
+ 
++class CoverageTest(unittest.TestCase):
++    def test_concise_reports_missing_without_failing(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertFalse(payload["enforce"])
++            self.assertTrue(payload["not_built"])
++            self.assertIn("internal/order.go", payload["missing"])
++            self.assertNotIn("README.md", payload["missing"])
++            self.assertNotIn("go.mod", payload["missing"])
++
++    def test_detailed_important_fails_until_file_table_covers_code(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            self.assertEqual(
++                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
++            )
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 1, payload)
++            self.assertTrue(payload["enforce"])
++            self.assertIn("internal/order.go", payload["missing"])
++            write_order_module(root / "spec")
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["missing"], [])
++            self.assertEqual(payload["covered_count"], payload["required_count"])
++
++    def test_directory_range_covers_and_extra_does_not_fail(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            self.assertEqual(
++                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
++            )
++            (root / "internal" / "extra.go").write_text(
++                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
++            )
++            git(root, "add", "internal/extra.go")
++            git(root, "commit", "-q", "-m", "extra")
++            write_order_module(root / "spec")
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 1, payload)
++            self.assertIn("internal/extra.go", payload["missing"])
++            readme = root / "spec" / "modules" / "order" / "README.md"
++            readme.write_text(
++                """# order
++
++## 根
++
++| 路径前缀 | 角色 |
++|----------|------|
++| `internal` | 领域包 |
++
++## 文件
++
++| 文件 | 职责 |
++|------|------|
++| `internal` | 领域包全部源文件 |
++| `internal/gone.go` | 已删除 |
++""",
++                encoding="utf-8",
++            )
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["missing"], [])
++            self.assertIn("internal/gone.go", payload["extra"])
++
++    def test_scope_and_path_limit_required_files(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            (root / "cmd").mkdir()
++            (root / "cmd" / "main.go").write_text(
++                "package main\n\nfunc main() {}\n", encoding="utf-8"
++            )
++            git(root, "add", "cmd/main.go")
++            git(root, "commit", "-q", "-m", "cmd")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            self.assertEqual(
++                run(
++                    "set-sync",
++                    "--cwd",
++                    str(root),
++                    "--mode",
++                    "detailed",
++                    "--scope",
++                    "internal",
++                )[0],
++                0,
++            )
++            write_order_module(root / "spec")
++            code, payload = run("coverage", "--cwd", str(root))
++            self.assertEqual(code, 0, payload)
++            self.assertIn("cmd/main.go", payload["unscoped"])
++            self.assertNotIn("cmd/main.go", payload["missing"])
++            code, payload = run("coverage", "--cwd", str(root), "--path", "cmd")
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["required_count"], 0)
++            self.assertIn("cmd/main.go", payload["unscoped"])
++
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -21,6 +21,7 @@
+     "inventory",
+     "symbols",
+     "diff",
++    "coverage",
+     "route",
+     "set-sync",
+     "validate",

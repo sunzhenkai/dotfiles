@@ -1,0 +1,24 @@
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -29,6 +29,7 @@
+ - 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
+ - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
+ - 不把每个源文件做成规格页；文件只做清单行、路由键和证据路径。
++- 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；notes/ 的命名是 topic（易踩坑的概念），不是源相对路径。已落地的源文件级 notes/ 路径（`notes/<source-rel>.md`）继续受 [modes.md](references/modes.md) 的热点清单约束，与 topic 命名并列存在。
+ - 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+   - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
+   - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
+@@ -111,8 +112,11 @@
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 5. 识别并维护工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 在单实现时也要写如何用测试/性质证明行为；TRAFFIC 无灰度也要写发布与回滚，没有则写「无」
+ 6. 模块地图、切片主路径、调用链、状态机、数据流等表格说不清时，按 [diagrams.md](references/diagrams.md) **在本轮** 调用 `archify` 写出 HTML。列出候选却不 deliver、或写「暂未生成 / 后续用 archify」都算没完成
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期
+-8. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
++7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 完整整理，但测试方法只简述；`important` 重要文件整理（核心方法写完整逻辑，其余方法简述不得漏列），其余文件与测试方法只简述，不得整份省略；`lightweight` 沿用当前轻量规则。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要热点详注且未给路径：先问（建议切片入口或一次 ≤15 个文件），未同意不批量建 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。**build 前先 grep 同 group 已镜像仓的 `modules/*/notes/` 主题列表做参考**（不复制内容，仅对齐主题维度）。`detail_level=complete` 下 `notes/` 不是 opt-in，见 8.5
++
++8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径。
++
++9. 写完 `$SPECCTL set-sync --commit <id> --branch <name> --mode <concise|detailed> --detail-level <complete|important|lightweight>`（详尽默认 `important`，有热点则加 `--hotspot`），再 `$SPECCTL validate`
+ 9. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update

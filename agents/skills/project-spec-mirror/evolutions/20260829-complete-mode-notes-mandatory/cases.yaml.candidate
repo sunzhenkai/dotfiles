@@ -5,7 +5,7 @@ cases:
     kind: basic
     judge: deterministic
     description: 机械工作只通过 specctl；stdout JSON，退出码 0/1/2
-    given: 需要探测、init、清单、coverage、diff、回写同步指针或校验骨架
+    given: 需要探测、init、清单、diff、回写同步指针或校验骨架
     expect:
       must:
         - 使用 $SPECCTL（PATH 上的 specctl 或 scripts/specctl.py）
@@ -35,7 +35,7 @@ cases:
       must:
         - 先跑 init 且不带 --confirm
         - 退出码 2 时展示 spec_root / source / placement，用返回的 confirm_args 重跑
-        - 骨架完成后进入 build，写完文件表后跑 coverage，再 set-sync 与 validate
+        - 骨架完成后进入 build，再 set-sync 与 validate
       must_not:
         - 把空骨架当成已完成镜像
         - 未确认就创建 spec 目录
@@ -194,7 +194,6 @@ cases:
         - important 核心方法写完整逻辑；工具方法简述但不得漏列；其余文件写简述
         - lightweight 沿用当前轻量模式
         - 将选择保存为 detail_level，并在后续 update 中沿用
-        - 写完文件表后跑 coverage；important/complete 的 missing 必须清空
       must_not:
         - 把 important 的核心方法只写成一句话职责
         - 漏列工具方法
@@ -223,7 +222,6 @@ cases:
       must:
         - 用 $SPECCTL route 把变更文件落到模块 README
         - 跟链接改被波及的实体/处理线/切面
-        - 改完文件表后跑 coverage
       must_not:
         - 为每个变更源文件新建或重写 files/ 详页
 
@@ -336,23 +334,9 @@ cases:
     expect:
       must:
         - 仍可 init/build/maintain
-        - update 跑 coverage 对照文件表并说明限制
+        - update 用 inventory 全量对照并说明限制
       must_not:
         - 伪造 synced_commit 或假装有分支 diff
-
-  - id: coverage-file-table-vs-inventory
-    kind: core
-    judge: deterministic
-    description: 用 coverage 对照 inventory 与模块文件表，不手对清单
-    given: build 或 update 已写模块文件表，或非 git 源要做 update
-    expect:
-      must:
-        - 跑 $SPECCTL coverage
-        - detailed + important/complete 时 missing 必须为空再 set-sync
-        - missing 只要求范围内代码文件；可用目录范围覆盖子路径
-      must_not:
-        - 手对 inventory 与文件表
-        - 因 README、go.mod、CI、compose 未进文件表而失败
 
   - id: specctl-unit-tests
     kind: regression

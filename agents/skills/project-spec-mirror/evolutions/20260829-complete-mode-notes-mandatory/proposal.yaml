@@ -1,0 +1,76 @@
+skill: project-spec-mirror
+
+problem: |
+  `detail_level=complete` 模式下 `modules/<m>/notes/` 详注长期被理解为 opt-in。
+  Agent 按 modes.md line 52 "默认不建，只对用户点名或符合热点条件的路径建"
+  字面理解 → 不建 → 用户 review 后才指出漏掉。
+  已镜像的 algogear-bidder/external（detail=complete）建了 6 个 notes/，但本次
+  build 未参照此先例。245 个 mirror task 中只要后续 task 仍走 detail=complete，
+  同样会漏。
+
+evidence:
+  - experience/failures/20260829-notes-missed-in-complete-mode.md
+  - 同一 OpenSpec change 的 task 1.10（external）已完成 6 个 notes/：
+    ali_express DPA URL 清洗、lazada 接口偏离根因、shein ID 大写、tiktok 双层
+    HMAC、rta DialOption、config 注入矩阵
+  - 6 个应该建但未建的 notes（已补）：options-builder-sequencing /
+    l1-throws-vs-l0l2-no-throw / demand-cache-double-check /
+    ruf-parse-resilience / md5-cluster-id-gen / preprocessor-feature-macros
+  - SKILL.md build 步骤第 7 步只列文件表 + 详尽档位说明，没列 "写 notes/"
+
+pattern: |
+  detail=complete + 跨文件契约丰富（如 builder 链、并发缓存、多源解析、
+  框架宏）的仓，应识别 ≥5 类 hot-spot 并各建一个 notes/。
+  触发条件当前是"用户点名或符合热点条件"——但"热点条件"无可执行判据。
+
+proposed_change: |
+  在 SKILL.md build 步骤末加一条规则，在 modes.md 重新定义 notes/ 的
+  "default vs mandatory" 边界：
+
+  1. SKILL.md build 步骤新增 8.5：
+     "在 modules/*/README.md 完成后，按跨文件契约清单建 5–8 个
+     modules/<m>/notes/<topic>.md（topic 由触发条件决定，不必与源路径同构）。
+     `detail_level=complete` 默认必建；其他档位保持 opt-in。"
+
+  2. modes.md line 52 那段改为两段：
+     - `concise / lightweight`：notes/ 不建
+     - `detail_level=important`：notes/ 默认不建，仅在用户点名时建
+     - `detail_level=complete`：notes/ **必建**（5–8 个），按以下触发条件
+       枚举至少 5 类
+  - 触发条件列表（满足任一即建一个）：
+     a. 跨 ≥2 个文件的契约（builder 配对、init→extract 时序、依赖注入矩阵）
+     b. 一致性失败路径与正常路径不同（parse 失败 ≠ throw、L1 抛 vs L0/L2 不抛）
+     c. 并发/锁的 race 分析（shared_mutex double-check、is_done_ 标记）
+     d. 监控盲区（声明了 bvar 但未 <<1、FE_ERROR 无对应 counter）
+     e. 框架/预处理器的使用约束（宏展开顺序、字段名规范、ABI 兼容性）
+
+  3. SKILL.md 非目标（"不要..." 段）补一条负面约束：
+     "不要把每个源文件做成 notes/ 一页一页；notes/ 的命名是 topic（易踩坑
+     的概念），不是源相对路径" —— 避免 notes/ 退化为 "一文件一详页" 反模式
+
+  4. evals/cases.yaml 加一个新 case：
+     id: complete-mode-notes-mandatory
+     检查 detail=complete 的镜像存在 ≥5 个 modules/<m>/notes/*.md，
+     且至少 5 类触发条件各占一篇。
+
+  5. evals/cases.yaml 改造 hotspot-notes-need-scope：
+     加一段 "但 detail=complete 不在此限，按上述清单必建"
+
+  6. SKILL.md "build 步骤 7" 末尾 +1 句："build 前先 grep
+     spec/<group>/<已镜像仓>/modules/*/notes/ 主题列表，作为本仓 notes/ 选题
+     参考（不要复制内容，仅对齐主题维度）"
+
+expected_improvement: |
+  - detail=complete 的 mirror 不再漏 notes/，与已有 task 1.10（external）
+    行为一致
+  - 245 个 mirror task 中后续 detail=complete 的不必每次都靠用户 review 发现
+  - 触发条件可执行（5 类清单），Agent 不需要主观判断"算不算热点"
+  - 跨仓主题一致性：同 group 内多个仓的 notes/ 主题可以横向对照
+
+risk: medium
+# medium 因为：
+# 1. 把 "opt-in" 改成 "complete 模式下必建" 改变了默认行为，但范围明确（只限
+#    detail=complete），其他档位不动
+# 2. 不删除既有规则，只加新分支
+# 3. 不修改 scripts/specctl.py
+# 4. 不修改 contracts（callers 看不到 notes/）

@@ -612,5 +612,116 @@ class RouteTest(unittest.TestCase):
             self.assertEqual(payload["issues"], [])
 
 
+class CoverageTest(unittest.TestCase):
+    def test_concise_reports_missing_without_failing(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertFalse(payload["enforce"])
+            self.assertTrue(payload["not_built"])
+            self.assertIn("internal/order.go", payload["missing"])
+            self.assertNotIn("README.md", payload["missing"])
+            self.assertNotIn("go.mod", payload["missing"])
+
+    def test_detailed_important_fails_until_file_table_covers_code(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            self.assertEqual(
+                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
+            )
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 1, payload)
+            self.assertTrue(payload["enforce"])
+            self.assertIn("internal/order.go", payload["missing"])
+            write_order_module(root / "spec")
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["missing"], [])
+            self.assertEqual(payload["covered_count"], payload["required_count"])
+
+    def test_directory_range_covers_and_extra_does_not_fail(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            self.assertEqual(
+                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
+            )
+            (root / "internal" / "extra.go").write_text(
+                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
+            )
+            git(root, "add", "internal/extra.go")
+            git(root, "commit", "-q", "-m", "extra")
+            write_order_module(root / "spec")
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 1, payload)
+            self.assertIn("internal/extra.go", payload["missing"])
+            readme = root / "spec" / "modules" / "order" / "README.md"
+            readme.write_text(
+                """# order
+
+## 根
+
+| 路径前缀 | 角色 |
+|----------|------|
+| `internal` | 领域包 |
+
+## 文件
+
+| 文件 | 职责 |
+|------|------|
+| `internal` | 领域包全部源文件 |
+| `internal/gone.go` | 已删除 |
+""",
+                encoding="utf-8",
+            )
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["missing"], [])
+            self.assertIn("internal/gone.go", payload["extra"])
+
+    def test_scope_and_path_limit_required_files(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            (root / "cmd").mkdir()
+            (root / "cmd" / "main.go").write_text(
+                "package main\n\nfunc main() {}\n", encoding="utf-8"
+            )
+            git(root, "add", "cmd/main.go")
+            git(root, "commit", "-q", "-m", "cmd")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            self.assertEqual(
+                run(
+                    "set-sync",
+                    "--cwd",
+                    str(root),
+                    "--mode",
+                    "detailed",
+                    "--scope",
+                    "internal",
+                )[0],
+                0,
+            )
+            write_order_module(root / "spec")
+            code, payload = run("coverage", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertIn("cmd/main.go", payload["unscoped"])
+            self.assertNotIn("cmd/main.go", payload["missing"])
+            code, payload = run("coverage", "--cwd", str(root), "--path", "cmd")
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["required_count"], 0)
+            self.assertIn("cmd/main.go", payload["unscoped"])
+
+
 if __name__ == "__main__":
     unittest.main()

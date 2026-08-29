@@ -42,4 +42,5 @@ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unm
 - 每个模块 README 必须有「根」表与「文件」表，否则下一步 update 无法路由。
 - 新增源文件：先落入某模块的根前缀，再补文件表一行。
 - 源文件消失：文件表删行或标明废弃；不要默默删 `<!-- manual -->`。
+- 增删后跑 `$SPECCTL coverage`；`missing` / `extra` 以 CLI 为准，不要手对清单。
 - `<!-- manual -->` 块不得覆盖。

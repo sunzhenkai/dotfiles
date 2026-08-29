@@ -1,0 +1,41 @@
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -204,12 +204,13 @@
+     kind: failure
+     judge: deterministic
+     description: 热点详注未给路径时先问，未同意不批量建 notes
+-    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个
++    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个；或 detail_level≠complete 的仓
+     expect:
+       must:
+         - 先问范围；建议切片入口或一次 ≤15 个文件
++        - detail_level=complete 必须按 modes.md 5 类触发条件清单枚举 ≥5 篇 notes/
+       must_not:
+-        - 未同意就批量建 notes/
++        - 未同意就批量建 notes/（detail=complete 不在此限）
+         - 用 inventory.file_count > 80 作为是否写详页的门禁
+ 
+   - id: update-routes-from-diff
+@@ -249,6 +250,22 @@
+         - 未要求删除就删掉 files/
+         - 把遗留 files/ 全量搬成 notes/
+ 
++  - id: complete-mode-notes-mandatory
++    kind: failure
++    judge: deterministic
++    description: detail_level=complete 必须按 5 类触发条件建 notes/，不是 opt-in
++    given: specctl init 用了 --mode detailed --detail-level complete；build 进入 modules/ 阶段
++    expect:
++      must:
++        - spec/<group>/<repo>/modules/<m>/notes/*.md 至少存在 5 篇
++        - 至少覆盖跨文件契约 / 一致性失败路径差异 / race 分析 / 监控盲区 / 框架宏约束 5 类触发条件中的 ≥3 类
++        - 至少 1 篇命名是 topic（易踩坑的概念）而非源相对路径
++        - build 步骤末尾曾 grep 同 group 已镜像仓的 modules/*/notes/ 主题做参考（输出 grep 结果或留 1 行说明）
++      must_not:
++        - 把每个源文件做成 notes/ 一页一页（"一文件一详页"反模式）
++        - 把跨文件契约、易踩坑设计选择塞进模块 README 而不是 notes/
++        - 假设 detail=complete 下 notes/ 仍 opt-in
++
+   - id: reject-per-file-catalog-request
+     kind: failure
+     judge: deterministic
