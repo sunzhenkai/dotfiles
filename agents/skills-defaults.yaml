@@ -9,3 +9,5 @@ skills:
     skill: browser-use
   - source: anthropics/skills
     skill: frontend-design
+  - source: anthropics/skills
+    skill: skill-creator
