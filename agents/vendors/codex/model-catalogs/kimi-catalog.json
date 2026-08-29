@@ -1,0 +1,164 @@
+{
+  "models": [
+    {
+      "slug": "kimi-for-coding",
+      "display_name": "Kimi For Coding",
+      "description": "K2.7 Code · 256K",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Low"
+        },
+        {
+          "effort": "high",
+          "description": "High"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Max"
+        }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 0,
+      "base_instructions": "You are Codex, a coding agent based on Kimi For Coding. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "supports_reasoning_summaries": true,
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": {
+        "mode": "bytes",
+        "limit": 10000
+      },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "context_window": 262144,
+      "max_context_window": 262144,
+      "effective_context_window_percent": 95
+    },
+    {
+      "slug": "kimi-for-coding-highspeed",
+      "display_name": "Kimi For Coding HighSpeed",
+      "description": "K2.7 Code · faster",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Low"
+        },
+        {
+          "effort": "high",
+          "description": "High"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Max"
+        }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 1,
+      "base_instructions": "You are Codex, a coding agent based on Kimi For Coding HighSpeed. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "supports_reasoning_summaries": true,
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": {
+        "mode": "bytes",
+        "limit": 10000
+      },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "context_window": 262144,
+      "max_context_window": 262144,
+      "effective_context_window_percent": 95
+    },
+    {
+      "slug": "k3-256k",
+      "display_name": "Kimi K3 256K",
+      "description": "K3 · 256K context",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Low"
+        },
+        {
+          "effort": "high",
+          "description": "High"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Max"
+        }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 2,
+      "base_instructions": "You are Codex, a coding agent based on Kimi K3 256K. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "supports_reasoning_summaries": true,
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": {
+        "mode": "bytes",
+        "limit": 10000
+      },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "context_window": 262144,
+      "max_context_window": 262144,
+      "effective_context_window_percent": 95
+    },
+    {
+      "slug": "k3",
+      "display_name": "Kimi K3",
+      "description": "K3 · up to 1M context",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Low"
+        },
+        {
+          "effort": "high",
+          "description": "High"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Max"
+        }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 3,
+      "base_instructions": "You are Codex, a coding agent based on Kimi K3. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "supports_reasoning_summaries": true,
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": {
+        "mode": "bytes",
+        "limit": 10000
+      },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "context_window": 1048576,
+      "max_context_window": 1048576,
+      "effective_context_window_percent": 95
+    }
+  ]
+}

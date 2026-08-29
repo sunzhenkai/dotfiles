@@ -186,47 +186,115 @@ install_claude() {
   fi
 }
 
-# 特殊配置：codex（依赖 MINIMAX_API_KEY 环境变量，无需 OpenAI 登录）
+# 特殊配置：codex（自定义 provider，无需 OpenAI 登录）
 #
-# ~/.codex/config.toml 不再使用软链，而是由「仓库 base + 本地 local」合并生成
-# 的真实文件。原因：codex 会把 [projects."<path>"] 自动写进该文件，软链会穿透
-# 污染仓库。projects 维护在 agents/vendors/codex/config.local.toml（gitignore），安装时合并。
+# ~/.codex/config.toml 不再使用软链，而是由「仓库 base + 可选 profile overlay
+# + 本地 local」合并生成的真实文件。原因：codex 会把 [projects."<path>"] 自动
+# 写进该文件，软链会穿透污染仓库。projects 维护在
+# agents/vendors/codex/config.local.toml（gitignore），安装时合并。
 #
-# 注意：每次安装都用 base + local 重新覆盖 ~/.codex/config.toml。codex 新增的
+# 注意：每次安装都用 base (+ profile) + local 重新覆盖 ~/.codex/config.toml。
 #       信任不会自动回抽——需手动把对应 [projects."<path>"] 块加入 local 后重跑。
-install_codex() {
-  if [ -z "$MINIMAX_API_KEY" ]; then
-    echo "⚠️  警告: MINIMAX_API_KEY 环境变量未设置"
-    echo "请在 ~/.envrc 或 shell 配置中设置后再运行安装脚本"
+#
+# 默认 provider 由 DOTF_CODEX_PROFILE / ~/.codex/.dotf-profile 决定（未指定则
+# 沿用 base 里的 MiniMax）。dotf codex -f/--profile 写入 ~/.codex/.dotf-profile。
+_codex_vendor_dir() {
+  printf '%s\n' "$DOTFILES_ROOT/agents/vendors/codex"
+}
+
+_codex_merge_py() {
+  printf '%s\n' "$DOTFILES_ROOT/scripts/modules/codex/merge_config.py"
+}
+
+_codex_profile_env_key() {
+  case "$1" in
+  minimax) printf '%s\n' "MINIMAX_API_KEY" ;;
+  nativex) printf '%s\n' "NATIVEX_API_KEY" ;;
+  kimi) printf '%s\n' "KIMI_API_KEY" ;;
+  zhipu) printf '%s\n' "ZHIPU_API_KEY" ;;
+  scnet) printf '%s\n' "SCNET_API_KEY" ;;
+  *) printf '%s\n' "" ;;
+  esac
+}
+
+_codex_warn_missing_key() {
+  local profile="$1"
+  local key
+  key="$(_codex_profile_env_key "$profile")"
+  [ -n "$key" ] || return 0
+  if [ -z "${!key:-}" ]; then
+    echo "⚠️  警告: ${key} 环境变量未设置（当前 Codex profile: ${profile}）"
+    echo "请在 senv ai 组或 shell 中设置后再运行 Codex"
     echo "（本配置使用自定义 provider，无需 codex login / OPENAI_API_KEY）"
+    if [ "$profile" = "scnet" ] && [ -n "${SCNET_TOKEN_PLAN_API_KEY:-}" ]; then
+      echo "提示: 检测到 SCNET_TOKEN_PLAN_API_KEY；本仓库 env_key 为 SCNET_API_KEY，可 export SCNET_API_KEY=\"\$SCNET_TOKEN_PLAN_API_KEY\""
+    fi
+  fi
+}
+
+install_codex() {
+  local vendor
+  vendor="$(_codex_vendor_dir)"
+  local merge_py
+  merge_py="$(_codex_merge_py)"
+  local requested="${DOTF_CODEX_PROFILE:-}"
+  local persist=0
+  if [ -n "$requested" ]; then
+    persist=1
+  fi
+
+  local active_file="$HOME/.codex/.dotf-profile"
+  if [ -z "$requested" ] && [ -f "$active_file" ]; then
+    requested="$(tr -d '[:space:]' <"$active_file")"
+  fi
+
+  local profile_file=""
+  local profile_name=""
+  if [ -n "$requested" ]; then
+    local resolved
+    resolved="$(python3 "$merge_py" --vendor-dir "$vendor" --resolve "$requested")" || return 1
+    profile_name="$(printf '%s\n' "$resolved" | sed -n '1p')"
+    profile_file="$(printf '%s\n' "$resolved" | sed -n '2p')"
+  fi
+
+  if [ -n "$profile_name" ]; then
+    _codex_warn_missing_key "$profile_name"
+  else
+    _codex_warn_missing_key "minimax"
   fi
 
   mkdir -p "$HOME/.codex"
 
-  local base="$DOTFILES_ROOT/agents/vendors/codex/config.toml"
-  local local_cfg="$DOTFILES_ROOT/agents/vendors/codex/config.local.toml"
+  local base="$vendor/config.toml"
+  local local_cfg="$vendor/config.local.toml"
   local target="$HOME/.codex/config.toml"
 
   # 旧机制遗留：target 若是软链则移除，改用合并生成
   [ -L "$target" ] && rm "$target" && echo "已移除旧的 config.toml 软链"
 
-  # 合并 base + local → target（真实文件，非软链；每次覆盖生成）
-  {
-    cat "$base"
-    if [ -f "$local_cfg" ]; then
-      echo ""
-      echo "# ============================================================"
-      echo "# ↓↓↓ 以下来自 agents/vendors/codex/config.local.toml（机器特定，不纳入 git） ↓↓↓"
-      cat "$local_cfg"
-    fi
-  } > "$target"
-  echo "已安装: ~/.codex/config.toml（base + local 合并生成）"
+  local -a merge_args=(--base "$base" --output "$target")
+  if [ -n "$profile_file" ]; then
+    merge_args+=(--profile "$profile_file")
+  fi
+  if [ -f "$local_cfg" ]; then
+    merge_args+=(--local "$local_cfg")
+  fi
+  python3 "$merge_py" "${merge_args[@]}"
+  if [ -n "$profile_name" ]; then
+    echo "已安装: ~/.codex/config.toml（base + profile=${profile_name} + local 合并生成）"
+  else
+    echo "已安装: ~/.codex/config.toml（base + local 合并生成）"
+  fi
 
-  # 模型能力目录（model catalog，只读，仍用软链；custom=MiniMax 默认，
-  # nativex=公司网关，由 nativex profile 的 model_catalog_json 引用）
+  if [ "$persist" -eq 1 ] && [ -n "$profile_name" ]; then
+    printf '%s\n' "$profile_name" >"$HOME/.codex/.dotf-profile"
+    echo "已记录默认 Codex profile: $profile_name"
+  fi
+
+  # 模型能力目录（model catalog，只读，仍用软链）
   mkdir -p "$HOME/.codex/model-catalogs"
   local c
-  for c in "$DOTFILES_ROOT"/agents/vendors/codex/model-catalogs/*.json; do
+  for c in "$vendor"/model-catalogs/*.json; do
     [ -f "$c" ] || continue
     link_file "agents/vendors/codex/model-catalogs/$(basename "$c")" "$HOME/.codex/model-catalogs/$(basename "$c")"
     echo "已安装: ~/.codex/model-catalogs/$(basename "$c")"
@@ -235,7 +303,7 @@ install_codex() {
   # profile 层（codex 0.134+ 独立文件机制，只读，用软链）
   # 如 nativex.config.toml → codex --profile nativex
   local p
-  for p in "$DOTFILES_ROOT"/agents/vendors/codex/*.config.toml; do
+  for p in "$vendor"/*.config.toml; do
     [ -f "$p" ] || continue
     link_file "agents/vendors/codex/$(basename "$p")" "$HOME/.codex/$(basename "$p")"
     echo "已安装: ~/.codex/$(basename "$p")"

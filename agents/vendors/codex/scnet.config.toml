@@ -1,0 +1,6 @@
+# SCNet Token Plan（dotf codex -f scnet / codex --profile scnet）
+# 默认 DeepSeek-V4-Flash-0731（平台标了 OpenAI Responses）
+model = "DeepSeek-V4-Flash-0731"
+model_provider = "scnet"
+model_context_window = 1000000
+model_catalog_json = "~/.codex/model-catalogs/scnet-catalog.json"

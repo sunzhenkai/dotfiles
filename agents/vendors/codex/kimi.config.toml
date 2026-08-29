@@ -1,0 +1,5 @@
+# Kimi For Coding profile（dotf codex -f kimi / codex --profile kimi）
+model = "kimi-for-coding"
+model_provider = "kimi"
+model_context_window = 262144
+model_catalog_json = "~/.codex/model-catalogs/kimi-catalog.json"

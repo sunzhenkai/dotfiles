@@ -1,6 +1,32 @@
 # Codex Configuration
 
-此配置用于 [OpenAI Codex](https://developers.openai.com/codex) CLI，默认直连 **MiniMax**（国内站 `api.minimaxi.com`，模型 `MiniMax-M3`）；**无需 OpenAI 账号登录**，密钥 `MINIMAX_API_KEY` 存 senv `ai` 组。备用 NativeX 公司网关（`codex --profile nativex`，`NATIVEX_API_KEY` 同在 senv `ai` 组）。
+此配置用于 [OpenAI Codex](https://developers.openai.com/codex) CLI。默认直连 **MiniMax**（国内站 `api.minimaxi.com`，模型 `MiniMax-M3`）；**无需 OpenAI 账号登录**。密钥一律走环境变量（senv `ai` 组），配置文件不含密钥。
+
+## 切换 provider
+
+`dotf codex -f/--profile` 会把选中的 provider 写进 `~/.codex/config.toml` 作为默认，同时安装全部 profile 文件，因此也可以用 `codex --profile <name>` 单次覆盖。TUI 里 `/model`（或 `codex exec -m <slug>`）按当前 catalog 切模型。
+
+```shell
+dotf codex -c                    # 按上次选择（或默认 MiniMax）重装配置
+dotf codex -f kimi               # 切换默认 provider（隐含 -c）
+dotf codex -c --profile zhipu    # 同上；bigmodel 是 zhipu 的别名
+dotf codex -f scnet
+dotf codex -f nativex
+dotf codex -f minimax            # 切回默认
+
+codex                            # 使用当前默认 provider
+codex --profile scnet            # 仅本次会话走 SCNet
+```
+
+| profile | 端点 | 鉴权 | 默认模型 | catalog |
+| --- | --- | --- | --- | --- |
+| `minimax` | `https://api.minimaxi.com/v1` | `MINIMAX_API_KEY` | `MiniMax-M3` | `custom-catalog.json` |
+| `nativex` | `https://ailink.nativex.com/v1` | `NATIVEX_API_KEY` | `gpt-5.6-luna` | `nativex-catalog.json` |
+| `kimi` | `https://api.kimi.com/coding/v1` | `KIMI_API_KEY` | `kimi-for-coding` | `kimi-catalog.json` |
+| `zhipu`（别名 `bigmodel`） | `https://open.bigmodel.cn/api/v1` | `ZHIPU_API_KEY` | `glm-5.3` | `zhipu-catalog.json` |
+| `scnet` | `https://api.scnet.cn/api/llm/v1` | `SCNET_API_KEY` | `DeepSeek-V4-Flash-0731` | `scnet-catalog.json` |
+
+全部 provider 均 `wire_api = "responses"`、`requires_openai_auth = false`。启动时跳过 ChatGPT 登录。
 
 ## MCP 说明
 
@@ -17,24 +43,18 @@ python3 scripts/agents/doctor.py
 
 ## 为什么不需要登录
 
-Codex 默认走 OpenAI 登录流程（ChatGPT / API Key）。但本配置使用的均是**自定义 provider**（MiniMax / NativeX），显式声明 `requires_openai_auth = false`。因此启动 `codex` 时会**直接跳过 ChatGPT 登录选择器**，转而用 `MINIMAX_API_KEY`（默认）或 `NATIVEX_API_KEY`（备用 profile）向对应端点鉴权。
+Codex 默认走 OpenAI 登录流程（ChatGPT / API Key）。本配置全部是**自定义 provider**，显式声明 `requires_openai_auth = false`。启动 `codex` 时会直接跳过 ChatGPT 登录选择器，改用对应 `*_API_KEY` 鉴权。
 
 ## 配置说明
 
-- `config.toml` - Codex **基础**配置（base），安装时与 `config.local.toml` 合并生成 `~/.codex/config.toml`（真实文件，非软链）。**不含 `projects`**（信任列表已本地化，见下节）
-  - `model_provider = "minimax"` - 默认直连 MiniMax 国内站
-  - `model = "MiniMax-M3"` - 默认模型（context 窗口 1M）
-  - `model_context_window = 1000000`
-  - `model_catalog_json` - 指向 `custom-catalog.json`（MiniMax-M3 元数据）
-  - `env_key = "MINIMAX_API_KEY"` - 从环境变量读取 API Key（senv `ai` 组），无需硬编码
-  - `wire_api = "responses"` - MiniMax `/v1/responses` 端点
-  - `requires_openai_auth = false` - 显式声明不要求 OpenAI 登录
-  - `[model_providers.nativex]` - 备用 provider（公司 newapi 网关 `ailink.nativex.com`）
+- `config.toml` - Codex **基础**配置（base），安装时与选中的 `*.config.toml` overlay、以及 `config.local.toml` 合并生成 `~/.codex/config.toml`（真实文件，非软链）。**不含 `projects`**（信任列表已本地化，见下节）
+  - 默认 `model_provider = "minimax"` / `model = "MiniMax-M3"`；`-f` 会覆盖这几项
+  - `[model_providers.*]` 一次声明全部 provider，切换只改顶层 model / catalog
   - `approval_policy` / `sandbox_mode` - 审批与沙箱策略
-- `nativex.config.toml` - NativeX 备用 profile（codex 0.134+ 独立文件机制，`codex --profile nativex` 激活，覆盖 model/context/catalog 回 gpt-5.3-codex）
-- `model-catalogs/custom-catalog.json` / `model-catalogs/nativex-catalog.json` - 两套模型能力目录，安装到 `~/.codex/model-catalogs/`；custom 版收录 MiniMax-M3（默认），nativex 版收录 gpt-5.3-codex + gpt-5.6-sol / terra / luna + deepseek-v4-flash-0731 / deepseek-v4-pro-0813，`/model` 切换器的数据来源
+- `minimax.config.toml` / `nativex.config.toml` / `kimi.config.toml` / `zhipu.config.toml` / `scnet.config.toml` - 各 provider 的 overlay（codex 0.134+ 独立文件，安装到 `~/.codex/<name>.config.toml`）
+- `model-catalogs/*.json` - 各 provider 的模型能力目录，`/model` 切换器的数据来源
 
-> **踩坑**：国内 key 打到海外站 `api.minimax.io` 会 `401 invalid api key`（Codex 正常、Pi/SDK 挂时常是这个）。  
+> **踩坑**：国内 MiniMax key 打到海外站 `api.minimax.io` 会 `401 invalid api key`（Codex 正常、Pi/SDK 挂时常是这个）。  
 > 专题：`repos/codeup/agent-data/knowledge/snippets/minimax-cn-vs-intl.md`
 
 ## projects 本地化（信任列表不入库）
@@ -45,12 +65,14 @@ Codex 首次信任一个项目时，会自动把 `[projects."<path>"]` 追加进
 | --- | --- | --- |
 | `agents/vendors/codex/config.toml` | ✅ 入库 | 稳定共享配置（model/provider/policy/tui 等），**不含 projects** |
 | `agents/vendors/codex/config.local.toml` | ❌ gitignore | 本机 projects 及任意本地覆盖 |
-| `~/.codex/config.toml` | — | 安装时由上面两者**合并生成**（普通文件，非软链） |
+| `~/.codex/config.toml` | — | 安装时由 base + profile overlay + local **合并生成**（普通文件，非软链） |
+| `~/.codex/.dotf-profile` | — | 上次 `dotf codex -f` 选中的默认 provider |
 
-`dotf codex` 每次都用 `config.toml`（base）+ `config.local.toml`（local）**重新覆盖生成** `~/.codex/config.toml`。因此：
+`dotf codex` 每次都用 `config.toml`（base）+ 当前 profile overlay + `config.local.toml`（local）**重新覆盖生成** `~/.codex/config.toml`。因此：
 
 - 稳定配置始终以仓库 `config.toml` 为单一来源；
 - projects 走 `config.local.toml`（gitignore，不污染仓库）；
+- 默认 provider 记在本机 `~/.codex/.dotf-profile`，下次不带 `-f` 重装仍保持；
 - codex 运行时新写入 `~/.codex/config.toml` 的信任**不会自动同步**进 local——需手动把 `[projects."<path>"]` 块加入 `config.local.toml` 后重跑（否则下次安装会被覆盖，需重新确认一次，成本很低）。
 
 > 这是 codex 的已知设计缺陷（[openai/codex#14601](https://github.com/openai/codex/issues/14601)、[#3120](https://github.com/openai/codex/issues/3120)），官方暂未支持 `projects` 独立文件，故由本仓库的安装脚本在外部解决。
@@ -60,7 +82,7 @@ Codex 首次信任一个项目时，会自动把 `[projects."<path>"]` 追加进
 ```bash
 cp agents/vendors/codex/config.local.toml.example agents/vendors/codex/config.local.toml
 # 按需编辑其中的项目路径
-dotf codex
+dotf codex -c
 ```
 
 ### 新增 / 删除已信任的项目
@@ -68,14 +90,14 @@ dotf codex
 直接编辑 `agents/vendors/codex/config.local.toml`，增删对应的 `[projects."<path>"]` 块，然后：
 
 ```bash
-dotf codex
+dotf codex -c
 ```
 
 （`config.local.toml` 是 projects 的唯一来源，安装时会以其为准覆盖生成 `~/.codex/config.toml`。）
 
 ## 模型能力目录（model catalog）
 
-通过 `model_catalog_json` 声明 MiniMax-M3 的多模态输入、reasoning level（thinking 开关）、system prompt、工具类型等详细参数。配置完成后，在 Codex CLI 中输入 `/model`，即可在模型列表中看到 MiniMax-M3 及其可选 reasoning level。
+通过 `model_catalog_json` 声明当前 provider 各模型的 reasoning level、system prompt、工具类型等。配置完成后，在 Codex CLI 中输入 `/model`，即可在列表中切换模型与 reasoning level。
 
 `custom-catalog.json` 常用字段：
 
@@ -94,14 +116,19 @@ dotf codex
 1. 密钥存 senv `ai` 组（shell 经 `~/.config/zsh/modules/misc.zsh` 的 `eval $(senv env export)` 自动导出）：
 
    ```bash
-   senv env set MINIMAX_API_KEY "<minimax key>" -g ai     # 默认 provider（api.minimaxi.com）
-   senv env set NATIVEX_API_KEY "<公司网关 key>" -g ai   # 备用 profile 用
+   senv env set MINIMAX_API_KEY "<minimax key>" -g ai     # 默认 MiniMax
+   senv env set NATIVEX_API_KEY "<公司网关 key>" -g ai   # NativeX
+   senv env set KIMI_API_KEY "<kimi coding key>" -g ai    # Kimi For Coding
+   senv env set ZHIPU_API_KEY "<智谱 coding plan key>" -g ai
+   senv env set SCNET_API_KEY "<scnet key>" -g ai         # 官方名也可能是 SCNET_TOKEN_PLAN_API_KEY
    ```
 
-2. 新开终端（或 `eval $(senv env export)`）后运行安装脚本（安装 `config.toml`、profile 与模型目录）：
+2. 新开终端（或 `eval $(senv env export)`）后运行安装脚本：
 
    ```bash
-   dotf codex
+   dotf codex -c
+   # 或直接切 provider
+   dotf codex -f kimi
    ```
 
    或者直接运行：
@@ -112,33 +139,41 @@ dotf codex
 ## 使用
 
 ```bash
-# 交互式 TUI（无需登录，直接走 MiniMax-M3）
-codex
-
-# 单次执行
-codex exec "review this change"
-
-# 在 TUI 中输入 /model 查看模型列表与 reasoning level
+codex                              # 交互式 TUI
+codex exec "review this change"    # 单次执行
+codex exec -m glm-5.3 "..."        # 指定模型（须属于当前 catalog）
 ```
 
-> **验证网关模型的正确姿势**（2026-08-20 踩坑）：判断某模型能否给 codex 用，必须 `codex exec -m <model>` 真跑——裸 curl 发简单 Responses 请求**不会触发网关的 Responses→chat 协议转换**，会被上游直接拒绝（如 "you must provide a messages parameter"），据此判定"chat-only 不可用"是误判；claude-sonnet / kimi-k3 / gemini-3.5-flash / deepseek-v4 两档均经 codex 实测通过。catalog 只收录高频几个，其他模型可 `-m <slug>` 直用或自行加条目。
+在 TUI 中输入 `/model` 查看当前 catalog 的模型列表与 reasoning level。
 
-## 备用 profile - NativeX（公司网关）
+> **验证网关模型的正确姿势**（2026-08-20 踩坑）：判断某模型能否给 codex 用，必须 `codex exec -m <model>` 真跑——裸 curl 发简单 Responses 请求**不会触发网关的 Responses→chat 协议转换**，会被上游直接拒绝（如 "you must provide a messages parameter"），据此判定"chat-only 不可用"是误判。catalog 只收录高频几个，其他模型可 `-m <slug>` 直用或自行加条目。
 
-需要走公司 newapi 网关时（codex 0.134+ 的 profile 是**独立文件** `~/.codex/<name>.config.toml`，顶层键，不再是主配置里的 `[profiles.<name>]` 表；本目录的 `nativex.config.toml` 会随安装软链过去）：
+## 各 provider 备注
 
-```bash
-codex --profile nativex
-```
+### MiniMax
 
-## 关于智谱 GLM（暂不兼容）
+国内站 `api.minimaxi.com`（不是海外站 `api.minimax.io`）。catalog 含 M3 / M2.7 / M2.5 等。
 
-早期版本（codex < 0.130）通过 `wire_api = "chat"`（OpenAI Chat Completion 协议）接入智谱 GLM Coding Plan。但 **codex 0.130+ 已彻底移除 `wire_api = "chat"` 支持，仅支持 Responses API**。而智谱 GLM Coding Plan 目前仅提供 Chat / Anthropic 协议（[社区已提交 /responses 支持的需求](https://github.com/zai-org/GLM-5/issues/39)），因此**暂无法在新版 codex 中保留智谱备选**。待智谱支持 `/responses` 端点后，可按相同方式新增 `[model_providers.zhipu]` 恢复。
+### NativeX
+
+公司 newapi 网关。默认 `gpt-5.6-luna`；catalog 含 gpt-5.6-sol/terra/luna、deepseek-v4 两档（不含 gpt-5.3-codex）。
+
+### Kimi For Coding
+
+官方 Base URL 是 Chat Completions；现行 Codex 只发 `/v1/responses`。若直连失败，需要本地 Responses 网关（官方文档示例为 CC Switch）。catalog：`kimi-for-coding`、`kimi-for-coding-highspeed`、`k3-256k`、`k3`。
+
+### 智谱 GLM Coding Plan（open.bigmodel.cn）
+
+官方 Codex 端点已是 OpenAI Responses：`https://open.bigmodel.cn/api/v1`（不要用 Chat Completions 的 `/api/coding/paas/v4`）。默认 `glm-5.3`；`/model` 还可切 `glm-5-turbo` / `glm-5.2` / `glm-5.1` / `glm-5`。`dotf codex -f bigmodel` 与 `-f zhipu` 相同。
+
+### SCNet
+
+OpenAI（含 Responses）：`https://api.scnet.cn/api/llm/v1`。Anthropic 端点 Codex 不用。默认 `DeepSeek-V4-Flash-0731`（平台标了 Responses）。catalog 收录平台列出的 Kimi / DeepSeek / 千问 / 智谱 / MiniMax；未标 Responses 的模型仍可在 `/model` 里看到，但 Codex 可能失败。SCNet 按市场价扣 Credits，选模时注意成本。
 
 ## 注意事项
 
-- 认证使用 `env_key`，Codex 运行时从 `MINIMAX_API_KEY`（默认）/ `NATIVEX_API_KEY`（备用 profile）环境变量读取密钥，因此配置文件本身不含敏感信息。
-- `config.toml` 采用「base + local 合并生成」（非软链），以免 codex 自动写入的 projects 污染仓库；`model-catalogs`、`*.config.toml` 等只读资源仍以软链管理。详见上文「projects 本地化」一节。
+- 认证使用 `env_key`，Codex 运行时从环境变量读密钥，配置文件本身不含敏感信息。
+- `config.toml` 采用「base + profile overlay + local 合并生成」（非软链），以免 codex 自动写入的 projects 污染仓库；`model-catalogs`、`*.config.toml` 等只读资源仍以软链管理。
 - 本配置**不需要** `codex login`，也不需要 `OPENAI_API_KEY`。
-- 两个密钥都存 senv `ai` 组（shell 经 `eval $(senv env export)` 自动导出）；已开着的终端需重开或手动 re-eval 才能拿到新加的 key。
+- 密钥存 senv `ai` 组；已开着的终端需重开或手动 `eval $(senv env export)` 才能拿到新加的 key。
 - `~/.codex/` 下的其他状态文件（`auth.json`、`history.jsonl` 等）不纳入 dotfiles 管理。

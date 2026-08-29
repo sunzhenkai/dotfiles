@@ -1,0 +1,6 @@
+# 智谱 GLM Coding Plan（dotf codex -f zhipu|bigmodel / codex --profile zhipu）
+model = "glm-5.3"
+model_provider = "zhipu"
+model_context_window = 1048576
+model_reasoning_effort = "high"
+model_catalog_json = "~/.codex/model-catalogs/zhipu-catalog.json"

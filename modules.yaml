@@ -238,7 +238,7 @@ modules:
       target: ~/.config/opencode
 
   - name: codex
-    desc: Codex CLI + 配置（MiniMax）
+    desc: Codex CLI + 多 provider 配置（MiniMax / NativeX / Kimi / 智谱 / SCNet）
     group: agents
     install: true
     doctor: true

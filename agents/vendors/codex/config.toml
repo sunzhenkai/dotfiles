@@ -1,14 +1,18 @@
-# Codex 配置 - 默认直连 MiniMax（MiniMax-M3），备用 NativeX 公司网关（--profile nativex）
+# Codex 配置 - 默认直连 MiniMax（MiniMax-M3）
 # 文档: https://developers.openai.com/codex/config-reference
 #
-# 两者均为自定义 provider，不依赖 OpenAI 账号：
-#   - 启动 `codex` 时不会弹出 ChatGPT 登录选择器
-#     （provider 的 requires_openai_auth = false，见下方）
-#   - 默认密钥 MINIMAX_API_KEY（senv ai 组）；备用 NATIVEX_API_KEY
+# 自定义 provider（均 requires_openai_auth = false，启动跳过 ChatGPT 登录）：
+#   minimax  — MiniMax 国内站（默认）  MINIMAX_API_KEY
+#   nativex  — 公司 newapi 网关        NATIVEX_API_KEY
+#   kimi     — Kimi For Coding         KIMI_API_KEY
+#   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
+#   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
 #
-# 注意: codex 0.130+ 已移除 wire_api = "chat" 支持（仅支持 Responses API）。
-#       智谱 GLM Coding Plan 目前仅提供 Chat / Anthropic 协议，暂不兼容新版 codex，
-#       故本配置暂不保留智谱备选（待智谱支持 /responses 端点后可恢复）。
+# 切换默认 provider：dotf codex -c -f <name>（或 --profile <name>）
+# 单次会话：codex --profile <name>
+# 模型切换：TUI /model 或 codex exec -m <slug>（catalog 为数据源）
+#
+# 注意: codex 0.130+ 仅支持 wire_api = "responses"。
 
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
@@ -59,9 +63,46 @@ env_key = "NATIVEX_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
 
+# ============================================================
+# 自定义模型提供商 - Kimi For Coding
+# ============================================================
+# 官方 Base URL 为 Chat Completions；Codex 仍发 /v1/responses。
+# 若直连失败，需 Responses 网关（如 CC Switch）做协议转换。
+[model_providers.kimi]
+name = "Kimi"
+base_url = "https://api.kimi.com/coding/v1"
+env_key = "KIMI_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
+# ============================================================
+# 自定义模型提供商 - 智谱 GLM Coding Plan（open.bigmodel.cn）
+# ============================================================
+# 官方 Codex 端点为 OpenAI Responses：https://open.bigmodel.cn/api/v1
+# （Chat Completions 套餐端点 /api/coding/paas/v4 不能给现行 Codex 直连）
+[model_providers.zhipu]
+name = "Zhipu Coding Plan"
+base_url = "https://open.bigmodel.cn/api/v1"
+env_key = "ZHIPU_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
+# ============================================================
+# 自定义模型提供商 - SCNet（超算互联网）
+# ============================================================
+# OpenAI 兼容（含 Responses）：https://api.scnet.cn/api/llm/v1
+# Anthropic 兼容（Codex 不用）：https://api.scnet.cn/api/llm/anthropic
+# 官方文档 env 名为 SCNET_TOKEN_PLAN_API_KEY；本仓库统一 SCNET_API_KEY。
+[model_providers.scnet]
+name = "SCNet"
+base_url = "https://api.scnet.cn/api/llm/v1"
+env_key = "SCNET_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
 # profile 层不在本文件（codex 0.134+ 已废弃 [profiles.<name>] 表），
-# 而是独立文件 nativex.config.toml，安装到 ~/.codex/nativex.config.toml，
-# 用 codex --profile nativex 切回公司网关。
+# 而是独立文件 <name>.config.toml，安装到 ~/.codex/<name>.config.toml，
+# 用 codex --profile <name> 或 dotf codex -f <name> 切换。
 
 # ============================================================
 # 子进程环境变量策略
