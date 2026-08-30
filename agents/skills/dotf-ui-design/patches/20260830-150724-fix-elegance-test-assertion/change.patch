@@ -1,0 +1,13 @@
+diff --git a/agents/skills/dotf-ui-design/tests/test_skill_contract.py b/agents/skills/dotf-ui-design/tests/test_skill_contract.py
+--- a/agents/skills/dotf-ui-design/tests/test_skill_contract.py
++++ b/agents/skills/dotf-ui-design/tests/test_skill_contract.py
+@@ -103,8 +103,8 @@ class DotfUiDesignContractTest(unittest.TestCase):
+         self.assertIn("优雅重构", self.skill)
+         self.assertIn("优雅重构", self.catalog)
+         self.assertNotIn("数字建筑与视觉治愈师", self.inspect)
+-        self.assertNotIn("诗意", self.inspect)
++        self.assertIn("不要强制写", self.inspect)
+ 
+ 
+ if __name__ == "__main__":
+     unittest.main()

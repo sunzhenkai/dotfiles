@@ -23,6 +23,7 @@ class DotfUiDesignContractTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.skill = SKILL.read_text(encoding="utf-8")
         cls.catalog = CATALOG.read_text(encoding="utf-8")
+        cls.inspect = (ROOT / "references" / "ui-inspect.md").read_text(encoding="utf-8")
 
     def test_frontmatter_name_matches_directory(self) -> None:
         self.assertIn("name: dotf-ui-design", self.skill)
@@ -76,6 +77,33 @@ class DotfUiDesignContractTest(unittest.TestCase):
         ):
             with self.subTest(text=text):
                 self.assertIn(text, self.catalog)
+
+    def test_ui_inspect_is_first_party_phase(self) -> None:
+        inspect = ROOT / "references" / "ui-inspect.md"
+        self.assertTrue(inspect.is_file(), inspect)
+        self.assertFalse((ROOT / "references" / "ui-inspect" / "SKILL.md").exists())
+        self.assertNotIn("ui-inspect", INTERNAL)
+        for text in ("ui-inspect", "细节检查"):
+            with self.subTest(text=text):
+                self.assertIn(text, self.skill)
+        self.assertIn("ui-inspect.md", self.catalog)
+        self.assertIn("自有 phase", self.catalog)
+
+    def test_ui_inspect_elegance_is_optional_mode(self) -> None:
+        for text in (
+            "优雅重构",
+            "可选模式",
+            "阶段一",
+            "不另起视觉语言",
+            "mode: inspect",
+            "mode: elegance",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, self.inspect)
+        self.assertIn("优雅重构", self.skill)
+        self.assertIn("优雅重构", self.catalog)
+        self.assertNotIn("数字建筑与视觉治愈师", self.inspect)
+        self.assertIn("不要强制写", self.inspect)
 
 
 if __name__ == "__main__":
