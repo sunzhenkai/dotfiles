@@ -956,5 +956,78 @@ class CoverageTest(unittest.TestCase):
             self.assertIn("cmd/main.go", payload["unscoped"])
 
 
+class FinalizeTest(unittest.TestCase):
+    def test_finalize_blocks_on_missing_coverage(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            head = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run(
+                "finalize",
+                "--cwd",
+                str(root),
+                "--mode",
+                "detailed",
+                "--detail-level",
+                "complete",
+                "--commit",
+                head,
+            )
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["stage"], "coverage")
+            self.assertEqual(payload["reason"], "coverage_missing")
+            self.assertIn("internal/order.go", payload["coverage"]["missing"])
+            state = json.loads(
+                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(state["build_status"], "skeleton")
+            self.assertIsNone(state["synced_commit"])
+
+    def test_finalize_records_commit_after_coverage_passes(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_order_module(root / "spec")
+            head = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run(
+                "finalize",
+                "--cwd",
+                str(root),
+                "--mode",
+                "detailed",
+                "--detail-level",
+                "complete",
+                "--commit",
+                head,
+            )
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["stage"], "done")
+            self.assertEqual(payload["issues"], [])
+            self.assertEqual(payload["coverage"]["required_count"], payload["coverage"]["covered_count"])
+            self.assertEqual(payload["state"]["build_status"], "built")
+            self.assertEqual(payload["state"]["synced_commit"], head)
+
+    def test_finalize_non_git_keeps_commit_null(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "plain-project"
+            (root / "internal").mkdir(parents=True)
+            (root / "go.mod").write_text("module example.com/plain\n", encoding="utf-8")
+            (root / "internal" / "order.go").write_text(
+                "package order\n\nfunc Place() {}\n", encoding="utf-8"
+            )
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_order_module(root / "spec")
+            code, payload = run("finalize", "--cwd", str(root), "--mode", "concise")
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["state"]["build_status"], "built")
+            self.assertIsNone(payload["state"]["synced_commit"])
+
+
 if __name__ == "__main__":
     unittest.main()

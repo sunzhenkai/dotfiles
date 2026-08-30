@@ -1,0 +1,310 @@
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -1863,11 +1863,8 @@
+     return issues
+ 
+ 
+-def cmd_set_sync(args: argparse.Namespace) -> int:
+-    cwd = Path(args.cwd).expanduser().resolve()
+-    spec_root = find_spec_root(
+-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+-    )
++def sync_state(spec_root: Path, args: argparse.Namespace) -> dict[str, Any]:
++    """按 args 计算并写回同步状态。写盘前先校验骨架，失败则抛错不推进。"""
+     current = load_state(spec_root)
+     source = resolve_source(spec_root, current)
+     state = dict(current)
+@@ -1961,9 +1958,78 @@
+         )
+     write_text(readme_path, rendered_readme)
+     write_state(spec_root, state)
++    return state
++
++
++def cmd_set_sync(args: argparse.Namespace) -> int:
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    state = sync_state(spec_root, args)
+     return emit(
+         {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
+         summary=f"set-sync: {state.get('synced_commit') or 'none'}",
++    )
++
++
++def cmd_finalize(args: argparse.Namespace) -> int:
++    """收尾：coverage 门禁 → 回写 build 状态 → 复验骨架，一条命令三步。"""
++    cwd = Path(args.cwd).expanduser().resolve()
++    spec_root = find_spec_root(
++        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
++    )
++    args.built = True
++    probe = dict(load_state(spec_root))
++    if args.mode:
++        probe["mode"] = args.mode
++    if probe.get("mode") == "detailed":
++        probe["detail_level"] = (
++            args.detail_level or probe.get("detail_level") or "important"
++        )
++    else:
++        probe["detail_level"] = None
++    if args.scope is not None:
++        probe["scope"] = list(args.scope)
++    source = resolve_source(spec_root, probe)
++    coverage = collect_coverage(spec_root, source, probe, path=args.path)
++    if not coverage["ok"]:
++        return emit(
++            {
++                "ok": False,
++                "result": "finalize",
++                "stage": "coverage",
++                "reason": "coverage_missing",
++                "spec_root": str(spec_root),
++                "coverage": coverage,
++            },
++            code=1,
++            summary=f"finalize: coverage missing={len(coverage['missing'])}",
++        )
++    state = sync_state(spec_root, args)
++    issues = validation_issues(spec_root, state)
++    ok = not issues
++    return emit(
++        {
++            "ok": ok,
++            "result": "finalize",
++            "stage": "done" if ok else "validate",
++            "spec_root": str(spec_root),
++            "coverage": {
++                "enforce": coverage["enforce"],
++                "required_count": coverage["required_count"],
++                "covered_count": coverage["covered_count"],
++                "extra": coverage["extra"],
++            },
++            "issues": issues,
++            "state": state,
++        },
++        code=0 if ok else 1,
++        summary=(
++            f"finalize: {state.get('synced_commit') or 'none'}"
++            if ok
++            else "finalize: validate issues"
++        ),
+     )
+ 
+ 
+@@ -2014,6 +2080,7 @@
+     "coverage": cmd_coverage,
+     "route": cmd_route,
+     "set-sync": cmd_set_sync,
++    "finalize": cmd_finalize,
+     "validate": cmd_validate,
+ }
+ 
+@@ -2079,24 +2146,31 @@
+     route.add_argument("--to", dest="to", default=None)
+     route.add_argument("--path", default=None)
+ 
++    def add_sync_args(target: argparse.ArgumentParser) -> None:
++        target.add_argument("--commit", default=None)
++        target.add_argument("--mode", choices=("concise", "detailed"), default=None)
++        target.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
++        target.add_argument(
++            "--important-path",
++            action="append",
++            default=None,
++            help="important 模式写深的源相对路径或前缀，可重复；整表写回",
++        )
++        target.add_argument("--scope", action="append", default=None)
++        target.add_argument(
++            "--hotspot",
++            action="append",
++            default=None,
++            help="热点源路径，可重复；本轮给出的列表整表写回",
++        )
++
+     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
+     set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
+-    set_sync.add_argument("--commit", default=None)
+-    set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
+-    set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+-    set_sync.add_argument(
+-        "--important-path",
+-        action="append",
+-        default=None,
+-        help="important 模式写深的源相对路径或前缀，可重复；整表写回",
+-    )
+-    set_sync.add_argument("--scope", action="append", default=None)
+-    set_sync.add_argument(
+-        "--hotspot",
+-        action="append",
+-        default=None,
+-        help="热点源路径，可重复；本轮给出的列表整表写回",
+-    )
++    add_sync_args(set_sync)
++
++    finalize = add("finalize", help="收尾：coverage 门禁 + 回写状态 + 复验")
++    add_sync_args(finalize)
++    finalize.add_argument("--path", default=None, help="coverage 只核对此前缀下的文件")
+ 
+     add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
+     return parser
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -81,6 +81,7 @@
+ | `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
+ | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+ | `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / scope / hotspots / 时间，并同步 README 状态表 |
++| `finalize` | 收尾一条命令：先按本轮粒度跑 coverage 门禁，通过才回写状态，再复验骨架 |
+ | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
+ 
+ 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
+@@ -116,7 +117,7 @@
+ 8. 详尽模式选定一种 `detail_level`，文件表按它覆盖：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important`（默认）覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保留必要代码证据，领域、流程、契约与投影照样加深。测试只写覆盖意图，不展开方法步骤。三档细则见 [modes.md](references/modes.md)
+ 9. 用户要「每个文件一页」时先说明模块 README 才是阅读单位，再问他要的是 `complete` 还是某几处热点；要源文件级热点详注却没给路径时同样先问（建议切片入口或分批），没谈拢就不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，在模块 README 注明可能过期。本工作区若已有其他项目的镜像，先扫一眼它们的 `modules/*/notes/` 主题列表对齐维度（只看主题，不复制内容），省得每个仓从零想选题
+ 10. **`detail_level=complete` 必建 `modules/<m>/notes/` 详注**，不是 opt-in：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+-11. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
++11. 写完文件表后跑 `$SPECCTL finalize` 收尾（不要手对清单）：它先按本轮粒度做 coverage 门禁，`enforce` 为真且有 `missing` 就停在这一步并列出缺哪些文件；通过后回写 build 状态并复验骨架与 README 状态表。Git 源 `$SPECCTL finalize --commit <id> --branch <name> --mode <concise|detailed>`，非 Git 源去掉 `--commit`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。需要分步排查时仍可单独跑 `$SPECCTL coverage` / `set-sync` / `validate`
+ 12. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update
+@@ -127,7 +128,7 @@
+ 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+ 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
+-7. changelog 追加本轮摘要；改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再先 `validate`，再按 build 的 Git / 非 Git 规则执行 `set-sync --built`，最后再次 `validate`
++7. changelog 追加本轮摘要；改完文件表后跑 `$SPECCTL finalize`，参数与 build 收尾一致（Git 源带 `--commit`，非 Git 源不带）
+ 
+ ### maintain
+ 
+diff --git a/agents/skills/project-spec-mirror/references/checklist.md b/agents/skills/project-spec-mirror/references/checklist.md
+--- a/agents/skills/project-spec-mirror/references/checklist.md
++++ b/agents/skills/project-spec-mirror/references/checklist.md
+@@ -15,7 +15,7 @@
+ ## 状态机
+ 
+ - CLI 退出码 2 时原样报告了 `prompt` / `confirm_args`，等用户同意才用 CLI 给的参数重跑，没有自行扩权。
+-- `set-sync --built` 之前跑过 `coverage` 与 `validate`，之后再跑一次 `validate`，确认 `.mirror.json` 与 README 状态表一致。
++- 收尾走的是 `$SPECCTL finalize`（coverage 门禁 → 回写状态 → 复验，一条命令）。要分步排查而直接用 `set-sync --built` 时，自己补上前后的 `coverage` 与 `validate`。
+ - 非 Git 源的 `synced_commit` 仍是 `null`，没有伪造 commit 或分支 diff。
+ - `mode=concise` 时 `detail_level` 为 `null`；`detailed` 时是 `complete` / `important` / `lightweight` 之一。
+ 
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -76,8 +76,9 @@
+     given: build 或 update 正文已经写完，准备回写状态
+     expect:
+       must:
+-        - Git 源用 set-sync --built --commit <id>
+-        - 非 Git 源用 set-sync --built，build_status 进入 built 且 synced_commit 保持 null
++        - 收尾用 finalize（coverage 门禁 + 回写 + 复验）；分步排查才直接用 set-sync 并自行补 coverage 与 validate
++        - Git 源带 --commit <id>
++        - 非 Git 源不带 --commit，build_status 进入 built 且 synced_commit 保持 null
+         - mode=concise 时 detail_level 为 null；mode=detailed 时为 complete|important|lightweight
+         - set-sync 写入前校验骨架，并同步 README 粒度、文件粒度、分支和 commit
+       must_not:
+@@ -375,7 +376,7 @@
+     given: build 或 update 已写模块文件表，或非 git 源要做 update
+     expect:
+       must:
+-        - 跑 $SPECCTL coverage
++        - 跑 $SPECCTL coverage，或跑内含 coverage 门禁的 $SPECCTL finalize
+         - detailed + important/complete 时 missing 必须为空再 set-sync
+         - missing 只要求范围内代码文件；可用目录范围覆盖子路径
+       must_not:
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -24,6 +24,7 @@
+     "coverage",
+     "route",
+     "set-sync",
++    "finalize",
+     "validate",
+ }
+ 
+diff --git a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py
+@@ -956,5 +956,78 @@
+             self.assertIn("cmd/main.go", payload["unscoped"])
+ 
+ 
++class FinalizeTest(unittest.TestCase):
++    def test_finalize_blocks_on_missing_coverage(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            head = git(root, "rev-parse", "HEAD").stdout.strip()
++            code, payload = run(
++                "finalize",
++                "--cwd",
++                str(root),
++                "--mode",
++                "detailed",
++                "--detail-level",
++                "complete",
++                "--commit",
++                head,
++            )
++            self.assertEqual(code, 1, payload)
++            self.assertEqual(payload["stage"], "coverage")
++            self.assertEqual(payload["reason"], "coverage_missing")
++            self.assertIn("internal/order.go", payload["coverage"]["missing"])
++            state = json.loads(
++                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
++            )
++            self.assertEqual(state["build_status"], "skeleton")
++            self.assertIsNone(state["synced_commit"])
++
++    def test_finalize_records_commit_after_coverage_passes(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = make_repo(Path(raw) / "example-api")
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            write_order_module(root / "spec")
++            head = git(root, "rev-parse", "HEAD").stdout.strip()
++            code, payload = run(
++                "finalize",
++                "--cwd",
++                str(root),
++                "--mode",
++                "detailed",
++                "--detail-level",
++                "complete",
++                "--commit",
++                head,
++            )
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["stage"], "done")
++            self.assertEqual(payload["issues"], [])
++            self.assertEqual(payload["coverage"]["required_count"], payload["coverage"]["covered_count"])
++            self.assertEqual(payload["state"]["build_status"], "built")
++            self.assertEqual(payload["state"]["synced_commit"], head)
++
++    def test_finalize_non_git_keeps_commit_null(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            root = Path(raw) / "plain-project"
++            (root / "internal").mkdir(parents=True)
++            (root / "go.mod").write_text("module example.com/plain\n", encoding="utf-8")
++            (root / "internal" / "order.go").write_text(
++                "package order\n\nfunc Place() {}\n", encoding="utf-8"
++            )
++            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
++            write_order_module(root / "spec")
++            code, payload = run("finalize", "--cwd", str(root), "--mode", "concise")
++            self.assertEqual(code, 0, payload)
++            self.assertEqual(payload["state"]["build_status"], "built")
++            self.assertIsNone(payload["state"]["synced_commit"])
++
++
+ if __name__ == "__main__":
+     unittest.main()

@@ -1,0 +1,89 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -152,10 +152,8 @@
+ 
+ ## 质量检查
+ 
+-完成镜像任务前：
+-
+-1. 读取 [evals/README.md](evals/README.md)，选择与本次阶段和模式相关的 `evals/cases.yaml` 条目核对。
+-2. 运行 `specctl validate`；修改了本 Skill 代码时再运行 `python3 -m unittest discover -s agents/skills/project-spec-mirror/tests`。
+-3. Eval 或测试失败时修正镜像输出，不带着失败声称完成。
++完成镜像任务前对照 [checklist.md](references/checklist.md) 核对本轮涉及的条目，并运行 `specctl validate`。任一条不满足就先修镜像输出再给回执，不要带着已知缺口声称完成。
+ 
+-`examples/`、`evals/` 与 `experience/` 是 Skill 维护资产。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。
++`examples/`、`evals/`、`experience/` 与 `tests/` 只存在于本 Skill 的源仓库，安装到 agent 目录后不随行，所以运行现场能读到的自检表就是上面那份 checklist。维护本 Skill 自身时（改 SKILL.md、references 或 specctl）另外跑 `evals/cases.yaml` 的完整回归与 `python3 -m unittest discover -s <skill-dir>/tests`。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。
+diff --git a/agents/skills/project-spec-mirror/references/checklist.md b/agents/skills/project-spec-mirror/references/checklist.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/project-spec-mirror/references/checklist.md
+@@ -0,0 +1,55 @@
++# 交卷前自检
++
++镜像写完、准备给回执之前对照本表，只核对本轮真正涉及的组：init 不必看 update 那组。任一条不满足就先修输出。
++
++本文件随 Skill 安装分发，是运行现场唯一能读到的自检表。源仓库里另有 `evals/cases.yaml` 的完整回归集，只在维护本 Skill 时使用。
++
++## 安全与边界（每轮都核对）
++
++- 密钥、token、password、AccessKey、连接串等**值**在镜像里写成 `<REDACTED>`，回执里说明省略了什么。字段名与注入方式可以照写。
++- 没有自动 `git commit` 或 `push`。
++- 只写入 `detect` / `status` 给出的 `spec_root`，没有碰 `openspec/`、目标源码、测试或构建文件。
++- `vendor/`、`node_modules/`、submodule 与外来仓的文件没有进模块、文件表或 `notes/`。邻接系统只在 `context/` 记边界。
++- `<!-- manual -->` 块原样保留。
++
++## 状态机
++
++- CLI 退出码 2 时原样报告了 `prompt` / `confirm_args`，等用户同意才用 CLI 给的参数重跑，没有自行扩权。
++- `set-sync --built` 之前跑过 `coverage` 与 `validate`，之后再跑一次 `validate`，确认 `.mirror.json` 与 README 状态表一致。
++- 非 Git 源的 `synced_commit` 仍是 `null`，没有伪造 commit 或分支 diff。
++- `mode=concise` 时 `detail_level` 为 `null`；`detailed` 时是 `complete` / `important` / `lightweight` 之一。
++
++## 粒度
++
++- 详尽是在同一批页上写深，不是给每个源文件建页；没有新建 `files/`，也没有把路径里的 `/` 拍成 `__` 当页名。
++- `important`：范围内文件都出现在文件表，`important_paths` 命中的写到完整逻辑（有序步骤、关键分支、成败如何结束、副作用），其余简述。
++- `complete`：inventory 里每个文件都有模块归属；`modules/*/notes/` 至少 5 篇、覆盖至少 3 个模块，按 [modes.md](modes.md) 的 5 类触发条件枚举，至少 1 篇用 topic 命名。
++- 测试方法只写覆盖意图，`complete` 也一样。
++- `symbols` 的输出当候选用，没有据此声称方法覆盖完备。
++
++## 路由与覆盖
++
++- 每个模块 README 都有「根」表和「文件」表，标题就是「根」「文件」或 `Roots` / `Files`——`route` 靠这两个标题解析，改了名下一轮 update 会失去路由。
++- update 改的页来自 `$SPECCTL route` 的结果，不是手算。`status=R` 改文件表里那一行的路径，不是删一行再加一行。
++- 文件表改完跑了 `$SPECCTL coverage`；`enforce` 为真时 `missing` 已清空。
++
++## 交付
++
++- 恢复投影五层（`context` / `data` / `surface` / `runtime` / `build`）里适用的写到可恢复，不适用的写了判断证据，而不是留空。
++- 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）有 archify HTML 并链回对应 `flows/` 页；archify 不可用时在回执里列为阻塞，没有生成假 HTML 或占位文字。
++- `diagrams/INDEX.md` 只链已经存在的 `.html`。
++- 给人读的页面用项目自己的语言：标题是项目名或该页主题，正文没有「Spec 镜像」「孪生规格」「不是 OpenSpec」这类制作过程用语。
++- 回执含项目、`spec_root`、粒度、分支与 commit（非 Git 写无）、本轮阶段、改了哪些层。
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -54,6 +54,7 @@
+     def test_reference_files_exist(self) -> None:
+         for rel in (
+             "references/layout.md",
++            "references/checklist.md",
+             "references/modes.md",
+             "references/knowledge.md",
+             "references/facets.md",
+@@ -125,3 +126,12 @@
+     def test_hard_safety_boundaries_remain(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+         self.assertIn("不自动 commit / push", skill)
+         self.assertIn("<REDACTED>", skill)
+         self.assertIn("不得覆盖", skill)
+         self.assertIn("外来仓", skill)
++
++    def test_checklist_is_the_installable_selfcheck(self) -> None:
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        checklist = (SKILL_ROOT / "references" / "checklist.md").read_text(encoding="utf-8")
++        self.assertIn("references/checklist.md", skill)
++        self.assertNotIn("-s agents/skills/project-spec-mirror/tests", skill)
++        for marker in ("<REDACTED>", "set-sync --built", "coverage", "archify"):
++            self.assertIn(marker, checklist)

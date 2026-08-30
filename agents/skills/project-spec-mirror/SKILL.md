@@ -30,11 +30,8 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
 - 默认不把每个源文件做成规格页；文件主要作为清单行、路由键和证据路径。
 - 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；topic notes（易踩坑的概念）与源文件级 `notes/<source-rel>.md` 并列。后者仅热点清单约束；前者在 `detail_level=complete` 下必建，其余模式仅用户明确接受维护成本后才建，不把它误称为默认 detailed 行为。
-- 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
-- 只梳理文本文件；跳过 `.gitignore` 当前忽略的路径、已知二进制扩展和内容检测为二进制的文件。inventory、diff、route 与 symbols 使用同一边界。
-  - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
-  - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
-  - 不要为三方或外来仓建模块、文件表行、`notes/`、概念或切片。需要给那个仓做镜像时，另开一次会话并显式 `--source`。
+- 不整理三方依赖源码，也不整理所依赖的其他仓库的代码；镜像只覆盖当前 `--source` 工程自己的代码。外来仓只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束。
+- 只梳理文本文件。`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，具体跳过哪些路径见 [routing.md](references/routing.md)。
 
 ## 放置规则
 
@@ -84,6 +81,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 | `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
 | `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
 | `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / scope / hotspots / 时间，并同步 README 状态表 |
+| `finalize` | 收尾一条命令：先按本轮粒度跑 coverage 门禁，通过才回写状态，再复验骨架 |
 | `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
 
 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
@@ -114,11 +112,13 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 3. 识别项目实际能力并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。适用层写到可恢复；不适用层保留 INDEX 并写判断证据。结束前做恢复完备自检
 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
 5. 识别并维护适用的工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 至少写现有测试/性质；完全没有部署或流量切换能力时，TRAFFIC 写 `不适用` 与证据，不编发布方案
-6. 用户明确要求图表时，按 [diagrams.md](references/diagrams.md) 在本轮调用 `archify` 交付 HTML。Agent 主动识别出的候选先判断是否比表格显著增益；低价值候选直接省略，高成本候选先征求用户，不因候选未画自动阻塞 build
-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要源文件级热点详注且未给路径：先问（建议切片入口或分批），未同意不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。**build 前先 grep 同 group 已镜像仓的 `modules/*/notes/` 主题列表做参考**（不复制内容，仅对齐主题维度）。`detail_level=complete` 下 topic `notes/` 不是 opt-in，见下一步
-8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
-9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
-10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+6. 按 [diagrams.md](references/diagrams.md) 为复杂业务逻辑和用户点名的图本轮交付 archify HTML。主处理线若有分叉、状态机或跨模块时序，必须有图并链到 `diagrams/`。线性三步用列表即可。缺 archify 时把必配图列为未完成，禁止假 HTML 或占位
+7. 每个模块 README 都要有「根」表与「文件」表（[routing.md](references/routing.md)）。下一轮 update 靠这两个标题把变更文件路由到页，缺一个这个模块就只能重建
+8. 详尽模式选定一种 `detail_level`，文件表按它覆盖：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important`（默认）覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保留必要代码证据，领域、流程、契约与投影照样加深。测试只写覆盖意图，不展开方法步骤。三档细则见 [modes.md](references/modes.md)
+9. 用户要「每个文件一页」时先说明模块 README 才是阅读单位，再问他要的是 `complete` 还是某几处热点；要源文件级热点详注却没给路径时同样先问（建议切片入口或分批），没谈拢就不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，在模块 README 注明可能过期。本工作区若已有其他项目的镜像，先扫一眼它们的 `modules/*/notes/` 主题列表对齐维度（只看主题，不复制内容），省得每个仓从零想选题
+10. **`detail_level=complete` 必建 `modules/<m>/notes/` 详注**，不是 opt-in：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+11. 写完文件表后跑 `$SPECCTL finalize` 收尾（不要手对清单）：它先按本轮粒度做 coverage 门禁，`enforce` 为真且有 `missing` 就停在这一步并列出缺哪些文件；通过后回写 build 状态并复验骨架与 README 状态表。Git 源 `$SPECCTL finalize --commit <id> --branch <name> --mode <concise|detailed>`，非 Git 源去掉 `--commit`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。需要分步排查时仍可单独跑 `$SPECCTL coverage` / `set-sync` / `validate`
+12. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
 
 ### update
 
@@ -128,7 +128,7 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
 6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
-7. changelog 追加本轮摘要；改完文件表后 `$SPECCTL coverage`（`enforce` 时 `missing` 必须为空），再先 `validate`，再按 build 的 Git / 非 Git 规则执行 `set-sync --built`，最后再次 `validate`
+7. changelog 追加本轮摘要；改完文件表后跑 `$SPECCTL finalize`，参数与 build 收尾一致（Git 源带 `--commit`，非 Git 源不带）
 
 ### maintain
 
@@ -152,10 +152,6 @@ stdout 只输出 JSON，stderr 是一行摘要。退出码：**0** 成功，**1*
 
 ## 质量检查
 
-完成镜像任务前：
+完成镜像任务前对照 [checklist.md](references/checklist.md) 核对本轮涉及的条目，并运行 `specctl validate`。任一条不满足就先修镜像输出再给回执，不要带着已知缺口声称完成。
 
-1. 读取 [evals/README.md](evals/README.md)，选择与本次阶段和模式相关的 `evals/cases.yaml` 条目核对。
-2. 运行 `specctl validate`；修改了本 Skill 代码时再运行 `python3 -m unittest discover -s agents/skills/project-spec-mirror/tests`。
-3. Eval 或测试失败时修正镜像输出，不带着失败声称完成。
-
-`examples/`、`evals/` 与 `experience/` 是 Skill 维护资产。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。
+`examples/`、`evals/`、`experience/` 与 `tests/` 只存在于本 Skill 的源仓库，安装到 agent 目录后不随行，所以运行现场能读到的自检表就是上面那份 checklist。维护本 Skill 自身时（改 SKILL.md、references 或 specctl）另外跑 `evals/cases.yaml` 的完整回归与 `python3 -m unittest discover -s <skill-dir>/tests`。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。

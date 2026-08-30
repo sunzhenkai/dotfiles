@@ -24,6 +24,7 @@ EXPECTED = {
     "coverage",
     "route",
     "set-sync",
+    "finalize",
     "validate",
 }
 
@@ -54,6 +55,7 @@ class ContractTest(unittest.TestCase):
     def test_reference_files_exist(self) -> None:
         for rel in (
             "references/layout.md",
+            "references/checklist.md",
             "references/modes.md",
             "references/knowledge.md",
             "references/facets.md",
@@ -94,16 +96,33 @@ class ContractTest(unittest.TestCase):
         self.assertIn("AppKey", modes)
         self.assertIn("SecretKey", modes)
 
-    def test_diagrams_are_request_driven_without_fake_delivery(self) -> None:
+    def test_reader_pages_use_project_voice(self) -> None:
+        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
+        specctl_src = (SKILL_ROOT / "scripts" / "specctl.py").read_text(encoding="utf-8")
+        evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
+        self.assertIn("读者口吻", layout)
+        self.assertIn("# <project>", layout)
+        self.assertNotIn("# Spec 镜像 — <project>", layout)
+        self.assertNotIn("给人读的孪生规格", layout)
+        self.assertNotIn("给人读的孪生规格", specctl_src)
+        self.assertNotIn("# Spec 镜像 — {project}", specctl_src)
+        self.assertIn("孪生规格", evals)
+
+    def test_diagrams_cover_complex_logic_without_fake_delivery(self) -> None:
         diagrams = (SKILL_ROOT / "references" / "diagrams.md").read_text(encoding="utf-8")
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        knowledge = (SKILL_ROOT / "references" / "knowledge.md").read_text(encoding="utf-8")
         evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
-        self.assertIn("用户明确要求", diagrams)
-        self.assertIn("不把“没有图”当作 build 失败", diagrams)
+        self.assertIn("复杂业务逻辑", diagrams)
+        self.assertIn("本轮必须交付", diagrams)
         self.assertIn("不能只留 JSON", diagrams)
-        self.assertIn("用户明确要求图表时", skill)
-        self.assertIn("不因候选未画自动阻塞 build", skill)
-        self.assertIn("用户明确要求图", evals)
+        self.assertIn("没有图不算失败", diagrams)
+        self.assertIn("复杂业务逻辑", skill)
+        self.assertIn("线性三步", skill)
+        self.assertIn("复杂业务逻辑", knowledge)
+        self.assertIn("复杂业务逻辑", evals)
+        self.assertNotIn("不把“没有图”当作 build 失败", diagrams)
+        self.assertNotIn("不因候选未画自动阻塞 build", skill)
 
     def test_hard_safety_boundaries_remain(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -111,3 +130,11 @@ class ContractTest(unittest.TestCase):
         self.assertIn("<REDACTED>", skill)
         self.assertIn("不得覆盖", skill)
         self.assertIn("外来仓", skill)
+
+    def test_checklist_is_the_installable_selfcheck(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        checklist = (SKILL_ROOT / "references" / "checklist.md").read_text(encoding="utf-8")
+        self.assertIn("references/checklist.md", skill)
+        self.assertNotIn("-s agents/skills/project-spec-mirror/tests", skill)
+        for marker in ("<REDACTED>", "set-sync --built", "coverage", "archify"):
+            self.assertIn(marker, checklist)

@@ -1,0 +1,84 @@
+diff --git a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md
++++ b/agents/skills/project-spec-mirror/references/layout.md
+@@ -56,7 +56,7 @@
+ 
+ 默认从上往下写和阅读；维护单个条目或用户有明确入口时可直接进入对应层：
+ 
+-1. `README.md` — 30 秒：这是什么镜像、当前版本、地图入口
++1. `README.md` — 30 秒：项目是什么、当前版本、地图入口
+ 2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
+ 3. `context/` / `surface/` / `data/` / `runtime/` / `build/` — 恢复可运行系统所需的投影
+ 4. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
+@@ -103,12 +103,12 @@
+ 
+ ## README.md
+ 
+-保持短。推荐结构：
++保持短。这是项目说明书的入口，不是「Spec 镜像」产品页。推荐结构：
+ 
+ ```markdown
+-# Spec 镜像 — <project>
++# <project>
+ 
+-给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
++<一句话：这个项目做什么。不要写「孪生规格 / 不是 OpenSpec / 验收档」。>
+ 
+ | 项 | 值 |
+ |----|-----|
+@@ -235,6 +235,7 @@
+ 
+ ## 展示原则
+ 
++- **读者口吻**：给人读的页面是项目说明书。标题写项目名或该页主题（`# checkout`、`# 下单`），开篇用项目语言写这页回答什么。制作过程用语（「Spec 镜像」「孪生规格」「不是 OpenSpec」「验收：只凭本镜像能重建」）只留在本 Skill，不写进镜像正文的标题或第一句。粒度、分支、同步 commit 放在状态表，用事实行，不要写成宣言。changelog 与 `.mirror.json` 是操作记录，可以用「镜像同步」。Agent 对用户的完成回执可以叫「Spec 镜像」，那是对话，不是仓库里的读者页。
+ - 标题即论点；表格优先于段落。
+ - 标识符、文件名、命令保持原文；叙述用中文。
+ - 每页开头用 1–3 句让人决定要不要继续读。
+diff --git a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py
+@@ -823,9 +823,9 @@
+ 
+ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
+     branch_text = branch or "（无）"
+-    return f"""# Spec 镜像 — {project}
++    return f"""# {project}
+ 
+-给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
++从这里读这个项目：先总览，再恢复投影，再按需下钻。
+ 
+ | 项 | 值 |
+ |----|-----|
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -94,6 +94,18 @@
+         self.assertIn("AppKey", modes)
+         self.assertIn("SecretKey", modes)
+ 
++    def test_reader_pages_use_project_voice(self) -> None:
++        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
++        specctl_src = (SKILL_ROOT / "scripts" / "specctl.py").read_text(encoding="utf-8")
++        evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
++        self.assertIn("读者口吻", layout)
++        self.assertIn("# <project>", layout)
++        self.assertNotIn("# Spec 镜像 — <project>", layout)
++        self.assertNotIn("给人读的孪生规格", layout)
++        self.assertNotIn("给人读的孪生规格", specctl_src)
++        self.assertNotIn("# Spec 镜像 — {project}", specctl_src)
++        self.assertIn("孪生规格", evals)
++
+     def test_diagrams_are_request_driven_without_fake_delivery(self) -> None:
+         diagrams = (SKILL_ROOT / "references" / "diagrams.md").read_text(encoding="utf-8")
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -103,6 +103,7 @@
+         - 下层重复上层已经说清的论点
+         - 用手绘 SVG/Mermaid 冒充 archify 产物
+         - 为范围内每个代码文件建 files/ 或 notes/
++        - 给人读的正文用「Spec 镜像」「孪生规格」「不是 OpenSpec」当标题或开篇
+ 
+   - id: facets-and-archify
+     kind: core

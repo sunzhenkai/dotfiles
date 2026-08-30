@@ -1,0 +1,133 @@
+diff --git a/agents/skills/project-spec-mirror/references/diagrams.md b/agents/skills/project-spec-mirror/references/diagrams.md
+--- a/agents/skills/project-spec-mirror/references/diagrams.md
++++ b/agents/skills/project-spec-mirror/references/diagrams.md
+@@ -10,15 +10,20 @@
+ 
+ ## 何时画
+ 
+-图表是解释复杂关系的手段，不是完成度装饰。候选包括：系统上下文、模块地图、部署/进程拓扑、切片主路径、对照实现差分、状态机、一次请求调用链、数据管道。
++图表解释角色、分叉、状态和时序。读者只靠有序列表或表格会跟丢这些关系时，文字不够，必须配图。图表不是完成度装饰，也不要为每个模块硬画一张结构图。
+ 
+-按请求来源决策：
++**本轮必须交付**（archify 可用时写出 HTML；不可用则在完成摘要列为未完成）：
+ 
+-- 用户明确要求某张图或“把架构/流程可视化”时：该图属于本轮交付，按 archify 流程生成 HTML；依赖缺失则明确报告阻塞。
+-- Agent 主动发现图表可能有帮助时：先比较表格/短流程是否已经足够。一个明显高价值、低额外成本的图可随 build 交付；多个图或高成本图先给候选、价值和范围，请用户选择。
+-- 用户没有要求且文字已清楚时：省略图表，不写占位，也不把“没有图”当作 build 失败。
++- 复杂业务逻辑：分叉、补偿、重试、多角色协作、状态机、一次请求跨多个模块/服务、非平凡数据路径。
++- overview 点名的主处理线，凡满足上列之一，必须有对应图并链回该 `flows/` 页。
++- 用户明确要求的某张图，或“把架构/流程可视化”。
+ 
+-overview 与切片页只链接已存在的图，不在 Markdown 里重复绘制。
++**可以省略：**
++
++- 线性三步、一张表已经说清的模块清单、没有分叉的 CRUD。
++- 其余结构/部署图：比表格有明显增益且成本低则可随 build 交付；多张或高成本先问用户。
++
++overview 与切片页只链接已存在的图，不在 Markdown 里重复绘制。不要写占位，也不要用「没有图不算失败」跳过上面的必配图。
+ 
+ ## 执行
+ 
+@@ -32,8 +37,8 @@
+    ```
+ 
+    质量档次、参数以 archify Skill 为准。非零退出不得称为已交付。
+-4. 用户要求图表时，**未安装**的判定是找不到 `archify/SKILL.md`、找不到 `bin/archify.mjs`，或 node 无法运行。此时在完成摘要写明阻塞，INDEX 保持空表或已有 HTML；不要生成假 HTML。
+-5. Agent 候选若本轮不做，不要往 INDEX 或正文写“暂未生成”占位；只在对话中说明取舍。已经承诺交付的图必须有 HTML，不能只留 JSON。
++4. **未安装**的判定是找不到 `archify/SKILL.md`、找不到 `bin/archify.mjs`，或 node 无法运行。必配图或用户点名图因此无法交付时，在完成摘要写明阻塞，INDEX 保持空表或已有 HTML；不要生成假 HTML，也不要声称这些复杂逻辑已经讲清。
++5. 可省略的结构/部署图若本轮不做，不要往 INDEX 或正文写“暂未生成”占位；只在对话中说明取舍。已经承诺或按上节必须交付的图必须有 HTML，不能只留 JSON。
+ 
+ ## 与切面的对应
+ 
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -114,7 +114,7 @@
+ 3. 识别项目实际能力并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。适用层写到可恢复；不适用层保留 INDEX 并写判断证据。结束前做恢复完备自检
+ 4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+ 5. 识别并维护适用的工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 至少写现有测试/性质；完全没有部署或流量切换能力时，TRAFFIC 写 `不适用` 与证据，不编发布方案
+-6. 用户明确要求图表时，按 [diagrams.md](references/diagrams.md) 在本轮调用 `archify` 交付 HTML。Agent 主动识别出的候选先判断是否比表格显著增益；低价值候选直接省略，高成本候选先征求用户，不因候选未画自动阻塞 build
++6. 按 [diagrams.md](references/diagrams.md) 为复杂业务逻辑和用户点名的图本轮交付 archify HTML。主处理线若有分叉、状态机或跨模块时序，必须有图并链到 `diagrams/`。线性三步用列表即可。缺 archify 时把必配图列为未完成，禁止假 HTML 或占位
+ 7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要源文件级热点详注且未给路径：先问（建议切片入口或分批），未同意不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。**build 前先 grep 同 group 已镜像仓的 `modules/*/notes/` 主题列表做参考**（不复制内容，仅对齐主题维度）。`detail_level=complete` 下 topic `notes/` 不是 opt-in，见下一步
+ 8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+ 9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
+diff --git a/agents/skills/project-spec-mirror/references/knowledge.md b/agents/skills/project-spec-mirror/references/knowledge.md
+--- a/agents/skills/project-spec-mirror/references/knowledge.md
++++ b/agents/skills/project-spec-mirror/references/knowledge.md
+@@ -57,7 +57,7 @@
+ | 输出 | 返回值、持久化、消息、副作用 |
+ | 失败 | 关键失败如何结束，是否可重试 |
+ 
+-步骤用有序列表，复杂分叉用小表格。链到实体和概念，不在流程里重新下定义。
++步骤用有序列表，复杂分叉用小表格。满足 [diagrams.md](diagrams.md) 必配条件的处理线必须链到 `diagrams/` 里已存在的 HTML，不要在 Markdown 里再画一遍。链到实体和概念，不在流程里重新下定义。
+ 
+ ## 维护
+ 
+@@ -68,4 +68,4 @@
+ | 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
+ | 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
+ 
+-build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。
++build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；overview 点名的主处理线若属复杂业务逻辑，必须链到 `diagrams/` 已有 HTML；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。图表门禁见 [diagrams.md](diagrams.md)。
+diff --git a/agents/skills/project-spec-mirror/tests/test_skill_contract.py b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_skill_contract.py
++++ b/agents/skills/project-spec-mirror/tests/test_skill_contract.py
+@@ -106,16 +106,21 @@
+         self.assertNotIn("# Spec 镜像 — {project}", specctl_src)
+         self.assertIn("孪生规格", evals)
+ 
+-    def test_diagrams_are_request_driven_without_fake_delivery(self) -> None:
++    def test_diagrams_cover_complex_logic_without_fake_delivery(self) -> None:
+         diagrams = (SKILL_ROOT / "references" / "diagrams.md").read_text(encoding="utf-8")
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        knowledge = (SKILL_ROOT / "references" / "knowledge.md").read_text(encoding="utf-8")
+         evals = (SKILL_ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8")
+-        self.assertIn("用户明确要求", diagrams)
+-        self.assertIn("不把“没有图”当作 build 失败", diagrams)
++        self.assertIn("复杂业务逻辑", diagrams)
++        self.assertIn("本轮必须交付", diagrams)
+         self.assertIn("不能只留 JSON", diagrams)
+-        self.assertIn("用户明确要求图表时", skill)
+-        self.assertIn("不因候选未画自动阻塞 build", skill)
+-        self.assertIn("用户明确要求图", evals)
++        self.assertIn("没有图不算失败", diagrams)
++        self.assertIn("复杂业务逻辑", skill)
++        self.assertIn("线性三步", skill)
++        self.assertIn("复杂业务逻辑", knowledge)
++        self.assertIn("复杂业务逻辑", evals)
++        self.assertNotIn("不把“没有图”当作 build 失败", diagrams)
++        self.assertNotIn("不因候选未画自动阻塞 build", skill)
+ 
+     def test_hard_safety_boundaries_remain(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+diff --git a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml
+@@ -108,21 +108,23 @@
+   - id: facets-and-archify
+     kind: core
+     judge: deterministic
+-    description: 维护适用切面；用户要求的图表委托 archify，产物在 diagrams/
++    description: 维护适用切面；复杂业务逻辑与用户点名的图委托 archify，产物在 diagrams/
+     given: build，或用户明确要求模块地图/切片路径/状态机图
+     expect:
+       must:
+         - 保留 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC 入口；适用项写事实，不适用项写证据
+         - 切片生命周期从 identified 起写，不跳步假装 migrated
++        - 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）在 archify 可用时本轮交付 HTML，并链回对应 flows/ 页
+         - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver，HTML 写入 diagrams/<slug>.html
+-        - Agent 主动候选先判断相对文字的增益；多图或高成本范围先让用户选择
++        - 线性三步或一张表已说清的步骤不硬画；其余结构/部署图多张或高成本先让用户选择
+         - INDEX 只链已存在的 .html；init 空表可以保留
+       must_not:
+         - 把 archify schema 或渲染器拷进本 Skill
+-        - 未安装 archify 时声称交付了用户要求的 HTML 图
++        - 未安装 archify 时声称交付了必配或用户要求的 HTML 图
+         - 把 PHP/Go 写死为唯一对照语言对
+         - 把未执行候选写成 INDEX 占位，或把 INDEX 链到 archify Skill 目录
+-        - 对已经承诺交付的图只写 JSON 候选
++        - 对已经承诺或必配交付的图只写 JSON 候选
++        - 用「没有图不算失败」跳过必配的复杂业务图
+ 
+   - id: recovery-projections-runnable
+     kind: core

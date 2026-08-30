@@ -57,7 +57,7 @@ INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
 | 输出 | 返回值、持久化、消息、副作用 |
 | 失败 | 关键失败如何结束，是否可重试 |
 
-步骤用有序列表，复杂分叉用小表格。链到实体和概念，不在流程里重新下定义。
+步骤用有序列表，复杂分叉用小表格。满足 [diagrams.md](diagrams.md) 必配条件的处理线必须链到 `diagrams/` 里已存在的 HTML，不要在 Markdown 里再画一遍。链到实体和概念，不在流程里重新下定义。
 
 ## 维护
 
@@ -68,4 +68,4 @@ INDEX：处理线 / 触发 / 输出 / 页。每一条必须能回答：
 | 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
 | 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
 
-build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。
+build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；overview 点名的主处理线若属复杂业务逻辑，必须链到 `diagrams/` 已有 HTML；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。图表门禁见 [diagrams.md](diagrams.md)。

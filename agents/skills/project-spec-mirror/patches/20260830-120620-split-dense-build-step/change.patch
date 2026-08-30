@@ -1,0 +1,44 @@
+diff --git a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md
++++ b/agents/skills/project-spec-mirror/SKILL.md
+@@ -32,8 +32,5 @@
+ - 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；topic notes（易踩坑的概念）与源文件级 `notes/<source-rel>.md` 并列。后者仅热点清单约束；前者在 `detail_level=complete` 下必建，其余模式仅用户明确接受维护成本后才建，不把它误称为默认 detailed 行为。
+-- 不整理三方依赖源码，也不整理本工程所依赖的其他仓库代码。镜像只覆盖当前 `--source` 工程自己的代码。
+-- 只梳理文本文件；跳过 `.gitignore` 当前忽略的路径、已知二进制扩展和内容检测为二进制的文件。inventory、diff、route 与 symbols 使用同一边界。
+-  - 跳过包管理器安装树：`vendor/`（Go / PHP Composer 等）、`node_modules/`、虚拟环境及同类目录（与 `inventory` 忽略规则一致）。
+-  - 跳过 git submodule、树内嵌套仓库、以及 `replace` / Composer path / 同级克隆等外来仓。邻接只在 `context/` 记边界与协议；包名与版本约束只在 `build/` 点到为止。
+-  - 不要为三方或外来仓建模块、文件表行、`notes/`、概念或切片。需要给那个仓做镜像时，另开一次会话并显式 `--source`。
++- 不整理三方依赖源码，也不整理所依赖的其他仓库的代码；镜像只覆盖当前 `--source` 工程自己的代码。外来仓只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束。
++- 只梳理文本文件。`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，具体跳过哪些路径见 [routing.md](references/routing.md)。
+ 
+ ## 放置规则
+@@ -117,6 +114,8 @@
+ 6. 按 [diagrams.md](references/diagrams.md) 为复杂业务逻辑和用户点名的图本轮交付 archify HTML。主处理线若有分叉、状态机或跨模块时序，必须有图并链到 `diagrams/`。线性三步用列表即可。缺 archify 时把必配图列为未完成，禁止假 HTML 或占位
+-7. 每个模块 README 必须有「根」表与「文件」表（[routing.md](references/routing.md)）。详尽模式必须采用一种 `detail_level`：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important` 覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保持必要代码证据，但仍加深领域、流程、契约与投影。测试只写覆盖意图，不展开方法步骤。用户要「每个文件一页」时说明新模型，改为 `complete` 或热点；要源文件级热点详注且未给路径：先问（建议切片入口或分批），未同意不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，并在模块 README 注明可能过期。本工作区若已有其他项目的镜像，先扫一眼它们的 `modules/*/notes/` 主题列表对齐维度（只看主题，不复制内容），省得每个仓从零想选题；没有可参照的镜像就直接按下一步的触发条件枚举。`detail_level=complete` 下 topic `notes/` 不是 opt-in，见下一步
+-8. **detail_level=complete 必建 `modules/<m>/notes/` 详注**：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容，必须落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+-9. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
+-10. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
++7. 每个模块 README 都要有「根」表与「文件」表（[routing.md](references/routing.md)）。下一轮 update 靠这两个标题把变更文件路由到页，缺一个这个模块就只能重建
++8. 详尽模式选定一种 `detail_level`，文件表按它覆盖：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important`（默认）覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保留必要代码证据，领域、流程、契约与投影照样加深。测试只写覆盖意图，不展开方法步骤。三档细则见 [modes.md](references/modes.md)
++9. 用户要「每个文件一页」时先说明模块 README 才是阅读单位，再问他要的是 `complete` 还是某几处热点；要源文件级热点详注却没给路径时同样先问（建议切片入口或分批），没谈拢就不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，在模块 README 注明可能过期。本工作区若已有其他项目的镜像，先扫一眼它们的 `modules/*/notes/` 主题列表对齐维度（只看主题，不复制内容），省得每个仓从零想选题
++10. **`detail_level=complete` 必建 `modules/<m>/notes/` 详注**，不是 opt-in：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
++11. 写完文件表后 `$SPECCTL coverage`（不要手对清单）。`enforce` 为真时 `missing` 必须为空。再 `$SPECCTL validate`。Git 源执行 `$SPECCTL set-sync --built --commit <id> --branch <name> --mode <concise|detailed>`；非 Git 源执行 `$SPECCTL set-sync --built --mode <concise|detailed>`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。再跑一次 `$SPECCTL validate`，确认 `.mirror.json` 与 README 状态表一致
++12. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
+ 
+ ### update
+diff --git a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+--- a/agents/skills/project-spec-mirror/references/routing.md
++++ b/agents/skills/project-spec-mirror/references/routing.md
+@@ -4,7 +4,11 @@
+ 
+ update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
+ 
+-`diff` / `inventory` / `route` 已丢弃 `.gitignore` 当前忽略的路径、非文本文件、三方安装树、嵌套 git / submodule、密钥与构建产物。这些不是镜像输入：不要当 `unmapped` 去建模块或 `notes/`。若 CLI 仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接；要给那个仓做镜像时切换 active target 并给 `--source`。
++## 输入边界
++
++`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，已经丢弃这些：`.gitignore` 当前命中的路径、已知二进制扩展与内容检测为二进制的文件、构建产物与密钥、包管理器安装树（`vendor/`、`node_modules/`、虚拟环境及同类目录）、git submodule 与树内嵌套仓库、`replace` / Composer path / 同级克隆指向的外来仓。
++
++它们不是镜像输入：不要当 `unmapped` 去建模块、文件表行、`notes/`、概念或切片；CLI 万一仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束；要给那个仓做镜像，另开一次会话、切换 active target 并显式 `--source`。
+ 
+ ## 算法
+ 

@@ -823,9 +823,9 @@ def extract_symbols(path: Path, *, include_private: bool) -> list[dict[str, str]
 
 def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
     branch_text = branch or "（无）"
-    return f"""# Spec 镜像 — {project}
+    return f"""# {project}
 
-给人读的孪生规格，不是源码、不是 OpenSpec。验收：只凭本镜像能重建可运行系统。
+从这里读这个项目：先总览，再恢复投影，再按需下钻。
 
 | 项 | 值 |
 |----|-----|
@@ -1863,11 +1863,8 @@ def validation_issues(
     return issues
 
 
-def cmd_set_sync(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-    )
+def sync_state(spec_root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    """按 args 计算并写回同步状态。写盘前先校验骨架，失败则抛错不推进。"""
     current = load_state(spec_root)
     source = resolve_source(spec_root, current)
     state = dict(current)
@@ -1961,9 +1958,78 @@ def cmd_set_sync(args: argparse.Namespace) -> int:
         )
     write_text(readme_path, rendered_readme)
     write_state(spec_root, state)
+    return state
+
+
+def cmd_set_sync(args: argparse.Namespace) -> int:
+    cwd = Path(args.cwd).expanduser().resolve()
+    spec_root = find_spec_root(
+        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+    )
+    state = sync_state(spec_root, args)
     return emit(
         {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
         summary=f"set-sync: {state.get('synced_commit') or 'none'}",
+    )
+
+
+def cmd_finalize(args: argparse.Namespace) -> int:
+    """收尾：coverage 门禁 → 回写 build 状态 → 复验骨架，一条命令三步。"""
+    cwd = Path(args.cwd).expanduser().resolve()
+    spec_root = find_spec_root(
+        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+    )
+    args.built = True
+    probe = dict(load_state(spec_root))
+    if args.mode:
+        probe["mode"] = args.mode
+    if probe.get("mode") == "detailed":
+        probe["detail_level"] = (
+            args.detail_level or probe.get("detail_level") or "important"
+        )
+    else:
+        probe["detail_level"] = None
+    if args.scope is not None:
+        probe["scope"] = list(args.scope)
+    source = resolve_source(spec_root, probe)
+    coverage = collect_coverage(spec_root, source, probe, path=args.path)
+    if not coverage["ok"]:
+        return emit(
+            {
+                "ok": False,
+                "result": "finalize",
+                "stage": "coverage",
+                "reason": "coverage_missing",
+                "spec_root": str(spec_root),
+                "coverage": coverage,
+            },
+            code=1,
+            summary=f"finalize: coverage missing={len(coverage['missing'])}",
+        )
+    state = sync_state(spec_root, args)
+    issues = validation_issues(spec_root, state)
+    ok = not issues
+    return emit(
+        {
+            "ok": ok,
+            "result": "finalize",
+            "stage": "done" if ok else "validate",
+            "spec_root": str(spec_root),
+            "coverage": {
+                "enforce": coverage["enforce"],
+                "required_count": coverage["required_count"],
+                "covered_count": coverage["covered_count"],
+                "extra": coverage["extra"],
+            },
+            "issues": issues,
+            "state": state,
+        },
+        code=0 if ok else 1,
+        summary=(
+            f"finalize: {state.get('synced_commit') or 'none'}"
+            if ok
+            else "finalize: validate issues"
+        ),
     )
 
 
@@ -2014,6 +2080,7 @@ COMMANDS = {
     "coverage": cmd_coverage,
     "route": cmd_route,
     "set-sync": cmd_set_sync,
+    "finalize": cmd_finalize,
     "validate": cmd_validate,
 }
 
@@ -2079,24 +2146,31 @@ def build_parser() -> argparse.ArgumentParser:
     route.add_argument("--to", dest="to", default=None)
     route.add_argument("--path", default=None)
 
+    def add_sync_args(target: argparse.ArgumentParser) -> None:
+        target.add_argument("--commit", default=None)
+        target.add_argument("--mode", choices=("concise", "detailed"), default=None)
+        target.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+        target.add_argument(
+            "--important-path",
+            action="append",
+            default=None,
+            help="important 模式写深的源相对路径或前缀，可重复；整表写回",
+        )
+        target.add_argument("--scope", action="append", default=None)
+        target.add_argument(
+            "--hotspot",
+            action="append",
+            default=None,
+            help="热点源路径，可重复；本轮给出的列表整表写回",
+        )
+
     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
     set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
-    set_sync.add_argument("--commit", default=None)
-    set_sync.add_argument("--mode", choices=("concise", "detailed"), default=None)
-    set_sync.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
-    set_sync.add_argument(
-        "--important-path",
-        action="append",
-        default=None,
-        help="important 模式写深的源相对路径或前缀，可重复；整表写回",
-    )
-    set_sync.add_argument("--scope", action="append", default=None)
-    set_sync.add_argument(
-        "--hotspot",
-        action="append",
-        default=None,
-        help="热点源路径，可重复；本轮给出的列表整表写回",
-    )
+    add_sync_args(set_sync)
+
+    finalize = add("finalize", help="收尾：coverage 门禁 + 回写状态 + 复验")
+    add_sync_args(finalize)
+    finalize.add_argument("--path", default=None, help="coverage 只核对此前缀下的文件")
 
     add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
     return parser
