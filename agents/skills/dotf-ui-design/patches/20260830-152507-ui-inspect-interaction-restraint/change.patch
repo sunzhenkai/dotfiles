@@ -1,0 +1,60 @@
+diff --git a/agents/skills/dotf-ui-design/references/ui-inspect.md b/agents/skills/dotf-ui-design/references/ui-inspect.md
+--- a/agents/skills/dotf-ui-design/references/ui-inspect.md
++++ b/agents/skills/dotf-ui-design/references/ui-inspect.md
+@@ -6,7 +6,7 @@
+ 
+ ## 何时进入
+ 
+-- 用户要检查、打磨、过一遍现有页的间距、分割线、内容块 padding、图标/按钮位置、整体布局。
++- 用户要检查、打磨、过一遍现有页的间距、分割线、内容块 padding、图标/按钮位置、整体布局、交互是否过重。
+ - 用户明确要求对**现有页**做优雅重构、换气质、赋予呼吸感。
+ - 整页新建或翻新：实现之后、`webapp-testing` 验收之前（默认走空间检查；用户点了优雅重构再开可选模式）。
+ 
+@@ -17,7 +17,7 @@
+ 1. **定范围**：当前可见面默认必查。用户点了多页就都查；否则不擅自扩到整站。有交互态（empty / error / 展开）且同屏能到的，带上。
+ 2. **取证**：优先看渲染结果。需要真页面时串行加载 `webapp-testing`，拍桌面宽度；布局响应式再拍一个窄屏（约 375–390px），用完即弃。没有浏览器就读结构与间距 class，并在输出里标明「证据不完整」。
+ 3. **对照清单**：按下列块走一遍，只记真实问题。跟项目间距刻度；没有则 4px 基数。对齐到**本页已占优的节奏**，不要为这一页发明新刻度。
+-4. **分级记录**：P0 重叠/溢出/挡住内容；P1 同一表面节奏不一致（混用 gap、分割线一侧贴死、同级卡片 padding 不齐、按钮组不对齐）；P2 光学微调（约 1–2px）。
++4. **分级记录**：P0 重叠/溢出/挡住内容；P1 同一表面节奏不一致（混用 gap、分割线一侧贴死、同级卡片 padding 不齐、按钮组不对齐）或多余交互层（不必要的确认/向导/多入口）；P2 光学微调（约 1–2px）。
+ 5. **修复**：先 P0 再 P1。改实现需要 Tailwind 模式时串行加载 `tailwind-css-patterns`，用完即弃。默认模式不顺手改配色、字号、组件库或无关页面。
+ 6. **复检**：改过的面再看一次（有截图再截一次）。P2 未修要列出并说明为何留下。
+ 7. **可选**：用户点了优雅重构时，在清单之后走「优雅重构」4 阶段；未点名则停在本流程。
+@@ -73,6 +73,14 @@
+ - **降噪**：能靠背景层级分开的区域，不要再叠硬边框和重阴影。
+ - **微交互**：已有 hover/focus 用短 `transition`（约 150–200ms）；不主动加弹跳、视差、光影跟随，除非用户要。
+ 
++### 交互克制
++
++默认检查也看交互是否过重，只记真实过度设计，不借机重做信息架构或加功能。
++
++- **克制**：完成当前任务用最少步骤和最少新控件；本页已能一次完成的操作，不要加确认层、向导、嵌套抽屉，或只靠悬停才出现的第二套入口。
++- **取舍**：必要状态（empty / error / loading / disabled）要齐；可选增强（二次确认、预览层、快捷手势、同一操作多条路径）只在用户明确要、或本页/邻近页已有同类模式时保留。缺必要状态不是「克制」，是漏做。
++- **过度设计**：为「交互完整」补用户没要求的步骤或反馈层、把简单字段拆成多步、同一操作叠多种提示，记为问题并建议收敛；不要再加一层来「补齐」。
++
+ ## 输出（默认）
+ 
+ ```text
+@@ -137,5 +145,6 @@
+ 
+ - 不要 AI 模板套餐（蓝紫渐变、万能 Inter、大圆角毛玻璃堆在一起）。
+ - 不要花哨但不服务于阅读/操作的动画。
++- 不要为交互完整性堆确认层、向导或多入口。
+ - 不要为气质牺牲性能或可达性。
+ - 不要在用户没允许时换色、换字、换组件库。
+diff --git a/agents/skills/dotf-ui-design/tests/test_skill_contract.py b/agents/skills/dotf-ui-design/tests/test_skill_contract.py
+--- a/agents/skills/dotf-ui-design/tests/test_skill_contract.py
++++ b/agents/skills/dotf-ui-design/tests/test_skill_contract.py
+@@ -105,6 +105,13 @@
+         self.assertNotIn("数字建筑与视觉治愈师", self.inspect)
+         self.assertIn("不要强制写", self.inspect)
+ 
++    def test_ui_inspect_keeps_interaction_restrained(self) -> None:
++        for text in ("交互克制", "过度设计", "必要状态"):
++            with self.subTest(text=text):
++                self.assertIn(text, self.inspect)
++        self.assertIn("缺必要状态不是", self.inspect)
++        self.assertIn("多余交互层", self.inspect)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

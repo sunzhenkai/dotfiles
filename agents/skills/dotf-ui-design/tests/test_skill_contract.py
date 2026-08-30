@@ -105,6 +105,13 @@ class DotfUiDesignContractTest(unittest.TestCase):
         self.assertNotIn("数字建筑与视觉治愈师", self.inspect)
         self.assertIn("不要强制写", self.inspect)
 
+    def test_ui_inspect_keeps_interaction_restrained(self) -> None:
+        for text in ("交互克制", "过度设计", "必要状态"):
+            with self.subTest(text=text):
+                self.assertIn(text, self.inspect)
+        self.assertIn("缺必要状态不是", self.inspect)
+        self.assertIn("多余交互层", self.inspect)
+
 
 if __name__ == "__main__":
     unittest.main()
