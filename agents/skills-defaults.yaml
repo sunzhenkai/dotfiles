@@ -11,3 +11,5 @@ skills:
     skill: frontend-design
   - source: anthropics/skills
     skill: skill-creator
+  - source: nextlevelbuilder/ui-ux-pro-max-skill
+    skill: ui-ux-pro-max

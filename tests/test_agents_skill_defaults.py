@@ -27,6 +27,7 @@ def test_catalog_has_archify_browser_use_frontend_design() -> None:
     assert by_skill["browser-use"] == "browser-use/browser-use"
     assert by_skill["frontend-design"] == "anthropics/skills"
     assert by_skill["skill-creator"] == "anthropics/skills"
+    assert by_skill["ui-ux-pro-max"] == "nextlevelbuilder/ui-ux-pro-max-skill"
     assert "shadcn" not in by_skill
     assert "tailwind-css-patterns" not in by_skill
     assert "tailwind-design-system" not in by_skill
@@ -42,6 +43,7 @@ def test_catalog_does_not_overlap_first_party() -> None:
     assert "browser-use" not in first
     assert "frontend-design" not in first
     assert "skill-creator" not in first
+    assert "ui-ux-pro-max" not in first
 
 
 def test_add_command_is_global_copy_without_agent_flag() -> None:
