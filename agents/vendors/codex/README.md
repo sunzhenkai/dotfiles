@@ -177,4 +177,5 @@ OpenAI（含 Responses）：`https://api.scnet.cn/api/llm/v1`。Anthropic 端点
 - `config.toml` 采用「base + profile overlay + local 合并生成」（非软链），以免 codex 自动写入的 projects 污染仓库；`model-catalogs`、`*.config.toml` 等只读资源仍以软链管理。
 - 本配置**不需要** `codex login`，也不需要 `OPENAI_API_KEY`。
 - 密钥存 senv `ai` 组；已开着的终端需重开或手动 `eval $(senv env export)` 才能拿到新加的 key。
+- **app-server 只在启动时拷贝环境。** `printenv` / `eval` 成功只证明当前 shell 有变量；早已在跑的 `codex app-server`（Codex Desktop / SSH 远程常见，socket 在 `~/.codex/app-server-control/`）不会自动加载后来才 export 的 `*_API_KEY`。TUI 报 `Missing environment variable`、同机 `codex exec` 却能打到网关，就是这个坑。处理：在已 export 的终端里 `pkill -f 'codex app-server'` 后重新 `cx`（会打断 Desktop/SSH 远程会话，随后用新环境拉起）。不要 `resume` 失败的旧 session。
 - `~/.codex/` 下的其他状态文件（`auth.json`、`history.jsonl` 等）不纳入 dotfiles 管理。
