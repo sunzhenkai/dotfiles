@@ -19,6 +19,16 @@ codex_print_profiles() {
     --current "$current"
 }
 
+opencode_print_profiles() {
+  local current="minimax"
+  if [ -f "${HOME}/.config/opencode/.dotf-profile" ]; then
+    current="$(tr -d '[:space:]' <"${HOME}/.config/opencode/.dotf-profile")"
+  fi
+  python3 "$SCRIPT_DIR/scripts/modules/opencode/merge_config.py" \
+    --describe-profiles \
+    --current "$current"
+}
+
 codex_normalize_profile() {
   case "$1" in
   bigmodel | zai) printf '%s\n' "zhipu" ;;
@@ -30,6 +40,15 @@ codex_is_provider() {
   local n
   n="$(codex_normalize_profile "$1")"
   [ -n "$n" ] && [ -f "$SCRIPT_DIR/agents/vendors/codex/${n}.config.toml" ]
+}
+
+opencode_is_provider() {
+  local n
+  n="$(codex_normalize_profile "$1")"
+  case "$n" in
+  minimax | nativex | company | kimi | zhipu | scnet) return 0 ;;
+  *) return 1 ;;
+  esac
 }
 
 is_usage_profile() {
@@ -658,6 +677,8 @@ show_help() {
   echo "  dotf codex -f               # 列出可用 Codex provider"
   echo "  dotf codex -f kimi          # 切换 Codex 默认 provider（隐含 -c）"
   echo "  dotf codex -c --profile scnet"
+  echo "  dotf opencode -f            # 列出可用 OpenCode provider"
+  echo "  dotf opencode -f company    # 切换 OpenCode 默认模型（隐含 -c）"
 }
 
 # ============================================================
@@ -820,10 +841,18 @@ main() {
     -f | --codex-profile)
       shift
       if [ -z "${1:-}" ] || [[ "${1}" == -* ]]; then
-        codex_print_profiles
+        if [ ${#modules[@]} -eq 1 ] && [ "${modules[0]}" = "opencode" ]; then
+          opencode_print_profiles
+        else
+          codex_print_profiles
+        fi
         exit 0
       fi
-      config_extra+=("--codex-profile" "$1")
+      if [ ${#modules[@]} -eq 1 ] && [ "${modules[0]}" = "opencode" ]; then
+        config_extra+=("--opencode-profile" "$1")
+      else
+        config_extra+=("--codex-profile" "$1")
+      fi
       ;;
     --profile)
       shift
@@ -856,37 +885,64 @@ main() {
     shift
   done
 
-  # --- Codex provider：-f / --codex-profile，以及 `dotf codex --profile <provider>` ---
+  # --- provider 切换：-f，以及 `dotf {codex,opencode} --profile <provider>` ---
   local has_codex_profile_flag=0
+  local has_opencode_profile_flag=0
   local x
   for x in "${config_extra[@]+"${config_extra[@]}"}"; do
     if [ "$x" = "--codex-profile" ]; then
       has_codex_profile_flag=1
-      break
+    elif [ "$x" = "--opencode-profile" ]; then
+      has_opencode_profile_flag=1
     fi
   done
-  if [ "$has_codex_profile_flag" -eq 0 ] && [ -n "$DOTF_USAGE_PROFILE" ] &&
-    ! is_usage_profile "$DOTF_USAGE_PROFILE" && codex_is_provider "$DOTF_USAGE_PROFILE"; then
-    config_extra+=("--codex-profile" "$DOTF_USAGE_PROFILE")
-    has_codex_profile_flag=1
-    DOTF_USAGE_PROFILE=""
+  if [ "$has_codex_profile_flag" -eq 0 ] && [ "$has_opencode_profile_flag" -eq 0 ] &&
+    [ -n "$DOTF_USAGE_PROFILE" ] && ! is_usage_profile "$DOTF_USAGE_PROFILE"; then
+    local has_opencode_mod=0
+    local has_codex_mod=0
+    for x in "${modules[@]+"${modules[@]}"}"; do
+      [ "$x" = "opencode" ] && has_opencode_mod=1
+      [ "$x" = "codex" ] && has_codex_mod=1
+    done
+    if [ "$has_opencode_mod" -eq 1 ] && [ "$has_codex_mod" -eq 0 ] &&
+      opencode_is_provider "$DOTF_USAGE_PROFILE"; then
+      config_extra+=("--opencode-profile" "$DOTF_USAGE_PROFILE")
+      has_opencode_profile_flag=1
+      DOTF_USAGE_PROFILE=""
+    elif codex_is_provider "$DOTF_USAGE_PROFILE"; then
+      config_extra+=("--codex-profile" "$DOTF_USAGE_PROFILE")
+      has_codex_profile_flag=1
+      DOTF_USAGE_PROFILE=""
+    fi
   fi
-  if [ "$has_codex_profile_flag" -eq 1 ]; then
+  if [ "$has_codex_profile_flag" -eq 1 ] || [ "$has_opencode_profile_flag" -eq 1 ]; then
     if [ "$want_all" -eq 1 ]; then
-      echo "错误: -f/--codex-profile 只能与 codex 模块一起使用（如: dotf codex -c -f kimi）"
+      echo "错误: -f 只能与 codex 或 opencode 一起使用（如: dotf opencode -f kimi）"
       exit 1
     fi
     if [ ${#modules[@]} -eq 0 ]; then
-      modules=(codex)
+      if [ "$has_opencode_profile_flag" -eq 1 ]; then
+        modules=(opencode)
+      else
+        modules=(codex)
+      fi
     else
       local has_codex_mod=0
+      local has_opencode_mod=0
       for x in "${modules[@]}"; do
         [ "$x" = "codex" ] && has_codex_mod=1
+        [ "$x" = "opencode" ] && has_opencode_mod=1
       done
-      if [ "$has_codex_mod" -eq 0 ]; then
-        echo "错误: -f/--profile <provider> 仅支持 dotf codex"
+      if [ "$has_codex_profile_flag" -eq 1 ] && [ "$has_codex_mod" -eq 0 ]; then
+        echo "错误: -f/--profile <provider> 仅支持 dotf codex 或 dotf opencode"
         echo ""
         codex_print_profiles
+        exit 1
+      fi
+      if [ "$has_opencode_profile_flag" -eq 1 ] && [ "$has_opencode_mod" -eq 0 ]; then
+        echo "错误: -f/--profile <provider> 仅支持 dotf codex 或 dotf opencode"
+        echo ""
+        opencode_print_profiles
         exit 1
       fi
     fi
@@ -896,8 +952,9 @@ main() {
   if [ "$do_i" -eq 1 ] || [ "$do_c" -eq 1 ] || [ "$do_d" -eq 1 ]; then
     has_action=1
   fi
-  # 只切 Codex provider 时默认走配置
-  if [ "$has_action" -eq 0 ] && [ "$has_codex_profile_flag" -eq 1 ]; then
+  # 只切 provider 时默认走配置
+  if [ "$has_action" -eq 0 ] &&
+    { [ "$has_codex_profile_flag" -eq 1 ] || [ "$has_opencode_profile_flag" -eq 1 ]; }; then
     do_c=1
     has_action=1
   fi
@@ -974,7 +1031,7 @@ main() {
       local has_agents_only_flag=0
       for x in "${config_extra[@]+"${config_extra[@]}"}" "${doctor_extra[@]+"${doctor_extra[@]}"}"; do
         case "$x" in
-        --profile | --codex-profile) ;;
+        --profile | --codex-profile | --opencode-profile) ;;
         --skills-only | --env-only | --strict | --json | --deep | --verbose | --fail-on | --tool)
           has_agents_only_flag=1
           ;;

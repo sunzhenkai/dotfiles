@@ -534,6 +534,76 @@ PY
 # 特殊配置：opencode
 # 不再整目录软链 vendors → ~/.config/opencode（skills/MCP 写穿会污染仓库）。
 # 与 kiro/cursor 一致：home 真实目录 + 从 vendor 安装手写配置；skills/MCP 走 sync。
+# provider 全量写入；dotf opencode -f 只改默认 model（记在 ~/.config/opencode/.dotf-profile）。
+_opencode_merge_py() {
+  printf '%s\n' "$DOTFILES_ROOT/scripts/modules/opencode/merge_config.py"
+}
+
+_opencode_warn_missing_key() {
+  local profile="$1"
+  local key
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    if [ -z "${!key:-}" ]; then
+      echo "⚠️  警告: ${key} 环境变量未设置（当前 OpenCode provider: ${profile}）"
+      if [ "$profile" = "company" ]; then
+        echo "请在 senv feg 组设置 COMPANY_API_KEY / COMPANY_BASE_URL；OpenCode 运行时读 {env:VAR}"
+      else
+        echo "请在 senv ai 组或 shell 中设置后再运行 OpenCode"
+      fi
+    fi
+  done < <(python3 -c "
+import sys
+sys.path.insert(0, '$DOTFILES_ROOT/scripts/modules/opencode')
+from merge_config import profile_env_keys
+print('\\n'.join(profile_env_keys(sys.argv[1])))
+" "$profile")
+}
+
+_install_opencode_json() {
+  local vendor="$1"
+  local target="$2"
+  local merge_py
+  merge_py="$(_opencode_merge_py)"
+  local requested="${DOTF_OPENCODE_PROFILE:-}"
+  local persist=0
+  if [ -n "$requested" ]; then
+    persist=1
+  fi
+
+  local active_file="$target/.dotf-profile"
+  if [ -z "$requested" ] && [ -f "$active_file" ]; then
+    requested="$(tr -d '[:space:]' <"$active_file")"
+  fi
+
+  local profile_name=""
+  if [ -n "$requested" ]; then
+    local resolved
+    resolved="$(python3 "$merge_py" --resolve "$requested")" || return 1
+    profile_name="$(printf '%s\n' "$resolved" | sed -n '1p')"
+    _opencode_warn_missing_key "$profile_name"
+  else
+    _opencode_warn_missing_key "minimax"
+  fi
+
+  local -a merge_args=(--vendor "$vendor/opencode.json" --target "$target/opencode.json")
+  if [ -n "$profile_name" ]; then
+    merge_args+=(--profile "$profile_name")
+  fi
+  if [ "$persist" -eq 1 ] && [ -n "$profile_name" ]; then
+    merge_args+=(--persist-file "$active_file")
+  fi
+  python3 "$merge_py" "${merge_args[@]}"
+  if [ -n "$profile_name" ]; then
+    echo "已安装: ~/.config/opencode/opencode.json（providers + model=${profile_name}）"
+  else
+    echo "已安装: ~/.config/opencode/opencode.json（托管 providers，保留本地 model/mcp）"
+  fi
+  if [ "$persist" -eq 1 ] && [ -n "$profile_name" ]; then
+    echo "已记录默认 OpenCode provider: $profile_name"
+  fi
+}
+
 install_opencode_config() {
   local vendor="$DOTFILES_ROOT/agents/vendors/opencode"
   local target="$HOME/.config/opencode"
@@ -571,17 +641,12 @@ install_opencode_config() {
     echo "已安装: ~/.config/opencode/package.json"
   fi
 
-  # opencode.json：仅在缺失时用仓库骨架；已存在则留给 MCP sync 合并
-  if [ ! -f "$target/opencode.json" ]; then
-    if [ -f "$vendor/opencode.json" ]; then
-      cp "$vendor/opencode.json" "$target/opencode.json"
-      echo "已安装: ~/.config/opencode/opencode.json（骨架）"
-    else
-      echo "⚠️  缺少仓库骨架 agents/vendors/opencode/opencode.json"
-    fi
-  else
-    echo "已存在: ~/.config/opencode/opencode.json（跳过覆盖）"
+  # opencode.json：托管 provider + 可选默认 model；不碰 mcp（由 agents sync 合并）
+  if [ ! -f "$vendor/opencode.json" ]; then
+    echo "✗ 缺少仓库骨架 agents/vendors/opencode/opencode.json"
+    return 1
   fi
+  _install_opencode_json "$vendor" "$target"
 
   # 插件依赖：home 下无 node_modules 时安装（优先复用 vendor 已有目录）
   if [ ! -d "$target/node_modules" ]; then

@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "modules" / "codex"))
-from merge_config import (  # noqa: E402
-    ALIASES,
-    expand_env,
-    list_profiles,
-    merge,
-    overlay,
-    resolve_profile_name,
-)
+
+
+def _load_merge():
+    path = ROOT / "scripts" / "modules" / "codex" / "merge_config.py"
+    spec = importlib.util.spec_from_file_location("codex_merge_config", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_merge = _load_merge()
+ALIASES = _merge.ALIASES
+expand_env = _merge.expand_env
+list_profiles = _merge.list_profiles
+merge = _merge.merge
+overlay = _merge.overlay
+resolve_profile_name = _merge.resolve_profile_name
 
 VENDOR = ROOT / "agents" / "vendors" / "codex"
 
@@ -247,9 +256,7 @@ def test_vendor_files_have_no_company_secrets() -> None:
 
 
 def test_describe_profiles_marks_current_and_aliases() -> None:
-    from merge_config import describe_profiles
-
-    text = describe_profiles(VENDOR, current="bigmodel")
+    text = _merge.describe_profiles(VENDOR, current="bigmodel")
     assert "* zhipu" in text
     assert "bigmodel" in text
     assert "当前默认: zhipu" in text
