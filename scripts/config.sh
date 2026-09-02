@@ -210,11 +210,31 @@ _codex_profile_env_key() {
   case "$1" in
   minimax) printf '%s\n' "MINIMAX_API_KEY" ;;
   nativex) printf '%s\n' "NATIVEX_API_KEY" ;;
+  company) printf '%s\n' "COMPANY_API_KEY" ;;
   kimi) printf '%s\n' "KIMI_API_KEY" ;;
   zhipu) printf '%s\n' "ZHIPU_API_KEY" ;;
   scnet) printf '%s\n' "SCNET_API_KEY" ;;
   *) printf '%s\n' "" ;;
   esac
+}
+
+# 当前环境没有时，从 senv 补进本进程（不打印值）。
+# company 的地址/密钥约定在 feg 组；get 默认组是 default，所以要带 group:key。
+_codex_resolve_senv_var() {
+  local var="$1"
+  if [ -n "${!var:-}" ]; then
+    return 0
+  fi
+  command -v senv >/dev/null 2>&1 || return 0
+  local value=""
+  local group
+  for group in feg ai default; do
+    value="$(senv env get "${group}:${var}" 2>/dev/null || true)"
+    if [ -n "$value" ]; then
+      export "${var}=${value}"
+      return 0
+    fi
+  done
 }
 
 _codex_warn_missing_key() {
@@ -224,11 +244,18 @@ _codex_warn_missing_key() {
   [ -n "$key" ] || return 0
   if [ -z "${!key:-}" ]; then
     echo "⚠️  警告: ${key} 环境变量未设置（当前 Codex profile: ${profile}）"
-    echo "请在 senv ai 组或 shell 中设置后再运行 Codex"
+    if [ "$profile" = "company" ]; then
+      echo "请在 senv feg 组设置 COMPANY_API_KEY / COMPANY_BASE_URL 后再运行 Codex"
+    else
+      echo "请在 senv ai 组或 shell 中设置后再运行 Codex"
+    fi
     echo "（本配置使用自定义 provider，无需 codex login / OPENAI_API_KEY）"
     if [ "$profile" = "scnet" ] && [ -n "${SCNET_TOKEN_PLAN_API_KEY:-}" ]; then
       echo "提示: 检测到 SCNET_TOKEN_PLAN_API_KEY；本仓库 env_key 为 SCNET_API_KEY，可 export SCNET_API_KEY=\"\$SCNET_TOKEN_PLAN_API_KEY\""
     fi
+  fi
+  if [ "$profile" = "company" ] && [ -z "${COMPANY_BASE_URL:-}" ]; then
+    echo "⚠️  警告: COMPANY_BASE_URL 未设置（senv feg 组）；company provider 的 base_url 无法展开"
   fi
 }
 
@@ -256,6 +283,9 @@ install_codex() {
     profile_name="$(printf '%s\n' "$resolved" | sed -n '1p')"
     profile_file="$(printf '%s\n' "$resolved" | sed -n '2p')"
   fi
+
+  _codex_resolve_senv_var COMPANY_BASE_URL
+  _codex_resolve_senv_var COMPANY_API_KEY
 
   if [ -n "$profile_name" ]; then
     _codex_warn_missing_key "$profile_name"

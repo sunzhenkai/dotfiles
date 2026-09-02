@@ -4,6 +4,7 @@
 # 自定义 provider（均 requires_openai_auth = false，启动跳过 ChatGPT 登录）：
 #   minimax  — MiniMax 国内站（默认）  MINIMAX_API_KEY
 #   nativex  — 公司 newapi 网关        NATIVEX_API_KEY
+#   company  — 内网 new-api 网关       COMPANY_API_KEY / COMPANY_BASE_URL（senv）
 #   kimi     — Kimi For Coding         KIMI_API_KEY
 #   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
 #   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
@@ -60,6 +61,19 @@ requires_openai_auth = false
 name = "NativeX"
 base_url = "https://ailink.nativex.com/v1"
 env_key = "NATIVEX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
+# ============================================================
+# 自定义模型提供商 - Company（内网 new-api，地址不入库）
+# ============================================================
+# Codex 走 Responses：COMPANY_BASE_URL 须含 /v1。
+# 安装时由 merge 从环境 / senv 展开 ${COMPANY_BASE_URL}，写入本机 ~/.codex/config.toml。
+# 密钥运行时读 COMPANY_API_KEY。两者都放 senv，不要写进仓库。
+[model_providers.company]
+name = "Company"
+base_url = "${COMPANY_BASE_URL}"
+env_key = "COMPANY_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
 

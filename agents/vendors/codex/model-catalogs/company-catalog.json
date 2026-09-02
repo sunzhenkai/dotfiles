@@ -1,0 +1,26 @@
+{
+  "models": [
+    {
+      "slug": "vanchin/deepseek-v4-pro-0813",
+      "display_name": "DeepSeek V4 Pro 0813",
+      "description": "Company new-api 当前默认",
+      "default_reasoning_level": "high",
+      "supported_reasoning_levels": [
+        { "effort": "low", "description": "Fast" },
+        { "effort": "medium", "description": "Balanced" },
+        { "effort": "high", "description": "Deep" }
+      ],
+      "shell_type": "shell_command",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 0,
+      "base_instructions": "You are Codex, a coding agent based on DeepSeek V4 Pro via the company new-api gateway. You and the user share the same workspace and collaborate to achieve the user's goals.",
+      "default_reasoning_summary": "none",
+      "support_verbosity": false,
+      "truncation_policy": { "mode": "bytes", "limit": 10000 },
+      "supports_parallel_tool_calls": true,
+      "experimental_supported_tools": [],
+      "input_modalities": ["text"]
+    }
+  ]
+}

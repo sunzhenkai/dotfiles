@@ -1,0 +1,8 @@
+# Company new-api profile（dotf codex -f company / codex --profile company）
+#
+# 地址与密钥只从 senv 读（COMPANY_BASE_URL / COMPANY_API_KEY），不要写进本文件。
+# 默认模型以网关 GET /v1/models 为准。
+model = "vanchin/deepseek-v4-pro-0813"
+model_provider = "company"
+model_context_window = 1000000
+model_catalog_json = "~/.codex/model-catalogs/company-catalog.json"

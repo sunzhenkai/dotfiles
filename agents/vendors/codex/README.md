@@ -1,6 +1,6 @@
 # Codex Configuration
 
-此配置用于 [OpenAI Codex](https://developers.openai.com/codex) CLI。默认直连 **MiniMax**（国内站 `api.minimaxi.com`，模型 `MiniMax-M3`）；**无需 OpenAI 账号登录**。密钥一律走环境变量（senv `ai` 组），配置文件不含密钥。
+此配置用于 [OpenAI Codex](https://developers.openai.com/codex) CLI。默认直连 **MiniMax**（国内站 `api.minimaxi.com`，模型 `MiniMax-M3`）；**无需 OpenAI 账号登录**。密钥一律走环境变量（senv `ai` 组；`company` 的地址/密钥在 `feg` 组），配置文件不含密钥。
 
 ## 切换 provider
 
@@ -13,6 +13,7 @@ dotf codex -f kimi               # 切换默认 provider（隐含 -c）
 dotf codex -c --profile zhipu    # 同上；bigmodel 是 zhipu 的别名
 dotf codex -f scnet
 dotf codex -f nativex
+dotf codex -f company
 dotf codex -f minimax            # 切回默认
 
 codex                            # 使用当前默认 provider
@@ -23,6 +24,7 @@ codex --profile scnet            # 仅本次会话走 SCNet
 | --- | --- | --- | --- | --- |
 | `minimax` | `https://api.minimaxi.com/v1` | `MINIMAX_API_KEY` | `MiniMax-M3` | `minimax-catalog.json` |
 | `nativex` | `https://ailink.nativex.com/v1` | `NATIVEX_API_KEY` | `gpt-5.6-luna` | `nativex-catalog.json` |
+| `company` | senv `COMPANY_BASE_URL`（须含 `/v1`） | `COMPANY_API_KEY` | `vanchin/deepseek-v4-pro-0813` | `company-catalog.json` |
 | `kimi` | `https://api.kimi.com/coding/v1` | `KIMI_API_KEY` | `kimi-for-coding` | `kimi-catalog.json` |
 | `zhipu`（别名 `bigmodel`） | `https://open.bigmodel.cn/api/v1` | `ZHIPU_API_KEY` | `glm-5.3` | `zhipu-catalog.json` |
 | `scnet` | `https://api.scnet.cn/api/llm/v1` | `SCNET_API_KEY` | `DeepSeek-V4-Flash-0731` | `scnet-catalog.json` |
@@ -52,7 +54,7 @@ Codex 默认走 OpenAI 登录流程（ChatGPT / API Key）。本配置全部是*
   - 默认 `model_provider = "minimax"` / `model = "MiniMax-M3"`；`-f` 会覆盖这几项
   - `[model_providers.*]` 一次声明全部 provider，切换只改顶层 model / catalog
   - `approval_policy` / `sandbox_mode` - 审批与沙箱策略
-- `minimax.config.toml` / `nativex.config.toml` / `kimi.config.toml` / `zhipu.config.toml` / `scnet.config.toml` - 各 provider 的 overlay（codex 0.134+ 独立文件，安装到 `~/.codex/<name>.config.toml`）
+- `minimax.config.toml` / `nativex.config.toml` / `company.config.toml` / `kimi.config.toml` / `zhipu.config.toml` / `scnet.config.toml` - 各 provider 的 overlay（codex 0.134+ 独立文件，安装到 `~/.codex/<name>.config.toml`）
 - `model-catalogs/*.json` - 各 provider 的模型能力目录，`/model` 切换器的数据来源
 
 > **踩坑**：国内 MiniMax key 打到海外站 `api.minimax.io` 会 `401 invalid api key`（Codex 正常、Pi/SDK 挂时常是这个）。  
@@ -122,6 +124,8 @@ dotf codex -c
    senv env set KIMI_API_KEY "<kimi coding key>" -g ai    # Kimi For Coding
    senv env set ZHIPU_API_KEY "<智谱 coding plan key>" -g ai
    senv env set SCNET_API_KEY "<scnet key>" -g ai         # 官方名也可能是 SCNET_TOKEN_PLAN_API_KEY
+   senv env set COMPANY_API_KEY "<company new-api token>" -g feg
+   senv env set COMPANY_BASE_URL "<openai-compatible-base>/v1" -g feg
    ```
 
 2. 新开终端（或 `eval $(senv env export)`）后运行安装脚本：
@@ -158,6 +162,19 @@ codex exec -m glm-5.3 "..."        # 指定模型（须属于当前 catalog）
 ### NativeX
 
 公司 newapi 网关。默认 `gpt-5.6-luna`；catalog 含 gpt-5.6-sol/terra/luna、deepseek-v4 两档（不含 gpt-5.3-codex）。
+
+### Company
+
+内网 new-api 网关。地址与令牌只放 senv `feg` 组（`COMPANY_BASE_URL`、`COMPANY_API_KEY`），安装时展开进本机 `~/.codex/config.toml`，**不要入库**。Codex 走 Responses，`COMPANY_BASE_URL` 必须带 `/v1`。默认模型以网关 `GET /v1/models` 为准（当前 catalog 为 `vanchin/deepseek-v4-pro-0813`）。
+
+```bash
+senv env set COMPANY_API_KEY "<token>" -g feg
+senv env set COMPANY_BASE_URL "<base>/v1" -g feg
+eval "$(senv env export)"
+dotf codex -f company
+```
+
+改完 senv 后要重跑 `dotf codex -c`（或 `-f company`），否则本机 `config.toml` 里的 base_url 不会更新。
 
 ### Kimi For Coding
 

@@ -10,12 +10,14 @@ is kept. Local projects are appended after a marker comment.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 
 TABLE_RE = re.compile(r"^\s*\[")
 ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=")
+PLACEHOLDER_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 ALIASES = {
     "bigmodel": "zhipu",
@@ -127,6 +129,18 @@ def describe_profiles(vendor_dir: Path, current: str | None = None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def expand_env(text: str, environ: dict[str, str] | None = None) -> str:
+    """Replace ${VAR} from the environment; leave unknown placeholders intact."""
+    env = os.environ if environ is None else environ
+
+    def repl(match: re.Match[str]) -> str:
+        key = match.group(1)
+        value = env.get(key)
+        return value if value else match.group(0)
+
+    return PLACEHOLDER_RE.sub(repl, text)
+
+
 def merge(base: str, profile: str | None, local: str | None) -> str:
     text = overlay(base, profile or "")
     if local and local.strip():
@@ -135,7 +149,7 @@ def merge(base: str, profile: str | None, local: str | None) -> str:
         text += LOCAL_MARKER + local
         if not text.endswith("\n"):
             text += "\n"
-    return text
+    return expand_env(text)
 
 
 def main(argv: list[str] | None = None) -> int:
