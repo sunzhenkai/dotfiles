@@ -1,421 +1,164 @@
 #!/usr/bin/env python3
-"""将 agents/env MCP 声明同步到各 agent 工具。"""
+"""Plan and apply agents/env MCP declarations for supported vendors."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from common import (
-    TOOLS,
-    Catalog,
-    atomic_write_json,
-    backup_file,
-    die,
-    render_server_for_tool,
-    repo_root_from,
-)
+from common import Catalog, die, repo_root_from
+from dotf_core.sanitize import sanitize_for_terminal
+from sync_plan import SyncPlanError, apply_sync_plan, compile_sync_plan, plan_json
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Sync agents/env MCP to target tools")
-    p.add_argument(
-        "tool",
-        nargs="?",
-        default="all",
-        choices=[*TOOLS, "all"],
-        help="目标工具（默认 all）",
-    )
+    p.add_argument("tool", nargs="?", default="all", help="目标工具（默认 all）")
     p.add_argument("--profile", default=None, help="覆盖 profile（默认读 manifest/local）")
-    p.add_argument("--dry-run", action="store_true", help="只打印将要写入的内容")
+    p.add_argument("--dry-run", action="store_true", help="只编译并打印无副作用 SyncPlan")
+    p.add_argument("--json", action="store_true", help="输出严格机器可读 SyncPlan JSON")
     p.add_argument("--root", type=Path, default=None, help="仓库根目录")
-    p.add_argument(
-        "--also-repo-templates",
-        action="store_true",
-        default=True,
-        help="同时更新仓库内 MCP 模板（默认开启）",
-    )
-    p.add_argument(
-        "--no-repo-templates",
-        action="store_false",
-        dest="also_repo_templates",
-        help="不更新仓库内 MCP 模板",
-    )
+    p.add_argument("--validate-tool", action="store_true", help=argparse.SUPPRESS)
+    p.add_argument("--require-mcp", action="store_true", help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
 
 def merge_mcp_servers(
-    existing: Dict[str, Any],
-    managed: Dict[str, Any],
-    managed_ids: Set[str],
+    existing: Dict[str, Any], managed: Dict[str, Any], managed_ids: Set[str]
 ) -> Dict[str, Any]:
-    """更新托管 server，保留非托管 server。"""
+    """Compatibility helper: update selected ids but do not reconcile without ownership."""
+    del managed_ids
     out = dict(existing)
-    # 移除旧托管中已不在本次集合的 id（仅托管集合内）
-    for sid in list(out.keys()):
-        if sid in managed_ids and sid not in managed:
-            del out[sid]
     out.update(managed)
     return out
 
 
-def sync_cursor(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    servers = cat.selected_servers("cursor", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "cursor") for sid, srv in servers.items()
+def _text_plan(plan: Any) -> None:
+    runtimes = {
+        runtime.resource_id: f"{runtime.package}@{runtime.version}"
+        for item in plan.items
+        for runtime in item.declared_runtime_versions
     }
-    target = Path.home() / ".cursor" / "mcp.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcpServers"] = merged
-
-    status = f"cursor: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "cursor" / "mcp.json"
-        # 仓库模板只写托管 server，保持占位符
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
-def sync_kiro(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    """Merge mcpServers into ~/.kiro/settings/mcp.json（保留非托管 server）。"""
-    servers = cat.selected_servers("kiro", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "kiro") for sid, srv in servers.items()
-    }
-    target = Path.home() / ".kiro" / "settings" / "mcp.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcpServers"] = merged
-
-    status = f"kiro: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "kiro" / "mcp.json"
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
-def sync_opencode(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    servers = cat.selected_servers("opencode", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "opencode")
-        for sid, srv in servers.items()
-    }
-    target = Path.home() / ".config" / "opencode" / "opencode.json"
-    repo_cfg = cat.root / "agents" / "vendors" / "opencode" / "opencode.json"
-
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    elif repo_cfg.is_file():
-        # home 尚未有配置时，以仓库模板为骨架
-        try:
-            existing = json.loads(repo_cfg.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {repo_cfg}: {exc}")
-
-    cur = existing.get("mcp") or {}
-    if not isinstance(cur, dict):
-        cur = {}
-    data = dict(existing)
-    data["mcp"] = merge_mcp_servers(cur, rendered, cat.managed_server_ids())
-
-    status = f"opencode: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcp": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        if not repo_cfg.is_file():
-            die(f"缺少 OpenCode 仓库模板: {repo_cfg}")
-        try:
-            repo_data = json.loads(repo_cfg.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {repo_cfg}: {exc}")
-        repo_cur = repo_data.get("mcp") or {}
-        if not isinstance(repo_cur, dict):
-            repo_cur = {}
-        repo_data["mcp"] = merge_mcp_servers(repo_cur, rendered, cat.managed_server_ids())
-        backup_file(repo_cfg, Path.home() / ".config" / "backups")
-        atomic_write_json(repo_cfg, repo_data, dry_run=False)
-        print(f"已更新仓库模板: {repo_cfg.relative_to(cat.root)}")
-    return "ok"
-
-
-def sync_kimi_code(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    servers = cat.selected_servers("kimi-code", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "kimi-code")
-        for sid, srv in servers.items()
-    }
-    target = Path.home() / ".kimi-code" / "mcp.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    block = existing.get("mcpServers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcpServers"] = merged
-
-    status = f"kimi-code: {len(rendered)} managed servers → {target}"
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(json.dumps({"mcpServers": rendered}, indent=2, ensure_ascii=False))
-        return "ok"
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "kimi-code" / "mcp.json"
-        atomic_write_json(repo_tpl, {"mcpServers": rendered}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
-    return "ok"
-
-
-def sync_zcode(
-    cat: Catalog,
-    profile: Optional[str],
-    dry_run: bool,
-    also_repo: bool,
-) -> str:
-    """Merge mcp.servers into ~/.zcode/cli/config.json（保留其它本机字段）。
-
-    ZCode 不展开配置里的 ${VAR}。HTTP Authorization 和 stdio env 必须在
-    写入本机 config 时展开，否则连接会 401。仓库模板仍只保留占位符。
-    """
-    servers = cat.selected_servers("zcode", profile)
-    rendered = {
-        sid: render_server_for_tool(sid, srv, "zcode") for sid, srv in servers.items()
-    }
-    # 缺密钥时在写盘前失败，避免留下无法连接的占位符配置
-    home_rendered = {
-        sid: render_server_for_tool(sid, srv, "zcode", expand_secrets=True)
-        for sid, srv in servers.items()
-    }
-    target = Path.home() / ".zcode" / "cli" / "config.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            die(f"无法解析 {target}: {exc}")
-    mcp_block = existing.get("mcp") if isinstance(existing.get("mcp"), dict) else {}
-    block = mcp_block.get("servers") or {}
-    if not isinstance(block, dict):
-        block = {}
-    merged = merge_mcp_servers(block, home_rendered, cat.managed_server_ids())
-    data = dict(existing)
-    data["mcp"] = {**mcp_block, "servers": merged}
-
-    status = f"zcode: {len(rendered)} managed servers → {target} (mcp.servers)"
-    warn = (
-        "⚠️  ZCode 不展开 ${} 占位符，已将 ZHIPU_API_KEY 等密钥展开写入本机 "
-        "config（不写入仓库模板）"
+    print(f"profile={plan.profile} dry_run=True")
+    print(
+        "declared_runtime_versions="
+        + (", ".join(f"{key}:{value}" for key, value in sorted(runtimes.items())) or "none")
     )
-    if dry_run:
-        print(f"[dry-run] {status}")
-        print(warn)
-        print(json.dumps({"mcp": {"servers": rendered}}, indent=2, ensure_ascii=False))
-        return "ok"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        backup_file(target, Path.home() / ".config" / "backups")
-    atomic_write_json(target, data, dry_run=False)
-    print(f"已同步: {status}")
-    print(warn)
+    for item in plan.items:
+        secrets = ",".join(f"${{{name}}}" for name in item.required_secrets) or "none"
+        print(
+            f"[dry-run] {item.adapter}: state={item.state} action={item.action} "
+            f"risk={item.risk} target={item.target} required_secrets={secrets} "
+            f"expected={item.expected_hash} current={item.current_hash or 'none'} "
+            f"installed={item.installed_hash or 'none'} actual={item.actual_state}"
+        )
 
-    if also_repo:
-        repo_tpl = cat.root / "agents" / "vendors" / "zcode" / "mcp.json"
-        atomic_write_json(repo_tpl, {"mcp": {"servers": rendered}}, dry_run=False)
-        print(f"已更新仓库模板: {repo_tpl.relative_to(cat.root)}")
+
+def _sync_one(
+    cat: Catalog,
+    tool: str,
+    profile: Optional[str],
+    dry_run: bool,
+) -> str:
+    capability = cat.vendor_matrix.capability(tool)
+    if not capability.mcp:
+        reason = ((cat.manifest.get("unsupported") or {}).get(tool) or {}).get("reason") or "MCP sync unsupported"
+        print(("[dry-run] " if dry_run else "") + f"{tool}: skip MCP sync ({reason})")
+        return "skip"
+    plan = compile_sync_plan(cat, profile, [tool])
+    if dry_run:
+        _text_plan(plan)
+        return "ok"
+    try:
+        results, secret_values = apply_sync_plan(plan, cat, approved=True)
+    except (OSError, ValueError, SyncPlanError) as exc:
+        die(sanitize_for_terminal(str(exc)))
+    for result in results:
+        message = f"{result.resource_id}: {result.status} → {result.target}"
+        print(sanitize_for_terminal(message, secret_values=secret_values))
     return "ok"
+
+
+def sync_cursor(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    return _sync_one(cat, "cursor", profile, dry_run)
+
+
+def sync_kiro(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    return _sync_one(cat, "kiro", profile, dry_run)
+
+
+def sync_opencode(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    return _sync_one(cat, "opencode", profile, dry_run)
+
+
+def sync_kimi_code(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    return _sync_one(cat, "kimi-code", profile, dry_run)
+
+
+def sync_zcode(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
+    return _sync_one(cat, "zcode", profile, dry_run)
 
 
 def sync_codex(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
-    reason = (
-        (cat.manifest.get("unsupported") or {})
-        .get("codex", {})
-        .get("reason")
-        or "Codex MCP unsupported"
-    )
-    msg = f"codex: skip MCP sync ({reason})"
-    if dry_run:
-        print(f"[dry-run] {msg}")
-    else:
-        print(msg)
-    return "skip"
+    return _sync_one(cat, "codex", profile, dry_run)
 
 
 def sync_pi(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
-    reason = (
-        (cat.manifest.get("unsupported") or {})
-        .get("pi", {})
-        .get("reason")
-        or "Pi MCP unsupported"
-    )
-    msg = f"pi: skip MCP sync ({reason})"
-    if dry_run:
-        print(f"[dry-run] {msg}")
-    else:
-        print(msg)
-    return "skip"
+    return _sync_one(cat, "pi", profile, dry_run)
 
 
 def sync_dsh(cat: Catalog, profile: Optional[str], dry_run: bool) -> str:
-    # DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>/cordis.patch.yml），
-    # 不参与 agents/env 聚合 MCP 同步；skills 由 sync.py 分发到 ~/.agents/skills。
-    reason = (
-        (cat.manifest.get("unsupported") or {})
-        .get("dsh", {})
-        .get("reason")
-        or "dsh MCP unsupported (profile-level config)"
-    )
-    msg = f"dsh: skip MCP sync ({reason})"
-    if dry_run:
-        print(f"[dry-run] {msg}")
-    else:
-        print(msg)
-    return "skip"
+    return _sync_one(cat, "dsh", profile, dry_run)
+
+
+def _validate_selection(cat: Catalog, tool: str, *, require_mcp: bool = False) -> tuple[str, ...]:
+    valid = set(cat.vendor_matrix.cli_tools)
+    if tool != "all" and tool not in valid:
+        die(f"未知参数/工具: {tool}（可选: {', '.join(cat.vendor_matrix.cli_tools)}, all）")
+    targets = cat.vendor_matrix.cli_tools if tool == "all" else (tool,)
+    if require_mcp and tool != "all" and not cat.vendor_matrix.capability(tool).mcp:
+        die(f"工具 {tool} 不支持 MCP sync（能力由 vendors.yaml 声明）")
+    return targets
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
+    if args.require_mcp and not args.validate_tool:
+        die("--require-mcp is only valid with delegated tool validation")
     root = args.root or repo_root_from(Path(__file__))
     cat = Catalog(root)
-    profile = args.profile
-    pdata = cat.resolve_profile(profile)
-    print(
-        f"profile={pdata['id']} risk={pdata.get('risk', 'low')} "
-        f"dry_run={args.dry_run}"
-    )
-
-    targets = list(TOOLS) if args.tool == "all" else [args.tool]
-    results = []
+    targets = _validate_selection(cat, args.tool, require_mcp=args.require_mcp)
+    if args.validate_tool:
+        if args.profile is not None:
+            cat.resolve_profile(args.profile)
+        return 0
+    plan = compile_sync_plan(cat, args.profile, targets)
+    if args.json:
+        if not args.dry_run:
+            die("--json requires --dry-run; machine output is an immutable plan")
+        print(plan_json(plan))
+        return 0
+    if args.dry_run:
+        _text_plan(plan)
+        for tool in targets:
+            if not cat.vendor_matrix.capability(tool).mcp:
+                _sync_one(cat, tool, args.profile, True)
+        print("结果: " + ", ".join(f"{tool}={'ok' if cat.vendor_matrix.capability(tool).mcp else 'skip'}" for tool in targets))
+        return 0
+    print(f"profile={plan.profile} dry_run=False")
+    try:
+        results, secret_values = apply_sync_plan(plan, cat, approved=True)
+    except (OSError, ValueError, SyncPlanError) as exc:
+        die(sanitize_for_terminal(str(exc)))
+    status_by_tool = {item.adapter: "ok" for item in plan.items}
+    for result in results:
+        print(sanitize_for_terminal(f"{result.resource_id}: {result.status} → {result.target}", secret_values=secret_values))
     for tool in targets:
-        if tool == "cursor":
-            results.append(
-                (
-                    tool,
-                    sync_cursor(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "kiro":
-            results.append(
-                (
-                    tool,
-                    sync_kiro(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "opencode":
-            results.append(
-                (
-                    tool,
-                    sync_opencode(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "codex":
-            results.append((tool, sync_codex(cat, profile, args.dry_run)))
-        elif tool == "kimi-code":
-            results.append(
-                (
-                    tool,
-                    sync_kimi_code(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "pi":
-            results.append((tool, sync_pi(cat, profile, args.dry_run)))
-        elif tool == "zcode":
-            results.append(
-                (
-                    tool,
-                    sync_zcode(cat, profile, args.dry_run, args.also_repo_templates),
-                )
-            )
-        elif tool == "dsh":
-            results.append((tool, sync_dsh(cat, profile, args.dry_run)))
-        else:
-            die(f"未知工具: {tool}")
-
-    print("结果: " + ", ".join(f"{t}={r}" for t, r in results))
+        if not cat.vendor_matrix.capability(tool).mcp:
+            status_by_tool[tool] = _sync_one(cat, tool, args.profile, False)
+    print("结果: " + ", ".join(f"{tool}={status_by_tool[tool]}" for tool in targets))
     return 0
 
 

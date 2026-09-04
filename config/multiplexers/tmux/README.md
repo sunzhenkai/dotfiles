@@ -1,3 +1,14 @@
+# Tmux Configuration
+
+`~/.config/tmux` 由 `dotf` 以 copy 策略管理为 HOME 下的真实目录（不是指向仓库的软链），从而让插件和运行态留在本机。先预览再应用：
+
+```shell
+dotf tmux -c --dry-run
+dotf tmux -c
+```
+
+仓库 `config/multiplexers/tmux/` 修改后不会自动传播；请重新运行 `dotf tmux -c`。本机修改受管文件会报告 `conflict`，不会被静默覆盖。
+
 # Init
 ```shell
 make install

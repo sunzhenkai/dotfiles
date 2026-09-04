@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "sync-plan",
+  "profile": "research",
+  "tools": ["cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "dsh"],
+  "items": {
+    "cursor": {"expected_hash": "b53eabe1843fe57e5bb0cda504277f278943f79a43296139d5be07b4c50ca5a7", "risk": "low", "target": ".cursor/mcp.json"},
+    "kiro": {"expected_hash": "2c774037123be35a6ff33df63bb5ab83053a9b0a302b6bbe09e11d6c87deb2e0", "risk": "low", "target": ".kiro/settings/mcp.json"},
+    "opencode": {"expected_hash": "1a681ba0a88b8bbe191d392e0e0387d8b02796a49280482abff88ad9090d1a04", "risk": "low", "target": ".config/opencode/opencode.json"},
+    "kimi-code": {"expected_hash": "fdbf423739196fc9076941117a5beafb1f3d22977799fbe50e22d64ce6885dde", "risk": "low", "target": ".kimi-code/mcp.json"},
+    "zcode": {"expected_hash": "f031c7a7a9fed293d078e7152415899f4328c7d84457c90d10cf9757ab93f922", "risk": "sensitive", "target": ".zcode/cli/config.json"}
+  }
+}

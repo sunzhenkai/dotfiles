@@ -11,7 +11,11 @@ dotf_doctor_l0() {
 
   echo "doctor ($mod) — L0"
 
-  if modules_has "$mod" config; then
+  if [ "$mod" = "agents" ]; then
+    if ! python3 "$DOTFILES_ROOT/scripts/agents/managed_status.py"; then
+      failed=1
+    fi
+  elif modules_has "$mod" config; then
     target="$(modules_target "$mod")"
     if [ -z "$target" ]; then
       echo "skip  config: 无 target 字段"

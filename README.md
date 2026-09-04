@@ -1,6 +1,6 @@
 # Dotfiles
 
-Personal dotfiles managed with symlinks.
+Personal dotfiles deployed with explicit copy/merge/render strategies and allowlisted read-only symlinks.
 
 应用配置位于 `config/<category>/`（shell / editors / terminals / multiplexers / desktop / tools）。
 模块能力与路径见仓库根 `modules.yaml`。
@@ -68,7 +68,9 @@ Commands:
 Actions / controls:
   -i/-c/-d          Install / config / doctor
   -a                Install all + config all
-  --dry-run         Show plan only
+  --dry-run         Show plan only (cross-OS preview is dry-run only)
+  --continue-on-error
+                    After failure, run only dependency-independent actions; final exit stays nonzero
   --yes / -y        Skip plan + side-effect confirms (not validation/backup)
   --json            Redacted execution summary JSON
   --deep            Enable doctor L1
@@ -122,3 +124,25 @@ scripts/agents/sync.sh all --dry-run
 ## ColorScheme
 
 - [rose pine](https://rosepinetheme.com/)
+
+## 配置状态边界与恢复
+
+`modules.yaml` 为每个配置模块声明 `copy` / `merge` / `render` / 只读 `symlink` 策略。可写配置安装到 HOME 的真实文件或目录；应用产生的 cache、session、plugin、credential 与本机路径不会回写仓库。因为 `copy` 不会随仓库编辑自动变化，修改 `config/` 后必须重新运行 `dotf <module> -c`；可先用 `--dry-run` 查看计划，doctor 会把未应用的源变化报告为 `changed`。
+
+升级旧安装时，先运行 `dotf <module> -c --dry-run`。指向本仓声明源的历史整目录软链会在执行时仅 unlink 链接本身，再创建 HOME 真实目录并复制受管内容；仓库源不会被移动或删除。外来软链、未托管真实目标、受管后被本机修改的文件默认是 `conflict`，不会静默覆盖或删除。dotf 只 reconcile managed manifest 明确拥有且 hash 未被本机修改的条目；冲突应先审查，必要时保留统一备份后再显式处理。
+
+本机 Agent/Codex 覆盖只放在 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`：
+
+```shell
+PYTHONPATH=scripts python3 -m dotf_core.overlays init     # 新机创建外置安全示例
+PYTHONPATH=scripts python3 -m dotf_core.overlays migrate  # 迁移旧仓库 local 配置
+```
+
+默认 Agent profile 是低风险 `research`，不会启用 browser；`browser` / `full` 必须显式选择。普通 `dotf agents -c` 只写 HOME 与 XDG state，不反写仓库模板。维护者修改 `agents/env/` 后需显式生成并审查模板：
+
+```shell
+python3 scripts/agents/generate_templates.py
+# CI 使用同一命令后执行 git diff --exit-code
+```
+
+执行状态写入 `${XDG_STATE_HOME:-$HOME/.local/state}/dotf/runs/` 的逐动作 journal。事务失败会逆序 rollback；若 rollback 本身失败，保留 `failed-rollback` journal 与备份供人工恢复，不要重新创建可写整目录软链。普通失败可用 `dotf retry`，它会从最近完整摘要选出 failed 动作并重新经过正常 planner/registry/OS 校验。

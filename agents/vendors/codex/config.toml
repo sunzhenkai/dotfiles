@@ -9,8 +9,8 @@
 #   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
 #   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
 #
-# 切换默认 provider：dotf codex -c -f <name>（或 --profile <name>）
-# 单次会话：codex --profile <name>
+# 切换默认 provider：dotf codex -f <name>（选择仓库 profile 并 merge）
+# profile TOML 只作为仓库内 merge 输入，不作为 Codex CLI 辅助配置安装。
 # 模型切换：TUI /model 或 codex exec -m <slug>（catalog 为数据源）
 #
 # 注意: codex 0.130+ 仅支持 wire_api = "responses"。
@@ -22,8 +22,8 @@ model = "MiniMax-M3"
 model_provider = "minimax"
 model_context_window = 1000000
 # 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
-# 安装后位于 ~/.codex/model-catalogs/minimax-catalog.json（symlink 到本仓库文件）。
-# 切回 NativeX 时由 nativex profile 覆盖为 nativex-catalog.json。
+# 安装后由 config_deploy 管理为 ~/.codex/model-catalogs/minimax-catalog.json 真实文件。
+# `dotf codex -f nativex` 时由仓库 profile merge 为 nativex-catalog.json。
 model_catalog_json = "~/.codex/model-catalogs/minimax-catalog.json"
 
 # 审批策略: untrusted | on-request | never
@@ -51,7 +51,7 @@ wire_api = "responses"
 requires_openai_auth = false
 
 # ============================================================
-# 自定义模型提供商 - NativeX（备用，--profile nativex 激活）
+# 自定义模型提供商 - NativeX（备用，`dotf codex -f nativex` 激活）
 # ============================================================
 # ailink.nativex.com 是 newapi 网关，/v1/responses 端点已验证可用。
 # 认证通过 env_key 从 NATIVEX_API_KEY 环境变量读取（senv ai 组）。
@@ -114,9 +114,8 @@ env_key = "SCNET_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
 
-# profile 层不在本文件（codex 0.134+ 已废弃 [profiles.<name>] 表），
-# 而是独立文件 <name>.config.toml，安装到 ~/.codex/<name>.config.toml，
-# 用 codex --profile <name> 或 dotf codex -f <name> 切换。
+# profile 层来自仓库内 <name>.config.toml merge 输入；`dotf codex -f <name>`
+# 将其顶层键合并进唯一的 ~/.codex/config.toml，不安装 profile 辅助文件。
 
 # ============================================================
 # 子进程环境变量策略
@@ -136,7 +135,8 @@ notifications = ["agent-turn-complete", "approval-requested"]
 # codex 运行时会把"首次信任的项目"以 [projects."<path>"] 形式自动写入
 # ~/.codex/config.toml。这类内容机器特定、动态变化，放进本仓库会污染 git。
 #
-# 方案：projects 由本地文件 codex/config.local.toml 维护（已 .gitignore），
-# 安装时（`dotf codex`）自动与本文件（base）合并生成 ~/.codex/config.toml。
-# codex 新增的信任会在下次安装时自动回抽到 config.local.toml，不丢也不入库。
+# 方案：projects 等本机配置仅在
+# ${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/*.yaml 的 codex.local_toml
+# 中维护；`dotf codex -c` 将其与本文件（base）合并到 ~/.codex/config.toml。
+# 旧仓库内 config.local.toml 仅作为只读迁移输入，不再回抽或写入。
 # 详见 codex/README.md「projects 本地化」一节。

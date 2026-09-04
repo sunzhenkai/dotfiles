@@ -14,14 +14,15 @@ providers:
   playwright:
     risk: high
     package: "@playwright/mcp"
+    version: "0.0.80"
     launch:
       command: npx
-      args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+      args: ["-y", "@playwright/mcp@0.0.80", "--browser", "chromium"]
     # headless 时追加 --headless；headed 由 local override 控制
     headless_arg: "--headless"
     # 隔离 user data（避免读取主浏览器 profile）
     user_data_arg: "--user-data-dir"
-    tools: [cursor, opencode]
+    tools: [cursor, kiro, opencode, kimi-code, zcode]
     profiles: [browser, full]
     required_tools: [node, npx]
     checks:
@@ -35,13 +36,13 @@ providers:
         hint: "需要 npx（随 Node.js 安装）"
       - id: package
         kind: hint
-        hint: "首次运行会通过 npx 拉取 @playwright/mcp@latest 并下载浏览器二进制"
+        hint: "首次运行会通过 npx 拉取 @playwright/mcp@0.0.80 并下载浏览器二进制"
       - id: browser_binary
         kind: hint
         hint: "若启动失败，可执行 npx @playwright/mcp install-browser chrome-for-testing"
     deep_check:
       kind: launch_help
-      command: ["npx", "-y", "@playwright/mcp@latest", "--help"]
+      command: ["npx", "-y", "@playwright/mcp@0.0.80", "--help"]
 
   chrome-devtools:
     risk: high
@@ -49,12 +50,12 @@ providers:
     opt_in: true
     tools: [cursor, opencode]
     profiles: [browser, full]
-    notes: "连接真实 Chrome 调试端口可能暴露登录态与个人浏览数据；仅在 local override 显式启用"
+    notes: "连接真实 Chrome 调试端口可能暴露登录态与个人浏览数据；仅在 XDG external overlay 显式启用"
     checks:
       - id: cdp_endpoint
         kind: env_or_local
         keys: [AGENT_ENV_CDP_ENDPOINT, cdp_endpoint]
-        hint: "在 local.yaml 设置 cdp_endpoint 或 export AGENT_ENV_CDP_ENDPOINT"
+        hint: "在 XDG external overlay 设置 cdp_endpoint 或 export AGENT_ENV_CDP_ENDPOINT"
       - id: browser_executable
         kind: optional_path
         keys: [AGENT_ENV_BROWSER_EXECUTABLE, browser_executable]
@@ -69,8 +70,8 @@ local_override_keys:
   - use_real_profile  # true 时 doctor 标 high risk
 
 warnings:
-  - "浏览器自动化为 high risk；默认 profile=browser 会启用 Playwright MCP，research/coding 不会"
+  - "浏览器自动化为 high risk；默认 profile=research 不启用 Playwright MCP；仅显式 browser/full 启用"
   - "默认使用隔离 profile，不读取用户主浏览器 cookie/扩展"
   - "截图、trace、downloads 放到 artifact_dir，不要提交到仓库"
   - "截图默认不要传 filename（自动进 --output-dir）；自定义 filename 可能落到工作区根目录"
-  - "Chrome DevTools / 真实 profile 需 local override 显式 opt-in"
+  - "Chrome DevTools / 真实 profile 需 XDG external overlay 显式 opt-in"

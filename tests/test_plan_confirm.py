@@ -11,6 +11,8 @@ import textwrap
 import time
 from pathlib import Path
 
+from plan_test_helpers import plan_env, write_test_plan
+
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
 COMMON = ROOT / "scripts" / "tools" / "common.sh"
@@ -226,16 +228,13 @@ def test_plan_y_does_not_set_dotf_yes_for_handlers(tmp_home: Path, tmp_path: Pat
     install.chmod(install.stat().st_mode | stat.S_IXUSR)
 
     plan = tmp_path / "plan.txt"
-    plan.write_text(
-        "PLAN_OK\nOS\tlinux\nPROFILE\t\nACTION\t1\tinstall\tprobe\texplicit\n",
-        encoding="utf-8",
-    )
+    write_test_plan(plan, handlers, [("install", "probe")])
 
     env = {
         "HOME": str(tmp_home),
-        "DOTF_HANDLERS_DIR": str(handlers),
         "DOTFILES_ROOT": str(ROOT),
     }
+    env.update(plan_env(plan, handlers))
     # 清掉可能继承的授权
     full_env = os.environ.copy()
     full_env.update(env)
@@ -268,13 +267,10 @@ def test_run_plan_yes_sets_dotf_yes(tmp_home: Path, tmp_path: Path) -> None:
     )
     install.chmod(install.stat().st_mode | stat.S_IXUSR)
     plan = tmp_path / "plan.txt"
-    plan.write_text(
-        "PLAN_OK\nOS\tlinux\nPROFILE\t\nACTION\t1\tinstall\tprobe\texplicit\n",
-        encoding="utf-8",
-    )
+    write_test_plan(plan, handlers, [("install", "probe")])
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
-    env["DOTF_HANDLERS_DIR"] = str(handlers)
+    env.update(plan_env(plan, handlers))
     r = subprocess.run(
         ["bash", str(RUN_PLAN), "--yes", "--plan-file", str(plan)],
         capture_output=True,

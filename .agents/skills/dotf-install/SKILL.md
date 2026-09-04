@@ -103,26 +103,26 @@ dotf <mod> -i --yes         # 非交互（shared 下系统级动作仍会确认�
 
 ### config `<mod...>`
 
-仅配置（不装），例如刷新 nvim/tmux 配置软链。
+仅配置（不装）。可写模块使用 HOME 下的真实文件/目录和 `copy` / `merge` / `render`；只有注册表显式允许的只读文件可使用 `symlink`。仓库源修改后不会自动传播，必须重跑 config：
 
 ```bash
-dotf <mod> -c
+dotf <mod> -c --dry-run
 dotf <mod> -c --yes
-dotf agents -c              # 聚合同步 skills（~/.agents/skills）+ MCP
+dotf agents -c                # 聚合同步 skills（~/.agents/skills）+ MCP
 dotf agents -c --tool cursor  # 过滤 MCP 同步目标（skills 与 tool 无关）
 ```
 
-配置类基本是用户级文件软链，shared 下也安全。但 `dotf agents -c` 会写 `~/.agents/skills` 与各工具的 MCP 配置——确认目标路径在用户 HOME 下（如 `~/.zcode`），不污染全局。
+历史整目录软链由 config 计划仅 unlink 链接本身并迁移为真实目录；外来软链、未托管目标或本机修改默认 `conflict`，不得静默覆盖。Agent runtime/MCP 只 reconcile managed manifest 拥有且 hash 未变的项。失败先查看 XDG state 下的 journal；普通 failed 动作用 `dotf retry` 重新经过 planner，`failed-rollback` 则保留 journal/备份并人工恢复。shared 下仍须确认目标位于当前用户 HOME。
 
 ### all（全量补装）
 
 ```bash
-dotf -a                     # 装全部 + 配全部（不含 doctor），按当前 OS 过滤
-dotf -a --dry-run           # 先看计划
-dotf -a --profile remote    # 指定使用场景 profile
+dotf -a                                  # 装全部 + 配全部（不含 doctor），按当前 OS 过滤
+dotf -a --dry-run                        # 预览当前 OS 适用的完整 all 计划
+dotf init --profile remote --dry-run     # 按使用场景 profile 初始化
 ```
 
-shared 下 **all 会包含 system 等系统级模块** → 必须先 dry-run，逐项确认或改用更小的 profile + 手动补用户级模块。
+`-a` 始终表示当前 OS 适用模块的完整 all 集合，不受使用场景 profile 缩小；需要 profile 范围时使用 `dotf init --profile <name>`。shared 下 **all 会包含 system 等系统级模块** → 必须先 dry-run，逐项确认或改用更小的 `dotf init` profile + 手动补用户级模块。
 
 ### doctor `[mod...]`
 
@@ -144,7 +144,7 @@ dotf retry
 
 ## chsh 绕过（shared 下装 zsh 时）
 
-`zsh` 配置（`.zshrc` 等）是用户级软链，不 chsh 也能用。shared 下推荐不改默认 shell：
+`zsh` 配置通过 `copy` 部署到 HOME 下的真实用户级文件/目录，不 chsh 也能用；仓库源修改后需重跑 `dotf zsh -c`。shared 下推荐不改默认 shell：
 
 ```bash
 # 方案 A：~/.bashrc 末尾自动切（仅当前用户，不影响他人登录默认 shell）

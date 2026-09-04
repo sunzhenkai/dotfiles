@@ -203,3 +203,11 @@ command -v dws && dws --help >/dev/null
 - 不把公司代码、密钥、内部 URL 写入本公开仓库或外发。
 - 飞书/钉钉登录链接过期则重跑对应命令，不复用旧 device code。
 - 脚本失败时记入台账踩坑，并提示可能需更新 `dotf` 脚本或相关 skill。
+
+## 配置迁移与恢复约定
+
+- 可写配置是 HOME 下的受管真实文件/目录，不要假定仓库编辑会经软链立即生效；修改 `config/` 后重跑 `dotf <module> -c`。
+- 迁移前先 `--dry-run`。指向当前仓库声明源的历史目录软链只 unlink 链接本身；外来链接、未托管真实目标和本机修改默认 `conflict`，不得绕过 ownership 静默覆盖。
+- Agent 本机覆盖用 `PYTHONPATH=scripts python3 -m dotf_core.overlays init|migrate` 放到 XDG 外置 overlay 目录；默认 `research` 为低风险 profile，browser/full 需显式选择。
+- 普通 sync 不生成仓库模板。只有维护者显式运行 `python3 scripts/agents/generate_templates.py` 并审查 diff。
+- 执行失败先看 XDG state 下的 run/transaction journal。普通 failed 可 `dotf retry`；`failed-rollback` 必须保留 journal 与备份，人工恢复后重新 dry-run。

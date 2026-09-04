@@ -13,13 +13,14 @@
 
 ## 应用方式
 
-将本仓库中的 `kitty/` 链到你本机配置文件目录，例如：
+Kitty 使用注册表声明的 `copy` 策略。先预览，再将配置安装为 HOME 下的真实目录：
 
 ```shell
-ln -s "$(pwd)/kitty" ~/.config/kitty
+dotf kitty -c --dry-run
+dotf kitty -c --yes
 ```
 
-若你使用其它 dotfile 管理方式，保持 `~/.config/kitty/kitty.conf` 指向或包含本仓库内容即可。
+`~/.config/kitty` 不会链接回仓库，因此 Kitty 写入的本机状态不会反向进入源码。修改本仓库中的 Kitty 配置后，需要重新运行 `dotf kitty -c` 才会同步到 HOME。
 
 本目录中的 **`macos-launch-services-cmdline`** 用于在 **macOS 上从 GUI 启动** 时附加 `--start-as=fullscreen`；说明见 [USAGE.md](USAGE.md) 第 2 节。
 

@@ -22,7 +22,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@z_ai/mcp-server@latest"
+        "@z_ai/mcp-server@0.1.5"
       ],
       "env": {
         "Z_AI_API_KEY": "${ZHIPU_API_KEY}",
@@ -33,7 +33,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@playwright/mcp@latest",
+        "@playwright/mcp@0.0.80",
         "--browser",
         "chromium",
         "--headless",

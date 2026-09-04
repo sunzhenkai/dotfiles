@@ -11,7 +11,7 @@ tools:
   - zcode
   - dsh
 
-default_profile: browser
+default_profile: research
 
 modules:
   mcp:
@@ -25,15 +25,19 @@ modules:
   tools:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    exclude: []
   env:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    exclude: []
   security:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    exclude: []
   agents:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    exclude: []
 
 # Codex / Pi / DSH 当前无 agents/env 聚合 MCP 配置入口，显式降级
 unsupported:

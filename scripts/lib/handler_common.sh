@@ -38,31 +38,73 @@ dotf_skip_if_bin() {
   return 1
 }
 
-# 按注册表 source/target 做通用 symlink 配置。
-# 禁止用于应用数据根目录（如 ~/.logseq）：应用会把缓存/密钥写进仓库。
-dotf_registry_symlink_config() {
+# Registry-driven generic config dispatch. Copy is owned by the Python planner /
+# apply path. Merge/render modules must call the same Python API with a pure
+# expected-content producer; they fail closed here rather than gaining a direct
+# write escape hatch. Symlink remains only for explicitly safe registry entries.
+dotf_registry_config() {
   local mod="${1:-${DOTF_MODULE:?}}"
-  local src tgt
+  local strategy src tgt status pythonpath_value
+  local -a state_args=()
+  if [ -n "${XDG_STATE_HOME:-}" ]; then
+    state_args=(--state-home "$XDG_STATE_HOME")
+  fi
   if ! modules_has "$mod" config; then
     dotf_result_failed "$mod has no config capability"
     return 1
   fi
-  src=$(modules_source "$mod") || {
-    dotf_result_failed "$mod: missing config.source"
+  strategy=$(modules_strategy "$mod") || {
+    dotf_result_failed "$mod: missing config.strategy"
     return 1
   }
-  tgt=$(modules_target "$mod") || {
-    dotf_result_failed "$mod: missing config.target"
+  case "$strategy" in
+  copy | merge | render)
+    pythonpath_value="${_DOTF_CORE_PYTHONPATH}"
+    if [ -n "${PYTHONPATH:-}" ]; then
+      pythonpath_value="${pythonpath_value}:${PYTHONPATH}"
+    fi
+    status=$(PYTHONPATH="$pythonpath_value" \
+      python3 -m dotf_core.config_handler "$mod" \
+      --repo-root "$DOTFILES_ROOT" --home "$HOME" \
+      "${state_args[@]}" --run-id "$DOTF_RUN_ID") || {
+      dotf_result_failed "$mod: safe $strategy deployment failed"
+      return 1
+    }
+    if [ "$status" = "unchanged" ]; then
+      dotf_result_unchanged "$mod already deployed"
+    else
+      dotf_result_changed "$mod deployed"
+    fi
+    ;;
+  symlink)
+    src=$(modules_source "$mod") || {
+      dotf_result_failed "$mod: missing config.source"
+      return 1
+    }
+    tgt=$(modules_target "$mod") || {
+      dotf_result_failed "$mod: missing config.target"
+      return 1
+    }
+    tgt=$(dotf_expand_path "$tgt")
+    if ! dotf_ensure_symlink "$src" "$tgt"; then
+      dotf_result_failed "$mod: symlink failed"
+      return 1
+    fi
+    if [ "${DOTF_CFG_STATUS:-}" = "unchanged" ]; then
+      dotf_result_unchanged "$mod already linked"
+    else
+      dotf_result_changed "$mod linked"
+    fi
+    ;;
+  *)
+    dotf_result_failed "$mod: unsupported config strategy $strategy"
     return 1
-  }
-  tgt=$(dotf_expand_path "$tgt")
-  if ! dotf_ensure_symlink "$src" "$tgt"; then
-    dotf_result_failed "$mod: symlink failed"
-    return 1
-  fi
-  if [ "${DOTF_CFG_STATUS:-}" = "unchanged" ]; then
-    dotf_result_unchanged "$mod already linked"
-  else
-    dotf_result_changed "$mod linked"
-  fi
+    ;;
+  esac
+}
+
+# Compatibility name retained while module wrappers migrate; behavior is now
+# registry-driven and no longer implies a symlink strategy.
+dotf_registry_symlink_config() {
+  dotf_registry_config "$@"
 }

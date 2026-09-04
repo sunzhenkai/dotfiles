@@ -13,6 +13,7 @@ from typing import Any, Iterable
 # 与 modules.py 同目录
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import modules  # noqa: E402
+import plan_protocol  # noqa: E402
 
 
 ACTION_ORDER = ("install", "config", "doctor")
@@ -33,6 +34,11 @@ class PlanAction:
 class Plan:
     os_id: str
     profile: str | None
+    requested_os: str | None = None
+    detected_os: str = ""
+    requested_actions: list[str] = field(default_factory=list)
+    ordered_modules: list[str] = field(default_factory=list)
+    registry: list[dict[str, Any]] = field(default_factory=list, repr=False)
     actions: list[PlanAction] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     module_reasons: dict[str, str] = field(default_factory=dict)
@@ -174,8 +180,17 @@ def build_plan(
     profiles_data = profiles_data if profiles_data is not None else modules.load_profiles()
     profiles = profiles_data.get("profiles") or {}
 
-    resolved_os = os_id or modules.detect_os()
+    detected_os = modules.detect_os()
+    resolved_os = os_id or detected_os
     want_actions = list(actions or ["install", "config"])
+    if len(want_actions) != len(set(want_actions)):
+        return Plan(
+            os_id=resolved_os,
+            profile=profile,
+            requested_os=os_id,
+            detected_os=detected_os,
+            errors=["请求动作包含重复项"],
+        )
     for a in want_actions:
         if a not in ACTION_ORDER:
             return Plan(
@@ -183,6 +198,7 @@ def build_plan(
                 profile=profile,
                 errors=[f"未知动作: {a}"],
             )
+    want_actions = [action for action in ACTION_ORDER if action in want_actions]
 
     by_name = {m["name"]: m for m in mod_list if m.get("name")}
     order_map = registry_order_map(mod_list)
@@ -260,7 +276,17 @@ def build_plan(
 
     if not unique_seeds and not errors:
         # 允许空计划（例如空 profile）
-        return Plan(os_id=resolved_os, profile=profile, actions=[], module_reasons={})
+        return Plan(
+            os_id=resolved_os,
+            profile=profile,
+            requested_os=os_id,
+            detected_os=detected_os,
+            requested_actions=want_actions,
+            ordered_modules=[],
+            registry=mod_list,
+            actions=[],
+            module_reasons={},
+        )
 
     selected, dep_reasons, dep_errors = expand_depends(unique_seeds, by_name)
     errors.extend(dep_errors)
@@ -287,6 +313,7 @@ def build_plan(
     if errors:
         return Plan(
             os_id=resolved_os,
+
             profile=profile,
             errors=errors,
             module_reasons=reasons,
@@ -336,8 +363,145 @@ def build_plan(
     return Plan(
         os_id=resolved_os,
         profile=profile,
+        requested_os=os_id,
+        detected_os=detected_os,
+        requested_actions=want_actions,
+        ordered_modules=ordered,
+        registry=mod_list,
         actions=plan_actions,
         module_reasons=reasons,
+    )
+
+
+def load_retry_candidates(path: Path) -> list[dict[str, str]]:
+    """Load untrusted candidate selectors; these are never executable plan records."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PlanError([f"retry 候选损坏: {type(exc).__name__}"]) from exc
+    if not isinstance(value, list) or not value:
+        raise PlanError(["retry 候选必须为非空列表"])
+    candidates: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict) or set(item) != {"module", "action", "dependency_hash"}:
+            raise PlanError([f"retry 候选 {index} schema 无效"])
+        if not all(isinstance(item[key], str) and item[key] for key in item):
+            raise PlanError([f"retry 候选 {index} 字段无效"])
+        digest = item["dependency_hash"]
+        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            raise PlanError([f"retry 候选 {index} dependency_hash 无效"])
+        candidates.append(dict(item))
+    return candidates
+
+
+def build_retry_plan(
+    candidates: list[dict[str, str]],
+    *,
+    os_id: str,
+    profile: str | None,
+    registry: list[dict[str, Any]],
+    profiles_data: dict[str, Any],
+) -> Plan:
+    """Re-plan failed selectors through normal capability/OS/profile/dependency logic."""
+    detected = modules.detect_os()
+    if os_id != detected:
+        return Plan(os_id=os_id, profile=profile, detected_os=detected, errors=[
+            f"报告 OS={os_id} 与当前 OS={detected} 不一致"
+        ])
+    profiles = profiles_data.get("profiles") or {}
+    if profile is not None and profile not in profiles:
+        return Plan(os_id=os_id, profile=profile, detected_os=detected, errors=[
+            f"报告 profile 不再存在: {profile}"
+        ])
+
+    pair_set: set[tuple[str, str]] = set()
+    candidate_modules: list[str] = []
+    requested_actions: list[str] = []
+    closure: set[str] = set()
+    errors: list[str] = []
+    for candidate in candidates:
+        name, action = candidate["module"], candidate["action"]
+        pair = (name, action)
+        if pair in pair_set:
+            errors.append(f"重复失败动作: {name}/{action}")
+            continue
+        pair_set.add(pair)
+        candidate_modules.append(name)
+        if action not in requested_actions:
+            requested_actions.append(action)
+        planned = build_plan(
+            os_id=os_id,
+            modules_explicit=[name],
+            actions=[action],
+            registry=registry,
+            profiles_data=profiles_data,
+        )
+        if planned.errors:
+            errors.extend(planned.errors)
+            continue
+        probe = plan_protocol.make_document(
+            requested_os=os_id,
+            detected_os=detected,
+            planned_os=os_id,
+            profile=None,
+            requested_actions=[action],
+            registry=registry,
+            ordered_modules=planned.ordered_modules,
+            actions=[asdict(item) for item in planned.actions],
+        )
+        current_dependency_hash = plan_protocol.dependency_digest(probe, name)
+        if current_dependency_hash != candidate["dependency_hash"]:
+            errors.append(f"{name}/{action}: 递归依赖已漂移")
+        closure.update(planned.ordered_modules)
+
+    requested_actions = [action for action in ACTION_ORDER if action in requested_actions]
+    if profile is not None and not errors:
+        profile_plan = build_plan(
+            os_id=os_id,
+            profile=profile,
+            actions=requested_actions,
+            registry=registry,
+            profiles_data=profiles_data,
+        )
+        if profile_plan.errors:
+            errors.extend(profile_plan.errors)
+        else:
+            profile_modules = set(profile_plan.ordered_modules)
+            for name in candidate_modules:
+                if name not in profile_modules:
+                    errors.append(f"模块 {name} 已不属于报告 profile={profile}")
+
+    by_name = {item["name"]: item for item in registry if item.get("name")}
+    ordered, topo_errors = topo_sort(closure, by_name, registry_order_map(registry)) if closure else ([], [])
+    errors.extend(topo_errors)
+    if errors:
+        return Plan(
+            os_id=os_id, profile=profile, requested_os=os_id, detected_os=detected,
+            requested_actions=requested_actions, registry=registry, errors=errors,
+        )
+
+    actions: list[PlanAction] = []
+    index = 0
+    for name in ordered:
+        for action in ACTION_ORDER:
+            if (name, action) not in pair_set:
+                continue
+            index += 1
+            actions.append(PlanAction(module=name, action=action, reason="retry", index=index))
+    if len(actions) != len(pair_set):
+        return Plan(os_id=os_id, profile=profile, detected_os=detected, errors=[
+            "retry 候选未能由 planner 完整重建"
+        ])
+    return Plan(
+        os_id=os_id,
+        profile=profile,
+        requested_os=os_id,
+        detected_os=detected,
+        requested_actions=requested_actions,
+        ordered_modules=ordered,
+        registry=registry,
+        actions=actions,
+        module_reasons={name: "retry" for name in candidate_modules},
     )
 
 
@@ -381,27 +545,77 @@ def format_plan_text(plan: Plan) -> str:
 
 
 def format_plan_machine(plan: Plan) -> str:
-    """bash 易解析的行协议。"""
-    lines = ["PLAN_OK" if plan.ok else "PLAN_ERR"]
-    lines.append(f"OS\t{plan.os_id}")
-    lines.append(f"PROFILE\t{plan.profile or ''}")
-    for err in plan.errors:
-        lines.append(f"ERROR\t{err}")
-    for a in plan.actions:
-        lines.append(f"ACTION\t{a.index}\t{a.action}\t{a.module}\t{a.reason}")
-    return "\n".join(lines) + "\n"
+    """Versioned, complete JSON protocol consumed by plan_protocol.py."""
+    if not plan.ok:
+        raise PlanError(plan.errors)
+    document = plan_protocol.make_document(
+        requested_os=plan.requested_os,
+        detected_os=plan.detected_os,
+        planned_os=plan.os_id,
+        profile=plan.profile,
+        requested_actions=plan.requested_actions,
+        registry=plan.registry,
+        ordered_modules=plan.ordered_modules,
+        actions=[asdict(action) for action in plan.actions],
+    )
+    return plan_protocol.dumps(document)
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
+    try:
+        registry = modules.load_registry()
+        profiles_data = modules.load_profiles()
+        strict_errors = modules.validate_registry(
+            registry,
+            profiles_data=profiles_data,
+            strict_handlers=True,
+        )
+    except (OSError, SystemExit) as exc:
+        print(f"计划前置校验失败: {exc}", file=sys.stderr)
+        return 2
+    if strict_errors:
+        print("计划前置 strict registry/handler 校验失败:", file=sys.stderr)
+        for error in strict_errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+
     actions = [x.strip() for x in args.actions.split(",") if x.strip()]
     explicit = [x.strip() for x in (args.modules or "").split(",") if x.strip()]
-    plan = build_plan(
-        os_id=args.os,
-        profile=args.profile,
-        modules_explicit=explicit or None,
-        actions=actions,
-        select_all=args.all,
-    )
+    if args.retry_candidates:
+        try:
+            candidates = load_retry_candidates(Path(args.retry_candidates))
+        except PlanError as exc:
+            print("计划校验失败:", file=sys.stderr)
+            for error in exc.errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 1
+        if not args.os:
+            print("计划校验失败: retry 必须提供报告 OS", file=sys.stderr)
+            return 1
+        plan = build_retry_plan(
+            candidates,
+            os_id=args.os,
+            profile=args.profile,
+            registry=registry,
+            profiles_data=profiles_data,
+        )
+    else:
+        plan = build_plan(
+            os_id=args.os,
+            profile=args.profile,
+            modules_explicit=explicit or None,
+            actions=actions,
+            select_all=args.all,
+            registry=registry,
+            profiles_data=profiles_data,
+        )
+    if plan.errors:
+        print("计划校验失败:", file=sys.stderr)
+        for error in plan.errors:
+            print(f"  - {error}", file=sys.stderr)
+        if args.format == "json":
+            print(json.dumps({"ok": False, "errors": plan.errors}, ensure_ascii=False, indent=2))
+        return 1
     if args.format == "json":
         payload = {
             "ok": plan.ok,
@@ -438,6 +652,11 @@ def main() -> int:
         help="逗号分隔动作 install,config,doctor",
     )
     p.add_argument("--all", action="store_true", help="当前 OS 适用全集")
+    p.add_argument(
+        "--retry-candidates",
+        default="",
+        help=argparse.SUPPRESS,
+    )
     p.add_argument(
         "--format",
         choices=["text", "machine", "json"],

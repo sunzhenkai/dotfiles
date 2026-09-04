@@ -1,0 +1,90 @@
+version: 1
+vendors:
+  cursor:
+    cli: true
+    mcp: true
+    adapter: cursor
+    target: ~/.cursor/mcp.json
+    block_path: [mcpServers]
+    transports: [stdio, streamable-http]
+    secret_mode: runtime-placeholder
+    runtime_versions: true
+    sensitive: false
+    docs: "Cursor MCP JSON; secrets remain runtime placeholders"
+  kiro:
+    cli: true
+    mcp: true
+    adapter: kiro
+    target: ~/.kiro/settings/mcp.json
+    block_path: [mcpServers]
+    transports: [stdio, streamable-http]
+    secret_mode: runtime-placeholder
+    runtime_versions: true
+    sensitive: false
+    docs: "Kiro MCP JSON; secrets remain runtime placeholders"
+  opencode:
+    cli: true
+    mcp: true
+    adapter: opencode
+    target: ~/.config/opencode/opencode.json
+    block_path: [mcp]
+    transports: [stdio, streamable-http]
+    secret_mode: runtime-placeholder
+    runtime_versions: true
+    sensitive: false
+    docs: "OpenCode MCP JSON; uses {env:NAME} placeholders"
+  codex:
+    cli: true
+    mcp: false
+    adapter: none
+    target: null
+    block_path: []
+    transports: []
+    secret_mode: unsupported
+    runtime_versions: false
+    sensitive: false
+    docs: "MCP sync unsupported; shared skills remain supported"
+  kimi-code:
+    cli: true
+    mcp: true
+    adapter: kimi-code
+    target: ~/.kimi-code/mcp.json
+    block_path: [mcpServers]
+    transports: [stdio, streamable-http]
+    secret_mode: environment-reference
+    runtime_versions: true
+    sensitive: false
+    docs: "Kimi Code uses bearerTokenEnvVar or a runtime shell mapping"
+  pi:
+    cli: true
+    mcp: false
+    adapter: none
+    target: null
+    block_path: []
+    transports: []
+    secret_mode: unsupported
+    runtime_versions: false
+    sensitive: false
+    docs: "MCP sync unsupported; shared skills remain supported"
+  zcode:
+    cli: true
+    mcp: true
+    adapter: zcode
+    target: ~/.zcode/cli/config.json
+    block_path: [mcp, servers]
+    transports: [stdio, streamable-http]
+    secret_mode: literal-at-apply
+    runtime_versions: true
+    sensitive: true
+    docs: "ZCode literals are resolved only after plan approval"
+  dsh:
+    cli: true
+    mcp: false
+    adapter: none
+    target: null
+    block_path: []
+    transports: []
+    secret_mode: unsupported
+    runtime_versions: false
+    sensitive: false
+    docs: "MCP configuration is profile-local and outside aggregate sync"

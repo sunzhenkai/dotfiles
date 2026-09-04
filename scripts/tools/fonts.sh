@@ -9,6 +9,12 @@ FONT_ZIP="MapleMono-NF-CN.zip"
 
 # Detect OS
 detect_os() {
+  if [ -n "${DOTF_OS:-}" ]; then
+    ID="$DOTF_OS"
+    export ID
+    echo "Planned OS: $ID"
+    return 0
+  fi
   if [ -f "/etc/os-release" ]; then
     . /etc/os-release
   elif [ -f "/etc/arch-release" ]; then
@@ -82,7 +88,8 @@ install_fonts_linux() {
 
   echo "Installing fonts on Linux..."
 
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local dotfiles_root
+  dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   local fonts_dir="$dotfiles_root/assets/fonts"
 
   mkdir -p "$fonts_dir"
@@ -112,7 +119,8 @@ install_fonts_linux() {
 install_fonts_macos() {
   echo "Installing fonts on macOS..."
 
-  local dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local dotfiles_root
+  dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   local fonts_dir="$dotfiles_root/assets/fonts"
 
   mkdir -p "$fonts_dir"

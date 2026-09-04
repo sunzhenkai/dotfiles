@@ -192,3 +192,20 @@ def test_usage_profiles_cli(repo_root: Path) -> None:
     ).stdout.split()
     assert "minimal" in out
     assert "full" in out
+
+
+def test_registry_loader_rejects_duplicate_mapping_keys(tmp_path: Path) -> None:
+    reg = tmp_path / "duplicate.yaml"
+    reg.write_text(
+        "modules:\n"
+        "  - name: tmux\n"
+        "    desc: first\n"
+        "    desc: silently-overwritten-before-fix\n",
+        encoding="utf-8",
+    )
+    try:
+        modules.load_registry(reg)
+    except SystemExit as exc:
+        assert "duplicate key 'desc'" in str(exc)
+    else:  # pragma: no cover - explicit regression guard
+        raise AssertionError("duplicate YAML key was silently accepted")

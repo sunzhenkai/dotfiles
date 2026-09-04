@@ -16,42 +16,23 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from ensure_pyyaml import ensure_yaml  # noqa: E402
-
-yaml = ensure_yaml()
-
-TOOLS = (
-    "cursor",
-    "kiro",
-    "opencode",
-    "codex",
-    "kimi-code",
-    "pi",
-    "zcode",
-    "dsh",
+from catalog import (  # noqa: E402
+    CatalogError,
+    load_catalog_documents,
+    load_vendor_matrix,
 )
-KNOWN_PROFILES = ("coding", "research", "browser", "full")
-SERVER_ALLOWED_KEYS = {
-    "transport",
-    "url",
-    "command",
-    "args",
-    "auth",
-    "tools",
-    "profiles",
-    "risk",
-    "required_tools",
-    "browser_provider",
-    "env",
-    "headers",
-    "cwd",
-}
+from dotf_core.overlays import (  # noqa: E402
+    OverlayCatalog,
+    OverlayError,
+    load_overlays,
+)
+
+_DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+TOOLS = load_vendor_matrix(_DEFAULT_ROOT).cli_tools
 # 生成配置中允许保留的 env 占位符形式
 PLACEHOLDER_OK = re.compile(
     r"(\$\{[A-Z][A-Z0-9_]*\}|\{env:[A-Z][A-Z0-9_]*\})"
 )
-# 未解析的模板占位（我们自己的 {{...}}）
-UNRESOLVED_TMPL = re.compile(r"\{\{[^{}]+\}\}")
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -66,13 +47,6 @@ def agent_env_dir(root: Path) -> Path:
     return root / "agents" / "env"
 
 
-def load_yaml(path: Path) -> Any:
-    if not path.is_file():
-        die(f"缺少文件: {path}")
-    with path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data if data is not None else {}
-
 
 def deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
     out = copy.deepcopy(base)
@@ -84,120 +58,59 @@ def deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def load_local_override(env_dir: Path) -> Dict[str, Any]:
-    merged: Dict[str, Any] = {}
-    local_file = env_dir / "local.yaml"
-    if local_file.is_file():
-        data = load_yaml(local_file)
-        if not isinstance(data, dict):
-            die(f"local.yaml 必须是 mapping: {local_file}")
-        merged = deep_merge(merged, data)
-    local_dir = env_dir / "local"
-    if local_dir.is_dir():
-        for path in sorted(local_dir.glob("*.yaml")):
-            data = load_yaml(path)
-            if not isinstance(data, dict):
-                die(f"local override 必须是 mapping: {path}")
-            merged = deep_merge(merged, data)
-    return merged
-
-
 class Catalog:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, include_overlays: bool = True):
         self.root = root
         self.env_dir = agent_env_dir(root)
-        self.manifest = load_yaml(self.env_dir / "manifest.yaml")
-        self.env_schema = load_yaml(self.env_dir / "env.schema.yaml")
-        self.tools = load_yaml(self.env_dir / "tools.yaml")
-        self.security = load_yaml(self.env_dir / "security.yaml")
-        self.browser = load_yaml(self.env_dir / "browser.yaml")
-        self.servers_doc = load_yaml(self.env_dir / "mcp" / "servers.yaml")
-        self.local = load_local_override(self.env_dir)
-        self.profiles = self._load_profiles()
+        try:
+            documents = load_catalog_documents(root)
+        except CatalogError as exc:
+            die(f"catalog 校验失败: {exc}")
+        self.manifest = documents.manifest
+        self.env_schema = documents.env_schema
+        self.tools = documents.tools
+        self.security = documents.security
+        self.browser = documents.browser
+        self.servers_doc = documents.servers
+        self.profiles = documents.profiles
+        self.vendor_matrix = documents.vendors
+        if include_overlays:
+            try:
+                self.overlays = load_overlays(
+                    repo_root=root,
+                    catalog=OverlayCatalog(
+                        profiles=frozenset(self.profiles),
+                        servers=frozenset(self.servers),
+                        tools=frozenset(self.manifest.get("tools") or TOOLS),
+                    ),
+                )
+            except OverlayError as exc:
+                die(f"overlay 校验失败: {exc}")
+            self.local = self.overlays.agents
+        else:
+            # Explicit repository generation must depend only on committed safe
+            # catalog sources, never machine overlays, legacy locals, or secrets.
+            self.overlays = None
+            self.local = {}
         self.errors: List[str] = []
         self.validate()
 
-    def _load_profiles(self) -> Dict[str, Dict[str, Any]]:
-        profiles: Dict[str, Dict[str, Any]] = {}
-        pdir = self.env_dir / "mcp" / "profiles"
-        if not pdir.is_dir():
-            die(f"缺少 profiles 目录: {pdir}")
-        for path in sorted(pdir.glob("*.yaml")):
-            data = load_yaml(path)
-            if not isinstance(data, dict):
-                die(f"profile 必须是 mapping: {path}")
-            pid = data.get("id") or path.stem
-            data["id"] = pid
-            profiles[pid] = data
-        return profiles
-
     @property
     def servers(self) -> Dict[str, Dict[str, Any]]:
-        raw = self.servers_doc.get("servers") or {}
-        if not isinstance(raw, dict):
-            die("mcp/servers.yaml 的 servers 必须是 mapping")
-        return raw
+        return self.servers_doc["servers"]
 
     def default_profile(self) -> str:
         if isinstance(self.local.get("profile"), str):
             return self.local["profile"]
-        return str(self.manifest.get("default_profile") or "browser")
+        return str(self.manifest["default_profile"])
 
     def validate(self) -> None:
-        errs: List[str] = []
-        known_tools = set(self.manifest.get("tools") or TOOLS)
-        for t in known_tools:
-            if t not in TOOLS:
-                errs.append(f"manifest 声明未知工具: {t}")
-
-        for pid, pdata in self.profiles.items():
-            if pid not in KNOWN_PROFILES:
-                errs.append(f"未知 profile 文件: {pid}")
-            for sid in pdata.get("mcp_servers") or []:
-                if sid not in self.servers:
-                    errs.append(f"profile {pid} 引用未知 server: {sid}")
-
-        seen: Set[str] = set()
-        for sid, srv in self.servers.items():
-            if sid in seen:
-                errs.append(f"重复 server id: {sid}")
-            seen.add(sid)
-            if not isinstance(srv, dict):
-                errs.append(f"server {sid} 必须是 mapping")
-                continue
-            unknown = set(srv.keys()) - SERVER_ALLOWED_KEYS
-            if unknown:
-                errs.append(f"server {sid} 含不支持字段: {sorted(unknown)}")
-            for t in srv.get("tools") or []:
-                if t not in TOOLS:
-                    errs.append(f"server {sid} 未知工具: {t}")
-            for p in srv.get("profiles") or []:
-                if p not in self.profiles and p not in KNOWN_PROFILES:
-                    errs.append(f"server {sid} 未知 profile: {p}")
-            auth = srv.get("auth") or {}
-            if auth:
-                env_name = auth.get("env")
-                if not env_name:
-                    errs.append(f"server {sid} auth 缺少 env")
-                else:
-                    vars_ = (self.env_schema.get("variables") or {})
-                    if env_name not in vars_:
-                        errs.append(
-                            f"server {sid} 引用未声明 env: {env_name}"
-                        )
-            transport = srv.get("transport")
-            if transport in ("streamable-http", "http", "sse") and not srv.get("url"):
-                errs.append(f"server {sid} HTTP transport 缺少 url")
-            if transport == "stdio" and not srv.get("command"):
-                errs.append(f"server {sid} stdio transport 缺少 command")
-
-        dp = self.default_profile()
-        if dp not in self.profiles:
-            errs.append(f"默认 profile 不存在: {dp}")
-
-        self.errors = errs
-        if errs:
-            die("manifest 校验失败:\n  - " + "\n  - ".join(errs))
+        # Committed documents were validated as one cross-referenced catalog before
+        # overlays were loaded. Only the external overlay can alter this selection.
+        profile = self.default_profile()
+        if profile not in self.profiles:
+            die(f"overlay 引用未知 profile: {profile}")
+        self.errors = []
 
     def resolve_profile(self, profile: Optional[str] = None) -> Dict[str, Any]:
         name = profile or self.default_profile()
@@ -206,6 +119,8 @@ class Catalog:
         return self.profiles[name]
 
     def module_supports_tool(self, module: str, tool: str) -> bool:
+        if module == "mcp":
+            return self.vendor_matrix.capability(tool).mcp
         mods = self.manifest.get("modules") or {}
         mod = mods.get(module) or {}
         if mod.get("enabled") is False:
@@ -263,7 +178,7 @@ class Catalog:
         return out
 
     def browser_local(self) -> Dict[str, Any]:
-        base = copy.deepcopy(self.browser)
+        base = copy.deepcopy(dict(self.browser))
         overlay = self.local.get("browser") or {}
         if isinstance(overlay, dict):
             base = deep_merge(base, overlay)
@@ -303,9 +218,7 @@ class Catalog:
         artifact_dir = b.get("artifact_dir")
         if artifact_dir and "--output-dir" not in args:
             args.extend(["--output-dir", os.path.expanduser(str(artifact_dir))])
-        exe = b.get("browser_executable") or os.environ.get(
-            "AGENT_ENV_BROWSER_EXECUTABLE"
-        )
+        exe = b.get("browser_executable")
         if exe:
             args.extend(["--executable-path", os.path.expanduser(str(exe))])
         srv["args"] = args
@@ -313,6 +226,25 @@ class Catalog:
 
     def managed_server_ids(self) -> Set[str]:
         return set(self.servers.keys())
+
+    def runtime_declarations(
+        self,
+        profile: Optional[str] = None,
+        tools: Optional[List[str]] = None,
+    ) -> Dict[str, str]:
+        """Return pinned runtimes for the servers actually selected for these tools."""
+        selected: Set[str] = set()
+        for tool in tools or list(self.manifest.get("tools") or TOOLS):
+            selected.update(self.selected_servers(tool, profile))
+
+        declared: Dict[str, str] = {}
+        for sid in sorted(selected):
+            srv = self.servers.get(sid) or {}
+            package = srv.get("package")
+            version = srv.get("version")
+            if package and version:
+                declared[sid] = f"{package}@{version}"
+        return declared
 
 
 def auth_header(env_name: str, style: str) -> str:
@@ -552,58 +484,3 @@ def _to_opencode_env(env: Dict[str, Any]) -> Dict[str, Any]:
             v = re.sub(r"\$\{([A-Z][A-Z0-9_]*)\}", r"{env:\1}", v)
         out[k] = v
     return out
-
-
-def check_no_unresolved(obj: Any, path: str = "$") -> None:
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            check_no_unresolved(v, f"{path}.{k}")
-    elif isinstance(obj, list):
-        for i, v in enumerate(obj):
-            check_no_unresolved(v, f"{path}[{i}]")
-    elif isinstance(obj, str):
-        if UNRESOLVED_TMPL.search(obj):
-            die(f"未解析模板占位符: {path} = {obj}")
-
-
-def atomic_write_json(path: Path, data: Any, dry_run: bool = False) -> str:
-    import json
-    import tempfile
-
-    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-    # 校验可解析
-    json.loads(text)
-    check_no_unresolved(data)
-    if dry_run:
-        return text
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(
-        dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp", text=True
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-        os.replace(tmp, path)
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    return text
-
-
-def backup_file(path: Path, backup_root: Path) -> Optional[Path]:
-    import time
-
-    if not path.exists() and not path.is_symlink():
-        return None
-    backup_root.mkdir(parents=True, exist_ok=True)
-    dest = backup_root / f"{path.name}-{int(time.time())}"
-    import shutil
-
-    if path.is_symlink() or path.is_file():
-        shutil.copy2(path, dest, follow_symlinks=True)
-    else:
-        shutil.copytree(path, dest)
-    return dest

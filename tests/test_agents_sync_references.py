@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def _run_sync(tmp_home: Path) -> subprocess.CompletedProcess:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
+    env["XDG_STATE_HOME"] = str(tmp_home / ".local" / "state")
     return subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "agents" / "sync.py"), "--root", str(ROOT)],
         capture_output=True,

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
+
+from plan_test_helpers import plan_env, write_test_plan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -41,9 +44,12 @@ def test_minimal_profile_plan() -> None:
         check=False,
     )
     assert r.returncode == 0, r.stderr
-    assert "PLAN_OK" in r.stdout
-    assert "zsh" in r.stdout
-    assert "hypr" not in r.stdout
+    document = json.loads(r.stdout)
+    assert document["header"] == "DOTF_EXECUTION_PLAN"
+    assert document["success_marker"] == "DOTF_PLAN_COMPLETE_V1"
+    names = {action["module"] for action in document["actions"]}
+    assert "zsh" in names
+    assert "hypr" not in names
 
 
 def test_full_profile_larger_than_minimal() -> None:
@@ -67,7 +73,7 @@ def test_full_profile_larger_than_minimal() -> None:
             cwd=str(ROOT),
             check=True,
         )
-        return sum(1 for line in r.stdout.splitlines() if line.startswith("ACTION\t"))
+        return len(json.loads(r.stdout)["actions"])
 
     assert count_actions("full") > count_actions("minimal")
     assert count_actions("remote") > count_actions("minimal")
@@ -124,13 +130,10 @@ def test_run_plan_json_summary(tmp_home: Path, tmp_path: Path) -> None:
         encoding="utf-8",
     )
     plan = tmp_path / "plan.txt"
-    plan.write_text(
-        "PLAN_OK\nOS\tlinux\nPROFILE\tminimal\nACTION\t1\tinstall\tdemo\texplicit\n",
-        encoding="utf-8",
-    )
+    write_test_plan(plan, handlers, [("install", "demo")], profile="test")
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
-    env["DOTF_HANDLERS_DIR"] = str(handlers)
+    env.update(plan_env(plan, handlers))
     r = subprocess.run(
         [
             "bash",

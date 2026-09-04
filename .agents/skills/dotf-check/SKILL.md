@@ -69,9 +69,9 @@ dotf status --profile minimal              # 或更小范围
 
 | 能力域 | 涵盖 group / 模块 | 检查重点 |
 |--------|-------------------|----------|
-| **Shell 与提示符** | shell (git/zsh/starship) | git 就位、zsh 配置软链、starship 就位 |
+| **Shell 与提示符** | shell (git/zsh/starship) | git 就位、zsh 配置受管目标、starship 就位 |
 | **SDK 与语言** | core (sdk/golang) + tools 里语言相关 | mise 就位、go/python/node 版本、GOPATH |
-| **编辑器** | editors (nvim/helix/zed) | 编辑器二进制 + 配置软链 |
+| **编辑器** | editors (nvim/helix/zed) | 编辑器二进制 + 配置受管目标 |
 | **终端复用** | multiplexers (tmux/zellij) | 二进制 + 配置 |
 | **终端模拟器** | terminals (kitty/alacritty/wezterm/ghostty/iterm2) | 桌面环境才查；远程可跳过 |
 | **Agent 生态** | agents (claude/cursor/kiro/...) | 见维度 3 |
@@ -91,7 +91,7 @@ dotf status --profile minimal              # 或更小范围
   ✅ Shell 与提示符：git/zsh/starship 全就绪
   ✅ SDK 与语言：mise + go1.22 + python3.11 + node20 就绪
   ⚠️ 编辑器：nvim 就绪，helix/zed 未装（按需）
-  ❌ 终端复用：tmux 配置软链损坏 → 建议 dotf tmux -c
+  ❌ 终端复用：tmux 配置受管目标损坏 → 建议 dotf tmux -c
   ✅ Agent 生态：claude/cursor/zcode 就位（见下）
   ℹ️ CLI 工具：delta 就绪；grepom/senv 按需未装
   ℹ️ 终端模拟器/桌面/云 CLI：远程环境，跳过
@@ -171,7 +171,7 @@ git -C "$(dotf __path)" grep -lE "(api[_-]?key|secret|token|password)\s*[:=]" --
 4. **询问修复**：列出可修复项，问用户「是否修复以下问题？」，按选择委托：
    - 整体未初始化 → `dotf-init` skill
    - 单模块缺失 → `dotf-install` skill / `dotf <mod> -ic`
-   - 配置软链损坏 → `dotf <mod> -c`
+   - 配置受管目标损坏 → `dotf <mod> -c`
    - skills 同步差异 → `dotf agents -c`
    - 旧备份堆积 → 列出路径让用户确认后清理（不自动删）
    - 台账缺失 → 提示 `dotf-init` 的 ledger phase

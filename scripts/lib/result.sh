@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 模块动作结果协议（内部稳定行协议）
-# 状态: changed | unchanged | skipped | failed
+# 状态: changed | unchanged | skipped | failed | blocked | not-run
 #
 # 行格式（TAB 分隔）:
 #   RESULT  <status>  <module>  <action>  <duration_ms>  <exit_code>  <reason>
@@ -16,7 +16,7 @@
 
 dotf_result_is_valid() {
   case "$1" in
-  changed | unchanged | skipped | failed) return 0 ;;
+  changed | unchanged | skipped | failed | blocked | not-run) return 0 ;;
   *) return 1 ;;
   esac
 }

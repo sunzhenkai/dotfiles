@@ -1,4 +1,5 @@
-# research：低风险编码能力 + 网页搜索/阅读（不含 Playwright；默认已改为 browser）
+# research：低风险编码能力 + 网页搜索/阅读（不含 Playwright；安全默认）
+version: 1
 id: research
 description: "coding 工具检查 + 智谱 web-search / web-reader / zread"
 risk: low

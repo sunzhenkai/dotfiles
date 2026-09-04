@@ -61,3 +61,48 @@ private_boundary:
     - API keys / tokens / cookies
     - real browser profile contents
     - company-internal URLs or credentials
+
+# Conservative default: sensitive backups expire after 7 days. Operators may
+# change retention_days here; this committed, versioned policy is the authority.
+sensitive_backups:
+  retention_days: 7
+  metadata_filename: .dotf-backup.json
+
+# Runtime/state artifacts are diagnosed by path only; doctor never opens them.
+private_runtime:
+  forbidden_in_repo:
+    - ".agents/state/**"
+    - ".agents/history/**"
+    - ".agents/sessions/**"
+    - ".agents/credentials.json"
+    - ".cursor/history/**"
+    - ".codex/history/**"
+    - ".codex/sessions/**"
+    - ".kiro/sessions/**"
+    - ".zcode/history/**"
+    - "**/agent-transactions/**"
+    - "**/agents-manifest.json"
+    - "**/agents-mcp-manifest.json"
+    - "**/credentials.json"
+    - "**/cookies.json"
+
+# Scan only Git-tracked Agent/runtime source text. rule_version is emitted in
+# every report so CI and operators know which rule boundary produced findings.
+scan:
+  rule_version: 1
+  tracked_roots:
+    - agents
+    - scripts/agents
+    - scripts/dotf_core
+    - scripts/modules/agents
+  text_extensions:
+    - .py
+    - .sh
+    - .md
+    - .json
+    - .yaml
+    - .yml
+    - .toml
+    - .txt
+  exclude:
+    - agents/env/security.yaml

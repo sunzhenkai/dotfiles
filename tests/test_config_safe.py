@@ -144,8 +144,11 @@ echo "STATUS=$DOTF_CFG_STATUS"
     assert r.returncode == 0, r.stderr
     assert "STATUS=changed" in r.stdout
     assert target.is_symlink()
-    backups = list((tmp_home / ".config" / "backups").glob("link-*"))
+    backups = [p for p in (tmp_home / ".config" / "backups").rglob("link.*")]
     assert len(backups) == 1
+    relative = backups[0].relative_to(tmp_home / ".config" / "backups")
+    assert len(relative.parts) == 2  # <run-id>/<target-name>.<hash>
+    assert relative.parts[1].startswith("link.")
     assert backups[0].read_text(encoding="utf-8") == "old content"
 
 

@@ -1,4 +1,5 @@
 # browser：research + Playwright 浏览器自动化（high risk）
+version: 1
 id: browser
 description: "网页研究 + 隔离浏览器自动化"
 risk: high

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -33,15 +34,15 @@ def test_agents_install_plan_expands_tools() -> None:
         check=False,
     )
     assert r.returncode == 0, r.stderr + r.stdout
-    assert "PLAN_OK" in r.stdout
+    document = json.loads(r.stdout)
+    assert document["header"] == "DOTF_EXECUTION_PLAN"
+    planned = {(action["action"], action["module"]) for action in document["actions"]}
     for tool in ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode"):
-        assert f"install\t{tool}" in r.stdout.replace(" ", "\t") or (
-            f"\tinstall\t{tool}\t" in r.stdout
-        )
+        assert ("install", tool) in planned
     # 已移除的 vendor 不进安装计划
-    assert "\tinstall\tclaude\t" not in r.stdout
-    assert "\tinstall\tqoder\t" not in r.stdout
-    assert "\tinstall\tcodebuddy-code\t" not in r.stdout
+    assert ("install", "claude") not in planned
+    assert ("install", "qoder") not in planned
+    assert ("install", "codebuddy-code") not in planned
 
 
 def test_removed_vendors_not_in_tools_or_bundle() -> None:
@@ -77,9 +78,10 @@ def test_agents_config_plan_does_not_pull_tool_configs() -> None:
         check=False,
     )
     assert r.returncode == 0, r.stdout
-    assert "\tconfig\tagents\t" in r.stdout
-    assert "\tconfig\tclaude\t" not in r.stdout
-    assert "\tconfig\tcursor\t" not in r.stdout
+    planned = {(action["action"], action["module"]) for action in json.loads(r.stdout)["actions"]}
+    assert ("config", "agents") in planned
+    assert ("config", "claude") not in planned
+    assert ("config", "cursor") not in planned
 
 
 def test_cursor_install_plan_is_solo() -> None:
@@ -103,9 +105,10 @@ def test_cursor_install_plan_is_solo() -> None:
         check=False,
     )
     assert r.returncode == 0, r.stdout
-    assert "\tinstall\tcursor\t" in r.stdout
-    assert "\tinstall\tkiro\t" not in r.stdout
-    assert "\tinstall\tagents\t" not in r.stdout
+    planned = {(action["action"], action["module"]) for action in json.loads(r.stdout)["actions"]}
+    assert ("install", "cursor") in planned
+    assert ("install", "kiro") not in planned
+    assert ("install", "agents") not in planned
 
 
 def test_single_tool_config_source_has_no_sync_call() -> None:

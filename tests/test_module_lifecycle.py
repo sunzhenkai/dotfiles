@@ -10,15 +10,14 @@ from pathlib import Path
 
 import pytest
 
+from plan_test_helpers import plan_env, write_test_plan
+
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
 
 
-def _write_plan(path: Path, *actions: tuple[str, str]) -> None:
-    lines = ["PLAN_OK", "OS\tlinux", "PROFILE\t"]
-    for i, (action, module) in enumerate(actions, start=1):
-        lines.append(f"ACTION\t{i}\t{action}\t{module}\texplicit")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def _write_plan(path: Path, handlers: Path, *actions: tuple[str, str]) -> None:
+    write_test_plan(path, handlers, actions)
 
 
 def _write_handler(handlers: Path, module: str, action: str, body: str) -> Path:
@@ -42,7 +41,7 @@ def _run_plan(
     env = os.environ.copy()
     env["HOME"] = str(home)
     if handlers is not None:
-        env["DOTF_HANDLERS_DIR"] = str(handlers)
+        env.update(plan_env(plan, handlers))
     if load_log is not None:
         env["DOTF_LOAD_LOG"] = str(load_log)
     if require_handlers:
@@ -73,7 +72,7 @@ def test_result_protocol_changed(tmp_home: Path, tmp_path: Path) -> None:
         ),
     )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "demo"))
+    _write_plan(plan, handlers, ("install", "demo"))
     r = _run_plan(plan, home=tmp_home, handlers=handlers)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "RESULT\tchanged\tdemo\tinstall" in r.stdout
@@ -84,11 +83,12 @@ def test_missing_handler_fails_when_required(tmp_home: Path, tmp_path: Path) -> 
     handlers = tmp_path / "handlers"
     handlers.mkdir()
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "missingmod"))
+    _write_plan(plan, handlers, ("install", "missingmod"))
     r = _run_plan(plan, home=tmp_home, handlers=handlers, require_handlers=True)
     assert r.returncode != 0
-    assert "RESULT\tfailed\tmissingmod\tinstall" in (r.stdout + r.stderr)
-    assert "缺少处理器" in (r.stdout + r.stderr)
+    combined = r.stdout + r.stderr
+    assert "RESULT\tfailed\tmissingmod\tinstall" not in combined
+    assert "缺少处理器" in combined
 
 
 def test_undeclared_handler_reported_by_validate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,7 +148,7 @@ def test_declared_missing_handler_reported_by_validate(tmp_path: Path, monkeypat
     assert any("缺少处理器" in e and "needinstall" in e for e in errors)
 
 
-def test_handler_failure_does_not_abort_the_plan(tmp_home: Path, tmp_path: Path) -> None:
+def test_handler_failure_stops_default_plan(tmp_home: Path, tmp_path: Path) -> None:
     handlers = tmp_path / "handlers"
     _write_handler(
         handlers,
@@ -162,8 +162,7 @@ def test_handler_failure_does_not_abort_the_plan(tmp_home: Path, tmp_path: Path)
         ),
     )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "boom"), ("install", "after"))
-    # 一个坏模块不应锁住后续交付
+    _write_plan(plan, handlers, ("install", "boom"), ("install", "after"))
     _write_handler(
         handlers,
         "after",
@@ -171,21 +170,24 @@ def test_handler_failure_does_not_abort_the_plan(tmp_home: Path, tmp_path: Path)
         textwrap.dedent(
             """\
             #!/usr/bin/env bash
-            dotf_result_changed "runs anyway"
+            dotf_result_changed "must not run by default"
             """
         ),
     )
+    # Regenerate after all handlers exist so the handler digest is complete.
+    _write_plan(plan, handlers, ("install", "boom"), ("install", "after"))
     load_log = tmp_path / "load.log"
     r = _run_plan(plan, home=tmp_home, handlers=handlers, load_log=load_log)
-    # 失败只传播到退出码与错误项回放，不中止计划
+    # 默认 fail-fast：独立的后续模块记录为 not-run 且不得加载。
     assert r.returncode != 0
     assert "RESULT\tfailed\tboom\tinstall" in (r.stdout + r.stderr)
     assert "failed=1" in r.stdout or "→ failed" in (r.stdout + r.stderr)
     assert "boom/install" in r.stdout
-    assert "RESULT\tchanged\tafter\tinstall" in (r.stdout + r.stderr)
+    assert "RESULT\tnot-run\tafter\tinstall" in (r.stdout + r.stderr)
+    assert "RESULT\tchanged\tafter\tinstall" not in (r.stdout + r.stderr)
     loaded = load_log.read_text(encoding="utf-8") if load_log.exists() else ""
     assert "boom\tinstall" in loaded
-    assert "after\tinstall" in loaded
+    assert "after\tinstall" not in loaded
 
 
 def test_lazy_load_only_planned_handler(tmp_home: Path, tmp_path: Path) -> None:
@@ -203,7 +205,7 @@ def test_lazy_load_only_planned_handler(tmp_home: Path, tmp_path: Path) -> None:
             ),
         )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "beta"))
+    _write_plan(plan, handlers, ("install", "beta"))
     load_log = tmp_path / "load.log"
     r = _run_plan(plan, home=tmp_home, handlers=handlers, load_log=load_log)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -235,7 +237,7 @@ def test_idempotent_second_run_unchanged(tmp_home: Path, tmp_path: Path) -> None
         ),
     )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("config", "idem"))
+    _write_plan(plan, handlers, ("config", "idem"))
 
     first = _run_plan(plan, home=tmp_home, handlers=handlers)
     assert first.returncode == 0, first.stdout + first.stderr
@@ -263,11 +265,11 @@ def test_dry_run_does_not_load_handlers(tmp_home: Path, tmp_path: Path) -> None:
         ),
     )
     plan = tmp_path / "plan.txt"
-    _write_plan(plan, ("install", "demo"))
+    _write_plan(plan, handlers, ("install", "demo"))
     load_log = tmp_path / "load.log"
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
-    env["DOTF_HANDLERS_DIR"] = str(handlers)
+    env.update(plan_env(plan, handlers))
     env["DOTF_LOAD_LOG"] = str(load_log)
     r = subprocess.run(
         ["bash", str(RUN_PLAN), "--dry-run", "--plan-file", str(plan)],

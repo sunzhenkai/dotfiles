@@ -1,7 +1,7 @@
 # pretty-view-ppt tests
 
 ```bash
-python3 tests/test_skill_contract.py
+python3 tests/test_pretty_view_ppt_contract.py
 python3 tests/test_update_catalog.py
 python3 tests/test_marine_life_outputs.py
 ```

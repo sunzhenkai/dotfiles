@@ -133,7 +133,14 @@ zellij attach <名称>   # 附加到已有会话
 zellij ls              # 列出会话
 ```
 
-配置文件通常位于 `$XDG_CONFIG_HOME/zellij/config.kdl`（macOS 上多为 `~/.config/zellij/config.kdl`）。若使用本 dotfiles，请按你的安装方式将该目录或文件链到上述路径。
+配置文件安装到 `$XDG_CONFIG_HOME/zellij/config.kdl`（默认 `~/.config/zellij/config.kdl`）。使用本仓库时先预览再应用：
+
+```bash
+dotf zellij -c --dry-run
+dotf zellij -c --yes
+```
+
+目标是 HOME 下的真实目录；修改仓库配置后需重新运行 `dotf zellij -c`。
 
 ---
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
+# OpenCode provider selection feeds a pure producer; config_deploy owns the only target write.
 # shellcheck source=/dev/null
 source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
 dotf_handler_init
-# shellcheck source=/dev/null
-source "$DOTFILES_ROOT/scripts/config.sh"
 
 opencode_profile=""
 while [ $# -gt 0 ]; do
@@ -31,13 +30,4 @@ done
 if [ -n "$opencode_profile" ]; then
   export DOTF_OPENCODE_PROFILE="$opencode_profile"
 fi
-
-if install_opencode; then
-  if [ -n "$opencode_profile" ]; then
-    dotf_result_changed "opencode config applied (profile=${opencode_profile})"
-  else
-    dotf_result_changed "opencode config applied"
-  fi
-else
-  dotf_result_failed "opencode config failed"
-fi
+dotf_registry_config

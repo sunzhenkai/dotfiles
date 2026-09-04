@@ -77,6 +77,35 @@ modules_target() {
   _modules_py field "$1" target
 }
 
+modules_strategy() {
+  _modules_py field "$1" strategy
+}
+
+modules_writable() {
+  _modules_py field "$1" writable
+}
+
+modules_sensitive() {
+  _modules_py field "$1" sensitive
+}
+
+modules_target_mode() {
+  _modules_py field "$1" target_mode
+}
+
+# Compatibility alias for callers using the shorter registry spelling.
+modules_mode() {
+  _modules_py field "$1" mode
+}
+
+modules_preserve() {
+  _modules_py field "$1" preserve
+}
+
+modules_exclude() {
+  _modules_py field "$1" exclude
+}
+
 modules_bin() {
   _modules_py field "$1" bin
 }
@@ -103,5 +132,5 @@ modules_get() {
 }
 
 modules_validate() {
-  _modules_py validate
+  _modules_py validate "$@"
 }

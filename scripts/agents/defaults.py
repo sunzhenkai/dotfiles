@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
-"""Install curated third-party skills into ~/.agents/skills via npx skills."""
+"""Install only strictly locked, audited third-party skills through runtime ownership."""
 
 from __future__ import annotations
 
 import argparse
-import shutil
-import subprocess
-import sys
+import tempfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import List, Optional
+import sys
 
 _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from ensure_pyyaml import ensure_yaml  # noqa: E402
+from ensure_pyyaml import ensure_yaml
+from managed_runtime import AgentRuntimeConflict, apply_skills_plan, compile_skills_plan
+from sync import render_skill_bytes
+from third_party import ThirdPartyLock, ThirdPartyLockError, acquire_all, load_lock
 
-yaml = ensure_yaml()
-
+_yaml = ensure_yaml()
 CATALOG_REL = Path("agents") / "skills-defaults.yaml"
-RunFn = Callable[..., subprocess.CompletedProcess]
+LOCK_REL = Path("agents") / "skills-defaults.lock.yaml"
+THIRD_PARTY_OWNER = "agents:third-party:"
 
 
 def repo_root() -> Path:
@@ -30,86 +32,47 @@ def skills_target() -> Path:
     return Path.home() / ".agents" / "skills"
 
 
-def catalog_path(root: Path) -> Path:
-    return root / CATALOG_REL
-
-
-def dest_skill_md(skill: str, dest_root: Optional[Path] = None) -> Path:
-    base = dest_root if dest_root is not None else skills_target()
-    return base / skill / "SKILL.md"
-
-
 def first_party_skill_ids(root: Path) -> List[str]:
     skills_root = root / "agents" / "skills"
     if not skills_root.is_dir():
         return []
-    return sorted(
-        p.name
-        for p in skills_root.iterdir()
-        if p.is_dir() and (p / "SKILL.md").is_file()
-    )
+    return sorted(path.name for path in skills_root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file())
 
 
-def load_catalog(root: Path) -> List[Dict[str, str]]:
-    path = catalog_path(root)
-    if not path.is_file():
-        raise SystemExit(f"error: 缺少默认 skill 清单: {path}")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise SystemExit(f"error: {path} 必须是 mapping")
-    raw = data.get("skills")
-    if not isinstance(raw, list) or not raw:
-        raise SystemExit(f"error: {path} 需要非空 skills 列表")
-
-    items: List[Dict[str, str]] = []
-    seen: set[str] = set()
-    for i, entry in enumerate(raw):
-        if not isinstance(entry, dict):
-            raise SystemExit(f"error: {path} skills[{i}] 必须是 mapping")
-        source = str(entry.get("source") or "").strip()
-        skill = str(entry.get("skill") or "").strip()
-        if not source or not skill:
-            raise SystemExit(f"error: {path} skills[{i}] 需要 source 与 skill")
-        if skill in seen:
-            raise SystemExit(f"error: {path} 重复 skill: {skill}")
-        seen.add(skill)
-        items.append({"source": source, "skill": skill})
-
-    overlap = sorted(seen.intersection(first_party_skill_ids(root)))
-    if overlap:
-        raise SystemExit(
-            "error: 默认 skill 与 agents/skills/ 同名，会互相覆盖: " + ", ".join(overlap)
+def load_catalog(root: Path) -> ThirdPartyLock:
+    catalog_path = root / CATALOG_REL
+    lock_path = root / LOCK_REL
+    try:
+        catalog = _yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, _yaml.YAMLError) as exc:
+        raise ThirdPartyLockError(f"cannot read third-party defaults catalog: {catalog_path}") from exc
+    if not isinstance(catalog, dict) or set(catalog) != {"version", "lock", "skills"}:
+        raise ThirdPartyLockError("third-party defaults catalog has missing or unknown keys")
+    if catalog["version"] != 2 or catalog["lock"] != LOCK_REL.name or not isinstance(catalog["skills"], list):
+        raise ThirdPartyLockError("third-party defaults catalog version/lock/skills is invalid")
+    ids = catalog["skills"]
+    if any(not isinstance(item, str) or not item for item in ids) or len(ids) != len(set(ids)):
+        raise ThirdPartyLockError("third-party defaults catalog skill ids are invalid or duplicate")
+    lock = load_lock(lock_path)
+    locked_ids = [item.id for item in lock.skills]
+    if ids != locked_ids:
+        missing = sorted(set(ids) - set(locked_ids))
+        extra = sorted(set(locked_ids) - set(ids))
+        raise ThirdPartyLockError(
+            "third-party defaults must exactly match the strict lock "
+            f"(unlocked={missing}, unselected={extra})"
         )
-    return items
+    overlap = sorted(set(ids).intersection(first_party_skill_ids(root)))
+    if overlap:
+        raise ThirdPartyLockError("third-party defaults overlap first-party skills: " + ", ".join(overlap))
+    return lock
 
 
-def add_command(source: str, skill: str) -> List[str]:
-    """全局安装到 ~/.agents/skills；不传 -a，避免写入各工具私有 skills 目录。"""
-    return [
-        "npx",
-        "--yes",
-        "skills",
-        "add",
-        source,
-        "--skill",
-        skill,
-        "--global",
-        "--yes",
-        "--copy",
-    ]
-
-
-def _run_add(
-    cmd: Sequence[str],
-    *,
-    run: RunFn,
-) -> subprocess.CompletedProcess:
-    return run(
-        list(cmd),
-        cwd=str(Path.home()),
-        check=False,
-        timeout=180,
-    )
+def _home_for_target(destination: Path) -> Path:
+    destination = destination.expanduser().absolute()
+    if destination.name == "skills" and destination.parent.name == ".agents":
+        return destination.parent.parent
+    return Path.home().expanduser().absolute()
 
 
 def install_defaults(
@@ -117,81 +80,57 @@ def install_defaults(
     *,
     dry_run: bool = False,
     dest_root: Optional[Path] = None,
-    run: Optional[RunFn] = None,
-    which: Callable[[str], Optional[str]] = shutil.which,
 ) -> int:
-    items = load_catalog(root)
-    dest = dest_root if dest_root is not None else skills_target()
-    runner: RunFn = run or subprocess.run
-
-    print(f"==> default skills → {dest}")
-
-    if which("npx") is None:
-        missing = [it["skill"] for it in items if not dest_skill_md(it["skill"], dest).is_file()]
-        if missing:
+    """Verify the strict lock; apply only bytes acquired and checked in private staging."""
+    lock = load_catalog(root)
+    destination = (dest_root or skills_target()).expanduser().absolute()
+    print(f"==> locked default skills → {destination}")
+    if dry_run:
+        for item in lock.skills:
             print(
-                "  ! 未找到 npx，跳过第三方默认 skill："
-                + ", ".join(missing)
-                + "（安装 Node.js 后重跑 dotf agents -c）"
+                f"  + {item.id} revision={item.revision} content={item.content_hash} "
+                f"license={item.license.spdx} audit={item.audit.status}@{item.audit.date}/{item.audit.tool}"
             )
-        else:
-            print("  = npx 缺失，但清单内 skill 均已存在")
+        print(f"  done defaults (plan): locked={len(lock.skills)} network=none writes=none")
         return 0
 
-    failed = 0
-    for it in items:
-        skill = it["skill"]
-        marker = dest_skill_md(skill, dest)
-        cmd = add_command(it["source"], skill)
-        cmd_s = " ".join(cmd)
-        if marker.is_file():
-            print(f"  = {marker}")
-            continue
-        print(f"  + {marker}")
-        print(f"    npx: {cmd_s}")
-        if dry_run:
-            continue
-        dest.mkdir(parents=True, exist_ok=True)
-        try:
-            proc = _run_add(cmd, run=runner)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            print(f"  ! {skill} 安装失败: {exc}", file=sys.stderr)
-            failed += 1
-            continue
-        if proc.returncode != 0:
-            print(f"  ! {skill} 安装失败 (exit {proc.returncode})", file=sys.stderr)
-            failed += 1
-            continue
-        if not marker.is_file():
-            print(f"  ! {skill} 安装后仍缺少 {marker}", file=sys.stderr)
-            failed += 1
-
-    if failed:
-        print(
-            f"  ! 有 {failed} 个默认 skill 未装上；一手 skills 仍已同步。"
-            " 缺 npx/网络时稍后重跑 dotf agents -c",
-            file=sys.stderr,
-        )
-    print(f"  done defaults: items={len(items)} failed={failed}")
+    home = _home_for_target(destination)
+    try:
+        with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
+            staging = Path(temporary) / "acquired"
+            source_root = acquire_all(lock, staging)
+            plan = compile_skills_plan(
+                root,
+                render_skill_bytes,
+                home=home,
+                target_root=destination,
+                source_root=source_root,
+                owner_prefix=THIRD_PARTY_OWNER,
+                identity_prefix=f"agents/skills-defaults.lock.yaml@{lock.digest}",
+            )
+            result = apply_skills_plan(plan, render_skill_bytes)
+    except (ThirdPartyLockError, AgentRuntimeConflict, OSError, ValueError) as exc:
+        print(f"error: locked third-party skills: {exc}", file=__import__("sys").stderr)
+        return 1
+    print(
+        f"  done defaults: locked={len(lock.skills)} changed={result.changed} "
+        f"pruned={result.pruned} unchanged={result.unchanged}"
+    )
     return 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Install curated third-party skills to ~/.agents/skills"
-    )
+    parser = argparse.ArgumentParser(description="Install audited third-party skills from the strict lock")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
     root = args.root.resolve() if args.root else repo_root()
     try:
         return install_defaults(root, dry_run=args.dry_run)
-    except SystemExit as e:
-        code = e.code
-        if isinstance(code, int):
-            return code
+    except ThirdPartyLockError as exc:
+        print(f"error: {exc}", file=__import__("sys").stderr)
         return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

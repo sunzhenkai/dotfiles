@@ -9,14 +9,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 codex_print_profiles() {
-  local current="minimax"
-  if [ -f "${HOME}/.codex/.dotf-profile" ]; then
-    current="$(tr -d '[:space:]' <"${HOME}/.codex/.dotf-profile")"
-  fi
   python3 "$SCRIPT_DIR/scripts/modules/codex/merge_config.py" \
     --vendor-dir "$SCRIPT_DIR/agents/vendors/codex" \
     --describe-profiles \
-    --current "$current"
+    --installed-config "${HOME}/.codex/config.toml" \
+    --default-current minimax
 }
 
 opencode_print_profiles() {
@@ -61,13 +58,9 @@ is_usage_profile() {
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/scripts/modules.sh"
 
-# 检测 Homebrew bash（优先使用更新版本）
+# Compatibility helpers always use the system Bash; hosted macOS validates 3.2.
 get_bash() {
-  if [ -x /opt/homebrew/bin/bash ]; then
-    echo "/opt/homebrew/bin/bash"
-  else
-    echo "/bin/bash"
-  fi
+  echo "/bin/bash"
 }
 
 # ============================================================
@@ -79,6 +72,7 @@ DOTF_YES=0
 DOTF_DRY_RUN=0
 DOTF_JSON=0
 DOTF_DEEP=0
+DOTF_CONTINUE_ON_ERROR=0
 DOTF_USAGE_PROFILE=""
 
 confirm() {
@@ -155,12 +149,17 @@ plan_and_run() {
   # shellcheck disable=SC2064
   trap "rm -f '$plan_file'" RETURN
 
-  # 失败时 machine 格式仍含 ERROR 行；交给 run_plan 统一展示
-  python3 "$SCRIPT_DIR/scripts/planner.py" "${plan_args[@]}" >"$plan_file" || true
+  # Preserve planner failure exactly; an unsuccessful planner never reaches runner.
+  python3 "$SCRIPT_DIR/scripts/planner.py" "${plan_args[@]}" >"$plan_file"
+  local planner_rc=$?
+  if [ "$planner_rc" -ne 0 ]; then
+    return "$planner_rc"
+  fi
 
   run_args=(--plan-file "$plan_file")
   [ "$DOTF_YES" -eq 1 ] && run_args+=(--yes)
   [ "$DOTF_DRY_RUN" -eq 1 ] && run_args+=(--dry-run)
+  [ "${DOTF_CONTINUE_ON_ERROR:-0}" -eq 1 ] && run_args+=(--continue-on-error)
   [ "${DOTF_JSON:-0}" -eq 1 ] && run_args+=(--json)
   [ "${DOTF_DEEP:-0}" -eq 1 ] && export DOTF_DEEP=1
   local x
@@ -259,14 +258,18 @@ cmd_init() {
     --dry-run)
       DOTF_DRY_RUN=1
       ;;
+    --continue-on-error)
+      DOTF_CONTINUE_ON_ERROR=1
+      ;;
     -h | --help)
-      echo "用法: dotf init [--os <id>] [--profile <name>] [--yes] [--dry-run] [--list]"
+      echo "用法: dotf init [--os <id>] [--profile <name>] [--yes] [--dry-run] [--continue-on-error] [--list]"
       echo ""
       echo "  OS 决定平台适用性；--profile 选择使用场景（默认 full）"
       echo "  --os <id>        强制 OS（darwin、ubuntu、arch…）"
       echo "  --profile <name> 使用场景 profile（minimal/remote/desktop/full）"
       echo "  --list           列出 OS 与使用场景 profile"
-      echo "  --dry-run        只展示计划"
+      echo "  --dry-run        只展示计划（允许跨 OS 预览）"
+      echo "  --continue-on-error 失败后仅继续依赖无关动作（最终仍非零）"
       echo "  --yes            跳过计划确认与副作用确认"
       exit 0
       ;;
@@ -345,7 +348,11 @@ cmd_status() {
   export DOTF_YES=1
   [ "$json" -eq 1 ] && export DOTF_JSON=1
 
-  echo "环境状态  profile=$usage_profile (只读 L0)"
+  if [ "$json" -eq 1 ]; then
+    echo "环境状态  profile=$usage_profile (只读 L0)" >&2
+  else
+    echo "环境状态  profile=$usage_profile (只读 L0)"
+  fi
   plan_and_run "doctor" --profile "$usage_profile"
 }
 
@@ -641,7 +648,8 @@ show_help() {
   echo "  -cd                         先配置后诊断"
   echo "  -icd                        安装 → 配置 → 诊断"
   echo "  -a, --all                   全量（配合 -i/-c/-d；单独 -a = 装+配，不含 doctor）"
-  echo "  --dry-run                   只展示执行计划，不执行"
+  echo "  --dry-run                   只展示执行计划，不执行（允许跨 OS 预览）"
+  echo "  --continue-on-error         失败后仅继续依赖无关动作；最终仍非零"
   echo "  --yes, -y                   跳过计划确认与副作用确认（不绕过校验/备份）"
   echo "  --json                      输出脱敏执行汇总 JSON"
   echo "  -h, --help                  显示帮助"
@@ -803,6 +811,9 @@ main() {
       ;;
     --dry-run)
       DOTF_DRY_RUN=1
+      ;;
+    --continue-on-error)
+      DOTF_CONTINUE_ON_ERROR=1
       ;;
     --yes | -y)
       DOTF_YES=1

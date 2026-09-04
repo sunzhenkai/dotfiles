@@ -1,0 +1,13 @@
+version: 1
+skills:
+  files:
+    - SKILL.md
+  sidecars:
+    - references
+    - scripts
+  excluded:
+    - patches
+    - evals
+    - experience
+    - evolutions
+    - authoring

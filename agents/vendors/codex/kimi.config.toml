@@ -1,4 +1,5 @@
-# Kimi For Coding profile（dotf codex -f kimi / codex --profile kimi）
+# Kimi For Coding profile（`dotf codex -f kimi` 合并到 ~/.codex/config.toml）
+# 本文件仅为仓库内 merge 输入，不单独安装到 HOME。
 model = "kimi-for-coding"
 model_provider = "kimi"
 model_context_window = 262144

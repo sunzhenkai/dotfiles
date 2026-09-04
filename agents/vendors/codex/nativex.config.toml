@@ -1,9 +1,8 @@
-# NativeX profile（dotf codex -f nativex / codex --profile nativex）
+# NativeX profile（`dotf codex -f nativex` 合并到 ~/.codex/config.toml）
 #
 # 需要走公司 newapi 网关时覆盖 model / context / catalog。
 # 默认 gpt-5.6-luna；catalog 不含 gpt-5.3-codex。
-# codex 0.134+ 的 profile 是独立文件 ~/.codex/<name>.config.toml（顶层键，
-# 不嵌 [profiles.<name>]），叠加在 ~/.codex/config.toml 之上。
+# 本文件仅为仓库内 merge 输入，不单独安装到 HOME。
 model = "gpt-5.6-luna"
 model_provider = "nativex"
 model_context_window = 400000

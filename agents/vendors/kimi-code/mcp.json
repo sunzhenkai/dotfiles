@@ -16,14 +16,14 @@
       "command": "sh",
       "args": [
         "-c",
-        "Z_AI_API_KEY=\"$ZHIPU_API_KEY\" Z_AI_MODE=ZHIPU exec npx -y @z_ai/mcp-server@latest"
+        "Z_AI_API_KEY=\"$ZHIPU_API_KEY\" Z_AI_MODE=ZHIPU exec npx -y @z_ai/mcp-server@0.1.5"
       ]
     },
     "playwright": {
       "command": "npx",
       "args": [
         "-y",
-        "@playwright/mcp@latest",
+        "@playwright/mcp@0.0.80",
         "--browser",
         "chromium",
         "--headless",

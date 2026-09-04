@@ -1,4 +1,5 @@
-# MiniMax profile（默认；dotf codex -f minimax / codex --profile minimax）
+# MiniMax profile（默认；`dotf codex -f minimax` 合并到 ~/.codex/config.toml）
+# 本文件仅为仓库内 merge 输入，不单独安装到 HOME。
 model = "MiniMax-M3"
 model_provider = "minimax"
 model_context_window = 1000000

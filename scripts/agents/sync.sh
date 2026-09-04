@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # 统一 agents sync：一手 skills + 第三方默认 skill（~/.agents/skills）+ MCP/env（按 tool 过滤）。
 # 用法:
-#   sync.sh [cursor|kiro|opencode|codex|kimi-code|pi|zcode|dsh|all]
+#   sync.sh [<tool>|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
+# 工具名称与能力由 agents/env/vendors.yaml 校验。
 # 诊断请用: dotf agents -d  或  python3 scripts/agents/doctor.py
 set -euo pipefail
 
@@ -15,18 +16,15 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 TOOL="all"
+TOOL_SET=0
 SKILLS=1
 ENV=1
 PROFILE=""
 DRY_RUN=0
 STRICT=0
-EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  cursor | kiro | opencode | codex | kimi-code | pi | zcode | dsh | all)
-    TOOL="$1"
-    ;;
   --skills-only)
     SKILLS=1
     ENV=0
@@ -45,7 +43,6 @@ while [ $# -gt 0 ]; do
     ;;
   --dry-run)
     DRY_RUN=1
-    EXTRA+=(--dry-run)
     ;;
   --doctor)
     echo "error: --doctor 已不再作为 sync 旁路旗标" >&2
@@ -58,18 +55,39 @@ while [ $# -gt 0 ]; do
   --root)
     shift
     ROOT="${1:-}"
+    if [ -z "$ROOT" ]; then
+      echo "error: --root 需要参数" >&2
+      exit 1
+    fi
     ;;
   -h | --help)
-    sed -n '2,7p' "$0" | sed 's/^# //'
+    sed -n '2,8p' "$0" | sed 's/^# //'
     exit 0
     ;;
-  *)
+  -*)
     echo "error: 未知参数 '$1'" >&2
     exit 1
+    ;;
+  *)
+    if [ "$TOOL_SET" -eq 1 ]; then
+      echo "error: 只能指定一个工具（额外参数: '$1'）" >&2
+      exit 1
+    fi
+    TOOL="$1"
+    TOOL_SET=1
     ;;
   esac
   shift
 done
+
+validation_args=("$TOOL" --root "$ROOT" --validate-tool)
+if [ -n "$PROFILE" ]; then
+  validation_args+=(--profile "$PROFILE")
+fi
+if [ "$ENV" -eq 1 ] && [ "$SKILLS" -eq 0 ] && [ "$TOOL" != "all" ]; then
+  validation_args+=(--require-mcp)
+fi
+python3 "$SCRIPT_DIR/env_sync.py" "${validation_args[@]}"
 
 echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-default}  dry_run=$DRY_RUN"
 

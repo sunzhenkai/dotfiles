@@ -109,7 +109,7 @@ exec zsh -l
 # 方案 C：终端模拟器里指定启动命令为 zsh（不影响 SSH 登录 shell）
 ```
 
-`dotf` 的 zsh 配置（`.zshrc` 等）是软链到 HOME 的用户级文件，不 chsh 也能用——只是登录默认 shell 还是原来的。要把这一点讲清楚。
+`dotf` 的 zsh 配置通过 `copy` 部署到 HOME 下的真实用户级文件/目录，不 chsh 也能用——只是登录默认 shell 还是原来的。仓库源变更后需重跑 `dotf zsh -c`；要把这两点讲清楚。
 
 ## 环境台账 `~/.dotf-env.md`
 

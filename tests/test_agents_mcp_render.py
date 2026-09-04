@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -40,7 +41,7 @@ def _vision_srv() -> dict:
     return {
         "transport": "stdio",
         "command": "npx",
-        "args": ["-y", "@z_ai/mcp-server@latest"],
+        "args": ["-y", "@z_ai/mcp-server@0.1.5"],
         "env": {
             "Z_AI_API_KEY": "${ZHIPU_API_KEY}",
             "Z_AI_MODE": "ZHIPU",
@@ -114,7 +115,7 @@ def test_sync_zcode_writes_expanded_home_config(
 ) -> None:
     monkeypatch.setenv("ZHIPU_API_KEY", FAKE_KEY)
     cat = Catalog(ROOT)
-    sync_zcode(cat, "research", dry_run=False, also_repo=False)
+    sync_zcode(cat, "research", dry_run=False)
     target = tmp_home / ".zcode" / "cli" / "config.json"
     data = json.loads(target.read_text(encoding="utf-8"))
     servers = data["mcp"]["servers"]
@@ -151,7 +152,7 @@ def test_kimi_stdio_maps_placeholder_via_shell() -> None:
     assert 'Z_AI_API_KEY="$ZHIPU_API_KEY"' in script
     assert "Z_AI_MODE=ZHIPU" in script
     assert "npx" in script
-    assert "@z_ai/mcp-server@latest" in script
+    assert "@z_ai/mcp-server@0.1.5" in script
     assert "${ZHIPU_API_KEY}" not in script
     assert "env" not in entry
 
@@ -160,7 +161,7 @@ def test_kimi_stdio_without_placeholder_keeps_command() -> None:
     srv = {
         "transport": "stdio",
         "command": "npx",
-        "args": ["-y", "@playwright/mcp@latest"],
+        "args": ["-y", "@playwright/mcp@0.0.80"],
         "env": {"FOO": "bar"},
     }
     entry = render_server_for_tool("playwright", srv, "kimi-code")
@@ -179,3 +180,35 @@ def test_vendor_kimi_vision_maps_zhipu_key_via_shell() -> None:
     assert 'Z_AI_API_KEY="$ZHIPU_API_KEY"' in script
     assert "${ZHIPU_API_KEY}" not in script
     assert FAKE_KEY not in text
+
+
+@pytest.mark.parametrize("tool", ["zcode", "all"])
+def test_no_secret_cli_dry_run_succeeds(
+    tool: str, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, no_senv: None
+) -> None:
+    monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_home),
+        "XDG_CONFIG_HOME": str(tmp_home / ".config"),
+        "XDG_STATE_HOME": str(tmp_home / ".local" / "state"),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            tool,
+            "--dry-run",
+            "--root",
+            str(ROOT),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "${ZHIPU_API_KEY}" in result.stdout
+    assert "无法展开环境变量占位符" not in result.stderr

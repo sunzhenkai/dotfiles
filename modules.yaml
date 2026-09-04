@@ -5,7 +5,10 @@
 #   name       — 唯一模块名
 #   desc       — 人类可读描述
 #   install    — true 表示具备安装能力（由 scripts/install.sh 按名调度）
-#   config     — { source, target } 配置源（相对仓根）与安装目标
+#   config     — 配置部署声明，必须显式包含:
+#                source/target、strategy(copy|merge|render|symlink)、
+#                writable/sensitive、target_mode（mode 为兼容别名）、
+#                preserve/exclude 相对路径列表
 #   doctor     — true 表示具备诊断能力（工具型模块强制；L0 或专用实现）
 #   bin        — 可选，L0 doctor 用于 PATH 检查的命令名
 #   os         — 可选适用 OS 集合；省略 = 全平台
@@ -15,6 +18,7 @@
 #   enabled    — 可选，false 时不参与 select_all / profile / --all；
 #                显式点名（dotf <name> -i 等）仍可用
 # 禁止字段: script/command/handler/function/exec/run（注册表非可执行 DSL）
+# 当前显式只读 symlink allowlist：空。清单始终由下方 strategy: symlink 条目派生。
 #
 # 使用场景 profile 见 profiles.yaml（与 OS profile 正交）
 # 非工具型（不强制 doctor）: system / homebrew / fonts
@@ -119,6 +123,12 @@ modules:
     config:
       source: config/tools/ocr
       target: ~/.opencodereview
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: []
+      exclude: []
 
   - name: trae-cli
     desc: 安装 Trae CLI
@@ -195,6 +205,12 @@ modules:
     config:
       source: config/tools/git
       target: ~/.config/git
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: agents
     desc: agents CLI 工具包 + skills/MCP 同步
@@ -203,8 +219,14 @@ modules:
     install: true
     doctor: true
     config:
-      source: agents
-      target: ~/.local/share/dotfiles-agents
+      source: agents/skills-defaults.yaml
+      target: ~/.config/dotf/managed/agents-skills-defaults.yaml
+      strategy: render
+      writable: true
+      sensitive: true
+      target_mode: "0600"
+      preserve: []
+      exclude: []
 
   - name: cursor
     desc: Cursor Agent CLI + MCP 配置
@@ -215,6 +237,12 @@ modules:
     config:
       source: agents/vendors/cursor/mcp.json
       target: ~/.cursor/mcp.json
+      strategy: render
+      writable: true
+      sensitive: true
+      target_mode: "0600"
+      preserve: []
+      exclude: []
 
   - name: kiro
     desc: Kiro CLI + skills/prompts/MCP 配置
@@ -225,6 +253,12 @@ modules:
     config:
       source: agents/vendors/kiro
       target: ~/.kiro
+      strategy: render
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [skills, prompts]
+      exclude: []
 
   - name: opencode
     desc: OpenCode CLI + 配置
@@ -236,6 +270,12 @@ modules:
       # 手写模板在 vendor；运行时目标为 home 真实目录（不再整目录软链）
       source: agents/vendors/opencode
       target: ~/.config/opencode
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [node_modules, skills, commands]
+      exclude: []
 
   - name: codex
     desc: Codex CLI + 多 provider 配置（MiniMax / NativeX / Kimi / 智谱 / SCNet）
@@ -244,8 +284,14 @@ modules:
     doctor: true
     bin: codex
     config:
-      source: agents/vendors/codex/config.toml
-      target: ~/.codex/config.toml
+      source: agents/vendors/codex
+      target: ~/.codex
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [auth.json, history.jsonl, sessions, archived_sessions, log, shell_snapshots, skills, prompts, tmp, models_cache.json, version.json]
+      exclude: [README.md, config.local.toml.example]
 
   - name: kimi-code
     desc: Kimi Code CLI + 配置
@@ -256,6 +302,12 @@ modules:
     config:
       source: agents/vendors/kimi-code/config.toml
       target: ~/.kimi-code/config.toml
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0600"
+      preserve: []
+      exclude: []
 
   - name: pi
     desc: Pi coding agent CLI + 配置
@@ -266,6 +318,12 @@ modules:
     config:
       source: agents/vendors/pi
       target: ~/.pi/agent
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [npm]
+      exclude: []
 
   - name: zcode
     desc: ZCode CLI + 配置（~/.zcode）
@@ -276,6 +334,12 @@ modules:
     config:
       source: agents/vendors/zcode
       target: ~/.zcode
+      strategy: render
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [skills, commands]
+      exclude: []
 
   # ---------- config-only: shell ----------
   - name: zsh
@@ -285,6 +349,12 @@ modules:
     config:
       source: config/shell/zsh
       target: ~/.config/zsh
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: starship
     desc: Starship 终端提示符配置
@@ -295,6 +365,12 @@ modules:
     config:
       source: config/shell/starship/starship.toml
       target: ~/.config/starship.toml
+      strategy: copy
+      writable: false
+      sensitive: false
+      target_mode: "0644"
+      preserve: []
+      exclude: []
 
   # ---------- config-only: editors ----------
   - name: nvim
@@ -305,6 +381,12 @@ modules:
     config:
       source: config/editors/nvim
       target: ~/.config/nvim
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [cache, data, debug, history, pack, plugin, session, sessions, .repro, .tests, doc/tags]
+      exclude: []
 
   - name: helix
     desc: Helix 编辑器配置
@@ -314,6 +396,12 @@ modules:
     config:
       source: config/editors/helix
       target: ~/.config/helix
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: zed
     desc: Zed 编辑器配置
@@ -322,6 +410,12 @@ modules:
     config:
       source: config/editors/zed
       target: ~/.config/zed
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [cache, conversations, extensions, history, plugins, prompts, sessions, workspaces]
+      exclude: []
 
   # ---------- config-only: terminals ----------
   - name: kitty
@@ -332,6 +426,12 @@ modules:
     config:
       source: config/terminals/kitty
       target: ~/.config/kitty
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: alacritty
     desc: Alacritty 终端模拟器配置
@@ -341,6 +441,12 @@ modules:
     config:
       source: config/terminals/alacritty
       target: ~/.config/alacritty
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: ghostty
     desc: Ghostty 终端模拟器配置
@@ -350,6 +456,12 @@ modules:
     config:
       source: config/terminals/ghostty
       target: ~/.config/ghostty
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: wezterm
     desc: WezTerm 终端模拟器配置
@@ -359,6 +471,12 @@ modules:
     config:
       source: config/terminals/wezterm
       target: ~/.config/wezterm
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: iterm2
     desc: iTerm2 终端模拟器配置
@@ -367,17 +485,30 @@ modules:
     config:
       source: config/terminals/iterm2
       target: ~/.config/iterm2
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [cache, sessions, history]
+      exclude: []
     os: [darwin]
 
   # ---------- multiplexers ----------
   - name: tmux
     desc: Tmux 终端复用器配置
     group: multiplexers
+    install: true
     doctor: true
     bin: tmux
     config:
       source: config/multiplexers/tmux
       target: ~/.config/tmux
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [tmux-config, resurrect, cache, sessions, history]
+      exclude: [plugins, 3rd/tpm/.git]
 
   - name: zellij
     desc: Zellij 终端复用器配置
@@ -387,6 +518,12 @@ modules:
     config:
       source: config/multiplexers/zellij
       target: ~/.config/zellij
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   - name: herdr
     desc: Herdr 终端复用器安装与 tmux 风格配置
@@ -397,6 +534,12 @@ modules:
     config:
       source: config/multiplexers/herdr
       target: ~/.config/herdr
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
 
   # ---------- config-only: desktop ----------
   - name: hypr
@@ -406,6 +549,12 @@ modules:
     config:
       source: config/desktop/hypr
       target: ~/.config/hypr
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: []
+      exclude: []
     os: [linux]
 
   - name: fcitx5
@@ -415,6 +564,12 @@ modules:
     config:
       source: config/desktop/fcitx5
       target: ~/.config/fcitx5
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [cache, data, history, db, dictionaries]
+      exclude: [conf/cached_layouts]
     os: [linux]
 
   # ---------- config-only: tools ----------
@@ -426,6 +581,12 @@ modules:
     config:
       source: config/tools/yazi
       target: ~/.config/yazi
+      strategy: copy
+      writable: true
+      sensitive: false
+      target_mode: "0755"
+      preserve: [cache, history, sessions]
+      exclude: []
 
   - name: k9s
     desc: K9s Kubernetes CLI 配置
@@ -435,6 +596,12 @@ modules:
     config:
       source: config/tools/k9s
       target: ~/.config/k9s
+      strategy: copy
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [cache, clusters, history, plugins, screen-dumps, sessions, snapshots]
+      exclude: []
 
   - name: shell_gpt
     desc: Shell-GPT 配置
@@ -443,6 +610,12 @@ modules:
     config:
       source: config/tools/shell_gpt
       target: ~/.config/shell_gpt
+      strategy: copy
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [.sgptrc, cache, history, sessions]
+      exclude: []
 
   - name: logseq
     desc: Logseq 笔记配置（~/.logseq 为真实目录，禁止整树软链）
@@ -451,3 +624,9 @@ modules:
     config:
       source: config/tools/logseq
       target: ~/.logseq
+      strategy: merge
+      writable: true
+      sensitive: true
+      target_mode: "0700"
+      preserve: [cache, graphs, plugins, sessions, history, graphs.edn]
+      exclude: []

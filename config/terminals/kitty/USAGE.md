@@ -15,12 +15,12 @@
 ## 2. 让 Kitty 读到这份配置
 
 1. 已安装 [Kitty](https://sw.kovidgoyal.net/kitty/)。
-2. 将本目录作为 **`~/.config/kitty`** 使用（任选其一）：
-   - **符号链接**（适合本仓库直接当 dotfiles）：
-     ```bash
-     ln -sfn /你的/dotfiles/路径/kitty ~/.config/kitty
-     ```
-   - 或仅复制 / 合并 `kitty.conf` 等到 `~/.config/kitty/`。
+2. 使用 dotf 预览并安装配置：
+   ```bash
+   dotf kitty -c --dry-run
+   dotf kitty -c --yes
+   ```
+   `~/.config/kitty` 是 HOME 下由 manifest 管理的真实目录，不是指向仓库的整目录软链。修改仓库中的 `config/terminals/kitty/` 后，需要重新运行 `dotf kitty -c` 才会应用变化。
 3. **macOS**：本仓库包含 `macos-launch-services-cmdline`（内容为 `--start-as=fullscreen`）。从 **程序坞 / Spotlight / `open -a kitty`** 等 GUI 方式启动时，Kitty 会读取该文件并让**首个 OS 窗口以全屏打开**（见 [官方 FAQ](https://sw.kovidgoyal.net/kitty/faq/#how-do-i-specify-command-line-options-for-kitty-on-macos)）。在终端里直接执行 `kitty` **不会**读此文件；若也需要全屏，请使用 `kitty --start-as=fullscreen` 或自行 alias。
 4. 首次启动或改完配置后，建议执行：
    ```bash

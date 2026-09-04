@@ -5,6 +5,12 @@ source "$SCRIPT_DIR/scripts/tools/common.sh"
 
 # 检测操作系统
 detect_os() {
+  if [ -n "${DOTF_OS:-}" ]; then
+    ID="$DOTF_OS"
+    export ID
+    echo "Planned OS: $ID"
+    return 0
+  fi
   if [ -f "/etc/os-release" ]; then
     # shellcheck source=/dev/null
     . /etc/os-release

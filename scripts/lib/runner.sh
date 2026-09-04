@@ -135,6 +135,22 @@ runner_run_action() {
       # shellcheck source=/dev/null
       source "$handler" ${extra[@]+"${extra[@]}"}
     ) >"$capture" 2>&1 || rc=$?
+  elif [ "$action" = "config" ]; then
+    # Registry-declared config has one safe generic entry point. Specialized
+    # modules retain a handler only when they need to parse module-specific args.
+    runner_mark_loaded "$module" "config" "registry"
+    (
+      set -euo pipefail
+      export DOTFILES_ROOT
+      export DOTF_MODULE="$module"
+      export DOTF_ACTION=config
+      # shellcheck source=/dev/null
+      source "$DOTFILES_ROOT/scripts/lib/result.sh"
+      # shellcheck source=/dev/null
+      source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
+      dotf_handler_init
+      dotf_registry_config "$module" "${extra[@]+"${extra[@]}"}"
+    ) >"$capture" 2>&1 || rc=$?
   else
     if [ "${DOTF_REQUIRE_HANDLERS:-0}" = "1" ]; then
       end_ms=$(runner_now_ms)

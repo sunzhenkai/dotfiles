@@ -1,10 +1,16 @@
-.PHONY: install test validate smoke bash32 shellcheck ci
+.PHONY: install registry validate test smoke bash32 shellcheck templates secret-scan acceptance ci
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
+TEMPLATE_OUTPUTS := \
+	agents/vendors/cursor/mcp.json \
+	agents/vendors/kiro/mcp.json \
+	agents/vendors/opencode/opencode.json \
+	agents/vendors/kimi-code/mcp.json \
+	agents/vendors/zcode/mcp.json
 
-validate:
-	python3 scripts/modules.py validate
+registry validate:
+	python3 scripts/modules.py validate --strict-handlers
 
 test:
 	python3 -m pytest -q
@@ -16,14 +22,19 @@ bash32:
 	bash scripts/ci/bash32-check.sh
 
 shellcheck:
-	shellcheck -x bin/dotf scripts/modules.sh scripts/doctor.sh \
-		scripts/bootstrap.sh scripts/run_plan.sh \
-		scripts/ci/smoke-linux.sh scripts/ci/bash32-check.sh
+	bash scripts/ci/shellcheck-first-party.sh
 
-ci: validate test
-	@command -v shellcheck >/dev/null && $(MAKE) shellcheck || echo "skip shellcheck (not installed)"
-	$(MAKE) smoke
-	$(MAKE) bash32
+templates:
+	python3 scripts/agents/generate_templates.py
+	git diff --exit-code -- $(TEMPLATE_OUTPUTS)
+
+secret-scan:
+	python3 scripts/ci/secret-scan.py
+
+acceptance:
+	BASH_BIN="$${BASH_BIN:-bash}" bash scripts/ci/acceptance-isolated-home.sh
+
+ci: registry test shellcheck templates secret-scan acceptance smoke bash32
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \

@@ -1,0 +1,5 @@
+# Strict third-party skills lock. Do not add an entry without externally
+# verifiable license and audit evidence for the exact immutable revision/hash.
+schema_version: 1
+kind: third-party-skills-lock
+skills: []

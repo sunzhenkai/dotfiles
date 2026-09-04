@@ -1,0 +1,51 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://github.com/sunzhenkai/dotfiles/agents/env/overlay.schema.yaml"
+title: dotf external overlay
+additionalProperties: false
+required: [schema_version, kind]
+type: object
+properties:
+  schema_version:
+    const: 1
+  kind:
+    const: dotf-overlay
+  agents:
+    additionalProperties: false
+    type: object
+    properties:
+      profile:
+        enum: [coding, research, browser, full]
+      enabled_servers:
+        type: array
+        uniqueItems: true
+        items: {type: string}
+      disabled_servers:
+        type: array
+        uniqueItems: true
+        items: {type: string}
+      browser:
+        additionalProperties: false
+        type: object
+        properties:
+          provider: {type: string}
+          headed: {type: boolean}
+          browser_executable: {type: string}
+          user_data_dir: {type: string}
+          artifact_dir: {type: string}
+          cdp_endpoint: {type: string}
+          use_real_profile: {type: boolean}
+      exclude:
+        type: object
+        additionalProperties:
+          additionalProperties: false
+          type: object
+          properties:
+            servers:
+              type: array
+              uniqueItems: true
+              items: {type: string}
+  codex:
+    additionalProperties: false
+    type: object
+    properties:
+      local_toml: {type: string}

@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import sys
-import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from managed_runtime import (
+    AgentRuntimeConflict,
+    apply_skills_plan,
+    compile_skills_plan,
+)
 
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
@@ -22,14 +26,6 @@ def die(msg: str, code: int = 1) -> None:
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
-
-
-def backup_dir() -> Path:
-    return Path.home() / ".config" / "backups"
-
-
-def timestamp() -> str:
-    return str(int(time.time()))
 
 
 def skills_target() -> Path:
@@ -133,66 +129,16 @@ def render_skill_frontmatter(meta: Dict[str, str], skill_id: str) -> str:
     return "---\n" + "\n".join(lines) + "\n---\n"
 
 
-def _skip_sidecar_file(path: Path) -> bool:
-    if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
-        return True
-    return False
-
-
-def install_skill_sidecars(
-    skill_dir: Path,
-    skill_id: str,
-    base: Path,
-    dry_run: bool,
-) -> Tuple[int, int]:
-    """Copy references/ and scripts/ as-is (no frontmatter render, no slash replace)."""
-    written = 0
-    skipped = 0
-    for name in ("references", "scripts"):
-        src_root = skill_dir / name
-        if not src_root.is_dir():
-            continue
-        for src_file in sorted(p for p in src_root.rglob("*") if p.is_file()):
-            if _skip_sidecar_file(src_file):
-                continue
-            dest = (base / f"{skill_id}/{name}/{src_file.relative_to(src_root)}").expanduser()
-            data = src_file.read_bytes()
-            if dest.is_file() and dest.read_bytes() == data:
-                skipped += 1
-                print(f"  = {dest}")
-                continue
-            written += 1
-            print(f"  + {dest}")
-            if dry_run:
-                continue
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-    return written, skipped
-
-
-def install_file(content: str, dest: Path, dry_run: bool = False) -> str:
-    """Write content to dest with backup/idempotent skip. Returns status."""
-    dest = dest.expanduser()
-    if dest.is_file():
-        existing = dest.read_text()
-        if existing == content:
-            return "skip"
-    if dry_run:
-        return "dry-run"
-    if dest.exists() or dest.is_symlink():
-        bdir = backup_dir()
-        bdir.mkdir(parents=True, exist_ok=True)
-        backup_path = bdir / f"{dest.name}-{timestamp()}"
-        # avoid clobber backup names
-        n = 0
-        while backup_path.exists():
-            n += 1
-            backup_path = bdir / f"{dest.name}-{timestamp()}-{n}"
-        shutil.move(str(dest), str(backup_path))
-        print(f"  已备份 {dest} → {backup_path}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(content)
-    return "write"
+def render_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
+    """Render one SKILL.md without mutating source or destination state."""
+    src = skill_dir / "SKILL.md"
+    meta, body = parse_frontmatter(src.read_text(encoding="utf-8"))
+    body = replace_slashes(body)
+    content = render_skill_frontmatter(meta, skill_id) + "\n" + body.lstrip("\n")
+    if not content.endswith("\n"):
+        content += "\n"
+    validate_output(src, content)
+    return content.encode("utf-8")
 
 
 def validate_output(path: Path, content: str) -> None:
@@ -202,40 +148,43 @@ def validate_output(path: Path, content: str) -> None:
 
 
 def sync_skills(root: Path, dry_run: bool = False) -> int:
-    skills_root = root / "agents" / "skills"
-    if not skills_root.is_dir():
-        die(f"missing agents source under {root / 'agents'}")
-
     base = skills_target()
-    written = 0
-    skipped = 0
-
     print(f"==> sync skills → {base}")
+    plan = compile_skills_plan(root, render_skill_bytes, target_root=base)
 
-    for skill_dir in sorted(p for p in skills_root.iterdir() if p.is_dir()):
-        skill_id = skill_dir.name
-        src = skill_dir / "SKILL.md"
-        if not src.is_file():
-            continue
-        meta, body = parse_frontmatter(src.read_text())
-        body = replace_slashes(body)
-        content = render_skill_frontmatter(meta, skill_id) + "\n" + body.lstrip("\n")
-        if not content.endswith("\n"):
-            content += "\n"
-        dest = base / skill_id / "SKILL.md"
-        validate_output(dest, content)
-        status = install_file(content, dest, dry_run=dry_run)
-        if status == "skip":
-            skipped += 1
-            print(f"  = {dest}")
-        else:
-            written += 1
-            print(f"  + {dest}")
-        w, s = install_skill_sidecars(skill_dir, skill_id, base, dry_run)
-        written += w
-        skipped += s
+    markers = {
+        "none": "=",
+        "create": "+",
+        "update": "+",
+        "chmod": "~",
+        "prune": "-",
+        "block": "!",
+    }
+    for operation in plan.operations:
+        print(f"  {markers[operation.action]} {operation.target}")
+        if operation.conflict:
+            print(f"    conflict: {operation.conflict}")
 
-    print(f"  done skills: wrote={written} skipped={skipped}")
+    if dry_run:
+        changed = sum(item.action in {"create", "update", "chmod"} for item in plan.operations)
+        pruned = sum(item.action == "prune" for item in plan.operations)
+        unchanged = sum(item.action == "none" for item in plan.operations)
+        conflicts = len(plan.conflicts)
+        print(
+            f"  done skills (plan): changed={changed} pruned={pruned} "
+            f"unchanged={unchanged} conflicts={conflicts}"
+        )
+        return 1 if conflicts else 0
+
+    try:
+        result = apply_skills_plan(plan, render_skill_bytes)
+    except AgentRuntimeConflict as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"  done skills: changed={result.changed} pruned={result.pruned} "
+        f"unchanged={result.unchanged}"
+    )
     return 0
 
 
@@ -287,7 +236,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     rc = 0
     try:
-        sync_skills(root, dry_run=args.dry_run)
+        rc = sync_skills(root, dry_run=args.dry_run)
     except SystemExit as e:
         rc = int(e.code) if e.code else 1
     except Exception as e:

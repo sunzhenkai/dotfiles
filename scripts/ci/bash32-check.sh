@@ -30,6 +30,9 @@ echo "==> bash -n syntax"
 "$BASH_BIN" -n scripts/lib/doctor_run.sh
 "$BASH_BIN" -n scripts/ci/smoke-linux.sh
 "$BASH_BIN" -n scripts/ci/bash32-check.sh
+"$BASH_BIN" -n scripts/ci/shellcheck-first-party.sh
+"$BASH_BIN" -n scripts/ci/acceptance-isolated-home.sh
+"$BASH_BIN" -n scripts/ci/smoke-macos.sh
 
 TMP_HOME="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_HOME"; }
@@ -44,5 +47,6 @@ echo "==> run help under $BASH_BIN"
 "$BASH_BIN" bin/dotf -h >/dev/null
 
 # 若为 bash 3.x，额外标注
+# shellcheck disable=SC2016  # expand BASH_VERSINFO in the selected child shell
 ver="$("$BASH_BIN" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"')"
 echo "✓ Bash compatibility check passed (version $ver)"

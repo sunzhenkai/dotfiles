@@ -1,0 +1,18 @@
+# Safe example only. Copy to:
+# ${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/00-local.yaml
+schema_version: 1
+kind: dotf-overlay
+
+agents:
+  # Safe low-risk default; browser/full require an explicit choice.
+  profile: research
+  disabled_servers: []
+  exclude:
+    opencode:
+      servers: []
+
+# Machine-specific Codex project trust may be stored as TOML text externally:
+# codex:
+#   local_toml: |
+#     [projects."/absolute/machine/path"]
+#     trust_level = "trusted"

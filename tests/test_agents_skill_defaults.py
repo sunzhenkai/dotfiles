@@ -1,135 +1,150 @@
-"""第三方默认 skill 清单：与一手 skill 不重名；已存在则跳过 npx。"""
+"""Strict audited third-party skill lock and ownership installation tests."""
 
 from __future__ import annotations
 
-import importlib.util
-import subprocess
+import hashlib
+import importlib
+import shutil
 from pathlib import Path
-from types import SimpleNamespace
+
+import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _load_defaults():
-    path = ROOT / "scripts" / "agents" / "defaults.py"
-    spec = importlib.util.spec_from_file_location("agents_defaults", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+import sys
+
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+def _load(name: str):
+    return importlib.import_module(name)
 
 
-def test_catalog_has_archify_browser_use_frontend_design() -> None:
-    defaults = _load_defaults()
-    items = defaults.load_catalog(ROOT)
-    by_skill = {it["skill"]: it["source"] for it in items}
-    assert by_skill["archify"] == "tt-a1i/archify"
-    assert by_skill["browser-use"] == "browser-use/browser-use"
-    assert by_skill["frontend-design"] == "anthropics/skills"
-    assert by_skill["skill-creator"] == "anthropics/skills"
-    assert by_skill["ui-ux-pro-max"] == "nextlevelbuilder/ui-ux-pro-max-skill"
-    assert "shadcn" not in by_skill
-    assert "tailwind-css-patterns" not in by_skill
-    assert "tailwind-design-system" not in by_skill
-    assert "webapp-testing" not in by_skill
+def test_repository_defaults_use_empty_strict_lock_without_invented_approvals() -> None:
+    defaults = _load("defaults")
+    lock = defaults.load_catalog(ROOT)
+    assert lock.kind == "third-party-skills-lock"
+    assert lock.schema_version == 1
+    assert lock.skills == ()
+    assert yaml.safe_load((ROOT / "agents" / "skills-defaults.yaml").read_text())["skills"] == []
 
 
-def test_catalog_does_not_overlap_first_party() -> None:
-    defaults = _load_defaults()
-    items = defaults.load_catalog(ROOT)
-    first = set(defaults.first_party_skill_ids(ROOT))
-    overlap = first.intersection(it["skill"] for it in items)
-    assert not overlap, f"默认 skill 与一手 skill 同名: {sorted(overlap)}"
-    assert "browser-use" not in first
-    assert "frontend-design" not in first
-    assert "skill-creator" not in first
-    assert "ui-ux-pro-max" not in first
-
-
-def test_add_command_is_global_copy_without_agent_flag() -> None:
-    defaults = _load_defaults()
-    cmd = defaults.add_command("tt-a1i/archify", "archify")
-    assert cmd[:5] == ["npx", "--yes", "skills", "add", "tt-a1i/archify"]
-    assert "--skill" in cmd and "archify" in cmd
-    assert "--global" in cmd
-    assert "--yes" in cmd
-    assert "--copy" in cmd
-    assert "--agent" not in cmd and "-a" not in cmd
-    assert "--all" not in cmd
-
-
-def test_install_skips_existing_and_is_idempotent(tmp_path: Path) -> None:
-    defaults = _load_defaults()
-    dest = tmp_path / ".agents" / "skills"
-    existing = {"archify", "browser-use"}
-    for name in existing:
-        skill_dir = dest / name
-        skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text(f"# {name}\n")
-    expected_missing = [
-        it["skill"] for it in defaults.load_catalog(ROOT) if it["skill"] not in existing
-    ]
-    calls: list[list[str]] = []
-
-    def run(cmd, **kwargs):
-        calls.append(cmd)
-        return SimpleNamespace(returncode=0)
-
-    rc = defaults.install_defaults(
-        ROOT,
-        dest_root=dest,
-        run=run,
-        which=lambda _name: "/usr/bin/npx",
+def test_unlocked_or_floating_catalog_fails_closed(tmp_path: Path) -> None:
+    defaults = _load("defaults")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "skills-defaults.lock.yaml", repo / "agents")
+    (repo / "agents" / "skills-defaults.yaml").write_text(
+        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [unlocked]\n", encoding="utf-8"
     )
-    assert rc == 0
-    assert calls, "缺失的默认 skill 应调用 npx"
-    assert [c[c.index("--skill") + 1] for c in calls] == expected_missing
+    with pytest.raises(defaults.ThirdPartyLockError, match="strict lock"):
+        defaults.load_catalog(repo)
 
-    rc2 = defaults.install_defaults(
-        ROOT,
-        dest_root=dest,
-        run=run,
-        which=lambda _name: "/usr/bin/npx",
+    (repo / "agents" / "skills-defaults.yaml").write_text(
+        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
     )
-    assert rc2 == 0
-    # mock 不落盘，第二次仍会重试同一批缺失项
-    assert [c[c.index("--skill") + 1] for c in calls[len(expected_missing) :]] == expected_missing
-
-
-def test_dry_run_does_not_invoke_npx(tmp_path: Path) -> None:
-    defaults = _load_defaults()
-    dest = tmp_path / ".agents" / "skills"
-    calls: list[list[str]] = []
-
-    def run(cmd, **kwargs):
-        calls.append(cmd)
-        raise AssertionError("dry-run 不应调用 npx")
-
-    rc = defaults.install_defaults(
-        ROOT,
-        dry_run=True,
-        dest_root=dest,
-        run=run,
-        which=lambda _name: "/usr/bin/npx",
+    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+        "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
+        "  - id: demo\n    source: https://github.com/example/demo\n"
+        "    revision: main\n    subdirectory: skill\n    content_hash: '" + "a" * 64 + "'\n"
+        "    license: {spdx: MIT, file: LICENSE, hash: '" + "b" * 64 + "'}\n"
+        "    audit: {status: pending, date: '2026-09-04', tool: review, evidence: https://example.com/audit}\n",
+        encoding="utf-8",
     )
-    assert rc == 0
+    with pytest.raises(defaults.ThirdPartyLockError, match="revision|audit"):
+        defaults.load_catalog(repo)
+
+
+def test_checkout_verification_checks_revision_content_license_and_symlinks(tmp_path: Path) -> None:
+    third_party = _load("third_party")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    license_file = checkout / "LICENSE"
+    license_file.write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    item = third_party.LockedSkill(
+        "demo",
+        "https://github.com/example/demo",
+        revision,
+        "skill",
+        third_party.tree_hash(skill),
+        third_party.LicenseLock("MIT", "LICENSE", hashlib.sha256(license_file.read_bytes()).hexdigest()),
+        third_party.AuditLock("approved", "2026-09-04", "manual-review-v1", "https://example.com/audit/demo"),
+    )
+    assert third_party.verify_checkout(item, checkout, revision) == skill
+    with pytest.raises(third_party.ThirdPartyLockError, match="revision"):
+        third_party.verify_checkout(item, checkout, "2" * 40)
+    license_file.write_text("changed\n", encoding="utf-8")
+    with pytest.raises(third_party.ThirdPartyLockError, match="license hash"):
+        third_party.verify_checkout(item, checkout, revision)
+    license_file.write_text("MIT\n", encoding="utf-8")
+    (skill / "unsafe").symlink_to("SKILL.md")
+    with pytest.raises(third_party.ThirdPartyLockError, match="symlink"):
+        third_party.verify_checkout(item, checkout, revision)
+
+
+def test_empty_lock_dry_run_and_apply_never_invoke_network(tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = _load("defaults")
+    calls: list[object] = []
+    monkeypatch.setattr(defaults, "acquire_all", lambda lock, destination: (destination / "skills"))
+    assert defaults.install_defaults(ROOT, dry_run=True, dest_root=tmp_home / ".agents" / "skills") == 0
     assert calls == []
 
+    def empty_acquire(lock, destination):
+        destination.mkdir(mode=0o700)
+        skills = destination / "skills"
+        skills.mkdir(mode=0o700)
+        return skills
 
-def test_missing_npx_skips_without_failing(tmp_path: Path) -> None:
-    defaults = _load_defaults()
-    dest = tmp_path / ".agents" / "skills"
-    calls: list[list[str]] = []
+    monkeypatch.setattr(defaults, "acquire_all", empty_acquire)
+    assert defaults.install_defaults(ROOT, dest_root=tmp_home / ".agents" / "skills") == 0
+    assert not (tmp_home / ".agents" / "skills").exists()
 
-    def run(cmd, **kwargs):
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0)
 
-    rc = defaults.install_defaults(
-        ROOT,
-        dest_root=dest,
-        run=run,
-        which=lambda _name: None,
+def test_verified_locked_skill_installs_through_managed_ownership(tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    content_hash = third_party.tree_hash(skill)
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    (repo / "agents" / "skills-defaults.yaml").write_text(
+        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
     )
-    assert rc == 0
-    assert calls == []
+    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+        "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
+        "  - id: demo\n    source: https://github.com/example/demo\n"
+        f"    revision: '{revision}'\n    subdirectory: skill\n    content_hash: {content_hash}\n"
+        f"    license: {{spdx: MIT, file: LICENSE, hash: {license_hash}}}\n"
+        "    audit: {status: approved, date: '2026-09-04', tool: test-review-v1, evidence: https://example.com/audit/demo}\n",
+        encoding="utf-8",
+    )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    target = destination / "demo" / "SKILL.md"
+    assert target.is_file()
+    manifest = yaml.safe_load((tmp_home / ".local" / "state" / "dotf" / "agents-manifest.json").read_text())
+    assert {item["owner"] for item in manifest["items"]} == {"agents:third-party:demo"}
+    before = target.stat().st_mtime_ns
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    assert target.stat().st_mtime_ns == before

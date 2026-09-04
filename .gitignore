@@ -36,3 +36,5 @@ config/multiplexers/tmux/resurrect/
 config/tools/k9s/screen-dumps/
 config/tools/k9s/snapshots/
 config/tools/k9s/clusters/
+
+.kiro

@@ -1,15 +1,6 @@
-# 第三方默认 skill：由 `dotf agents -c` 通过 `npx skills add -g` 安装到 ~/.agents/skills。
-# 不要与 agents/skills/ 下手写 skill 同名（一手 sync 会覆盖）。
-# 多 skill 仓库必须写 skill:，禁止 --all。
-version: 1
-skills:
-  - source: tt-a1i/archify
-    skill: archify
-  - source: browser-use/browser-use
-    skill: browser-use
-  - source: anthropics/skills
-    skill: frontend-design
-  - source: anthropics/skills
-    skill: skill-creator
-  - source: nextlevelbuilder/ui-ux-pro-max-skill
-    skill: ui-ux-pro-max
+# Third-party defaults are selected only by id; every selected id must have an
+# approved immutable entry in skills-defaults.lock.yaml. No current catalog
+# entry has repository-verifiable audit approval, so the safe default is empty.
+version: 2
+lock: skills-defaults.lock.yaml
+skills: []

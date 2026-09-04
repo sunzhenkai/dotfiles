@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Merge Codex base config with a profile overlay and optional local file.
+"""Merge Codex base config with a repository-only profile and optional local overlay.
 
-Profile files (e.g. kimi.config.toml) only carry top-level scalars such as
-model / model_provider / model_catalog_json. Those keys replace the same
-keys in the base preamble (before the first [table]); other base content
-is kept. Local projects are appended after a marker comment.
+Profile files (for example ``kimi.config.toml``) are merge inputs only. Their
+model / model_provider / model_catalog_json keys replace matching top-level
+keys in the base preamble; no profile auxiliary file is installed in HOME.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -26,7 +26,7 @@ ALIASES = {
 
 LOCAL_MARKER = (
     "\n# ============================================================\n"
-    "# ↓↓↓ 以下来自 agents/vendors/codex/config.local.toml（机器特定，不纳入 git） ↓↓↓\n"
+    "# ↓↓↓ 以下来自 XDG dotf overlay（机器特定，不纳入 git） ↓↓↓\n"
 )
 
 
@@ -45,6 +45,13 @@ def parse_assignments(preamble: str) -> dict[str, str]:
         if match:
             out[match.group(1)] = line
     return out
+
+
+def assignment_value(line: str) -> str:
+    value = line.split("=", 1)[1].strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
 
 
 def overlay(base: str, profile: str) -> str:
@@ -94,18 +101,39 @@ def profile_path(vendor_dir: Path, name: str) -> Path:
 
 
 def profile_default_model(path: Path) -> str:
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = ASSIGN_RE.match(line)
-        if match and match.group(1) == "model":
-            value = line.split("=", 1)[1].strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            return value
-    return ""
+    assignments = parse_assignments(split_preamble(path.read_text(encoding="utf-8"))[0])
+    line = assignments.get("model")
+    return assignment_value(line) if line else ""
 
 
 def alias_names(canonical: str) -> list[str]:
     return sorted(alias for alias, target in ALIASES.items() if target == canonical)
+
+
+def current_profile_from_config(
+    vendor_dir: Path,
+    installed_config: Path | None,
+    default: str = "minimax",
+) -> str | None:
+    """Derive current provider from installed config, never from a marker file."""
+    names = list_profiles(vendor_dir)
+    resolved_default = resolve_profile_name(default)
+    fallback = resolved_default if resolved_default in names else (names[0] if names else None)
+    if installed_config is None:
+        return fallback
+    try:
+        item = installed_config.lstat()
+        if not stat.S_ISREG(item.st_mode):
+            return fallback
+        text = installed_config.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError, UnicodeError):
+        return fallback
+    assignments = parse_assignments(split_preamble(text)[0])
+    provider_line = assignments.get("model_provider")
+    if not provider_line:
+        return fallback
+    provider = resolve_profile_name(assignment_value(provider_line))
+    return provider if provider in names else fallback
 
 
 def describe_profiles(vendor_dir: Path, current: str | None = None) -> str:
@@ -157,7 +185,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--vendor-dir", type=Path, default=None)
     parser.add_argument("--list-profiles", action="store_true")
     parser.add_argument("--describe-profiles", action="store_true")
-    parser.add_argument("--current", default=None, help="当前默认 profile（describe 时标记）")
+    parser.add_argument("--current", default=None, help="显式当前 profile（测试/兼容）")
+    parser.add_argument("--installed-config", type=Path, default=None)
+    parser.add_argument("--default-current", default="minimax")
     parser.add_argument("--resolve", metavar="NAME", default=None)
     parser.add_argument("--base", type=Path, default=None)
     parser.add_argument("--profile", type=Path, default=None)
@@ -169,7 +199,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.vendor_dir is None:
             parser.error("--list-profiles / --describe-profiles 需要 --vendor-dir")
         if args.describe_profiles:
-            sys.stdout.write(describe_profiles(args.vendor_dir, args.current))
+            current = args.current
+            if current is None:
+                current = current_profile_from_config(
+                    args.vendor_dir, args.installed_config, args.default_current
+                )
+            sys.stdout.write(describe_profiles(args.vendor_dir, current))
         else:
             print("\n".join(list_profiles(args.vendor_dir)))
         return 0

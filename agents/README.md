@@ -105,3 +105,22 @@ scripts/config.sh agents
 仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`dotf-ui-design`（UI Engineering 薄路由：frontend-design 走全局 defaults，其余 4 条能力 skill 为内部引用）、`task-design`（复杂任务可选设计环节）、`task-grill`（taskflow 链路上 explore 与 propose 之间的可选收敛）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`taskflow` 在已安装时委托它们。
 
 第三方默认（`agents/skills-defaults.yaml`，`npx skills add -g`）：`archify`（`tt-a1i/archify`）、`browser-use`（`browser-use/browser-use`）、`frontend-design`（`anthropics/skills`）、`skill-creator`（`anthropics/skills`）、`ui-ux-pro-max`（`nextlevelbuilder/ui-ux-pro-max-skill`）。多 skill 仓库只装点名的那一项，不会 `--all`。
+
+## Managed ownership 与冲突
+
+`dotf agents -c` 先生成无网络、无 secret lookup、无写盘的 plan；确认后才写 HOME。runtime bundle 和 MCP server id 由 `${XDG_STATE_HOME:-$HOME/.local/state}/dotf/` 下的版本化 managed manifest 记录 owner、source identity 与 hash。只有上次 owned 且仍匹配 managed hash 的 stale 项会被 prune；未托管同名项或本机改写进入 `conflict`，默认保持原样，不静默覆盖。`patches/`、`evals/`、`experience/`、`evolutions/` 等 authoring 数据不属于默认 runtime bundle。
+
+多目标 MCP apply 使用 transaction journal，提交失败时逆序 rollback。`failed-rollback` 表示回滚也失败：保留 journal/备份，按其中的受限路径与 hash 人工恢复后再运行 dry-run；不要删除 journal 或把运行目录重新软链到仓库。
+
+## 仓库模板维护
+
+普通 sync 永不更新 `agents/vendors/*` 的 committed MCP 模板。修改 `agents/env/` 安全真相源后，维护者必须显式运行：
+
+```shell
+python3 scripts/agents/generate_templates.py
+python3 scripts/agents/generate_templates.py --check
+git diff --exit-code -- agents/vendors/cursor/mcp.json agents/vendors/kiro/mcp.json \
+  agents/vendors/opencode/opencode.json agents/vendors/kimi-code/mcp.json agents/vendors/zcode/mcp.json
+```
+
+生成器禁用本机 overlay，不解析 secret 值，只使用 committed safe sources；生成 diff 必须审查并提交。

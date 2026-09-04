@@ -159,25 +159,12 @@ install_opencode
     ).strip() == "company"
 
 
-def test_install_opencode_keeps_mcp_on_reinstall(tmp_home: Path) -> None:
+def test_install_opencode_keeps_profile_on_reinstall(tmp_home: Path) -> None:
     target = tmp_home / ".config" / "opencode"
-    target.mkdir(parents=True)
-    (target / "opencode.json").write_text(
-        json.dumps(
-            {
-                "model": "kimi/k3",
-                "mcp": {"local-only": {"type": "local", "command": ["echo"]}},
-                "provider": {},
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     env["DOTFILES_ROOT"] = str(ROOT)
+    env["DOTF_OPENCODE_PROFILE"] = "company"
     script = r"""
 set -euo pipefail
 source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
@@ -195,9 +182,23 @@ install_opencode
     )
     assert r.returncode == 0, r.stdout + r.stderr
     cfg = json.loads((target / "opencode.json").read_text(encoding="utf-8"))
-    assert cfg["model"] == "kimi/k3"
-    assert "local-only" in cfg["mcp"]
-    assert "minimax" in cfg["provider"]
+    assert cfg["model"] == "company/vanchin/deepseek-v4-pro-0813"
+
+    # Reinstall without the env flag: the persisted profile keeps the model
+    # pointer stable instead of falling back to the vendor default.
+    env.pop("DOTF_OPENCODE_PROFILE")
+    r = subprocess.run(
+        ["bash", "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    cfg = json.loads((target / "opencode.json").read_text(encoding="utf-8"))
+    assert cfg["model"] == "company/vanchin/deepseek-v4-pro-0813"
+    assert (target / ".dotf-profile").read_text(encoding="utf-8").strip() == "company"
 
 
 def test_cli_opencode_f_dry_run() -> None:

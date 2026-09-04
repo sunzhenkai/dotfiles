@@ -10,8 +10,11 @@ configuration:
 - Tabs/windows: `prefix+c`, `prefix+n/p`, `prefix+1..9`
 - Copy mode: `prefix+Enter`
 
-Install and link the configuration with:
+Install Herdr and apply its copy-managed configuration with:
 
 ```shell
-dotf herdr -ic
+dotf herdr -ic --dry-run
+dotf herdr -ic --yes
 ```
+
+The target under `~/.config/herdr` is a real directory. Re-run `dotf herdr -c` after changing the repository configuration.

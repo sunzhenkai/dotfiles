@@ -43,7 +43,7 @@ scripts/agents/sync.sh all
 | 路径选择、生成合同、落盘、交付 | `agents/skills/pretty-view-ppt/SKILL.md` |
 | HTML catalog | `agents/skills/pretty-view-ppt/scripts/update-catalog.py` |
 | catalog 测试 | `agents/skills/pretty-view-ppt/tests/test_update_catalog.py` |
-| 路由契约测试 | `agents/skills/pretty-view-ppt/tests/test_skill_contract.py` |
+| 路由契约测试 | `agents/skills/pretty-view-ppt/tests/test_pretty_view_ppt_contract.py` |
 | 演示夹具 | `agents/skills/pretty-view-ppt/tests/test_marine_life_outputs.py` |
 | vendor 清单与审计 | `agents/skills/pretty-view-ppt/references/UPSTREAM.md` |
 
