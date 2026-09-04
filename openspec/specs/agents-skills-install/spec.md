@@ -32,20 +32,27 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 - **THEN** 若实现包含 commands→prompts 映射，则对应文件 SHALL 安装到约定的 `~/.codex/prompts/`（或文档声明的路径）
 
 ### Requirement: 安装行为安全且可重复
-
-skills/commands 安装 SHALL 可重复执行；对已由本系统管理且内容未变的目标 SHALL 可跳过；与现有备份策略一致，避免静默销毁用户手改内容而不留痕迹。
+skills/commands runtime bundle 安装 SHALL 记录本系统拥有的目标、来源、内容 hash 和版本。对等价受管内容 SHALL 返回 unchanged；对删除的来源 SHALL 执行安全 reconcile；对用户修改或非托管同名目标 SHALL 报告 conflict，除非用户显式选择备份后替换。
 
 #### Scenario: 重复配置幂等
+- **WHEN** 用户连续两次同步且共享源、选择范围和目标内容未变
+- **THEN** 第二次 SHALL 返回 unchanged
+- **THEN** SHALL NOT 创建备份或重写目标
 
-- **WHEN** 用户连续两次执行同一工具的配置且共享源未变
-- **THEN** 第二次执行 SHALL 成功完成
-- **THEN** 用户级目标中的托管条目内容 SHALL 与适配结果一致
+#### Scenario: 已撤销的受管 sidecar
+- **WHEN** 上次 manifest 中的 sidecar 已从源 runtime bundle 删除且目标仍等于上次受管 hash
+- **THEN** reconcile SHALL 删除该 stale 目标
+- **THEN** SHALL 更新 managed manifest
+
+#### Scenario: 已撤销目标被用户修改
+- **WHEN** stale 目标内容不等于上次受管 hash
+- **THEN** reconcile SHALL 报告 conflict
+- **THEN** SHALL NOT 静默删除或覆盖该目标
 
 #### Scenario: 冲突的非托管文件先备份
-
-- **WHEN** 目标路径已存在且不是本系统将写入的等效托管内容（例如用户手改的同名 skill）
-- **THEN** 系统 SHALL 在覆盖前将现有文件/目录备份到 `~/.config/backups/`（或仓库既有备份目录约定）
-- **THEN** 再写入适配结果
+- **WHEN** 计划目标已存在但没有受管 ownership 或内容不等价
+- **THEN** 默认 apply SHALL 报告 conflict 并保持目标不变
+- **THEN** 显式替换时 SHALL 先创建不跟随软链的安全备份
 
 ### Requirement: 同步入口可独立调用
 
@@ -62,3 +69,18 @@ skills/commands 安装 SHALL 可重复执行；对已由本系统管理且内容
 - **WHEN** 用户调用同步入口且指定全部目标工具（或等价 `agents` 全量模式）
 - **THEN** 系统 SHALL 依次处理 claude、cursor、opencode、codex、kimi-code、pi（跳过清单中排除的组合）
 
+### Requirement: Runtime bundle 与 authoring source 分离
+安装到用户级 Agent 目录的 runtime bundle SHALL 只包含清单声明的运行文件。`patches`、`evals`、`experience`、`evolutions` 和其它 authoring 数据 SHALL 默认留在仓库源，不得通过源码目录软链暴露为运行时安装。
+
+#### Scenario: 同步一手 skill
+- **WHEN** skill 清单将 `SKILL.md`、`references/` 和 `scripts/` 声明为 runtime 文件
+- **THEN** sync SHALL 安装这些文件并记录 hash
+- **THEN** 未声明的 authoring 目录 SHALL NOT 出现在安装目标
+
+### Requirement: 第三方 skill 可复现且可审计
+默认第三方 skill SHALL 由锁定来源、不可变 revision、内容 hash 和审计元数据描述。普通 sync SHALL NOT 从浮动上游直接安装未锁定内容。
+
+#### Scenario: 锁定第三方 skill 安装
+- **WHEN** sync 安装第三方 skill
+- **THEN** 获取内容 SHALL 与 lock 中的 revision 和 hash 一致
+- **THEN** 不一致或审计未通过时 SHALL 在写入目标前失败

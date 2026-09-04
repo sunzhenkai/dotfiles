@@ -17,17 +17,22 @@ The system SHALL manage only secret references and validation rules in repositor
 - **THEN** it MUST NOT print the secret value, authorization header, cookie, or token
 
 ### Requirement: Local private configuration is isolated
-The system SHALL keep machine-specific paths, browser profiles, private overrides, and experimental local settings in gitignored local files.
+The system SHALL load machine-specific paths, browser profiles, private overrides, and experimental settings from an XDG user configuration location outside the dotfiles repository. Repository files SHALL contain only schemas, safe defaults, and examples; a legacy gitignored repository-local override MAY be read only for migration and SHALL trigger a deprecation warning.
 
 #### Scenario: Local override file is created
-- **WHEN** a user creates an `agents/env` local override file
-- **THEN** the file SHALL be ignored by git
-- **THEN** sync and doctor SHALL be able to read it on that machine
+- **WHEN** a user creates or initializes an agent local override
+- **THEN** the file SHALL be stored below `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/`
+- **THEN** sync and doctor SHALL read it without creating a file inside the repository
+
+#### Scenario: Legacy repository-local override exists
+- **WHEN** a gitignored `agents/env/local.yaml` or vendor local file exists
+- **THEN** the system SHALL warn and provide a migration destination
+- **THEN** it SHALL NOT copy private values into generated repository templates
 
 #### Scenario: Private path is needed
-- **WHEN** a configuration needs a private path such as a browser profile, local binary, workspace, or socket
-- **THEN** the path SHALL be placed in a local override or environment variable
-- **THEN** the committed repository source SHALL contain only a placeholder or documented example
+- **WHEN** a configuration needs a browser profile, local binary, workspace, socket, endpoint, or private host
+- **THEN** the value SHALL come from the external local override, environment, or supported credential provider
+- **THEN** committed source SHALL contain only a safe placeholder or example
 
 ### Requirement: Risk levels are declared for capabilities
 The system SHALL classify agent environment capabilities by risk level and SHALL expose that classification to sync, doctor, and documentation.
@@ -43,17 +48,17 @@ The system SHALL classify agent environment capabilities by risk level and SHALL
 - **THEN** doctor SHALL include a warning explaining the risk category
 
 ### Requirement: High-risk capabilities require explicit profile selection
-The system SHALL NOT enable high-risk capabilities through the default profile unless the manifest explicitly documents that choice.
+The system SHALL use a default profile that excludes high-risk capabilities. Browser automation, real browser state, broad local filesystem access, and equivalent high-risk capabilities SHALL require an explicit profile or local consent selection.
 
 #### Scenario: User runs default install
-- **WHEN** the user installs or syncs agent environment without selecting a high-risk profile
+- **WHEN** the user syncs agent environment without selecting a profile or recording local consent
 - **THEN** high-risk MCP servers SHALL remain disabled
 - **THEN** doctor SHALL not require their dependencies
 
 #### Scenario: User selects high-risk profile
-- **WHEN** the user selects a high-risk profile
-- **THEN** sync SHALL install the high-risk capability for compatible tools
-- **THEN** doctor SHALL report the profile as high risk
+- **WHEN** the user explicitly selects `browser`, `full`, or another high-risk profile
+- **THEN** sync SHALL display the capability risk in its plan
+- **THEN** apply MAY install it only for compatible tools
 
 ### Requirement: Browser state is protected
 The system SHALL protect browser cookies, sessions, downloads, screenshots, traces, and profiles from accidental repository tracking.
@@ -138,3 +143,19 @@ The system SHALL keep generated browser MCP repository templates free of expande
 - **THEN** the generated template SHALL contain only shared command declarations and safe placeholders
 - **THEN** the generated template SHALL NOT contain cookies, tokens, internal page URLs, CDP endpoints, or private browser profile paths
 
+### Requirement: Sensitive agent output is confined and permissioned
+Agent-generated files containing expanded credentials or private state SHALL be written only to declared user-level targets, SHALL use permissions no wider than `0600` for files and `0700` for parent directories, and SHALL never be written to repository templates or reports.
+
+#### Scenario: Target requires literal credential
+- **WHEN** an adapter must materialize a credential in a HOME config
+- **THEN** secret resolution SHALL occur only during apply after plan approval
+- **THEN** the target and any permitted backup SHALL use sensitive permissions
+- **THEN** logs SHALL include only the secret variable name
+
+### Requirement: Agent-managed paths reject symlink traversal
+Agent sync SHALL validate target roots and every managed parent/leaf path without following symbolic links. An unexpected symlink SHALL be reported as a conflict before any managed file is written.
+
+#### Scenario: Skill sidecar target is a symlink
+- **WHEN** a destination sidecar or its parent resolves through a symlink
+- **THEN** sync SHALL fail or mark the action conflict
+- **THEN** the symlink target SHALL remain unchanged

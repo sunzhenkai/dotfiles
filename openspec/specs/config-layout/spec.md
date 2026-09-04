@@ -34,17 +34,23 @@
 - **THEN** 目标仍为 `~/.config/nvim`，源为仓库内 `config/editors/nvim`
 
 ### Requirement: 模块处理器约定目录
-模块生命周期处理器 SHALL 位于 `scripts/modules/<module>/`，动作文件名 SHALL 为 `install.sh`、`config.sh`、`doctor.sh`。应用配置实体 SHALL 继续位于 `config/<category>/<name>/`，处理器目录不得复制应用配置形成第二真相源。
+模块生命周期处理器 SHALL 位于 `scripts/modules/<module>/`，动作文件名 SHALL 为 `install.sh`、`config.sh`、`doctor.sh`。应用配置实体 SHALL 继续位于 `config/<category>/<name>/`，处理器目录不得复制应用配置形成第二真相源。无工具特有逻辑的配置 SHALL 复用与注册表部署策略匹配的公共实现；整目录软链不得作为通用默认行为。
 
 #### Scenario: Nvim 配置模块
 - **WHEN** 检查 nvim 模块布局
-- **THEN** nvim 配置实体 SHALL 保持位于 `config/editors/nvim`
+- **THEN** nvim 声明式配置 SHALL 保持位于 `config/editors/nvim`
+- **THEN** `~/.config/nvim` SHALL 为承载本机运行态的真实目录
 - **THEN** nvim 专用生命周期逻辑如存在 SHALL 位于 `scripts/modules/nvim/`
 
 #### Scenario: 无专用逻辑的软链模块
-- **WHEN** 模块仅需通用 symlink 配置
-- **THEN** SHALL 复用公共配置实现
+- **WHEN** 模块只需通用 copy、merge、render 或允许的只读 symlink 配置
+- **THEN** SHALL 复用相应公共配置实现
 - **THEN** SHALL NOT 复制一份同等逻辑到模块目录
+
+#### Scenario: 仓库声明与运行态隔离
+- **WHEN** 应用在其 HOME 配置根目录创建 cache、session、history、plugin、credential 或机器专属文件
+- **THEN** 这些路径 SHALL 留在 HOME 真实目录
+- **THEN** SHALL NOT 因配置部署而写入仓库源目录
 
 ### Requirement: 公共运行库与模块实现分离
 可复用的 runner、planner、结果、路径与 symlink 安全逻辑 SHALL 位于明确的公共脚本库；模块目录 SHALL 只包含模块特有行为。模块处理器 SHALL NOT 反向维护模块清单或自行解析全部注册表。

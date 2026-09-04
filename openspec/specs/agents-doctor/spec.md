@@ -79,17 +79,26 @@ The doctor command SHALL validate MCP manifest parsing, generated target configu
 - **THEN** network failures SHALL be reported without printing authorization headers
 
 ### Requirement: Doctor checks agents synchronization
-The doctor command SHALL verify that shared `agents/` skills and commands are synchronized for selected target tools.
+The doctor command SHALL compare expected runtime bundle and MCP outputs with managed manifest ownership and actual target hashes. It SHALL distinguish `missing`, `changed`, `stale`, `unowned`, `conflict`, `malformed`, and permission or link-boundary errors instead of treating directory existence as synchronization.
 
 #### Scenario: Agent skill output is stale
-- **WHEN** doctor detects generated skill or command output differs from the shared source
-- **THEN** doctor SHALL report drift
-- **THEN** doctor SHALL recommend running the existing agents sync command
+- **WHEN** an owned skill or sidecar remains installed after it was removed from expected runtime output
+- **THEN** doctor SHALL report stale with the target path and expected remediation
+- **THEN** it SHALL NOT print file contents
+
+#### Scenario: Agent skill content changed locally
+- **WHEN** an owned file differs from its prior managed hash and expected output
+- **THEN** doctor SHALL report conflict
+- **THEN** remediation SHALL NOT recommend silent overwrite
+
+#### Scenario: Skills are in sync
+- **WHEN** every expected runtime file matches its expected hash and no stale owned path remains
+- **THEN** doctor SHALL report pass with managed item counts
 
 #### Scenario: Agents sync script is missing or unavailable
-- **WHEN** doctor cannot run or inspect the agents sync mechanism
-- **THEN** doctor SHALL report a warning
-- **THEN** MCP and environment checks SHALL continue
+- **WHEN** doctor cannot load the shared planner or manifest
+- **THEN** doctor SHALL report warn or fail according to whether expected state can be determined
+- **THEN** unrelated environment checks SHALL continue
 
 ### Requirement: Doctor supports machine-readable output
 The doctor command SHALL support a machine-readable output mode for automation.
@@ -130,3 +139,25 @@ The doctor command SHALL support deep validation for the selected browser provid
 - **THEN** doctor SHALL report managed MCP drift
 - **THEN** doctor SHALL recommend syncing that target tool with the browser profile
 
+### Requirement: Doctor treats malformed targets as failures
+An existing target that cannot be parsed according to its declared format SHALL be reported as malformed and SHALL NOT be treated as missing or skipped.
+
+#### Scenario: MCP JSON is malformed
+- **WHEN** a selected target MCP file exists but contains invalid JSON
+- **THEN** doctor SHALL report fail with the target path and parse category
+- **THEN** it SHALL preserve and omit the file content from output
+
+### Requirement: Doctor audits state and link boundaries
+Doctor SHALL detect repository-pointing directory links for writable or sensitive modules, unexpected symlinks inside managed targets, insecure sensitive permissions, expired sensitive backups, and private artifacts under repository-managed paths.
+
+#### Scenario: Writable config root links to repository
+- **WHEN** a writable module target is a directory symlink into dotfiles
+- **THEN** doctor SHALL report fail and recommend the module migration command
+
+#### Scenario: Allowed read-only file link
+- **WHEN** a target is a correct symlink explicitly allowed by registry metadata
+- **THEN** doctor SHALL report pass or unchanged
+
+#### Scenario: Sensitive target permissions are broad
+- **WHEN** a sensitive config is readable by group or others
+- **THEN** doctor SHALL report fail without reading or printing its value

@@ -59,3 +59,29 @@
 - **WHEN** 请求列出具备 doctor 能力的模块
 - **THEN** 返回结果 SHALL 包含所有 `doctor: true` 的模块
 - **THEN** 返回结果 SHALL NOT 包含未声明 doctor 的非工具型模块（如未声明时的 `system`）
+
+### Requirement: 配置部署策略元数据
+模块注册表中的每个 `config` 能力 SHALL 显式声明部署策略，取值限于 `copy`、`merge`、`render`、`symlink`。条目 SHALL 能声明目标是否可写、是否敏感、目标权限以及需要保留或排除的本机路径；注册表校验 SHALL 在执行计划生成前拒绝缺失、类型错误或相互冲突的元数据。
+
+#### Scenario: 可写配置不能使用软链
+- **WHEN** 模块声明 `writable: true` 或 `sensitive: true`
+- **THEN** 注册表校验 SHALL 拒绝 `strategy: symlink`
+- **THEN** 任何配置动作 SHALL NOT 执行
+
+#### Scenario: 只读软链显式声明
+- **WHEN** 模块使用 `strategy: symlink`
+- **THEN** 模块 SHALL 显式声明目标为不可写且非敏感
+- **THEN** doctor SHALL 能识别该软链为受允许的只读链接
+
+#### Scenario: 敏感目标权限
+- **WHEN** 模块声明 `sensitive: true`
+- **THEN** 注册表 SHALL 要求普通文件目标权限不宽于 `0600`
+- **THEN** 目录目标权限不宽于 `0700`
+
+### Requirement: 配置策略由统一调度读取
+配置调度 SHALL 从模块注册表读取部署策略和安全元数据，不得按模块名维护并行的策略清单。需要工具特有 merge/render 逻辑的模块 MAY 使用专用处理器，但处理器 SHALL 遵守注册表声明的可写性、敏感度、权限和保留规则。
+
+#### Scenario: 通用 copy 配置
+- **WHEN** 模块声明 `strategy: copy` 且无需专用逻辑
+- **THEN** 调度 SHALL 使用公共 copy 实现安装配置
+- **THEN** SHALL NOT 创建指向仓库的目标软链

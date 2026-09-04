@@ -55,35 +55,49 @@ The system SHALL adapt shared MCP declarations into the configuration format use
 - **THEN** doctor SHALL report MCP support for Codex as unsupported or skipped rather than failed
 
 ### Requirement: MCP sync is idempotent and scoped
-The system SHALL update only MCP server ids managed by `agents/env` and SHALL preserve unrelated user or tool-managed configuration where possible.
+The system SHALL compile selected shared declarations and current target state into an immutable sync plan before apply. Apply SHALL update only owned managed server ids, preserve unrelated configuration, reconcile stale owned entries, and record expected and installed hashes. Equivalent output SHALL return unchanged without backup or replacement.
 
 #### Scenario: Repeated sync has no changes
-- **WHEN** sync runs twice with the same shared MCP source and selected profile
-- **THEN** the second run SHALL succeed
-- **THEN** managed MCP output SHALL remain equivalent after both runs
+- **WHEN** sync runs twice with the same source, profile, local overlay, and target state
+- **THEN** the second plan SHALL contain no update actions
+- **THEN** apply SHALL NOT create backups or replace files
 
 #### Scenario: Existing unmanaged MCP server is present
-- **WHEN** a target configuration contains an MCP server id not declared by `agents/env`
-- **THEN** sync SHALL preserve that unmanaged server unless the target tool requires full file replacement
-- **THEN** any full replacement SHALL first create a backup
+- **WHEN** a target contains an MCP id not owned by the managed manifest
+- **THEN** plan and apply SHALL preserve it
+- **THEN** the id SHALL be reported as unowned rather than stale
+
+#### Scenario: Managed server is removed
+- **WHEN** an owned server is absent from the new expected set and the installed value still matches the prior managed hash
+- **THEN** plan SHALL mark it prune
+- **THEN** apply SHALL remove only that owned entry
 
 #### Scenario: Managed server changes
-- **WHEN** a managed MCP server declaration changes
-- **THEN** sync SHALL update that server in target tool configuration
-- **THEN** unchanged unmanaged configuration SHALL remain intact where the target format allows merging
+- **WHEN** an owned managed server declaration or expected rendering changes
+- **THEN** plan SHALL mark only that managed entry for update
+- **THEN** unchanged unmanaged configuration SHALL remain intact
+
+#### Scenario: Managed server was edited locally
+- **WHEN** an owned target differs from both expected output and prior managed hash
+- **THEN** plan SHALL mark conflict
+- **THEN** default apply SHALL leave it unchanged
 
 ### Requirement: MCP output validation
-The system SHALL validate generated MCP configuration before declaring sync successful.
+The system SHALL render, parse, permission-check, and stage all selected target outputs before committing any target. A multi-target apply SHALL use a transaction journal and SHALL either commit all planned targets or roll back targets already committed in that run.
 
 #### Scenario: Placeholder remains unresolved
-- **WHEN** generated MCP output contains an unresolved template placeholder
-- **THEN** sync SHALL fail with a clear error
-- **THEN** target configuration SHALL NOT be silently left in a partially generated state
+- **WHEN** staged output contains a placeholder that the target format cannot safely resolve at runtime
+- **THEN** apply SHALL fail before changing any selected target
+- **THEN** the error SHALL identify the variable name without its value
 
 #### Scenario: Generated JSON is invalid
-- **WHEN** an adapter generates JSON configuration
-- **THEN** sync SHALL parse the generated JSON before writing or after writing atomically
-- **THEN** invalid JSON SHALL cause sync to fail
+- **WHEN** staged JSON, YAML, or TOML output is invalid
+- **THEN** apply SHALL fail and preserve all original targets
+
+#### Scenario: Later target commit fails
+- **WHEN** one target fails after an earlier target was committed in the same run
+- **THEN** the system SHALL use the journal to restore earlier targets
+- **THEN** the run SHALL end failed rather than partially successful
 
 ### Requirement: MCP profiles select active servers
 The system SHALL choose active MCP servers from the selected profile and per-tool compatibility rules.
@@ -117,23 +131,42 @@ The system SHALL render browser automation stdio MCP servers into each compatibl
 - **THEN** HTTP-only authentication placeholder handling SHALL NOT be applied to the stdio browser server
 
 ### Requirement: Browser MCP follows profile selection
-The system SHALL include browser automation MCP servers when the resolved profile enables them (default `browser` / `full`), and SHALL omit them for `research` / `coding`.
+The system SHALL omit browser automation from the default low-risk profile and include it only when the resolved profile explicitly enables browser capabilities and the selected tool is compatible.
 
 #### Scenario: Default agents config sync includes browser MCP
-- **WHEN** sync runs without an explicit profile override
-- **THEN** the resolved default profile SHALL include browser automation MCP servers for compatible tools
+- **WHEN** sync runs without an explicit high-risk profile or local consent
+- **THEN** browser automation MCP servers SHALL NOT appear in expected output
 
 #### Scenario: Research profile is synced
 - **WHEN** sync runs with the research profile
-- **THEN** browser automation MCP servers SHALL NOT be included in generated target configuration
+- **THEN** browser automation MCP servers SHALL NOT be included
 
 #### Scenario: Browser profile is synced
-- **WHEN** sync runs with the browser profile for a compatible tool
-- **THEN** browser automation MCP servers SHALL be included in generated target configuration
-- **THEN** generated repository templates SHALL remain auditable without private browser state or secrets
+- **WHEN** sync runs with an explicitly selected browser profile for a compatible tool
+- **THEN** the plan SHALL mark the capability high risk
+- **THEN** apply MAY include the browser MCP server without embedding private browser state in repository files
 
 #### Scenario: Browser MCP drift is detected
-- **WHEN** doctor compares a target tool configuration against the selected browser profile output
-- **THEN** missing or stale managed browser MCP entries SHALL be reported as configuration drift
-- **THEN** the report SHALL recommend the existing agents sync command
+- **WHEN** doctor compares a selected browser profile target with expected output
+- **THEN** missing, changed, stale, or conflicting owned entries SHALL be reported
+- **THEN** remediation SHALL identify the scoped sync command
 
+### Requirement: MCP planning is side-effect free
+The system SHALL provide a machine-readable MCP/Agent sync plan that performs no network access, secret value lookup, backup, HOME write, or repository write. The plan SHALL list required secret names, risk, ownership, target paths, expected hashes, current state, and proposed actions.
+
+#### Scenario: Dry-run without secrets
+- **WHEN** a selected target will require a literal secret during apply but the secret is absent during plan
+- **THEN** plan SHALL still succeed and list the required variable name
+- **THEN** no placeholder-expanded value SHALL be produced
+
+### Requirement: Runtime sync does not write repository templates
+Normal user sync/apply SHALL modify only declared user-level targets and state directories. Repository template generation SHALL be a separate deterministic command that ignores local overlays and secret values.
+
+#### Scenario: Normal sync uses local override
+- **WHEN** runtime sync applies a machine-specific local override
+- **THEN** no file under the dotfiles repository SHALL change
+
+#### Scenario: Repository templates are verified
+- **WHEN** maintainers run the explicit template generation command
+- **THEN** output SHALL be derived only from committed safe sources
+- **THEN** CI SHALL be able to verify that regeneration leaves no diff

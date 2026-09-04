@@ -1,44 +1,52 @@
-## ADDED Requirements
+# install-config-robust Specification
 
+## Purpose
+让配置模块安装过程在目标路径状态异常、备份、原子写入与结果验证等方面保持健壮、可重复且可审计。
+## Requirements
 ### Requirement: 目标路径状态检测
+配置安装 SHALL 在修改目标前检查注册表策略、目标类型、父级路径和符号链接状态。`copy`、`merge`、`render` 目标 SHALL 为 HOME 下的真实文件或目录，且写入路径不得经由符号链接逃逸目标根；`symlink` 仅适用于注册表明确允许的只读非敏感目标。
 
-`install_config()` SHALL 在创建 symlink 前检测目标路径的完整状态，使用以下简化逻辑：
+#### Scenario: copy 目标不存在
+- **WHEN** `strategy: copy` 的目标不存在
+- **THEN** 系统 SHALL 创建真实目标并原子写入源内容
+- **THEN** SHALL NOT 创建软链
 
-1. 如果目标是 symlink：检查 readlink 是否指向正确路径。正确则跳过，否则 `ln -sf` 覆盖（broken symlink 无需备份）
-2. 如果目标是普通文件/目录：备份后 `ln -s` 创建
-3. 如果目标不存在：直接 `ln -s` 创建
+#### Scenario: 可写目标是历史整目录软链
+- **WHEN** 可写模块目标是指向 dotfiles 仓库的整目录软链
+- **THEN** 系统 SHALL 只移除软链本身并创建 HOME 真实目录
+- **THEN** SHALL NOT 跟随软链删除或移动仓库内容
 
-#### Scenario: 目标不存在
-- **WHEN** 目标路径不存在且不是 symlink
-- **THEN** 直接 `ln -s` 创建 symlink，不执行备份
+#### Scenario: 写入路径包含非预期软链
+- **WHEN** copy、merge、render 或备份目标自身或父级路径包含未声明的软链
+- **THEN** 操作 SHALL 在写入前失败
+- **THEN** 错误 SHALL 指明路径边界问题且不泄露文件内容
 
-#### Scenario: 目标是正确的 symlink
-- **WHEN** 目标是 symlink 且 readlink 解析结果与期望路径一致
-- **THEN** 输出 "Already installed: <name>" 并跳过
-
-#### Scenario: 目标是指向错误位置的 symlink
-- **WHEN** 目标是 symlink 但 readlink 解析结果与期望路径不一致，且 symlink 目标存在（非 broken）
-- **THEN** 将 symlink 本身 mv 到备份目录，然后 `ln -s` 创建新 symlink
-
-#### Scenario: 目标是 broken symlink
-- **WHEN** 目标是 symlink 但指向的路径不存在
-- **THEN** 不执行备份，直接 `ln -sf` 覆盖
-
-#### Scenario: 目标是普通文件或目录
-- **WHEN** 目标路径存在且不是 symlink
-- **THEN** 将目标 mv 到 `~/.config/backups/<basename>-<timestamp>`，然后 `ln -s` 创建 symlink
+#### Scenario: 允许的只读软链已正确安装
+- **WHEN** `strategy: symlink` 的目标指向期望源且被注册表允许
+- **THEN** 操作 SHALL 返回 unchanged
+- **THEN** SHALL NOT 创建备份
 
 ### Requirement: 集中备份目录
-
-所有备份 SHALL 统一存放在 `~/.config/backups/` 目录下，命名格式为 `<原文件名>-<timestamp>`。
+所有配置备份 SHALL 存放在仓库外的统一备份根目录，并按唯一 run id 和目标相对路径隔离。备份 SHALL 使用 `lstat` 语义且不得跟随符号链接复制其目标；备份根目录权限 SHALL 不宽于 `0700`，敏感普通文件备份权限 SHALL 不宽于 `0600`。
 
 #### Scenario: 首次备份创建目录
-- **WHEN** `~/.config/backups/` 不存在
-- **THEN** 自动创建该目录
+- **WHEN** 统一备份根目录不存在
+- **THEN** 系统 SHALL 创建该目录并设置不宽于 `0700` 的权限
 
-#### Scenario: 备份不污染 dotfiles 仓库
-- **WHEN** 执行备份操作
-- **THEN** 备份文件 SHALL NOT 存放在 dotfiles 仓库目录内
+#### Scenario: 同名目标备份
+- **WHEN** 同一次或并发执行备份来自不同目录的同名文件
+- **THEN** 两份备份 SHALL 使用不同路径
+- **THEN** 已有备份 SHALL NOT 被覆盖
+
+#### Scenario: 备份目标是软链
+- **WHEN** 需要保留的旧目标是软链
+- **THEN** 系统 SHALL 记录或移动软链本身
+- **THEN** SHALL NOT 将软链指向内容复制为普通文件备份
+
+#### Scenario: 敏感备份保留
+- **WHEN** 敏感配置产生备份
+- **THEN** 系统 SHALL 应用已声明的短期保留或禁用备份策略
+- **THEN** doctor SHALL 能报告过期敏感备份而不读取或打印其内容
 
 ### Requirement: 安装输出包含备份路径
 
@@ -104,3 +112,16 @@
 - **WHEN** Docker 已安装但 daemon 未运行
 - **THEN** 输出 SHALL 提示用户启动 Docker（macOS: "open -a Docker"；Linux: "sudo systemctl start docker"）
 - **THEN** 脚本继续执行（不退出）
+
+### Requirement: 配置写入原子且可验证
+`copy`、`merge`、`render` 操作 SHALL 在目标同文件系统完成 staging 和格式校验，再通过原子替换提交。内容未变化时 SHALL 返回 unchanged 且不得创建备份。
+
+#### Scenario: 生成内容未变化
+- **WHEN** staging 内容与当前目标字节等价
+- **THEN** 操作 SHALL 返回 unchanged
+- **THEN** SHALL NOT 替换目标或创建备份
+
+#### Scenario: 格式校验失败
+- **WHEN** JSON、YAML、TOML 或声明格式的 staging 内容无法解析
+- **THEN** 操作 SHALL 失败且保留原目标
+- **THEN** SHALL 清理临时文件
