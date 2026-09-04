@@ -52,6 +52,7 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launch_home: Path)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
     monkeypatch.setenv("XDG_CACHE_HOME", str(cache))
     monkeypatch.delenv("DOTFILES_HOME", raising=False)
+    monkeypatch.delenv("KIRO_HOME", raising=False)
 
     assert home.resolve() != launch_home
     return home

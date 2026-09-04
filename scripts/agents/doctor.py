@@ -30,7 +30,13 @@ from adapters import adapter_for  # noqa: E402
 from common import Catalog, TOOLS  # noqa: E402
 from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
 from mcp_runtime import read_manifest as read_mcp_manifest  # noqa: E402
-from sync import render_skill_bytes  # noqa: E402
+from sync import (  # noqa: E402
+    KIRO_SKILL_IDENTITY_PREFIX,
+    KIRO_SKILL_OWNER_PREFIX,
+    kiro_skills_target,
+    render_kiro_skill_bytes,
+    render_skill_bytes,
+)
 from sync_plan import compile_sync_plan  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
@@ -281,12 +287,33 @@ def _counts_message(counts: Mapping[str, int]) -> str:
     return " ".join(f"{name}={counts.get(name, 0)}" for name in order)
 
 
-def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_home: Path | None = None) -> None:
+def _check_skills_plan(
+    root: Path,
+    report: DoctorReport,
+    *,
+    home: Path,
+    state_home: Path | None,
+    renderer: Callable[[Path, str], bytes],
+    target_root: Path,
+    owner_prefix: str,
+    label: str,
+) -> None:
     """Reuse the runtime planner; never approximate manifest/target drift."""
     try:
-        plan = compile_skills_plan(root, render_skill_bytes, home=home, state_home=state_home)
+        plan = compile_skills_plan(
+            root,
+            renderer,
+            home=home,
+            state_home=state_home,
+            target_root=target_root,
+            owner_prefix=owner_prefix,
+            identity_prefix=(
+                "agents/skills" if owner_prefix == "agents:skill:" else KIRO_SKILL_IDENTITY_PREFIX
+            ),
+        )
     except (AgentRuntimeError, OSError, SystemExit, ValueError) as exc:
-        report.add("skills", "planner", STATUS_FAIL, f"skills planner unavailable: {exc}")
+        planner_id = "planner" if label == "shared" else f"{label}-planner"
+        report.add("skills", planner_id, STATUS_FAIL, f"{label} planner unavailable: {exc}")
         return
     counts = Counter({name: 0 for name in (
         "managed", "missing", "changed", "stale", "unowned", "conflict", "permission", "malformed"
@@ -294,7 +321,17 @@ def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_hom
     statuses: list[str] = []
     if plan.manifest_status == "malformed":
         counts["malformed"] += 1
-        statuses.append(_record_state(report, "skills", "manifest-malformed", "malformed", str(Path(plan.state_home) / "dotf" / "agents-manifest.json"), "ownership manifest"))
+        if label == "shared":
+            statuses.append(
+                _record_state(
+                    report,
+                    "skills",
+                    "manifest-malformed",
+                    "malformed",
+                    str(Path(plan.state_home) / "dotf" / "agents-manifest.json"),
+                    "ownership manifest",
+                )
+            )
     for index, operation in enumerate(plan.operations):
         if operation.prior is not None:
             counts["managed"] += 1
@@ -323,9 +360,47 @@ def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_hom
         if category is not None:
             count_name = "conflict" if category == "link-boundary" else category
             counts[count_name] += 1
-            statuses.append(_record_state(report, "skills", f"runtime-{category}-{index}", category, operation.target, detail))
+            statuses.append(
+                _record_state(
+                    report,
+                    "skills",
+                    (
+                        f"runtime-{category}-{index}"
+                        if label == "shared"
+                        else f"{label}-runtime-{category}-{index}"
+                    ),
+                    category,
+                    operation.target,
+                    detail,
+                )
+            )
     summary_status = max(statuses, key=lambda value: _STATUS_ORDER[value]) if statuses else STATUS_PASS
-    report.add("skills", "sync-plan", summary_status, "runtime plan " + _counts_message(counts))
+    sync_plan_id = "sync-plan" if label == "shared" else f"{label}-sync-plan"
+    report.add("skills", sync_plan_id, summary_status, f"{label} runtime plan " + _counts_message(counts))
+
+
+def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_home: Path | None = None) -> None:
+    """Check both the shared runtime and Kiro CLI's dedicated mirror."""
+    _check_skills_plan(
+        root,
+        report,
+        home=home,
+        state_home=state_home,
+        renderer=render_skill_bytes,
+        target_root=home / ".agents" / "skills",
+        owner_prefix="agents:skill:",
+        label="shared",
+    )
+    _check_skills_plan(
+        root,
+        report,
+        home=home,
+        state_home=state_home,
+        renderer=render_kiro_skill_bytes,
+        target_root=kiro_skills_target(),
+        owner_prefix=KIRO_SKILL_OWNER_PREFIX,
+        label="kiro",
+    )
 
 
 def check_mcp_plan(

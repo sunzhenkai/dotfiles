@@ -1,4 +1,4 @@
-"""sync.py 分发 skill 到共享 ~/.agents/skills：references/scripts 原样拷贝。"""
+"""sync.py 分发 skill 到共享与 Kiro 目标：references/scripts 原样拷贝。"""
 
 from __future__ import annotations
 
@@ -8,12 +8,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+
+from sync import kiro_skills_target  # noqa: E402
 
 
-def _run_sync(tmp_home: Path) -> subprocess.CompletedProcess:
+def _run_sync(tmp_home: Path, *, kiro_home: str | None = None) -> subprocess.CompletedProcess:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     env["XDG_STATE_HOME"] = str(tmp_home / ".local" / "state")
+    if kiro_home is not None:
+        env["KIRO_HOME"] = kiro_home
     return subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "agents" / "sync.py"), "--root", str(ROOT)],
         capture_output=True,
@@ -63,6 +68,40 @@ def test_sync_renders_slash_placeholders(tmp_path: Path) -> None:
     content = skill.read_text()
     assert "{{slash:" not in content
     assert "/openspec-propose" in content
+
+
+def test_sync_also_targets_kiro_cli_skills(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run_sync(home)
+    assert r.returncode == 0, r.stderr + r.stdout
+    shared = home / ".agents" / "skills" / "task-design" / "SKILL.md"
+    kiro = home / ".kiro" / "skills" / "task-design" / "SKILL.md"
+    assert shared.is_file()
+    assert kiro.is_file(), f"Kiro skills 未分发: {kiro}\n{r.stdout}"
+    assert shared.read_text().rstrip().endswith("$ARGUMENTS") is False
+    assert kiro.read_text().rstrip().endswith("$ARGUMENTS")
+    kiro_reference = (
+        home / ".kiro" / "skills" / "task-design" / "references" / "design-template.md"
+    )
+    source_reference = (
+        ROOT / "agents" / "skills" / "task-design" / "references" / "design-template.md"
+    )
+    assert kiro_reference.read_bytes() == source_reference.read_bytes()
+
+
+def test_sync_kiro_cli_respects_kiro_home(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    kiro_home = home / "kiro-root"
+    r = _run_sync(home, kiro_home=str(kiro_home))
+    assert r.returncode == 0, r.stderr + r.stdout
+    assert (kiro_home / "skills" / "task-design" / "SKILL.md").is_file()
+
+
+def test_explicit_home_still_defaults_to_kiro_directory() -> None:
+    home = Path("/tmp/dotf-test-home")
+    assert kiro_skills_target(home) == home / ".kiro" / "skills"
 
 
 def test_sync_installs_no_taskctl_shim(tmp_path: Path) -> None:

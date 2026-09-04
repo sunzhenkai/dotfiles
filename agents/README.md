@@ -73,11 +73,11 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 {{slash:opsx-apply}}
 ```
 
-同步时统一渲染为 `/opsx-apply`（目标是共享的 `~/.agents/skills`，与工具无关）。
+同步时统一渲染为 `/opsx-apply`（共享目标是 `~/.agents/skills`；Kiro CLI 例外，见下文）。
 
 ## 同步
 
-skills 只同步到一个共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。
+skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。**Kiro CLI 是当前唯一例外**：它不读取 `~/.agents/skills`，因此同一入口会额外托管一份 `${KIRO_HOME:-~/.kiro}/skills/<id>/`，并在 `SKILL.md` 末尾补上 Kiro slash 参数占位 `$ARGUMENTS`。`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。
 
 一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过 `npx skills add <source> --skill <name> -g -y --copy` 安装到同一个 `~/.agents/skills`（不传 `-a`，避免写入各工具私有目录）。已存在的 skill 会跳过，不在每次 sync 时升级；升级用 `npx skills update -g`。缺少 npx 或网络时只警告，不阻断一手 skill 同步。
 
@@ -85,7 +85,7 @@ skills 只同步到一个共享目标：`~/.agents/skills/<id>/`（含 `referenc
 # 同步 skills（tool 无关，一次性）+ 全部工具的 MCP/env
 scripts/agents/sync.sh all
 
-# tool 参数只过滤 MCP/env 部分；skills 始终全量同步
+# tool 参数只过滤 MCP/env 部分；skills（含 Kiro 例外镜像）始终全量同步
 scripts/agents/sync.sh cursor
 
 # 只同步 skills
@@ -98,7 +98,7 @@ scripts/config.sh agents
 共享 sync：`dotf agents -c [--tool <name>]`（`--tool` 只过滤 MCP/env）。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `dsh`（DeepSeek Harness CLI，bin: `dsh`）：MCP client 配置在 profile 内，不参与 agents/env 聚合（env_sync 为 skip stub）。安装走 `dotf dsh -i`。
 
-**不要手改** `~/.agents/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`。
+**不要手改** `~/.agents/skills/` 或 `${KIRO_HOME:-~/.kiro}/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`。
 
 ## 示例条目
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 统一 agents sync：一手 skills + 第三方默认 skill（~/.agents/skills）+ MCP/env（按 tool 过滤）。
+# 统一 agents sync：一手 skills + 第三方默认 skill（~/.agents/skills 与 Kiro CLI）+ MCP/env（按 tool 过滤）。
 # 用法:
 #   sync.sh [<tool>|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
@@ -93,7 +93,8 @@ echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-defa
 
 if [ "$SKILLS" -eq 1 ]; then
   echo "--- skills ---"
-  # skills 同步到共享的 ~/.agents/skills，与 tool 过滤无关，一次性执行
+  # skills 同步到共享 ~/.agents/skills，并为 Kiro CLI 写 ~/.kiro/skills；
+  # 与 tool 过滤无关，一次性执行
   skills_args=(--root "$ROOT")
   if [ "$DRY_RUN" -eq 1 ]; then
     skills_args+=(--dry-run)

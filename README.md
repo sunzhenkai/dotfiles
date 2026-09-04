@@ -109,7 +109,7 @@ skills、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf cursor -c                 # 仅 vendor 配置（不隐式 sync）
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ MCP
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ MCP
 dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/agents/sync.sh all --dry-run

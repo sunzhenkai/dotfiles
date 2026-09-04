@@ -14,6 +14,7 @@
 ```
 
 可用环境变量 `KIRO_HOME` 重定向整个全局目录。
+dotf 托管写入要求 `KIRO_HOME` 位于 HOME 内；指向 HOME 外会在 dry-run/apply 阶段拒绝。
 
 ## 安装
 
@@ -33,7 +34,7 @@ dotf agents -i
 dotf kiro -c
 ```
 
-确保 `~/.kiro/{skills,prompts,settings}` 就绪。共享 skills / prompts / MCP：
+确保 `~/.kiro/{skills,prompts,settings}` 就绪。Kiro 不读取共享 `~/.agents/skills`；`dotf agents -c` 会额外托管一份 Kiro skills，并为 slash skill 追加 `$ARGUMENTS`：
 
 ```shell
 dotf agents -c --tool kiro
@@ -58,8 +59,10 @@ scripts/agents/sync.sh kiro
 | 目标 | 写入位置 | 说明 |
 |------|----------|------|
 | Skills | `~/.kiro/skills/` | 用户级；workspace `.kiro/` 不写 |
-| Commands | `~/.kiro/skills/<command>/SKILL.md` | 映射为可接收 `$ARGUMENTS` 的 slash skill；同名共享 skill 直接复用 |
+| Commands | `~/.kiro/skills/<skill-id>/SKILL.md` | 共享 skill 映射为可接收 `$ARGUMENTS` 的 slash skill |
 | MCP | merge → `~/.kiro/settings/mcp.json` 的 `mcpServers` | 保留非托管 server |
+
+Kiro skills 由 managed manifest 独立跟踪（owner 前缀 `agents:kiro-skill:`）。未托管或本机修改的同名文件会保持原样并报告 conflict，不会静默覆盖。
 
 `agents/vendors/kiro/mcp.json` 是 **agents/env 生成物**。请改 `agents/env/mcp/` 后运行：
 

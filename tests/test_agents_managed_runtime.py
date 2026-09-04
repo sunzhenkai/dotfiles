@@ -68,13 +68,17 @@ def test_manifest_permissions_records_and_idempotence(tmp_path: Path) -> None:
     assert manifest.stat().st_mode & 0o777 == 0o600
     assert manifest.parent.stat().st_mode & 0o777 == 0o700
     assert data["schema_version"] == 1
-    assert all(item["owner"] == "agents:skill:demo" for item in data["items"])
+    assert {item["owner"] for item in data["items"]} == {
+        "agents:skill:demo",
+        "agents:kiro-skill:demo",
+    }
     assert all(item["expected_hash"] == item["installed_hash"] for item in data["items"])
     target = home / ".agents" / "skills" / "demo" / "SKILL.md"
     target_before = target.stat().st_mtime_ns
     second = _run(repo, home)
     assert second.returncode == 0, second.stderr + second.stdout
     assert "done skills: changed=0" in second.stdout
+    assert "done kiro skills: changed=0" in second.stdout
     assert manifest.stat().st_mtime_ns == before
     assert target.stat().st_mtime_ns == target_before
 
@@ -221,8 +225,8 @@ def test_concurrent_syncs_serialize_without_manifest_loss(tmp_path: Path) -> Non
     assert one.returncode == 0, err1 + out1
     assert two.returncode == 0, err2 + out2
     data = json.loads(_manifest(home).read_text(encoding="utf-8"))
-    assert len(data["items"]) == 3
-    assert len({item["target"] for item in data["items"]}) == 3
+    assert len(data["items"]) == 6
+    assert len({item["target"] for item in data["items"]}) == 6
 
 
 def test_symlinked_lock_is_rejected(tmp_path: Path) -> None:

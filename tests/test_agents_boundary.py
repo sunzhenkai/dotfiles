@@ -165,7 +165,7 @@ def test_sync_removed_tools_rejected(tmp_home: Path) -> None:
 
 
 def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
-    """skills 同步与 tool 无关：只写 ~/.agents/skills 与 shims。"""
+    """skills 同步与 tool 无关：写共享目录、Kiro 例外镜像与 shims。"""
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     r = subprocess.run(
@@ -187,4 +187,30 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
     for dest in written:
         assert dest.startswith(str(tmp_home / ".agents" / "skills")) or dest.startswith(
             str(tmp_home / ".local" / "bin")
+        ) or dest.startswith(
+            str(tmp_home / ".kiro" / "skills")
         ), dest
+
+
+def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_home)
+    env["XDG_STATE_HOME"] = str(tmp_home / ".local" / "state")
+    r = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "bin" / "dotf"),
+            "agents",
+            "-c",
+            "--skills-only",
+            "--yes",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert r.returncode == 0, r.stderr + r.stdout
+    assert f"==> sync kiro skills → {tmp_home / '.kiro' / 'skills'}" in r.stdout
+    assert (tmp_home / ".kiro" / "skills" / "task-design" / "SKILL.md").is_file()

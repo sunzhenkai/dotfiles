@@ -104,7 +104,9 @@ def test_empty_lock_dry_run_and_apply_never_invoke_network(tmp_home: Path, monke
     assert not (tmp_home / ".agents" / "skills").exists()
 
 
-def test_verified_locked_skill_installs_through_managed_ownership(tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownership(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     defaults = _load("defaults")
     third_party = _load("third_party")
     repo = tmp_path / "repo"
@@ -139,12 +141,21 @@ def test_verified_locked_skill_installs_through_managed_ownership(tmp_path: Path
         return output
 
     monkeypatch.setattr(defaults, "acquire_all", acquire)
-    destination = tmp_home / ".agents" / "skills"
-    assert defaults.install_defaults(repo, dest_root=destination) == 0
-    target = destination / "demo" / "SKILL.md"
-    assert target.is_file()
+    shared_destination = tmp_home / ".agents" / "skills"
+    kiro_destination = tmp_home / ".kiro" / "skills"
+    assert defaults.install_defaults(repo, dest_roots=(shared_destination, kiro_destination)) == 0
+    shared_target = shared_destination / "demo" / "SKILL.md"
+    kiro_target = kiro_destination / "demo" / "SKILL.md"
+    assert shared_target.is_file()
+    assert kiro_target.is_file()
+    assert kiro_target.read_text().rstrip().endswith("$ARGUMENTS")
     manifest = yaml.safe_load((tmp_home / ".local" / "state" / "dotf" / "agents-manifest.json").read_text())
-    assert {item["owner"] for item in manifest["items"]} == {"agents:third-party:demo"}
-    before = target.stat().st_mtime_ns
-    assert defaults.install_defaults(repo, dest_root=destination) == 0
-    assert target.stat().st_mtime_ns == before
+    assert {item["owner"] for item in manifest["items"]} == {
+        "agents:third-party:demo",
+        "agents:kiro-third-party:demo",
+    }
+    shared_before = shared_target.stat().st_mtime_ns
+    kiro_before = kiro_target.stat().st_mtime_ns
+    assert defaults.install_defaults(repo, dest_roots=(shared_destination, kiro_destination)) == 0
+    assert shared_target.stat().st_mtime_ns == shared_before
+    assert kiro_target.stat().st_mtime_ns == kiro_before

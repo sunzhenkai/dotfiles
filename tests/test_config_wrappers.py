@@ -22,7 +22,7 @@ SPECIALIZED_MODULES = tuple(
     for module in modules.load_registry()
     if modules.has_config(module) and modules.module_strategy(module) in {"merge", "render"}
 )
-SPECIALIZED_CONFIG_HANDLERS = frozenset({"codex", "opencode"})
+SPECIALIZED_CONFIG_HANDLERS = frozenset({"agents", "codex", "opencode"})
 
 
 def _expand_home(value: str, home: Path) -> Path:

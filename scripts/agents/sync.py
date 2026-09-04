@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""Install agents/ skills into the shared ~/.agents/skills layout."""
+"""Install agents/ skills into shared and Kiro-specific runtime layouts."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from managed_runtime import (
     AgentRuntimeConflict,
+    RenderSkill,
     apply_skills_plan,
     compile_skills_plan,
 )
 
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
+POSITIONAL_RE = re.compile(r"\$\{\d+\}")
+KIRO_SKILL_OWNER_PREFIX = "agents:kiro-skill:"
+KIRO_SKILL_IDENTITY_PREFIX = "agents/skills:kiro"
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -28,8 +33,20 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def skills_target() -> Path:
-    return Path.home() / ".agents" / "skills"
+def skills_target(home: Path | None = None) -> Path:
+    return (home or Path.home()).expanduser().absolute() / ".agents" / "skills"
+
+
+def kiro_home(home: Path | None = None) -> Path:
+    """Resolve Kiro's global home; explicit home supplies HOME, not KIRO_HOME."""
+    configured = os.environ.get("KIRO_HOME")
+    if home is None and configured:
+        return Path(configured).expanduser().absolute()
+    return (home or Path.home()).expanduser().absolute() / ".kiro"
+
+
+def kiro_skills_target(home: Path | None = None) -> Path:
+    return kiro_home(home) / "skills"
 
 
 def _is_indented(line: str) -> bool:
@@ -141,16 +158,50 @@ def render_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
     return content.encode("utf-8")
 
 
+def inject_kiro_arguments(body: str) -> str:
+    """Kiro slash skills only receive arguments through an explicit marker."""
+    if "$ARGUMENTS" in body or POSITIONAL_RE.search(body):
+        return body
+    return body.rstrip() + "\n\n$ARGUMENTS\n"
+
+
+def render_kiro_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
+    """Render one Kiro skill without mutating source or destination state."""
+    src = skill_dir / "SKILL.md"
+    content = render_skill_bytes(skill_dir, skill_id).decode("utf-8")
+    marker = content.find("---\n", 1)
+    if marker < 0:
+        die(f"{src}: rendered frontmatter is malformed")
+    body = content[marker + 4 :]
+    content = content[: marker + 4] + inject_kiro_arguments(body)
+    validate_output(src, content)
+    return content.encode("utf-8")
+
+
 def validate_output(path: Path, content: str) -> None:
     if "{{" in content:
         leftovers = re.findall(r"\{\{[^}]+\}\}", content)
         die(f"{path}: residual placeholders: {leftovers}")
 
 
-def sync_skills(root: Path, dry_run: bool = False) -> int:
-    base = skills_target()
-    print(f"==> sync skills → {base}")
-    plan = compile_skills_plan(root, render_skill_bytes, target_root=base)
+def _sync_runtime(
+    root: Path,
+    base: Path,
+    renderer: RenderSkill,
+    *,
+    owner_prefix: str,
+    identity_prefix: str,
+    label: str,
+    dry_run: bool,
+) -> int:
+    print(f"==> sync {label} → {base}")
+    plan = compile_skills_plan(
+        root,
+        renderer,
+        target_root=base,
+        owner_prefix=owner_prefix,
+        identity_prefix=identity_prefix,
+    )
 
     markers = {
         "none": "=",
@@ -171,21 +222,46 @@ def sync_skills(root: Path, dry_run: bool = False) -> int:
         unchanged = sum(item.action == "none" for item in plan.operations)
         conflicts = len(plan.conflicts)
         print(
-            f"  done skills (plan): changed={changed} pruned={pruned} "
+            f"  done {label} (plan): changed={changed} pruned={pruned} "
             f"unchanged={unchanged} conflicts={conflicts}"
         )
         return 1 if conflicts else 0
 
     try:
-        result = apply_skills_plan(plan, render_skill_bytes)
+        result = apply_skills_plan(plan, renderer)
     except AgentRuntimeConflict as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(
-        f"  done skills: changed={result.changed} pruned={result.pruned} "
+        f"  done {label}: changed={result.changed} pruned={result.pruned} "
         f"unchanged={result.unchanged}"
     )
     return 0
+
+
+def sync_skills(root: Path, dry_run: bool = False) -> int:
+    return _sync_runtime(
+        root,
+        skills_target(),
+        render_skill_bytes,
+        owner_prefix="agents:skill:",
+        identity_prefix="agents/skills",
+        label="skills",
+        dry_run=dry_run,
+    )
+
+
+def sync_kiro_skills(root: Path, dry_run: bool = False) -> int:
+    """Kiro CLI does not consume ~/.agents, so keep a dedicated managed copy."""
+    return _sync_runtime(
+        root,
+        kiro_skills_target(),
+        render_kiro_skill_bytes,
+        owner_prefix=KIRO_SKILL_OWNER_PREFIX,
+        identity_prefix=KIRO_SKILL_IDENTITY_PREFIX,
+        label="kiro skills",
+        dry_run=dry_run,
+    )
 
 
 SHIMS: Dict[str, str] = {}
@@ -217,7 +293,7 @@ def install_shims(root: Path, dry_run: bool = False) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Sync shared agents skills to ~/.agents/skills (tool 无关)"
+        description="Sync shared agents skills to ~/.agents/skills and Kiro CLI (tool 无关)"
     )
     parser.add_argument(
         "tool",
@@ -237,6 +313,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     rc = 0
     try:
         rc = sync_skills(root, dry_run=args.dry_run)
+        if rc == 0:
+            rc = sync_kiro_skills(root, dry_run=args.dry_run)
     except SystemExit as e:
         rc = int(e.code) if e.code else 1
     except Exception as e:
