@@ -28,7 +28,7 @@ agents/
   skills/<skill-id>/SKILL.md       # 一手 skill 源（frontmatter 渲染后分发）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
-  skills-defaults.yaml             # 第三方默认 skill（npx skills add -g → ~/.agents/skills）
+  skills-defaults.yaml             # 第三方默认 skill（锁定后装到 ~/.agents/skills）
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
   env/                             # MCP / profiles / browser / security 真相源
   README.md
@@ -79,7 +79,7 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 
 skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。**Kiro CLI 是当前唯一例外**：它不读取 `~/.agents/skills`，因此同一入口会额外托管一份 `${KIRO_HOME:-~/.kiro}/skills/<id>/`，并在 `SKILL.md` 末尾补上 Kiro slash 参数占位 `$ARGUMENTS`。`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。
 
-一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过 `npx skills add <source> --skill <name> -g -y --copy` 安装到同一个 `~/.agents/skills`（不传 `-a`，避免写入各工具私有目录）。已存在的 skill 会跳过，不在每次 sync 时升级；升级用 `npx skills update -g`。缺少 npx 或网络时只警告，不阻断一手 skill 同步。
+一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过锁定目录安装到同一个 `~/.agents/skills`。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全局 `~/.agents/skills`（Kiro 例外镜像照旧）。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ```bash
 # 同步 skills（tool 无关，一次性）+ 全部工具的 MCP/env
@@ -98,11 +98,11 @@ scripts/config.sh agents
 共享 sync：`dotf agents -c [--tool <name>]`（`--tool` 只过滤 MCP/env）。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `dsh`（DeepSeek Harness CLI，bin: `dsh`）：MCP client 配置在 profile 内，不参与 agents/env 聚合（env_sync 为 skip stub）。安装走 `dotf dsh -i`。
 
-**不要手改** `~/.agents/skills/` 或 `${KIRO_HOME:-~/.kiro}/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`。
+**不要手改** `~/.agents/skills/` 或 `${KIRO_HOME:-~/.kiro}/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。
 
 ## 示例条目
 
-仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`dotf-ui-design`（UI Engineering 薄路由：frontend-design 走全局 defaults，其余 4 条能力 skill 为内部引用）、`task-design`（复杂任务可选设计环节）、`task-grill`（taskflow 链路上 explore 与 propose 之间的可选收敛）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 请用各工具 CLI 初始化，不必放进本目录；`taskflow` 在已安装时委托它们。
+仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`dotf-ui-design`（UI Engineering 薄路由：frontend-design 走全局 defaults，其余 4 条能力 skill 为内部引用）、`task-design`（复杂任务可选设计环节）、`task-grill`（taskflow 链路上 explore 与 propose 之间的可选收敛）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 由 `dotf agents -c` 默认装到全局 `~/.agents/skills`（`openspec init --tools agents`），不必写入本目录或各项目 `.cursor/skills`；`taskflow` 在已安装时委托它们。
 
 第三方默认（`agents/skills-defaults.yaml`，`npx skills add -g`）：`archify`（`tt-a1i/archify`）、`browser-use`（`browser-use/browser-use`）、`frontend-design`（`anthropics/skills`）、`skill-creator`（`anthropics/skills`）、`ui-ux-pro-max`（`nextlevelbuilder/ui-ux-pro-max-skill`）。多 skill 仓库只装点名的那一项，不会 `--all`。
 

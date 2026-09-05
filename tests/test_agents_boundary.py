@@ -213,4 +213,5 @@ def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
     )
     assert r.returncode == 0, r.stderr + r.stdout
     assert f"==> sync kiro skills → {tmp_home / '.kiro' / 'skills'}" in r.stdout
+    assert "--- openspec skills ---" in r.stdout
     assert (tmp_home / ".kiro" / "skills" / "task-design" / "SKILL.md").is_file()

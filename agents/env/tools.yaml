@@ -49,7 +49,7 @@ tools:
     version_cmd: ["openspec", "--version"]
     required: false
     profiles: [coding, research, browser, full]
-    install_hint: "安装 OpenSpec CLI（见项目文档）"
+    install_hint: "安装 OpenSpec CLI（dotf npm -i）；skills 由 dotf agents -c 装到 ~/.agents/skills"
 
   grepom:
     command: grepom

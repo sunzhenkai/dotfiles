@@ -61,6 +61,31 @@ def test_skills_plan_reports_all_states_managed_counts_and_safe_conflict_hint(
     assert "禁止静默覆盖" in local.hint
 
 
+def test_openspec_skills_doctor_skips_warns_and_passes(
+    tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = _report()
+    monkeypatch.setattr(doctor, "openspec_command", lambda: None)
+    doctor.check_openspec_skills(report, home=tmp_home)
+    skipped = next(item for item in report.items if item.id == "openspec-cli")
+    assert skipped.status == doctor.STATUS_SKIP
+
+    report = _report()
+    monkeypatch.setattr(doctor, "openspec_command", lambda: Path("/usr/bin/true"))
+    doctor.check_openspec_skills(report, home=tmp_home)
+    missing = next(item for item in report.items if item.id == "openspec-global")
+    assert missing.status == doctor.STATUS_WARN
+    assert "dotf agents -c" in missing.hint
+
+    target = tmp_home / ".agents" / "skills" / "openspec-propose" / "SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("---\nname: openspec-propose\ndescription: d\n---\n", encoding="utf-8")
+    report = _report()
+    doctor.check_openspec_skills(report, home=tmp_home)
+    present = next(item for item in report.items if item.id == "openspec-global")
+    assert present.status == doctor.STATUS_PASS
+
+
 def test_mcp_plan_reports_all_states_malformed_counts_and_pinned_runtime(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

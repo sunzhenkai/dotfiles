@@ -138,10 +138,10 @@ cases:
     kind: failure
     judge: deterministic
     description: openspec-* 不可用时停下报告，不发明等价命令
-    given: 目标仓没有 openspec-* skill
+    given: 当前环境没有 openspec-* skill
     expect:
       must:
-        - 停下并给出可选项（在目标仓 init，或 openspec CLI 直调）
+        - 停下并给出可选项（dotf agents -c 或 openspec init --tools agents 装到全局，或 openspec CLI 直调）
       must_not:
         - 自行发明等价命令并继续
 

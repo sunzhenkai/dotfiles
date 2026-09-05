@@ -30,12 +30,14 @@ from adapters import adapter_for  # noqa: E402
 from common import Catalog, TOOLS  # noqa: E402
 from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
 from mcp_runtime import read_manifest as read_mcp_manifest  # noqa: E402
+from openspec_skills import openspec_command  # noqa: E402
 from sync import (  # noqa: E402
     KIRO_SKILL_IDENTITY_PREFIX,
     KIRO_SKILL_OWNER_PREFIX,
     kiro_skills_target,
     render_kiro_skill_bytes,
     render_skill_bytes,
+    skills_target,
 )
 from sync_plan import compile_sync_plan  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
@@ -400,6 +402,30 @@ def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_hom
         target_root=kiro_skills_target(),
         owner_prefix=KIRO_SKILL_OWNER_PREFIX,
         label="kiro",
+    )
+
+
+def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
+    """OpenSpec CLI skills are installed globally, not per project."""
+    if openspec_command() is None:
+        report.add(
+            "skills",
+            "openspec-cli",
+            STATUS_SKIP,
+            "openspec CLI 未安装，跳过全局 OpenSpec skills 检查",
+            "dotf npm -i",
+        )
+        return
+    propose = skills_target(home) / "openspec-propose" / "SKILL.md"
+    if propose.is_file() and not propose.is_symlink():
+        report.add("skills", "openspec-global", STATUS_PASS, f"OpenSpec skills 已安装到 {propose.parent.parent}")
+        return
+    report.add(
+        "skills",
+        "openspec-global",
+        STATUS_WARN,
+        f"openspec CLI 已安装，但全局缺少 {propose}",
+        "运行 dotf agents -c 将 OpenSpec skills 装到 ~/.agents/skills",
     )
 
 
@@ -1014,6 +1040,7 @@ def build_report(args: argparse.Namespace) -> DoctorReport:
     _safe_check(report, "tools", "runtime-tools", lambda: check_tools(cat, report, profile))
     _safe_check(report, "mcp", "sync-plan-unavailable", lambda: check_mcp_plan(cat, report, profile, args.tool, args.deep, home=home))
     _safe_check(report, "skills", "sync-plan-unavailable", lambda: check_skills_plan(root, report, home=home))
+    _safe_check(report, "skills", "openspec-unavailable", lambda: check_openspec_skills(report, home=home))
     _safe_check(report, "browser", "browser-unavailable", lambda: check_browser(cat, report, profile, args.deep))
     _safe_check(report, "security", "registry-boundaries-unavailable", lambda: check_config_boundaries(root, report, home=home))
     _safe_check(report, "security", "declared-formats-unavailable", lambda: check_declared_formats(root, report, home=home))
