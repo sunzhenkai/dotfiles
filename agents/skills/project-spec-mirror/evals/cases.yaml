@@ -5,7 +5,7 @@ cases:
     kind: basic
     judge: deterministic
     description: 机械工作只通过 specctl；stdout JSON，退出码 0/1/2
-    given: 需要探测、init、清单、coverage、diff、回写同步指针或校验骨架
+    given: 需要探测、init、status、diff、route 或 finalize
     expect:
       must:
         - 使用 $SPECCTL（PATH 上的 specctl 或 scripts/specctl.py）
@@ -21,7 +21,7 @@ cases:
     given: 用户只说维护 spec 镜像，未写 init/build/update/maintain/status
     expect:
       must:
-        - 无镜像 → init；build_status=skeleton → build；build_status=built → update；只改词条 → maintain
+        - 无镜像 → init；skeleton 且 layout=current → build；built 且 layout=current → update；layout=legacy → rebuild
         - 旧镜像缺 build_status 时，有 synced_commit 视为 built，否则视为 skeleton
         - 用一行说明该推断
       must_not:
@@ -36,9 +36,10 @@ cases:
       must:
         - 先跑 init 且不带 --confirm
         - 退出码 2 时展示 spec_root / source / placement，用返回的 confirm_args 重跑
-        - 骨架完成后进入 build，写完文件表后跑 coverage，再 set-sync 与 validate
+        - 骨架完成后进入 build，写完能力 INDEX、处理线与 source-map 后跑 finalize
       must_not:
         - 把空骨架当成已完成镜像
+        - 用 set-sync --built 绕过 finalize
         - 未确认就创建 spec 目录
 
   - id: placement-in-vs-external
@@ -64,7 +65,7 @@ cases:
     expect:
       must:
         - 无 --branch 时跟踪默认分支（origin/HEAD → main/master 回退）
-        - set-sync 写入该分支 commit，而不是未提交工作区
+        - finalize --commit 写入该分支 commit，而不是未提交工作区
         - update 用 synced_commit..目标 commit 的 diff
       must_not:
         - 把脏工作区默认为已同步
@@ -76,81 +77,104 @@ cases:
     given: build 或 update 正文已经写完，准备回写状态
     expect:
       must:
-        - 收尾用 finalize（coverage 门禁 + 回写 + 复验）；分步排查才直接用 set-sync 并自行补 coverage 与 validate
+        - 收尾只走 finalize（门禁 + 回写 built / commit）；没有对外 set-sync / validate / coverage
         - Git 源带 --commit <id>
         - 非 Git 源不带 --commit，build_status 进入 built 且 synced_commit 保持 null
-        - mode=concise 时 detail_level 为 null；mode=detailed 时为 complete|important|lightweight
-        - set-sync 写入前校验骨架，并同步 README 粒度、文件粒度、分支和 commit
+        - mode 是 briefing 或 reconstructable
+        - finalize 写入前校验骨架与内容门，并同步 README 粒度、分支和 commit
       must_not:
         - 非 Git 源写入伪造 commit
         - 骨架校验失败后仍推进 build_status 或 synced_commit
-        - 接受 concise + 非 null detail_level
 
-  - id: pyramid-knowledge-on-build
+  - id: dual-audience-on-build
     kind: core
     judge: deterministic
-    description: build 按金字塔写正文并维护概念、实体、处理线
+    description: build 写 briefing 给人读、agent spec 给复现，evidence 只做路由
     given: 骨架已在，开始 build
     expect:
       must:
-        - 先读 references/layout.md、modes.md、knowledge.md、projections.md、facets.md、diagrams.md、routing.md
-        - 从上往下写 README / overview / context / surface / data / runtime / build / facets / concepts / entities / flows / modules
-        - 模块 README 含「根」表与「文件」表
-        - 切片不必等全部契约写完
-        - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
-        - detailed 同时使用 detail_level，未指定时为 important
+        - 先读 references/layout.md；复杂图再读 diagrams.md，路由再读 routing.md
+        - 人读写入 briefing/（overview、architecture、concepts、flows、diagrams）
+        - Agent 写入 agent/INDEX.md、agent/specs/<capability>/spec.md、model/surface/data
+        - evidence/source-map.md 记录能力到源路径
+        - 粒度与 .mirror.json 的 mode 一致
       must_not:
-        - CLI 代写概述或编造流程、契约、灰度方案
-        - 下层重复上层已经说清的论点
+        - CLI 代写概述或编造 Scenario
+        - 把方法完整逻辑或源文件表写进 briefing/
         - 用手绘 SVG/Mermaid 冒充 archify 产物
         - 为范围内每个代码文件建 files/ 或 notes/
         - 给人读的正文用「Spec 镜像」「孪生规格」「不是 OpenSpec」当标题或开篇
+        - 默认生成 facets/ 或 evidence/realization/
 
-  - id: facets-and-archify
+  - id: reconstructable-capability-specs
     kind: core
     judge: deterministic
-    description: 维护适用切面；复杂业务逻辑与用户点名的图委托 archify，产物在 diagrams/
-    given: build，或用户明确要求模块地图/切片路径/状态机图
+    description: reconstructable 用 OpenSpec 形态写可换栈复现的能力契约
+    given: mode=reconstructable，开始 build
     expect:
       must:
-        - 保留 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC 入口；适用项写事实，不适用项写证据
-        - 切片生命周期从 identified 起写，不跳步假装 migrated
-        - 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）在 archify 可用时本轮交付 HTML，并链回对应 flows/ 页
-        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver，HTML 写入 diagrams/<slug>.html
-        - 线性三步或一张表已说清的步骤不硬画；其余结构/部署图多张或高成本先让用户选择
+        - 至少识别 1 条能力
+        - 每条能力有 Purpose、Requirement 与至少一条 WHEN/THEN Scenario
+        - 功能一致按 L2–L3：对外契约、不变式、关键失败，不要求同一语言或目录树
+        - 每条能力在 source-map 有至少一行
+        - 写完后跑 finalize；reconstructable 时 missing 与未映射入口必须清空
+      must_not:
+        - 把当前函数步骤或工具链写成硬性要求
+        - 用 inventory 文件覆盖代替能力覆盖
+        - 把镜像写入目标仓 openspec/
+
+  - id: briefing-no-implementation-leak
+    kind: core
+    judge: deterministic
+    description: briefing 保持总结性，禁止实现泄漏
+    given: 任意模式的 build 或 update 写 briefing 页
+    expect:
+      must:
+        - 写架构、业务流、短词表与必配图
+        - 复杂业务逻辑链到 briefing/diagrams/ 已有 HTML
+      must_not:
+        - 在 briefing/ 写源文件表、方法逐步走读、语言/包管理器版本、compose/端口/启动命令
+
+  - id: archify-for-complex-flows
+    kind: core
+    judge: deterministic
+    description: 复杂业务逻辑与用户点名的图委托 archify，产物在 briefing/diagrams/
+    given: build，或用户明确要求架构/流程/状态机图
+    expect:
+      must:
+        - 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）在 archify 可用时本轮交付 HTML，并链回对应 briefing/flows/ 页
+        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver
+        - 线性三步或一张表已说清的步骤不硬画
         - INDEX 只链已存在的 .html；init 空表可以保留
       must_not:
         - 把 archify schema 或渲染器拷进本 Skill
         - 未安装 archify 时声称交付了必配或用户要求的 HTML 图
-        - 把 PHP/Go 写死为唯一对照语言对
         - 把未执行候选写成 INDEX 占位，或把 INDEX 链到 archify Skill 目录
         - 对已经承诺或必配交付的图只写 JSON 候选
         - 用「没有图不算失败」跳过必配的复杂业务图
 
-  - id: recovery-projections-runnable
-    kind: core
+  - id: realization-and-facets-opt-in
+    kind: boundary
     judge: deterministic
-    description: 维护五层恢复投影；验收是只凭镜像能重建可运行系统
-    given: 骨架已在，开始 build 或已有镜像缺恢复投影
+    description: runtime/build 与切面不是默认产物
+    given: 普通 build，用户未要求复原当前栈或改这个仓
     expect:
       must:
-        - 保留 context/ data/ surface/（含 config.md） runtime/ build/ 的稳定 INDEX
-        - 适用能力写到可恢复；不适用能力写判断依据和证据路径
-        - 结束前做恢复完备自检（适用性、边界、表面、数据、拓扑、再生、脱敏）
-        - 缺骨架时先补这六个文件再改正文
+        - agent/surface 与 agent/data 写行为与逻辑模型
+        - 结束前做复现完备自检（能力、表面、数据、人读无泄漏、脱敏、去栈）
       must_not:
-        - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
-        - 把 contracts/runtime.md 当成部署拓扑页
+        - 默认创建 evidence/realization/ 或 facets/
+        - 把拓扑、构建命令写成复现硬性要求
         - 在核心层已有合适位置时滥用 extensions/
 
   - id: delivery-summary-fields
     kind: core
     judge: deterministic
     description: 完成时输出项目、根、粒度、分支/commit、本轮阶段与变更层
-    given: init/build/update/maintain 结束
+    given: init/build/update/rebuild 结束
     expect:
       must:
-        - 输出含项目、spec_root、concise|detailed、本轮阶段、变更层
+        - 输出含项目、spec_root、briefing|reconstructable、本轮阶段、变更层
         - git 源含分支与 short-sha；非 git 写无
       must_not: []
 
@@ -185,123 +209,57 @@ cases:
     expect:
       must:
         - 镜像中敏感原文写 <REDACTED> 并说明省略
-        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进文件表或符号说明
+        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进 source-map 或 spec
       must_not:
         - 把密钥、.env、凭据或源码密钥字面量抄进 spec
         - 自动 git commit 或 push
 
-  - id: detailed-deepens-pages-not-files-tree
-    kind: core
-    judge: deterministic
-    description: 详尽加深模块/实体/流/契约，不为每个代码文件建页
-    given: mode=detailed，开始 build 或从 concise 升级
-    expect:
-      must:
-        - 加深模块 README 的行为承载符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
-        - 模块阅读叶子是 README 文件表
-        - 测试方法只简述，complete 亦然
-        - symbols 只作候选，不声称能证明全部方法或变量完整覆盖
-      must_not:
-        - 为范围内每个代码文件建 files/ 或 notes/
-        - 把路径中的 / 拍成 __ 作为页名
-
-  - id: detailed-file-granularity-choice
-    kind: core
-    judge: deterministic
-    description: 详尽模式选择代码证据粒度，并持久化 important 写深范围
-    given: mode=detailed，开始 build 或从 concise 升级
-    expect:
-      must:
-        - 提供 complete、important、lightweight 三个选项
-        - 未指定时使用 important
-        - complete 覆盖 inventory 全部文件并深入行为承载符号；测试和纯机械文件只简述
-        - important 覆盖范围内文件，对 important_paths 写深，其余简述
-        - lightweight 代码证据轻量，但领域、流程、契约和投影仍写深
-        - 将选择保存为 detail_level，将 important 选择保存为 important_paths，并在后续 update 中沿用
-        - 写完文件表后跑 coverage；important/complete 的 missing 必须清空
-      must_not:
-        - 把 important 的核心方法只写成一句话职责
-        - 把 symbols 候选当作方法全集证明
-        - 因路径在 important_paths 就自动建立 notes/
-        - 为测试方法写完整逻辑
-        - 为每个文件建立独立规格页
-
-  - id: hotspot-notes-need-scope
-    kind: failure
-    judge: deterministic
-    description: 热点详注未给路径时先问，未同意不批量建 notes
-    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个；或 detail_level≠complete 的仓
-    expect:
-      must:
-        - 先问范围并建议切片入口
-        - 默认按约 15 个文件一批；更大具体范围需用户明确确认并说明成本
-        - detail_level=complete 必须按 modes.md 5 类触发条件清单枚举 ≥5 篇 notes/
-      must_not:
-        - 未同意就批量建 notes/（detail=complete 不在此限）
-        - 用 inventory.file_count > 80 作为是否写详页的门禁
-
   - id: update-routes-from-diff
     kind: core
     judge: deterministic
-    description: update 必须用 route 映射到模块页，不按一文件一详页对号入座
+    description: update 必须用 route 映射到能力 spec
     given: 已有 synced_commit，开始 update
     expect:
       must:
-        - 用 $SPECCTL route 把变更文件落到模块 README
-        - 跟链接改被波及的实体/处理线/切面
-        - 改完文件表后跑 coverage
+        - 用 $SPECCTL route 把变更文件落到 capabilities / pages
+        - 跟链接改被波及的处理线、模型与表面
+        - 改完 source-map 后跑 finalize
       must_not:
-        - 为每个变更源文件新建或重写 files/ 详页
+        - 为每个变更源文件新建详页
+        - 手算路由或继续写模块文件表
 
-  - id: rename-updates-file-table
+  - id: rename-updates-source-map
     kind: core
     judge: deterministic
-    description: diff status=R 时改文件表路径，不当删除加新增
+    description: diff status=R 时改 source-map 路径，不当删除加新增
     given: diff 含 status=R 的 from/path
     expect:
       must:
-        - 用 from 找旧模块行，改成新 path
-        - 已有 notes/<from>.md 则改名为 notes/<path>.md
+        - 用 from 找旧能力行，由 route 回写 source-map 新 path
       must_not:
-        - 把 rename 当成删除旧页再新增一页
+        - 把 rename 当成删除旧行再新增一行
 
-  - id: legacy-files-dir-preserved
+  - id: legacy-pyramid-preserved
     kind: boundary
     judge: deterministic
-    description: 已有 modules/*/files/ 不自动删除，本轮停更
-    given: 镜像含遗留 files/ 详页，本轮 update 或 build
+    description: 旧金字塔与恢复投影目录不自动删除，本轮停更
+    given: 镜像含遗留 modules/ facets/ runtime/ build/ 顶层
     expect:
       must:
-        - 在模块 README 注明遗留 files/ 可能过期
-        - 停更这些详页
+        - 注明遗留目录可能过期
+        - 按 references/appendix.md 补 briefing/ agent/ evidence/ 后再继续
       must_not:
-        - 未要求删除就删掉 files/
-        - 把遗留 files/ 全量搬成 notes/
-
-  - id: complete-mode-notes-mandatory
-    kind: failure
-    judge: deterministic
-    description: detail_level=complete 必须按 5 类触发条件建 notes/，不是 opt-in
-    given: specctl init 用了 --mode detailed --detail-level complete；build 进入 modules/ 阶段
-    expect:
-      must:
-        - <spec_root>/modules/<m>/notes/*.md 至少存在 5 篇
-        - 至少覆盖跨文件契约 / 一致性失败路径差异 / race 分析 / 监控盲区 / 框架宏约束 5 类触发条件中的 ≥3 类
-        - 至少 1 篇命名是 topic（易踩坑的概念）而非源相对路径
-        - 本工作区已有其他镜像时参考过其 modules/*/notes/ 主题列表对齐维度；没有可参照镜像则按 5 类触发条件自行枚举
-      must_not:
-        - 把每个源文件做成 notes/ 一页一页（"一文件一详页"反模式）
-        - 把跨文件契约、易踩坑设计选择塞进模块 README 而不是 notes/
-        - 假设 detail=complete 下 notes/ 仍 opt-in
+        - 未要求删除就删掉遗留目录
+        - 继续加深旧模块文件表
 
   - id: reject-per-file-catalog-request
     kind: failure
     judge: deterministic
-    description: 用户要逐文件详注时说明默认模型并确认具体范围与成本
+    description: 用户要逐文件详注时说明默认模型
     given: 用户点名每个文件一页、给选定范围源文件写详页
     expect:
       must:
-        - 说明模块 README 是默认阅读单位，确认具体范围、预计页数和维护成本
+        - 说明人读 briefing、细节进能力 Scenario，并确认真正目标
       must_not:
         - 把模糊请求直接扩成全库 files/ 或 notes/
 
@@ -314,24 +272,24 @@ cases:
       must:
         - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
         - inventory / diff / route / symbols 忽略 .gitignore 命中的路径与非文本文件
-        - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
-        - 邻接系统只在 context/ 记边界；包名与约束只在 build/ 点到为止
+        - source-map 与能力 spec 只覆盖当前 --source 工程自己的代码
+        - 邻接系统只在 briefing/architecture.md 记边界
       must_not:
-        - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
-        - 为 .gitignore 命中的路径或二进制资源建模块、文件表行或 notes/
-        - 把 unmapped 的三方/外来路径并入本工程模块
-        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写金字塔
+        - 为 vendor/、node_modules/ 或依赖仓源码建能力或 source-map 行
+        - 把 unmapped 的三方/外来路径并入本工程能力
+        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写镜像
 
   - id: not-openspec-not-source-edit
     kind: boundary
     judge: deterministic
-    description: 不写 OpenSpec、不改目标 project 源码
+    description: 不写目标仓 OpenSpec change、不改目标 project 源码
     given: 用户要 spec 镜像，仓库里同时有 openspec/ 或源码
     expect:
       must:
         - 只写入 detect/status 给出的 spec_root
+        - Agent 契约写在 spec_root/agent/specs/
       must_not:
-        - 写入 openspec/ 或 specs/
+        - 写入目标仓 openspec/ 或 openspec/specs/
         - 修改目标 project 的源码、测试、构建或依赖
 
   - id: occupied-spec-no-overwrite
@@ -360,28 +318,28 @@ cases:
   - id: non-git-no-commit-diff
     kind: boundary
     judge: deterministic
-    description: 非 git 源可 build/maintain，update 不能做 commit diff
+    description: 非 git 源可 build/update，update 不能做 commit diff
     given: detect/status 显示源不是 git
     expect:
       must:
-        - 仍可 init/build/maintain
-        - update 跑 coverage 对照文件表并说明限制
+        - 仍可 init/build/update
+        - status / finalize 对照 inventory 与 source-map，报新出现/消失入口
       must_not:
         - 伪造 synced_commit 或假装有分支 diff
 
-  - id: coverage-file-table-vs-inventory
+  - id: coverage-capabilities-vs-source-map
     kind: core
     judge: deterministic
-    description: 用 coverage 对照 inventory 与模块文件表，不手对清单
-    given: build 或 update 已写模块文件表，或非 git 源要做 update
+    description: 用 finalize 对照能力 INDEX、spec 与 source-map，不手对清单
+    given: build 或 update 已写能力与 source-map，或非 git 源要做 update
     expect:
       must:
-        - 跑 $SPECCTL coverage，或跑内含 coverage 门禁的 $SPECCTL finalize
-        - detailed + important/complete 时 missing 必须为空再 set-sync
-        - missing 只要求范围内代码文件；可用目录范围覆盖子路径
+        - 跑 $SPECCTL finalize（内含 coverage 门禁）
+        - reconstructable 时 missing 与未映射代码入口必须为空；至少 1 条能力
+        - 能力缺口针对缺 spec 或缺 source-map 的能力；未映射代码入口另列或写入未指定
       must_not:
         - 手对 inventory 与文件表
-        - 因 README、go.mod、CI、compose 未进文件表而失败
+        - 因 README、go.mod、CI、compose 未进 source-map 而失败
 
   - id: specctl-unit-tests
     kind: regression

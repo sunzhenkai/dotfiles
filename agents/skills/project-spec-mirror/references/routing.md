@@ -1,50 +1,17 @@
-# 更新路由：文件 → 页
+# 路由
 
-源文件是 git 的变更单位，不是规格的阅读单位。`diff` 给出改了哪些路径；本文件规定如何把它们映射到已有金字塔/切面页。
+update 必须跑 `$SPECCTL route`。不要手算，不要一文件一页。
 
-update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
+`inventory` / `diff` / `route` 忽略：gitignore、二进制、构建产物、密钥、`vendor/` `node_modules/`、嵌套 git / submodule、外来仓。这些路径不要当 `unmapped` 建能力。
 
-## 输入边界
+无有效 source-map 行 → `not_built`，应先 `build`。
 
-`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，已经丢弃这些：`.gitignore` 当前命中的路径、已知二进制扩展与内容检测为二进制的文件、构建产物与密钥、包管理器安装树（`vendor/`、`node_modules/`、虚拟环境及同类目录）、git submodule 与树内嵌套仓库、`replace` / Composer path / 同级克隆指向的外来仓。
+算法：rename 用 `from` 匹配并**回写** source-map 路径；否则精确匹配，再最长前缀。仍未命中 → `unmapped`：并入已有能力或写入 INDEX「未指定」，不得丢弃。`finalize` 在已有 `synced_commit` 时拒绝未消化的 `unmapped`。
 
-它们不是镜像输入：不要当 `unmapped` 去建模块、文件表行、`notes/`、概念或切片；CLI 万一仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束；要给那个仓做镜像，另开一次会话、切换 active target 并显式 `--source`。
-
-## 算法
-
-对 `$SPECCTL diff` 的每一条（`status` / `path`，rename 另有 `from`）：
-
-1. **Rename（`status` 为 `R`）**：用 `from` 找旧归属，把该模块文件表那一行改成 `path`。若已有 `notes/<from>.md`，改名为 `notes/<path>.md` 并更新真身。禁止当成删除 + 新增。
-2. **文件表精确匹配** `path`（rename 则先匹配 `from`）→ 落入含该行的模块。
-3. 未命中 → **最长前缀**匹配该模块 README「根」表第一列。
-4. 仍未命中 → 记入 `unmapped`：并入最近模块或新建模块，不得丢弃，也不得为此建文件详页。
-5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约 / 恢复投影。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
-6. 非代码、配置、测试：先按下方「与切面的分工」落到恢复投影或 `facets/source.md`，其次才是模块表。
-
-标题约定（与 [layout.md](layout.md) 一致，便于日后 CLI 解析）：「根」或 `Roots`；「文件」或 `Files`。不要靠扫全库反引号路径做路由（易误伤）。
-
-无模块 README（刚 init 未 build）→ `route` 返回 `not_built: true`，全部 `unmapped`，进入 `build` 而不是硬编路由。
-
-## 与切面的分工
-
-| 变更像什么 | 优先改 |
+| 变更像什么 | 改哪里 |
 |------------|--------|
-| 领域包、入口、符号 | 模块 README 文件表；跟链接的实体/处理线 |
-| 路由 / OpenAPI / proto / 消息名 | `surface/INDEX.md` 与结构契约、切片 |
-| schema / migration | `data/` 与结构契约 |
-| 配置键、`.env.example`、feature flag | `surface/config.md`；路径仍登记 SOURCE |
-| compose / 编排 / Dockerfile / 单元文件 | `runtime/` |
-| Makefile、CI、包清单、启动脚本 | `build/` |
-| 邻接客户端、网关、鉴权入口 | `context/` |
-| 测试名、断言 | VERIFY 与行为/副作用契约 |
-| 放量、发布、回滚 | `traffic.md`（无发布机制则写「无」） |
-
-切片是垂直切口，穿过多个文件。不要为切片里的每个文件建页；入口文件成为热点的条件见 [modes.md](modes.md)。
-
-## 维护时
-
-- 每个模块 README 必须有「根」表与「文件」表，否则下一步 update 无法路由。
-- 新增源文件：先落入某模块的根前缀，再补文件表一行。
-- 源文件消失：文件表删行或标明废弃；不要默默删 `<!-- manual -->`。
-- 增删后跑 `$SPECCTL coverage`；`missing` / `extra` 以 CLI 为准，不要手对清单。
-- `<!-- manual -->` 块不得覆盖。
+| 领域行为、状态机 | 能力 spec + 处理线 |
+| 路由 / 消息名 | `agent/surface/` |
+| 逻辑存储 | `agent/data/` + model |
+| 邻接 / 鉴权 | `briefing/architecture.md` |
+| compose / 工具链 | 默认忽略 |

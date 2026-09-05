@@ -1,16 +1,16 @@
-# important 把核心方法写成一句话
+# 旧详尽档把方法写成一句话（已作废）
 
 - Date: 2026-08-28
 - Kind: failure
 - Skill: project-spec-mirror
-- Context: detailed / important 写模块核心符号时，把方法层理解成「名字 + 一句话」
+- Status: superseded
+- Context: 旧模型 detailed / important 曾要求在模块页写方法步骤
 
 ## What happened
 
-Agent 补上了文件表覆盖，但仍把核心方法写成一句话职责，并漏列工具方法。测试方法在 complete 下被展开成用例步骤。
+当时文件表有了，但方法说明过短；另一极端是把测试断言逐步抄进镜像。
 
 ## Lesson
 
-- 核心方法必须梳理完整逻辑（步骤、分支、成败、副作用），不是一句话点到为止。
-- 工具方法可以简述，但必须列名，不得漏列。
-- 测试方法只简述覆盖范围；important 与 complete 都不得写断言步骤。
+- **不得**再要求 briefing 写「完整逻辑」或方法逐步走读。那是旧档位，现行禁写。
+- 可验证行为写进能力 Scenario；briefing 只保留总结。

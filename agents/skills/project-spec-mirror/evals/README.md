@@ -1,6 +1,6 @@
 # Evals
 
-本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。详尽不等于每源文件一页；相关 case 见 `detailed-deepens-pages-not-files-tree` 等。
+本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。人读不等于源文件讲义；相关 case 见 `dual-audience-on-build`、`reconstructable-capability-specs` 等。
 
 ## 怎么跑
 

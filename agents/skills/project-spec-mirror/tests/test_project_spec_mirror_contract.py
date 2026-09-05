@@ -17,14 +17,17 @@ EXPECTED = {
     "detect",
     "init",
     "status",
+    "diff",
+    "route",
+    "finalize",
+}
+
+RETIRED = {
     "git-info",
     "inventory",
     "symbols",
-    "diff",
     "coverage",
-    "route",
     "set-sync",
-    "finalize",
     "validate",
 }
 
@@ -35,6 +38,8 @@ class ContractTest(unittest.TestCase):
         text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         for name in EXPECTED:
             self.assertRegex(text, rf"`{re.escape(name)}`")
+        for name in RETIRED:
+            self.assertNotRegex(text, rf"`{re.escape(name)}`")
 
     def test_frontmatter_name(self) -> None:
         text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -56,35 +61,43 @@ class ContractTest(unittest.TestCase):
         for rel in (
             "references/layout.md",
             "references/checklist.md",
+            "references/routing.md",
+            "references/diagrams.md",
+            "references/appendix.md",
             "references/modes.md",
             "references/knowledge.md",
             "references/facets.md",
-            "references/diagrams.md",
-            "references/routing.md",
             "references/projections.md",
+            "examples/minimal-checkout.md",
         ):
             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
 
-    def test_important_briefs_not_omits(self) -> None:
-        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+    def test_dual_audience_contract(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("简述", modes)
-        self.assertIn("不得整份省略", modes)
-        self.assertNotIn("只能忽略没有业务含义的文件", modes)
-        self.assertIn("简述", skill)
-        self.assertNotIn("只能忽略无业务含义文件", skill)
+        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
+        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+        self.assertIn("briefing/", skill)
+        self.assertIn("agent/specs/", skill)
+        self.assertIn("evidence/", skill)
+        self.assertIn("reconstructable", skill)
+        self.assertIn("briefing", modes)
+        self.assertIn("reconstructable", modes)
+        self.assertIn("briefing/", layout)
+        self.assertIn("agent/specs/", layout)
+        self.assertIn("合法值只有 `briefing` | `reconstructable`", modes)
+        self.assertNotIn("detail_level", skill)
+        self.assertNotIn("`scope`", skill)
 
-    def test_important_behavior_is_deep_but_not_fake_complete(self) -> None:
-        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+    def test_briefing_forbids_implementation_leak(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("完整逻辑", modes)
-        self.assertIn("important_paths", modes)
-        self.assertIn("不是语言级完备索引", modes)
-        self.assertRegex(modes, r"测试方法\s*\|\s*只简述")
-        self.assertIn("深入行为承载符号", skill)
-        self.assertIn("测试只写覆盖意图", skill)
-        self.assertIn("不作为完备证明", skill)
-        self.assertNotIn("用返回名单核对方法不得漏列", skill)
+        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
+        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+        self.assertIn("禁写", skill)
+        self.assertIn("禁止源文件表", skill)
+        self.assertIn("方法逐步走读", skill)
+        self.assertIn("完整逻辑", skill)
+        self.assertIn("待 build", layout)
+        self.assertIn("禁写", modes)
 
     def test_secret_literals_must_redact(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -93,8 +106,6 @@ class ContractTest(unittest.TestCase):
         self.assertIn("AppKey", skill)
         self.assertIn("SecretKey", skill)
         self.assertIn("<REDACTED>", modes)
-        self.assertIn("AppKey", modes)
-        self.assertIn("SecretKey", modes)
 
     def test_reader_pages_use_project_voice(self) -> None:
         layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
@@ -128,13 +139,66 @@ class ContractTest(unittest.TestCase):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("不自动 commit / push", skill)
         self.assertIn("<REDACTED>", skill)
-        self.assertIn("不得覆盖", skill)
+        self.assertIn("禁止覆盖", skill)
         self.assertIn("外来仓", skill)
+
+    def test_facets_are_opt_in(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        facets = (SKILL_ROOT / "references" / "facets.md").read_text(encoding="utf-8")
+        appendix = (SKILL_ROOT / "references" / "appendix.md").read_text(encoding="utf-8")
+        self.assertIn("默认不生成", skill)
+        self.assertIn("默认不生成", facets)
+        self.assertIn("evidence/realization", skill)
+        self.assertIn("facets", appendix)
+
+    def test_capability_status_and_finalize_only(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
+        self.assertIn("`draft` | `ready`", skill)
+        self.assertIn("唯一能把状态写成 `built`", layout)
+        self.assertIn("layout=legacy", skill)
+        self.assertIn("rebuild", skill)
+        appendix = (SKILL_ROOT / "references" / "appendix.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("旧金字塔", appendix)
+
+    def test_shared_skill_has_no_private_project_names(self) -> None:
+        forbidden = (
+            "algogear",
+            "ali_express",
+            "feature-extraction-lib",
+            "dotf agents",
+            "dotfiles 仓",
+        )
+        roots = [
+            SKILL_ROOT / "SKILL.md",
+            SKILL_ROOT / "experience",
+            SKILL_ROOT / "evals",
+            SKILL_ROOT / "references",
+            SKILL_ROOT / "examples",
+            SKILL_ROOT / "evolutions" / "README.md",
+            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "proposal.yaml",
+            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "decision.md",
+            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "eval.md",
+        ]
+        blob = []
+        for path in roots:
+            if path.is_file():
+                blob.append(path.read_text(encoding="utf-8"))
+            else:
+                for child in path.rglob("*"):
+                    if child.is_file() and child.suffix in {".md", ".yaml", ".yml"}:
+                        blob.append(child.read_text(encoding="utf-8"))
+        text = "\n".join(blob).lower()
+        for needle in forbidden:
+            self.assertNotIn(needle.lower(), text, needle)
 
     def test_checklist_is_the_installable_selfcheck(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         checklist = (SKILL_ROOT / "references" / "checklist.md").read_text(encoding="utf-8")
         self.assertIn("references/checklist.md", skill)
         self.assertNotIn("-s agents/skills/project-spec-mirror/tests", skill)
-        for marker in ("<REDACTED>", "set-sync --built", "coverage", "archify"):
+        self.assertNotIn("set-sync --built", checklist)
+        for marker in ("<REDACTED>", "finalize", "archify", "复现抽检"):
             self.assertIn(marker, checklist)

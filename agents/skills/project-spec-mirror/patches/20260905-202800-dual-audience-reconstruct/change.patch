@@ -1,0 +1,3365 @@
+diff -ruN a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml	2026-08-30 12:34:53.262550287 +0800
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml	2026-09-05 20:32:15.752462474 +0800
+@@ -36,7 +36,7 @@
+       must:
+         - 先跑 init 且不带 --confirm
+         - 退出码 2 时展示 spec_root / source / placement，用返回的 confirm_args 重跑
+-        - 骨架完成后进入 build，写完文件表后跑 coverage，再 set-sync 与 validate
++        - 骨架完成后进入 build，写完能力 INDEX 与 source-map 后跑 coverage，再 set-sync 与 validate
+       must_not:
+         - 把空骨架当成已完成镜像
+         - 未确认就创建 spec 目录
+@@ -79,68 +79,91 @@
+         - 收尾用 finalize（coverage 门禁 + 回写 + 复验）；分步排查才直接用 set-sync 并自行补 coverage 与 validate
+         - Git 源带 --commit <id>
+         - 非 Git 源不带 --commit，build_status 进入 built 且 synced_commit 保持 null
+-        - mode=concise 时 detail_level 为 null；mode=detailed 时为 complete|important|lightweight
+-        - set-sync 写入前校验骨架，并同步 README 粒度、文件粒度、分支和 commit
++        - mode 是 briefing 或 reconstructable
++        - set-sync 写入前校验骨架，并同步 README 粒度、分支和 commit
+       must_not:
+         - 非 Git 源写入伪造 commit
+         - 骨架校验失败后仍推进 build_status 或 synced_commit
+-        - 接受 concise + 非 null detail_level
+ 
+-  - id: pyramid-knowledge-on-build
++  - id: dual-audience-on-build
+     kind: core
+     judge: deterministic
+-    description: build 按金字塔写正文并维护概念、实体、处理线
++    description: build 写 briefing 给人读、agent spec 给复现，evidence 只做路由
+     given: 骨架已在，开始 build
+     expect:
+       must:
+-        - 先读 references/layout.md、modes.md、knowledge.md、projections.md、facets.md、diagrams.md、routing.md
+-        - 从上往下写 README / overview / context / surface / data / runtime / build / facets / concepts / entities / flows / modules
+-        - 模块 README 含「根」表与「文件」表
+-        - 切片不必等全部契约写完
+-        - 粒度与 .mirror.json 的 mode 一致：detailed 加深已有页，不是每文件一页
+-        - detailed 同时使用 detail_level，未指定时为 important
++        - 先读 references/layout.md、modes.md、knowledge.md、projections.md、diagrams.md、routing.md
++        - 人读写入 briefing/（overview、architecture、concepts、flows、diagrams）
++        - Agent 写入 agent/INDEX.md、agent/specs/<capability>/spec.md、model/surface/data
++        - evidence/source-map.md 记录能力到源路径
++        - 粒度与 .mirror.json 的 mode 一致
+       must_not:
+-        - CLI 代写概述或编造流程、契约、灰度方案
+-        - 下层重复上层已经说清的论点
++        - CLI 代写概述或编造 Scenario
++        - 把方法完整逻辑或源文件表写进 briefing/
+         - 用手绘 SVG/Mermaid 冒充 archify 产物
+         - 为范围内每个代码文件建 files/ 或 notes/
+         - 给人读的正文用「Spec 镜像」「孪生规格」「不是 OpenSpec」当标题或开篇
++        - 默认生成 facets/ 或 evidence/realization/
+ 
+-  - id: facets-and-archify
++  - id: reconstructable-capability-specs
+     kind: core
+     judge: deterministic
+-    description: 维护适用切面；复杂业务逻辑与用户点名的图委托 archify，产物在 diagrams/
+-    given: build，或用户明确要求模块地图/切片路径/状态机图
++    description: reconstructable 用 OpenSpec 形态写可换栈复现的能力契约
++    given: mode=reconstructable，开始 build
+     expect:
+       must:
+-        - 保留 facets 下 SOURCE/CONTRACT/SLICE/VERIFY/TRAFFIC 入口；适用项写事实，不适用项写证据
+-        - 切片生命周期从 identified 起写，不跳步假装 migrated
+-        - 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）在 archify 可用时本轮交付 HTML，并链回对应 flows/ 页
+-        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver，HTML 写入 diagrams/<slug>.html
+-        - 线性三步或一张表已说清的步骤不硬画；其余结构/部署图多张或高成本先让用户选择
++        - 至少识别 1 条能力
++        - 每条能力有 Purpose、Requirement 与至少一条 WHEN/THEN Scenario
++        - 功能一致按 L2–L3：对外契约、不变式、关键失败，不要求同一语言或目录树
++        - 每条能力在 source-map 有至少一行
++        - 写完后跑 coverage；enforce 时 missing 必须清空
++      must_not:
++        - 把当前函数步骤或工具链写成硬性要求
++        - 用 inventory 文件覆盖代替能力覆盖
++        - 把镜像写入目标仓 openspec/
++
++  - id: briefing-no-implementation-leak
++    kind: core
++    judge: deterministic
++    description: briefing 保持总结性，禁止实现泄漏
++    given: 任意模式的 build 或 update 写 briefing 页
++    expect:
++      must:
++        - 写架构、业务流、短词表与必配图
++        - 复杂业务逻辑链到 briefing/diagrams/ 已有 HTML
++      must_not:
++        - 在 briefing/ 写源文件表、方法逐步走读、语言/包管理器版本、compose/端口/启动命令
++
++  - id: archify-for-complex-flows
++    kind: core
++    judge: deterministic
++    description: 复杂业务逻辑与用户点名的图委托 archify，产物在 briefing/diagrams/
++    given: build，或用户明确要求架构/流程/状态机图
++    expect:
++      must:
++        - 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）在 archify 可用时本轮交付 HTML，并链回对应 briefing/flows/ 页
++        - 用户明确要求图且 archify CLI 可用时，本轮加载 archify Skill，validate 后 deliver
++        - 线性三步或一张表已说清的步骤不硬画
+         - INDEX 只链已存在的 .html；init 空表可以保留
+       must_not:
+         - 把 archify schema 或渲染器拷进本 Skill
+         - 未安装 archify 时声称交付了必配或用户要求的 HTML 图
+-        - 把 PHP/Go 写死为唯一对照语言对
+         - 把未执行候选写成 INDEX 占位，或把 INDEX 链到 archify Skill 目录
+         - 对已经承诺或必配交付的图只写 JSON 候选
+         - 用「没有图不算失败」跳过必配的复杂业务图
+ 
+-  - id: recovery-projections-runnable
+-    kind: core
++  - id: realization-and-facets-opt-in
++    kind: boundary
+     judge: deterministic
+-    description: 维护五层恢复投影；验收是只凭镜像能重建可运行系统
+-    given: 骨架已在，开始 build 或已有镜像缺恢复投影
++    description: runtime/build 与切面不是默认产物
++    given: 普通 build，用户未要求复原当前栈或改这个仓
+     expect:
+       must:
+-        - 保留 context/ data/ surface/（含 config.md） runtime/ build/ 的稳定 INDEX
+-        - 适用能力写到可恢复；不适用能力写判断依据和证据路径
+-        - 结束前做恢复完备自检（适用性、边界、表面、数据、拓扑、再生、脱敏）
+-        - 缺骨架时先补这六个文件再改正文
++        - agent/surface 与 agent/data 写行为与逻辑模型
++        - 结束前做复现完备自检（能力、表面、数据、人读无泄漏、脱敏、去栈）
+       must_not:
+-        - 把存储细节写进实体页、把进程拓扑写进模块页、把配置值原文写入镜像
+-        - 把 contracts/runtime.md 当成部署拓扑页
++        - 默认创建 evidence/realization/ 或 facets/
++        - 把拓扑、构建命令写成复现硬性要求
+         - 在核心层已有合适位置时滥用 extensions/
+ 
+   - id: delivery-summary-fields
+@@ -150,7 +173,7 @@
+     given: init/build/update/maintain 结束
+     expect:
+       must:
+-        - 输出含项目、spec_root、concise|detailed、本轮阶段、变更层
++        - 输出含项目、spec_root、briefing|reconstructable、本轮阶段、变更层
+         - git 源含分支与 short-sha；非 git 写无
+       must_not: []
+ 
+@@ -185,123 +208,57 @@
+     expect:
+       must:
+         - 镜像中敏感原文写 <REDACTED> 并说明省略
+-        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进文件表或符号说明
++        - 源码里的 AppKey / SecretKey / token / password 等值不得抄进 source-map 或 spec
+       must_not:
+         - 把密钥、.env、凭据或源码密钥字面量抄进 spec
+         - 自动 git commit 或 push
+ 
+-  - id: detailed-deepens-pages-not-files-tree
+-    kind: core
+-    judge: deterministic
+-    description: 详尽加深模块/实体/流/契约，不为每个代码文件建页
+-    given: mode=detailed，开始 build 或从 concise 升级
+-    expect:
+-      must:
+-        - 加深模块 README 的行为承载符号（核心方法写完整逻辑）、实体字段、处理线步骤、可追溯契约
+-        - 模块阅读叶子是 README 文件表
+-        - 测试方法只简述，complete 亦然
+-        - symbols 只作候选，不声称能证明全部方法或变量完整覆盖
+-      must_not:
+-        - 为范围内每个代码文件建 files/ 或 notes/
+-        - 把路径中的 / 拍成 __ 作为页名
+-
+-  - id: detailed-file-granularity-choice
+-    kind: core
+-    judge: deterministic
+-    description: 详尽模式选择代码证据粒度，并持久化 important 写深范围
+-    given: mode=detailed，开始 build 或从 concise 升级
+-    expect:
+-      must:
+-        - 提供 complete、important、lightweight 三个选项
+-        - 未指定时使用 important
+-        - complete 覆盖 inventory 全部文件并深入行为承载符号；测试和纯机械文件只简述
+-        - important 覆盖范围内文件，对 important_paths 写深，其余简述
+-        - lightweight 代码证据轻量，但领域、流程、契约和投影仍写深
+-        - 将选择保存为 detail_level，将 important 选择保存为 important_paths，并在后续 update 中沿用
+-        - 写完文件表后跑 coverage；important/complete 的 missing 必须清空
+-      must_not:
+-        - 把 important 的核心方法只写成一句话职责
+-        - 把 symbols 候选当作方法全集证明
+-        - 因路径在 important_paths 就自动建立 notes/
+-        - 为测试方法写完整逻辑
+-        - 为每个文件建立独立规格页
+-
+-  - id: hotspot-notes-need-scope
+-    kind: failure
+-    judge: deterministic
+-    description: 热点详注未给路径时先问，未同意不批量建 notes
+-    given: 用户要热点详注或「给这些文件写细」，未给路径或候选将超过 15 个；或 detail_level≠complete 的仓
+-    expect:
+-      must:
+-        - 先问范围并建议切片入口
+-        - 默认按约 15 个文件一批；更大具体范围需用户明确确认并说明成本
+-        - detail_level=complete 必须按 modes.md 5 类触发条件清单枚举 ≥5 篇 notes/
+-      must_not:
+-        - 未同意就批量建 notes/（detail=complete 不在此限）
+-        - 用 inventory.file_count > 80 作为是否写详页的门禁
+-
+   - id: update-routes-from-diff
+     kind: core
+     judge: deterministic
+-    description: update 必须用 route 映射到模块页，不按一文件一详页对号入座
++    description: update 必须用 route 映射到能力 spec
+     given: 已有 synced_commit，开始 update
+     expect:
+       must:
+-        - 用 $SPECCTL route 把变更文件落到模块 README
+-        - 跟链接改被波及的实体/处理线/切面
+-        - 改完文件表后跑 coverage
++        - 用 $SPECCTL route 把变更文件落到 capabilities / pages
++        - 跟链接改被波及的处理线、模型与表面
++        - 改完 source-map 后跑 coverage
+       must_not:
+-        - 为每个变更源文件新建或重写 files/ 详页
++        - 为每个变更源文件新建详页
++        - 手算路由或继续写模块文件表
+ 
+-  - id: rename-updates-file-table
++  - id: rename-updates-source-map
+     kind: core
+     judge: deterministic
+-    description: diff status=R 时改文件表路径，不当删除加新增
++    description: diff status=R 时改 source-map 路径，不当删除加新增
+     given: diff 含 status=R 的 from/path
+     expect:
+       must:
+-        - 用 from 找旧模块行，改成新 path
+-        - 已有 notes/<from>.md 则改名为 notes/<path>.md
++        - 用 from 找旧能力行，改成新 path
+       must_not:
+-        - 把 rename 当成删除旧页再新增一页
++        - 把 rename 当成删除旧行再新增一行
+ 
+-  - id: legacy-files-dir-preserved
++  - id: legacy-pyramid-preserved
+     kind: boundary
+     judge: deterministic
+-    description: 已有 modules/*/files/ 不自动删除，本轮停更
+-    given: 镜像含遗留 files/ 详页，本轮 update 或 build
++    description: 旧金字塔与恢复投影目录不自动删除，本轮停更
++    given: 镜像含遗留 modules/ facets/ runtime/ build/ 顶层
+     expect:
+       must:
+-        - 在模块 README 注明遗留 files/ 可能过期
+-        - 停更这些详页
++        - 注明遗留目录可能过期
++        - 按新树补 briefing/ agent/ evidence/ 后再继续
+       must_not:
+-        - 未要求删除就删掉 files/
+-        - 把遗留 files/ 全量搬成 notes/
+-
+-  - id: complete-mode-notes-mandatory
+-    kind: failure
+-    judge: deterministic
+-    description: detail_level=complete 必须按 5 类触发条件建 notes/，不是 opt-in
+-    given: specctl init 用了 --mode detailed --detail-level complete；build 进入 modules/ 阶段
+-    expect:
+-      must:
+-        - <spec_root>/modules/<m>/notes/*.md 至少存在 5 篇
+-        - 至少覆盖跨文件契约 / 一致性失败路径差异 / race 分析 / 监控盲区 / 框架宏约束 5 类触发条件中的 ≥3 类
+-        - 至少 1 篇命名是 topic（易踩坑的概念）而非源相对路径
+-        - 本工作区已有其他镜像时参考过其 modules/*/notes/ 主题列表对齐维度；没有可参照镜像则按 5 类触发条件自行枚举
+-      must_not:
+-        - 把每个源文件做成 notes/ 一页一页（"一文件一详页"反模式）
+-        - 把跨文件契约、易踩坑设计选择塞进模块 README 而不是 notes/
+-        - 假设 detail=complete 下 notes/ 仍 opt-in
++        - 未要求删除就删掉遗留目录
++        - 继续加深旧模块文件表
+ 
+   - id: reject-per-file-catalog-request
+     kind: failure
+     judge: deterministic
+-    description: 用户要逐文件详注时说明默认模型并确认具体范围与成本
++    description: 用户要逐文件详注时说明默认模型
+     given: 用户点名每个文件一页、给选定范围源文件写详页
+     expect:
+       must:
+-        - 说明模块 README 是默认阅读单位，确认具体范围、预计页数和维护成本
++        - 说明人读 briefing、细节进能力 Scenario，并确认真正目标
+       must_not:
+         - 把模糊请求直接扩成全库 files/ 或 notes/
+ 
+@@ -314,24 +271,24 @@
+       must:
+         - inventory / diff / route 忽略三方安装树与嵌套 git / submodule
+         - inventory / diff / route / symbols 忽略 .gitignore 命中的路径与非文本文件
+-        - 模块、文件表、notes/、概念与切片只覆盖当前 --source 工程自己的代码
+-        - 邻接系统只在 context/ 记边界；包名与约束只在 build/ 点到为止
++        - source-map 与能力 spec 只覆盖当前 --source 工程自己的代码
++        - 邻接系统只在 briefing/architecture.md 记边界
+       must_not:
+-        - 为 vendor/、node_modules/ 或依赖仓源码建模块、文件表行或 notes/
+-        - 为 .gitignore 命中的路径或二进制资源建模块、文件表行或 notes/
+-        - 把 unmapped 的三方/外来路径并入本工程模块
+-        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写金字塔
++        - 为 vendor/、node_modules/ 或依赖仓源码建能力或 source-map 行
++        - 把 unmapped 的三方/外来路径并入本工程能力
++        - 在本次会话跟随 replace / path / 同级克隆去给依赖仓写镜像
+ 
+   - id: not-openspec-not-source-edit
+     kind: boundary
+     judge: deterministic
+-    description: 不写 OpenSpec、不改目标 project 源码
++    description: 不写目标仓 OpenSpec change、不改目标 project 源码
+     given: 用户要 spec 镜像，仓库里同时有 openspec/ 或源码
+     expect:
+       must:
+         - 只写入 detect/status 给出的 spec_root
++        - Agent 契约写在 spec_root/agent/specs/
+       must_not:
+-        - 写入 openspec/ 或 specs/
++        - 写入目标仓 openspec/ 或 openspec/specs/
+         - 修改目标 project 的源码、测试、构建或依赖
+ 
+   - id: occupied-spec-no-overwrite
+@@ -365,23 +322,23 @@
+     expect:
+       must:
+         - 仍可 init/build/maintain
+-        - update 跑 coverage 对照文件表并说明限制
++        - update 跑 coverage 并说明限制
+       must_not:
+         - 伪造 synced_commit 或假装有分支 diff
+ 
+-  - id: coverage-file-table-vs-inventory
++  - id: coverage-capabilities-vs-source-map
+     kind: core
+     judge: deterministic
+-    description: 用 coverage 对照 inventory 与模块文件表，不手对清单
+-    given: build 或 update 已写模块文件表，或非 git 源要做 update
++    description: 用 coverage 对照能力 INDEX、spec 与 source-map，不手对清单
++    given: build 或 update 已写能力与 source-map，或非 git 源要做 update
+     expect:
+       must:
+         - 跑 $SPECCTL coverage，或跑内含 coverage 门禁的 $SPECCTL finalize
+-        - detailed + important/complete 时 missing 必须为空再 set-sync
+-        - missing 只要求范围内代码文件；可用目录范围覆盖子路径
++        - reconstructable 时 missing 必须为空再 set-sync；至少 1 条能力
++        - missing 针对缺 spec 或缺 source-map 的能力，不是 inventory 文件
+       must_not:
+         - 手对 inventory 与文件表
+-        - 因 README、go.mod、CI、compose 未进文件表而失败
++        - 因 README、go.mod、CI、compose 未进 source-map 而失败
+ 
+   - id: specctl-unit-tests
+     kind: regression
+diff -ruN a/agents/skills/project-spec-mirror/evals/README.md b/agents/skills/project-spec-mirror/evals/README.md
+--- a/agents/skills/project-spec-mirror/evals/README.md	2026-08-28 14:21:06.845669161 +0800
++++ b/agents/skills/project-spec-mirror/evals/README.md	2026-09-05 20:32:33.416522176 +0800
+@@ -1,6 +1,6 @@
+ # Evals
+ 
+-本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。详尽不等于每源文件一页；相关 case 见 `detailed-deepens-pages-not-files-tree` 等。
++本 Skill 的可验证成功标准。任务完成前对照 `cases.yaml` 检查关键输出与约束。人读不等于源文件讲义；相关 case 见 `dual-audience-on-build`、`reconstructable-capability-specs` 等。
+ 
+ ## 怎么跑
+ 
+diff -ruN a/agents/skills/project-spec-mirror/references/checklist.md b/agents/skills/project-spec-mirror/references/checklist.md
+--- a/agents/skills/project-spec-mirror/references/checklist.md	2026-08-30 12:34:53.262550287 +0800
++++ b/agents/skills/project-spec-mirror/references/checklist.md	2026-09-05 20:29:18.735876215 +0800
+@@ -1,42 +1,40 @@
+ # 交卷前自检
+ 
+-镜像写完、准备给回执之前对照本表，只核对本轮真正涉及的组：init 不必看 update 那组。任一条不满足就先修输出。
++镜像写完、准备给回执之前对照本表，只核对本轮真正涉及的组。任一条不满足就先修输出。
+ 
+ 本文件随 Skill 安装分发，是运行现场唯一能读到的自检表。源仓库里另有 `evals/cases.yaml` 的完整回归集，只在维护本 Skill 时使用。
+ 
+ ## 安全与边界（每轮都核对）
+ 
+-- 密钥、token、password、AccessKey、连接串等**值**在镜像里写成 `<REDACTED>`，回执里说明省略了什么。字段名与注入方式可以照写。
++- 密钥、token、password、AccessKey、连接串等**值**在镜像里写成 `<REDACTED>`，回执里说明省略了什么。
+ - 没有自动 `git commit` 或 `push`。
+-- 只写入 `detect` / `status` 给出的 `spec_root`，没有碰 `openspec/`、目标源码、测试或构建文件。
+-- `vendor/`、`node_modules/`、submodule 与外来仓的文件没有进模块、文件表或 `notes/`。邻接系统只在 `context/` 记边界。
++- 只写入 `detect` / `status` 给出的 `spec_root`，没有碰目标仓的 `openspec/`、源码、测试或构建文件。
++- `vendor/`、`node_modules/`、submodule 与外来仓的文件没有进 source-map 或能力 spec 的实现细节。
+ - `<!-- manual -->` 块原样保留。
+ 
+ ## 状态机
+ 
+-- CLI 退出码 2 时原样报告了 `prompt` / `confirm_args`，等用户同意才用 CLI 给的参数重跑，没有自行扩权。
+-- 收尾走的是 `$SPECCTL finalize`（coverage 门禁 → 回写状态 → 复验，一条命令）。要分步排查而直接用 `set-sync --built` 时，自己补上前后的 `coverage` 与 `validate`。
+-- 非 Git 源的 `synced_commit` 仍是 `null`，没有伪造 commit 或分支 diff。
+-- `mode=concise` 时 `detail_level` 为 `null`；`detailed` 时是 `complete` / `important` / `lightweight` 之一。
+-
+-## 粒度
+-
+-- 详尽是在同一批页上写深，不是给每个源文件建页；没有新建 `files/`，也没有把路径里的 `/` 拍成 `__` 当页名。
+-- `important`：范围内文件都出现在文件表，`important_paths` 命中的写到完整逻辑（有序步骤、关键分支、成败如何结束、副作用），其余简述。
+-- `complete`：inventory 里每个文件都有模块归属；`modules/*/notes/` 至少 5 篇、覆盖至少 3 个模块，按 [modes.md](modes.md) 的 5 类触发条件枚举，至少 1 篇用 topic 命名。
+-- 测试方法只写覆盖意图，`complete` 也一样。
+-- `symbols` 的输出当候选用，没有据此声称方法覆盖完备。
++- CLI 退出码 2 时原样报告了 `prompt` / `confirm_args`，等用户同意才用 CLI 给的参数重跑。
++- 收尾走的是 `$SPECCTL finalize`（coverage 门禁 → 回写状态 → 复验）。要分步排查而直接用 `set-sync --built` 时，自己补上前后的 `coverage` 与 `validate`。
++- 非 Git 源的 `synced_commit` 仍是 `null`，没有伪造 commit。
++- `mode` 是 `briefing` 或 `reconstructable`。
++
++## 双读者
++
++- 人读入口是 `briefing/`：总览、架构、处理线、图。没有把方法完整逻辑或文件表写进 briefing。
++- Agent 复现入口是 `agent/specs/`，格式是 Purpose / Requirement / Scenario。
++- `evidence/source-map.md` 只用于路由，回执没有把它当成给人读的说明书。
++- 没有默认生成 `facets/` 或 `evidence/realization/`，除非用户本轮明确要求。
+ 
+ ## 路由与覆盖
+ 
+-- 每个模块 README 都有「根」表和「文件」表，标题就是「根」「文件」或 `Roots` / `Files`——`route` 靠这两个标题解析，改了名下一轮 update 会失去路由。
+-- update 改的页来自 `$SPECCTL route` 的结果，不是手算。`status=R` 改文件表里那一行的路径，不是删一行再加一行。
+-- 文件表改完跑了 `$SPECCTL coverage`；`enforce` 为真时 `missing` 已清空。
++- update 改的页来自 `$SPECCTL route` 的 `capabilities` / `pages`，不是手算。`status=R` 改 source-map 那一行。
++- 能力表改完跑了 `$SPECCTL coverage`；`enforce` 为真时 `missing` 已清空。
++- `reconstructable`：至少 1 条能力，每条有 spec 与 source-map 行；built 后 spec 含 Requirement 与 Scenario。
+ 
+ ## 交付
+ 
+-- 恢复投影五层（`context` / `data` / `surface` / `runtime` / `build`）里适用的写到可恢复，不适用的写了判断证据，而不是留空。
+-- 复杂业务逻辑（分叉、补偿、状态机、跨模块时序、非平凡数据路径）有 archify HTML 并链回对应 `flows/` 页；archify 不可用时在回执里列为阻塞，没有生成假 HTML 或占位文字。
+-- `diagrams/INDEX.md` 只链已经存在的 `.html`。
++- 复杂业务逻辑有 archify HTML 并链回对应 `briefing/flows/` 页；archify 不可用时在回执里列为阻塞，没有生成假 HTML。
++- `briefing/diagrams/INDEX.md` 只链已经存在的 `.html`。
+ - 给人读的页面用项目自己的语言：标题是项目名或该页主题，正文没有「Spec 镜像」「孪生规格」「不是 OpenSpec」这类制作过程用语。
+-- 回执含项目、`spec_root`、粒度、分支与 commit（非 Git 写无）、本轮阶段、改了哪些层。
++- 回执含项目、`spec_root`、粒度（briefing|reconstructable）、分支与 commit（非 Git 写无）、本轮阶段、改了哪些层。
+diff -ruN a/agents/skills/project-spec-mirror/references/diagrams.md b/agents/skills/project-spec-mirror/references/diagrams.md
+--- a/agents/skills/project-spec-mirror/references/diagrams.md	2026-08-30 12:05:34.480141915 +0800
++++ b/agents/skills/project-spec-mirror/references/diagrams.md	2026-09-05 20:32:31.470515590 +0800
+@@ -1,53 +1,52 @@
+ # 图表（archify）
+ 
+-镜像里的结构图、流程图、时序、数据流、状态机都委托 skill `archify` 生成。手绘 SVG/Mermaid 不算 archify 产物——记法和校验规则不同，混进来的图下一轮没法再被 validate。同理，archify 的 schema 与渲染器留在它那边，不要拷进本 Skill。
++镜像里的结构图、流程图、时序、数据流、状态机都委托 skill `archify` 生成，产物放 `briefing/diagrams/`。手绘 SVG/Mermaid 不算 archify 产物。不要把 archify 的 schema 或渲染器拷进本 Skill。
+ 
+-- 上游： [tt-a1i/archify](https://github.com/tt-a1i/archify)（入口 `archify/SKILL.md`）
+-- 安装：`dotf agents -c` 会按 `agents/skills-defaults.yaml` 装到 `~/.agents/skills`；环境还没有时也可手动 `npx skills add tt-a1i/archify -g -y --copy`
++- 上游： [tt-a1i/archify](https://github.com/tt-a1i/archify)
++- 安装：`dotf agents -c` 会按 `agents/skills-defaults.yaml` 装到 `~/.agents/skills`；也可手动 `npx skills add tt-a1i/archify -g -y --copy`
+ - 类型：`architecture` | `workflow` | `sequence` | `dataflow` | `lifecycle`
+-- 产物：自包含 HTML 放到 `<spec_root>/diagrams/<slug>.html`；JSON 候选与 HTML 同目录、同 slug（如 `<slug>.json`），便于下次差分。只有 JSON、没有 HTML，不算交付
+-- `diagrams/INDEX.md`：图 / 类型 / 回答什么问题 / 链到**已经存在的** `.html`。init 骨架可以是空表——空表是诚实的；写成待办清单或链到 archify 的 Skill 目录，会让读者以为有图可看
++- 产物：自包含 HTML 放到 `<spec_root>/briefing/diagrams/<slug>.html`；JSON 候选与 HTML 同目录、同 slug。只有 JSON、没有 HTML，不算交付；不能只留 JSON
++- `briefing/diagrams/INDEX.md`：图 / 类型 / 回答什么问题 / 链到**已经存在的** `.html`。init 骨架可以是空表
++
++旧镜像若图仍在顶层 `diagrams/`：停更、不删；本轮新图写到 `briefing/diagrams/`，INDEX 可链过去。
+ 
+ ## 何时画
+ 
+-图表解释的是角色、分叉、状态和时序这几类关系。读者只靠有序列表或表格会跟丢它们时，文字就不够了。反过来，图不是完成度装饰：给每个模块硬画一张结构图，只会稀释真正重要的那几张。
++图表解释角色、分叉、状态和时序。读者只靠列表会跟丢时才需要图。图是人读主产物之一，不是完成度装饰。
+ 
+ **本轮必须交付**（archify 可用时写出 HTML；不可用则在完成摘要列为未完成）：
+ 
+ - 复杂业务逻辑：分叉、补偿、重试、多角色协作、状态机、一次请求跨多个模块/服务、非平凡数据路径。
+-- overview 点名的主处理线，凡满足上列之一，配图并链回该 `flows/` 页。
++- overview 点名的主处理线，凡满足上列之一，配图并链回该 `briefing/flows/` 页。
+ - 用户明确要求的某张图，或“把架构/流程可视化”。
+ 
+ **可以省略：**
+ 
+-- 线性三步、一张表已经说清的模块清单、没有分叉的 CRUD。
+-- 其余结构/部署图：比表格有明显增益且成本低就随 build 交付；多张或高成本先问用户。
++- 线性三步、一张表已经说清的能力清单、没有分叉的 CRUD。
++- 其余结构图：比表格有明显增益且成本低就随 build 交付；多张或高成本先问用户。
+ 
+-「没有图不算失败」这句是给上面这类可省略的图留的余地，不适用于必配图；复杂业务逻辑缺图时，读者手里就只剩一份读不懂的流程。overview 与切片页只链接已存在的图，不在 Markdown 里重复绘制，也不留占位。
++「没有图不算失败」只适用于可省略的图。复杂业务逻辑缺图时，人读层不合格。overview 只链接已存在的图，不在 Markdown 里重复绘制，也不留占位。
+ 
+ ## 执行
+ 
+-1. 读本文件后 **加载并遵循已安装的 `archify` Skill**，按它的 schema/validate/deliver 走；本文件不是它的替代品。宿主会话的 skill 列表里没有 `archify` **不等于未安装**：`Read ~/.agents/skills/archify/SKILL.md`（或 `dotf agents -c` 装到的同等路径），在本轮同一会话按其流程写 JSON、`validate`、`deliver`。
+-2. 图里的组件、调用、状态都要能追溯到当前镜像的 SOURCE / 模块 / 切片。为了好看发明一条拓扑，等于把读者引向一个不存在的系统。
+-3. 在 archify Skill 根目录执行（输出路径用镜像里的绝对或相对路径）：
++1. 读本文件后 **加载并遵循已安装的 `archify` Skill**。宿主会话列表里没有 `archify` **不等于未安装**：`Read ~/.agents/skills/archify/SKILL.md`（或同等路径）。
++2. 图里的组件、调用、状态都要能追溯到当前镜像的能力 / 处理线 / 表面。为了好看发明一条拓扑，等于把读者引向一个不存在的系统。
++3. 在 archify Skill 根目录执行：
+ 
+    ```bash
+-   node bin/archify.mjs validate <type> <spec_root>/diagrams/<slug>.json --json
+-   node bin/archify.mjs deliver <type> <spec_root>/diagrams/<slug>.json <spec_root>/diagrams/<slug>.html --json
++   node bin/archify.mjs validate <type> <spec_root>/briefing/diagrams/<slug>.json --json
++   node bin/archify.mjs deliver <type> <spec_root>/briefing/diagrams/<slug>.json <spec_root>/briefing/diagrams/<slug>.html --json
+    ```
+ 
+-   质量档次、参数以 archify Skill 为准。非零退出不算已交付。
+-4. 判定**未安装**的依据是：找不到 `archify/SKILL.md`、找不到 `bin/archify.mjs`，或 node 跑不起来。必配图或用户点名的图因此交不出来时，在完成摘要写明阻塞，INDEX 保持空表或只留已有 HTML。生成假 HTML、或者声称这些复杂逻辑已经讲清，比缺图更糟。
+-5. 可省略的结构/部署图本轮不做就不做，不在 INDEX 或正文留“暂未生成”占位，只在对话里说明取舍。已经承诺或按上节必须交付的图要有 HTML，不能只留 JSON。
+-
+-## 与切面的对应
+-
+-| 要回答的问题 | 优先类型 |
+-|--------------|----------|
+-| 系统与邻接、信任边界 | `architecture`（链到 `context/`） |
+-| 模块、边界、依赖 | `architecture` |
+-| 进程、部署、网络 | `architecture`（链到 `runtime/`） |
+-| 切片或发布步骤 | `workflow` |
+-| 一次请求/调用链 | `sequence` |
+-| 管道、血缘、存储 | `dataflow`（链到 `data/`） |
+-| 状态、重试、终态 | `lifecycle` |
++4. 找不到 `archify/SKILL.md`、`bin/archify.mjs` 或 node 跑不起来：必配图在完成摘要写明阻塞，INDEX 保持空表或只留已有 HTML。禁止假 HTML。
++5. 可省略的图本轮不做就不做，不在 INDEX 留“暂未生成”。
++
++## 与各层的对应
++
++| 要回答的问题 | 优先类型 | 链到 |
++|--------------|----------|------|
++| 系统与邻接、信任边界 | `architecture` | `briefing/architecture.md` |
++| 能力如何拼在一起 | `architecture` | `briefing/overview.md` |
++| 一次业务怎么走 | `workflow` / `sequence` | `briefing/flows/` |
++| 管道、血缘 | `dataflow` | `agent/data/` |
++| 状态、重试、终态 | `lifecycle` | 对应能力 spec 与处理线 |
+diff -ruN a/agents/skills/project-spec-mirror/references/facets.md b/agents/skills/project-spec-mirror/references/facets.md
+--- a/agents/skills/project-spec-mirror/references/facets.md	2026-08-30 02:21:20.399107721 +0800
++++ b/agents/skills/project-spec-mirror/references/facets.md	2026-09-05 20:28:58.453810655 +0800
+@@ -1,89 +1,19 @@
+-# 工程切面
++# 工程切面（非默认）
+ 
+-金字塔（概念 / 实体 / 处理线 / 模块）回答「这是什么」。恢复投影（`context/` `data/` `surface/` `runtime/` `build/`）回答「只凭镜像能否重建可运行系统」。切面回答「怎样可验证地改、迁、验」。三者并存，不互相替代。拓扑与启动走 `runtime/` / `build/`；本目录的 `contracts/runtime.md` 只写指标、灰度条件、回滚条件。
++切面回答「怎样可验证地改、迁、验**当前这个仓库**」。这与本 Skill 的默认验收（人读 briefing + 换栈复现 agent spec）不是同一件事。
+ 
+-参考结构来自可执行契约 + 垂直切片：先把现状变成证据，再以切片为最小交付单元；**不必等全部契约写完才开始维护切片**。PHP→Go 一类双栈迁移只是对照实现的一种实例，正文用「现状实现 / 对照实现」，不要写死语言对。
++**默认不生成、不维护 `facets/`。** 只有用户明确要求「按切片改这个仓 / 迁移 / 灰度 / 对照另一实现」时才读本文件并建目录。
+ 
+-## 目录
++## 何时不要用
+ 
+-```text
+-<spec_root>/facets/
+-├── INDEX.md
+-├── source.md              # SOURCE 现状来源
+-├── contracts/
+-│   ├── INDEX.md
+-│   ├── structure.md       # 结构契约
+-│   ├── behavior.md        # 行为契约
+-│   ├── side-effects.md    # 副作用契约
+-│   ├── decisions.md       # 决策契约
+-│   └── runtime.md         # 运行契约
+-├── slices/
+-│   ├── INDEX.md
+-│   └── <slice>.md
+-├── verify.md              # VERIFY 差分 / 对照验证
+-└── traffic.md             # TRAFFIC 影子、灰度、切换、回滚（不适用则写「无」）
+-```
++- 用户要架构、业务流、功能 spec、换语言重做 → 走 `briefing/` 与 `agent/specs/`
++- 用户要复原当前部署 → 走可选的 `evidence/realization/`
++- 不要把 TRAFFIC / SLICE 生命周期写进默认 build，以免挤占复现契约
+ 
+-build / update 保留这些稳定入口并维护适用切面。没有证据的契约页写「未知」和缺口；项目确实没有该能力时写 `不适用` 与证据。不要编造 OpenAPI、迁移阶段或灰度方案。
++## 若用户明确要求
+ 
+-## 五层切面
++目录与五层（SOURCE / CONTRACT / SLICE / VERIFY / TRAFFIC）可沿用旧约定，但契约正文应链到已有 `agent/specs/`，不要再复制一套行为叙述。切片是工程交付切口，处理线仍在 `briefing/flows/`。
+ 
+-| 切面 | 页 | 回答什么 |
+-|------|-----|----------|
+-| SOURCE | `source.md` | 事实从哪来：本工程代码、配置、已有测试、脱敏请求/样本（不含三方安装树与外来仓源码） |
+-| CONTRACT | `contracts/` | 必须保持为真的约定 |
+-| SLICE | `slices/` | 一条可独立交付的垂直切口 |
+-| VERIFY | `verify.md` | 如何证明行为仍真（测试、性质、对照差分） |
+-| TRAFFIC | `traffic.md` | 如何发布与回滚（含影子 / 灰度；没有则写「无」） |
++没有证据不要编造 OpenAPI、灰度方案或对照语言对。项目没有发布机制时写 `不适用`。
+ 
+-`facets/INDEX.md` 用表格链到上列五层。没有对照实现时，VERIFY 仍写现有测试、静态检查或可验证性质，差分写 `不适用`；完全没有可执行验证时写缺口。没有灰度但存在部署时，TRAFFIC 写实际发布与回滚；库、纯文档等没有部署/流量生命周期的项目可写 `不适用` 与证据。
+-
+-## 契约种类
+-
+-`contracts/INDEX.md` 五张表，缺哪种就空表而不是删列：
+-
+-| 种类 | 页 | 典型内容 |
+-|------|-----|----------|
+-| 结构 | `structure.md` | 路由清单、OpenAPI/Schema、消息名 |
+-| 行为 | `behavior.md` | 特征测试、Golden Case、输入→输出 |
+-| 副作用 | `side-effects.md` | DB / MQ / 外部调用断言 |
+-| 决策 | `decisions.md` | 轻量意图、ADR、开放问题 |
+-| 运行 | `runtime.md` | 指标、灰度条件、回滚条件（拓扑见 `<spec_root>/runtime/`） |
+-
+-契约必须能追溯到 SOURCE（路径或测试名）。解释意图用短段；固化行为优先链到测试，不要把测试抄进 Spec。
+-
+-## 垂直切片
+-
+-切片是工程交付单元：从入口（路由/命令/消费者）经业务与数据到外部副作用，能单独验证。处理线（`flows/`）是给人看的业务路径；一条切片通常链 1 条处理线，不要复制流程全文。
+-
+-切片 ≠ 源文件。一条切片穿过多个文件；不要按文件建切片页，也不要为切片里的每个文件建 `notes/`。切片**入口**文件在模块表写不下入口协议时，可成为热点详注（见 [modes.md](modes.md)）。
+-
+-**生命周期**（写在切片页顶部，按事实推进，不许跳步假装完成）：
+-
+-```text
+-identified → characterized → specified → implemented → verified → canary → migrated → retired
+-```
+-
+-| 状态 | 含义 |
+-|------|------|
+-| identified | 有边界和名字 |
+-| characterized | 已对照现状实现，有来源路径 |
+-| specified | 本片相关契约足够开始改 |
+-| implemented | 对照实现或改动已落在源码（镜像只记录，不写源码） |
+-| verified | 差分或测试已证明本片 |
+-| canary | 部分流量 |
+-| migrated | 流量已切走 |
+-| retired | 旧路径已下线 |
+-
+-单实现、无灰度的项目：用到 `verified` 即可，后面标「不适用」。
+-
+-切片页最少包含：一句话目标、入口、SOURCE 链接、契约链接、处理线链接、生命周期、副作用、验证方式。图放 `diagrams/`，页内只链过去。
+-
+-推荐循环（有对照实现时）：选切片 → 分析现状行为 → 特征测试 → 轻量契约 → 实现对照侧 → 差分 → 灰度 → 回写本镜像。无对照实现时停在「特征测试 + 契约 + 源码同步」，VERIFY 仍记录这些测试。
+-
+-## 维护
+-
+-- 新增切片：源码里能划清入口与副作用时再建页；先 identified，再补契约。
+-- 更新：`diff` 波及的路由/schema/测试按 [routing.md](routing.md) 改对应契约与切片，overview 只在地图变了才改。
+-- `<!-- manual -->` 块同样不可覆盖。
+-- 切面与金字塔、恢复投影交叉链接：切片 → flow / module / entity / surface；契约 → 测试路径；VERIFY → `build/` 测试命令。
++旧镜像已有 `facets/`：停更、不删；默认 update 不强制补全切面页。
+diff -ruN a/agents/skills/project-spec-mirror/references/knowledge.md b/agents/skills/project-spec-mirror/references/knowledge.md
+--- a/agents/skills/project-spec-mirror/references/knowledge.md	2026-08-30 11:26:28.145325760 +0800
++++ b/agents/skills/project-spec-mirror/references/knowledge.md	2026-09-05 20:32:32.219518124 +0800
+@@ -1,46 +1,18 @@
+-# 概念、实体、业务处理线
++# 概念、处理线、能力
+ 
+-这三层是给人建立心智模型的核心，必须**自动识别、持续维护**，不能只在首次 build 写一次。源码与现有镜像冲突时，以当前源码为准，并在页内注明旧说法被取代。
++概念与处理线给人建立心智模型，写在 `briefing/`。能力与实体模型给 Agent 复现，写在 `agent/`。源码与现有镜像冲突时，以当前源码为准，并在页内注明旧说法被取代。
+ 
+ 人工锁定的段落用 `<!-- manual -->` … `<!-- /manual -->` 包住，update/build 不得改其中文字。
+ 
+-## 概念（concepts）
++## 概念（briefing/concepts）
+ 
+-领域里需要解释的词：计费口径、状态机名、角色、协议术语、内部黑话。
++领域里需要解释的词：计费口径、状态机名、角色、协议术语。
+ 
+-**识别信号**（并存即可，不要求全中）：
++**识别信号**（并存即可）：README / docs 术语；类型名与枚举；注释与错误文案中的稳定说法。
+ 
+-- README / docs 里被定义或反复出现的术语
+-- 类型名、包名、配置键、枚举值
+-- 注释与错误文案中的稳定说法
++**一页一个概念，保持短。** INDEX 是词表。正文：定义、为什么存在、容易混淆的近义、出现在哪些处理线/能力。不下沉到每个字段或每个源文件。
+ 
+-**一页一个概念。** INDEX 是词表：
+-
+-```markdown
+-| 概念 | 一句话 | 页 |
+-|------|--------|-----|
+-| Listing | 一次可被预订的房源快照 | [listing.md](listing.md) |
+-```
+-
+-正文最少包含：定义、为什么存在、容易混淆的近义、出现在哪些实体/处理线/模块。没有依据时写「推断」并给路径。
+-
+-## 实体（entities）
+-
+-有身份、可被引用的对象：持久化记录、消息、聚合根、对外 DTO（仅当它就是领域语言时）。
+-
+-**识别信号**：schema / migration / protobuf / struct / 模型类；仓储或序列化边界上的名词。
+-
+-INDEX 用表格：实体 / 身份 / 生命周期 / 页。正文建议小节：
+-
+-1. 是什么（一句）
+-2. 关键字段（名、含义、约束）— 详尽模式补全；简约只列标识与状态
+-3. 与其他实体的关系
+-4. 谁读写（模块、处理线）
+-5. 不变式与常见错误状态
+-
+-不要把每个内部 DTO 都做成实体。胶水结构留在模块文件表即可。不要为纯结构体源文件再各建一页；详尽加深本实体页。
+-
+-## 业务处理线（flows）
++## 业务处理线（briefing/flows）
+ 
+ 一次对用户或系统有意义的完整路径，不是函数调用图。
+ 
+@@ -52,20 +24,42 @@
+ |----|--------|
+ | 背景 | 谁在什么场合发起 |
+ | 目标 | 成功时世界变成什么样 |
+-| 流程 | 有序步骤；简约到模块或核心符号名；详尽每步写模块 + 符号 + 失败形态 |
++| 流程 | 有序步骤，用业务语言；不要写模块内函数名 |
+ | 依赖 | 上游数据、服务、前置状态 |
+-| 输出 | 返回值、持久化、消息、副作用 |
++| 输出 | 返回、持久化、消息、副作用（说「发生了什么」，不说「调用了哪个函数」） |
+ | 失败 | 关键失败如何结束，是否可重试 |
+ 
+-步骤用有序列表，复杂分叉用小表格。满足 [diagrams.md](diagrams.md) 必配条件的处理线必须链到 `diagrams/` 里已存在的 HTML，不要在 Markdown 里再画一遍。链到实体和概念，不在流程里重新下定义。
++满足 [diagrams.md](diagrams.md) 必配条件的处理线（复杂业务逻辑）必须链到 `briefing/diagrams/` 里已存在的 HTML。链到概念和能力，不在流程里重新下定义。
++
++## 能力（agent/INDEX + agent/specs）
++
++能力是可独立验证的产品功能单元，通常对应 1 条主处理线，但以「必须保持为真的行为」为界，不以源文件为界。
++
++**识别信号**：对外入口、用户目标、收费点、权限边界、状态机。
++
++每条能力一页 `spec.md`，格式见 [layout.md](layout.md)。从源码核对行为时可用 `symbols`，但落盘必须是 Requirement / Scenario，不是方法清单。
++
++## 实体与不变式（agent/model）
++
++有身份、可被引用的对象：持久化记录、消息、聚合根、对外 DTO（仅当它就是领域语言时）。
++
++INDEX：实体 / 身份 / 生命周期 / 页。正文：
++
++1. 是什么
++2. 关键字段（名、含义、约束）— reconstructable 写全；briefing 模式可只列标识与状态
++3. 关系与不变式
++4. 谁读写（用能力名，不用源文件）
++5. 常见错误状态
++
++不要把每个内部 DTO 做成实体。胶水结构不必建页。
+ 
+ ## 维护
+ 
+ | 动作 | 做法 |
+ |------|------|
+ | 新增 | 源码里稳定出现且能讲清的，补页并挂 INDEX、overview 地图 |
+-| 更新 | `diff` 波及的符号/字段/步骤：先按 [routing.md](routing.md) 落到模块，再只改对应知识页；不要为每个变更源文件建详页。名称变更则改文件名或在旧页写跳转 |
+-| 删除 | 源码已消失：INDEX 移除，页顶标明废弃并链到替代；不要默默删掉 manual 块 |
++| 更新 | `diff` 波及的能力：先按 [routing.md](routing.md) 落到 spec，再只改对应 briefing / 模型页 |
++| 删除 | 源码已消失：INDEX 移除或标废弃；不要默默删 manual 块 |
+ | 合并 | 两个名字同一事物：留领域常用名，另一页改成别名并指向 |
+ 
+-build 与 update 结束前自检：每个模块 README 至少链到一个概念或处理线；每条处理线至少链到一个模块；每条切片至少链到一条处理线或一个模块；overview 点名的主处理线若属复杂业务逻辑，必须链到 `diagrams/` 已有 HTML；`context/` `surface/` `data/` `runtime/` `build/` 六份恢复页存在且做完 [projections.md](projections.md) 的恢复完备自检；孤页要么补链接要么删。切片与处理线分工见 [facets.md](facets.md)。图表门禁见 [diagrams.md](diagrams.md)。
++build 与 update 结束前自检：每条主处理线至少链到一个能力；每个能力至少链到一条处理线或一个实体；overview 点名的主处理线若属复杂业务逻辑，必须链到已有 HTML；孤页要么补链接要么删。
+diff -ruN a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md	2026-08-30 11:25:03.277900118 +0800
++++ b/agents/skills/project-spec-mirror/references/layout.md	2026-09-05 20:28:27.611711694 +0800
+@@ -1,70 +1,62 @@
+-# 金字塔布局与展示
++# 双读者布局
+ 
+-镜像根是 `detect` / `status` 给出的 `spec_root`：仅当目标 source 就是当前仓时为该仓的 `spec/`，否则为 `<cwd>/spec/<project>/`。所有给人读的正文都在这里。
++镜像根是 `detect` / `status` 给出的 `spec_root`：仅当目标 source 就是当前仓时为该仓的 `spec/`，否则为 `<cwd>/spec/<project>/`。
++
++人只读 `briefing/`。Agent 复现只读 `agent/`。`evidence/` 是维护层，不参与人读，也不参与换栈复现。
+ 
+ ## 目录
+ 
+ ```text
+ <spec_root>/
+-├── .mirror.json          # 机械状态，不给人读
+-├── README.md             # 入口：怎么读、版本、地图
+-├── overview.md           # 一层：项目是什么、为什么、模块与主路径
+-├── changelog.md          # 镜像同步史，不是产品 changelog
+-├── context/              # 恢复：系统在环境里的位置
+-│   └── INDEX.md
+-├── data/                 # 恢复：持久化与一致性
+-│   └── INDEX.md
+-├── surface/              # 恢复：对外表面
+-│   ├── INDEX.md
+-│   └── config.md         # 配置键表
+-├── runtime/              # 恢复：进程与部署拓扑
+-│   └── INDEX.md
+-├── build/                # 恢复：构建 / 测试 / 迁移 / 启动
+-│   └── INDEX.md
+-├── concepts/
+-│   ├── INDEX.md
+-│   └── <concept>.md
+-├── entities/
+-│   ├── INDEX.md
+-│   └── <entity>.md
+-├── flows/
+-│   ├── INDEX.md
+-│   └── <flow>.md
+-├── modules/
+-│   ├── INDEX.md
+-│   └── <module>/
+-│       ├── README.md     # 职责、根路径、文件表、核心符号
+-│       └── notes/        # 可选热点详注；init/build 默认不建
+-│           └── <source-rel>.md
+-├── facets/               # 工程切面：来源 / 契约 / 切片 / 验证 / 流量
+-│   ├── INDEX.md
+-│   ├── source.md
+-│   ├── contracts/
+-│   ├── slices/
+-│   ├── verify.md
+-│   └── traffic.md
+-└── diagrams/             # archify HTML（及同 slug 的 JSON 候选）
+-    └── INDEX.md
+-extensions/               # 可选；用户明确需要且核心层无法表达的领域附加内容
+-└── <name>/
+-    └── INDEX.md
++├── .mirror.json
++├── README.md
++├── changelog.md
++├── briefing/
++│   ├── overview.md
++│   ├── architecture.md
++│   ├── concepts/
++│   │   └── INDEX.md
++│   ├── flows/
++│   │   └── INDEX.md
++│   └── diagrams/
++│       └── INDEX.md
++├── agent/
++│   ├── INDEX.md
++│   ├── specs/
++│   │   └── <capability>/
++│   │       └── spec.md
++│   ├── model/
++│   │   └── INDEX.md
++│   ├── surface/
++│   │   └── INDEX.md
++│   └── data/
++│       └── INDEX.md
++└── evidence/
++    ├── source-map.md
++    └── realization/          # 可选；默认不建
++        └── INDEX.md
+ ```
+ 
+-核心顶层目录保持固定，以便导航和工具验证。只有用户明确需要、且现有层无法自然表达的领域内容才放 `extensions/<name>/`；不要为风格偏好另造平行分类。`notes/` 挂在模块下，不是新的顶层。默认不用 `files/` 为每个源文件建页。构建产物、三方安装树（`vendor/`、`node_modules/` 等）、外来仓源码、测试夹具不进 `modules/` / `notes/`。处理线或切片若用到某依赖，只写包名、接口或 `context/` 邻接，不把对方源文件列入文件表。恢复投影细则见 [projections.md](projections.md)；切面细则见 [facets.md](facets.md)；图表见 [diagrams.md](diagrams.md)；文件如何映射到页见 [routing.md](routing.md)；粒度见 [modes.md](modes.md)。
++不要为风格偏好另造平行顶层。旧镜像里的 `concepts/` `modules/` `facets/` `context/` `runtime/` `build/` 视为遗留：停更、不删；README 注明过期，本轮把内容提升进新树后再继续。
+ 
+-## 推荐阅读顺序
++`extensions/` 仅当用户明确需要、且现有层无法表达时才建。
+ 
+-默认从上往下写和阅读；维护单个条目或用户有明确入口时可直接进入对应层：
++## 推荐阅读顺序
+ 
+-1. `README.md` — 30 秒：项目是什么、当前版本、地图入口
+-2. `overview.md` — 5 分钟：背景、目标、边界、模块图、主处理线、主切片
+-3. `context/` / `surface/` / `data/` / `runtime/` / `build/` — 恢复可运行系统所需的投影
+-4. `facets/` — 来源、契约、垂直切片、验证与流量（工程怎么改）
+-5. `concepts/` / `entities/` / `flows/` — 按需：词、对象、端到端
+-6. `modules/` — 最后：代码如何承载（模块 README；`notes/` 仅热点）
+-7. `diagrams/` — 看图，不替代上文段落
++人：
+ 
+-下层**不得**重复上层已经说清的论点；只补充证据、接口、文件和例外。INDEX 用表格，一篇正文一个主题。
++1. `README.md` — 30 秒：项目是什么、当前版本
++2. `briefing/overview.md` — 5 分钟：背景、边界、能力地图、主路径
++3. `briefing/architecture.md` 与 `briefing/diagrams/` — 结构与邻接
++4. `briefing/flows/` — 一次业务怎么走完
++5. `briefing/concepts/` — 必要时查词
++
++Agent（复现或验证）：
++
++1. `agent/INDEX.md` — 能力与覆盖状态
++2. `agent/specs/<capability>/spec.md` — Requirement / Scenario
++3. `agent/model/` · `agent/surface/` · `agent/data/` — 模型、对外契约、一致性
++4. 不要读 `evidence/` 来实现功能；那只是 source → 能力的路由表
+ 
+ ## `.mirror.json`
+ 
+@@ -75,11 +67,8 @@
+   "placement": "in-project",
+   "source": "..",
+   "branch": "main",
+-  "mode": "concise",
+-  "detail_level": null,
++  "mode": "briefing",
+   "scope": [],
+-  "important_paths": [],
+-  "hotspots": [],
+   "build_status": "skeleton",
+   "built_at": null,
+   "synced_commit": null,
+@@ -90,20 +79,16 @@
+ 
+ - `placement`：`in-project` | `external`
+ - `source`：相对本镜像根；`in-project` 时为 `..`
+-- `mode`：`concise` | `detailed`。concise 时 `detail_level` 必须为 `null`
+-- `detail_level`：仅 detailed 使用，取 `complete` | `important` | `lightweight`
+-- `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）。不是「详页文件清单」
+-- `important_paths`：仅 `detailed + important` 使用；明确哪些源相对路径或前缀在模块页写深。缺字段的旧镜像视为尚未记录，下一次完成 update 时必须补齐
+-- `hotspots`：可选；已确认要写 `notes/` 的源相对路径。缺省视为 `[]`。只通过 `set-sync --hotspot` 写回；模块 README「热点」表给人读
+-- `build_status`：`skeleton` | `built`，独立于是否存在 Git commit；旧镜像缺字段时，有 `synced_commit` 视为 built，否则视为 skeleton
+-- `built_at`：最近一次完成 build/update 的时间
+-- `synced_commit`：Git 源已写入金字塔的那个 commit；非 Git 源始终为 `null`
++- `mode`：`briefing` | `reconstructable`
++- `scope`：知识覆盖的源路径前缀；空表示全库（仍受 inventory 忽略规则约束）
++- `build_status`：`skeleton` | `built`
++- `synced_commit`：Git 源已写入镜像的那个 commit；非 Git 源始终为 `null`
+ 
+-只通过 `init` / `set-sync` 改这个文件。
++只通过 `init` / `set-sync` 改这个文件。旧字段 `detail_level` / `important_paths` / `hotspots` 若仍在，忽略，不要据此再写文件表或 notes。
+ 
+ ## README.md
+ 
+-保持短。这是项目说明书的入口，不是「Spec 镜像」产品页。推荐结构：
++保持短。这是项目说明书的入口：
+ 
+ ```markdown
+ # <project>
+@@ -112,133 +97,117 @@
+ 
+ | 项 | 值 |
+ |----|-----|
+-| 粒度 | concise |
+-| 文件粒度 | 不适用 |
++| 粒度 | briefing |
+ | 分支 | main |
+ | 同步 commit | `abc1234`（尚未同步则写「尚未同步」） |
+ | 源 | git（或「非 git」） |
+ 
+ ## 怎么读
+ 
+-1. [overview.md](overview.md)
+-2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
+-3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+-4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
++1. 人：[总览](briefing/overview.md) · [架构](briefing/architecture.md) · [处理线](briefing/flows/INDEX.md) · [图](briefing/diagrams/INDEX.md)
++2. Agent：[能力](agent/INDEX.md) · [模型](agent/model/INDEX.md) · [表面](agent/surface/INDEX.md) · [数据](agent/data/INDEX.md)
+ 
+ ## 地图
+ 
+-| 层 | 路径 | 回答什么 |
+-|----|------|----------|
+-| 总览 | overview.md | 这是什么、边界在哪 |
+-| 上下文 | context/ | 系统在环境里的位置 |
+-| 表面 | surface/ | 对外接口与配置键 |
+-| 数据 | data/ | 持久化与一致性 |
+-| 运行时 | runtime/ | 进程、部署、拓扑 |
+-| 构建 | build/ | 如何构建、迁移、启动 |
+-| 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
+-| 概念 | concepts/ | 领域用语 |
+-| 实体 | entities/ | 关键对象及其关系 |
+-| 处理线 | flows/ | 一次业务怎么走完 |
+-| 模块 | modules/ | 代码如何落地 |
+-| 图 | diagrams/ | 结构 / 流程 / 时序 / 数据流 / 状态 |
++| 层 | 路径 | 给谁 | 回答什么 |
++|----|------|------|----------|
++| 总览 | briefing/overview.md | 人 | 这是什么、边界在哪 |
++| 架构 | briefing/architecture.md | 人 | 邻接、信任、能力如何拼在一起 |
++| 处理线 | briefing/flows/ | 人 | 一次业务怎么走完 |
++| 概念 | briefing/concepts/ | 人 | 领域用语（短） |
++| 图 | briefing/diagrams/ | 人 | 结构 / 流程 / 状态 |
++| 能力 | agent/specs/ | Agent | 可验证、可复现的功能契约 |
++| 模型 | agent/model/ | Agent | 实体、不变式、状态机 |
++| 表面 | agent/surface/ | Agent | 对外行为必须对上什么 |
++| 数据 | agent/data/ | Agent | 逻辑持久化与一致性 |
+ ```
+ 
+-## overview.md
++## briefing/overview.md
+ 
+-用短段和列表，不用大段散文：
++用短段和列表：
+ 
+ 1. **一句话** — 这个项目做什么
+ 2. **背景与目标** — 谁用、解决什么、非目标
+-3. **恢复入口** — 链到 context / surface / data / runtime / build，不在这里下定义
+-4. **模块地图** — 表格：模块 / 职责 / 入口路径（即模块根）
+-5. **主处理线** — 链到 `flows/` 里最重要的 1–3 条
+-6. **主切片** — 链到 `facets/slices/` 里正在维护的切口
+-7. **关键实体与概念** — 链到对应页面，不在这里下定义
+-8. **图** — 链到 `diagrams/` 里已存在的 `.html`；没有图则省略本节，不要写待办或链到 archify Skill 目录
++3. **能力地图** — 表格：能力 / 一句话 / 链到 `agent/specs/`（人可以点，但不需要读 Scenario）
++4. **主处理线** — 链到 `briefing/flows/` 最重要的 1–3 条
++5. **图** — 链到已存在的 `.html`；没有图则省略本节
+ 
+-## 模块如何划
++不要在 overview 写文件路径、函数名、语言版本或启动命令。
+ 
+-模块是连贯的代码边界，由 Agent 划分，**不是**一个源文件一模块。
++## briefing/architecture.md
+ 
+-| 生态 | 优先切法 |
+-|------|----------|
+-| Go | package 或 `cmd/<bin>`；多个紧密 package 可合成一个模块 |
+-| Python | 包目录；单文件脚本可自成模块 |
+-| JS/TS | `src/` 下功能目录；组件+样式+测试算该目录下的多行，不拆成三页 |
+-| Java | 领域包，不要一类一模块 |
++最少包含：
+ 
+-单模块文件表超过约 40 行是考虑拆模块的信号，不是机械阈值；优先按连贯职责拆分，若项目天然是单包则保留并改善分组。
++1. 系统对谁、在哪条链上负责什么
++2. 使用者 / 调用方
++3. 邻接系统：方向、协议、责任切在哪
++4. 信任边界（不写密钥值）
++5. 链到架构图（若已交付）
+ 
+-`modules/INDEX.md` 用表格：模块 / 根路径 / 一句话 / 页。
++质量属性只写实际约束设计的项；没有则写「未知」。
+ 
+-## 模块页
++## Agent spec 页
+ 
+-`modules/<module>/README.md` 固定结构：
++`agent/specs/<capability>/spec.md` 借用 OpenSpec 形态，但不是 change：
+ 
+ ```markdown
+-# <module>
++# checkout
+ 
+-<1–3 句：职责，相对 overview 不重复项目级论点>
++## Purpose
++买家提交订单到库存与支付结算的能力。
+ 
+-## 根
++## Requirements
+ 
+-| 路径前缀 | 角色 |
+-|----------|------|
+-| `internal/order` | 领域包 |
+-| `cmd/orderd` | 进程入口 |
++### Requirement: 库存不足时不创建订单
++系统 SHALL 在可用库存小于请求数量时拒绝创建订单，且不扣款。
+ 
+-## 对外入口
++#### Scenario: 库存为 0
++- **WHEN** 买家提交数量大于可用库存
++- **THEN** 订单不创建
++- **THEN** 账户余额不变
++```
+ 
+-命令、HTTP、消息、库 API。
++能力 slug 用小写连字符。INDEX 用表格：能力 / 一句话 / 状态 / 页。
+ 
+-## 文件
++状态：`identified` → `specified` → `scenario-complete` → `checked-against-source`。
+ 
+-| 文件 | 职责 | 核心 |
+-|------|------|------|
+-| `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
++- `identified`：有名字和边界
++- `specified`：已有 Purpose 与至少一条 Requirement
++- `scenario-complete`：每条 Requirement 至少一条 WHEN/THEN Scenario
++- `checked-against-source`：已对照当前实现；不是「已用同一语言重写」
+ 
+-## 核心符号
++`reconstructable` 下，INDEX 里的能力都必须达到 `scenario-complete`。
+ 
+-- `Place` —
+-  1. 校验订单字段
+-  2. 写入存储
+-  3. 失败则回滚并返回错误
+-- `formatId` — 格式化订单号（工具方法，简述）
++## evidence/source-map.md
+ 
+-## 依赖
++```markdown
++# 源映射
+ 
+-链到实体、处理线、切片、其他模块。
++| 能力 | 源路径 | spec |
++|------|--------|------|
++| checkout | `internal/order` | [checkout](../agent/specs/checkout/spec.md) |
+ ```
+ 
+-- **根**：路由用的路径前缀，也给人看边界。每个模块至少一行。标题必须是 `根` 或 `Roots`。
+-- **文件**：落地证据。标题必须是 `文件` 或 `Files`。简约核心列只写名字。`important` 范围内每个源文件至少一行（简述或整理），不得因「不重要」整份省略。
+-- **核心符号**（详尽）：核心方法写完整逻辑（步骤、分支、成败、副作用）；工具方法一句话但不得漏列；测试方法只简述（complete 亦然）。最低密度见 [modes.md](modes.md)。职责列与核心符号不得抄密钥字面量。
+-- **热点**（可选）：仅当有 `notes/` 时增加一表：路径 / 为何 / 页。
+-
+-详尽模式如何写深、何时建 `notes/`，见 [modes.md](modes.md)。`notes/` 与源树同构，页内用源相对路径标明真身。
+-
+-已有镜像若含 `modules/*/files/`：视为遗留，停更、不删；在本模块 README 注明可能过期。
++下一轮 `route` 靠这张表。缺表或空表时 update 视为 `not_built`。路径是前缀或精确文件，相对 source 根。
+ 
+ ## changelog.md
+ 
+-只记录镜像同步，不抄 `git log` 全文：
++只记录镜像同步：
+ 
+ ```markdown
+ # 镜像同步
+ 
+ ## 2026-01-02 — `abc1234`
+ 
+-- 模式：concise
+-- 范围：全库（或列出路径）
+-- 变更：新增 checkout 处理线；订单模块文件表更新
++- 模式：briefing
++- 变更：新增 checkout 能力；更新下单处理线
+ ```
+ 
+ ## 展示原则
+ 
+-- **读者口吻**：给人读的页面是项目说明书。标题写项目名或该页主题（`# checkout`、`# 下单`），开篇用项目语言写这页回答什么。制作过程用语（「Spec 镜像」「孪生规格」「不是 OpenSpec」「验收：只凭本镜像能重建」）只留在本 Skill，不写进镜像正文的标题或第一句。粒度、分支、同步 commit 放在状态表，用事实行，不要写成宣言。changelog 与 `.mirror.json` 是操作记录，可以用「镜像同步」。Agent 对用户的完成回执可以叫「Spec 镜像」，那是对话，不是仓库里的读者页。
+-- 标题即论点；表格优先于段落。
+-- 标识符、文件名、命令保持原文；叙述用中文。
+-- 每页开头用 1–3 句让人决定要不要继续读。
+-- 交叉链接用相对 Markdown 链接；概念 ↔ 实体 ↔ 处理线 ↔ 模块 ↔ 切片 ↔ 恢复投影能互相跳。
+-- 图只放 `diagrams/` 里已存在的 archify HTML 链接；Markdown 里不要再画一遍拓扑，也不要把 INDEX 写成「后续用 archify」。
+-- 不确定就写「未知 / 推断」，并标出来源路径；不要把命名猜测写成事实。
++- **读者口吻**：给人读的页面是项目说明书。标题写项目名或该页主题。制作过程用语（「Spec 镜像」「孪生规格」「不是 OpenSpec」「验收：只凭本镜像能重建」）只留在本 Skill。
++- briefing 禁止：源文件表、函数逐步走读、语言/包管理器/版本、compose/端口/副本、锁实现、宏、监控埋点名。
++- agent spec 写行为，不写当前函数步骤。从源码抽出的步骤要提升成 Scenario，不要留在模块讲义里。
++- 标识符、对外路由名、命令保持原文；叙述用中文。
++- 交叉链接用相对 Markdown 链接。
++- 不确定就写「未知 / 推断」，并标来源（对 Agent 页可标 evidence 路径；对 briefing 只写「见能力 checkout」）。
+diff -ruN a/agents/skills/project-spec-mirror/references/modes.md b/agents/skills/project-spec-mirror/references/modes.md
+--- a/agents/skills/project-spec-mirror/references/modes.md	2026-08-30 02:21:20.399107721 +0800
++++ b/agents/skills/project-spec-mirror/references/modes.md	2026-09-05 20:32:31.470515590 +0800
+@@ -1,180 +1,75 @@
+-# 简约与详尽
++# briefing 与 reconstructable
+ 
+-`.mirror.json` 的 `mode` 是本镜像的主粒度真相；`mode=detailed` 时，`detail_level` 是文件整理粒度真相。合法组合只有 `concise + null`，或 `detailed + complete|important|lightweight`。`important_paths` 只在 important 下生效，保存写深范围。切换模式等于该层重写，不是改几个标题。默认 **concise**；进入详尽但未指定文件整理粒度时默认 **important**。
++`.mirror.json` 的 `mode` 是本镜像的主粒度真相。合法值只有 `briefing` | `reconstructable`。切换模式等于该层按新验收重写，不是改几个标题。默认 **briefing**。
+ 
+-**触发：** 用户点名「详尽」→ `detailed`，并选择 `complete`、`important`（默认）或 `lightweight`。用户点名「每个函数 / 每个变量」时先确认真正目标：如果要理解公开 API、领域行为或状态变化，选择 detailed；如果要机械列出全部局部变量或语法节点，说明那不是 spec 镜像目标，不承诺用 `symbols` 完成。用户点名「每个文件一页 / 给每个源文件写详页」→ 说明本约定，选择 `complete` 或改问热点范围；**禁止**全库铺 `notes/` 或重建 `files/`。
++旧值 `concise` / `detailed` 以及 `detail_level` / `important_paths` / `hotspots` 不再使用。遇到旧镜像：说明需要按新树 rebuild，不要继续写模块文件表或 `notes/`。
+ 
+-三档控制的是代码证据密度；detailed 的领域、处理线、契约和恢复投影都会比 concise 更深入。
++**触发：** 用户只要「读清楚 / 架构 / 业务流」→ `briefing`。用户点名「可复现、换栈重建、给 Agent 的完整功能 spec」→ `reconstructable`。用户点名「每个函数 / 每个文件一页」时说明那不是本 Skill 目标：人读 briefing，细节进能力 Scenario，不铺源文件树。
+ 
+-文件有三种角色，详见 [routing.md](routing.md)：清单行、路由键、证据路径。第四种——`modules/<module>/notes/` 热点详注——仅 opt-in。
++两档都写同一棵双读者树；差别是 Agent 层必须完整到哪一步。
+ 
+-## concise（简约）
++## briefing（默认）
+ 
+-只回答「有哪些文件、各自核心能力是什么」。阅读叶子是**模块 README**。
++给人一份能扫完的说明书，并识别主能力。
+ 
+ | 写 | 不写 |
+ |----|------|
+-| 模块职责、根路径、文件一览表 | `modules/*/files/` 或为每个源文件建 `notes/` |
+-| 每个文件 1 句职责 | 局部变量、逐行实现 |
+-| 核心函数/类型：名字 + 一句职责 | 每个辅助函数的分支逻辑 |
+-| 概念/实体/处理线的定义与关系 | 把函数体搬进规格 |
++| briefing 总览、架构、主处理线、短词表、必配图 | 源文件表、方法完整逻辑、工具链配方 |
++| 主能力 INDEX + 至少 Purpose / 关键 Requirement | 要求全部能力都 scenario-complete |
++| source-map 覆盖已写能力，便于下次 update | `evidence/realization/`、`facets/` |
++| 未写深的能力标 `identified` 或「未指定」 | 假装覆盖了全库每一个源文件 |
+ 
+-「核心」指：对外入口、领域不变式、处理线必经符号。私有辅助、纯胶水、生成代码默认不列。
++`coverage` 的 `enforce` 为假：缺口列出来，不阻塞 `finalize`。
+ 
+-文件表示例：
++## reconstructable
+ 
+-```markdown
+-| 文件 | 职责 | 核心 |
+-|------|------|------|
+-| `cmd/server/main.go` | 进程入口 | `main` |
+-| `internal/order/service.go` | 下单与取消 | `Place`, `Cancel` |
+-```
++在 briefing 仍然干净的前提下，把已识别能力写成可换栈复现的契约。
+ 
+-## detailed（详尽）
++| 可验证的完成标准 | 含义 |
++|------------------|------|
++| 至少 1 条能力 | 空 INDEX 不能标 built |
++| 每条能力有 `agent/specs/<slug>/spec.md` | Purpose + Requirements |
++| 每条 Requirement 至少一条 Scenario | WHEN / THEN，可判定真假 |
++| 每条能力在 source-map 有至少一行 | 只为增量路由，不是复现输入 |
++| briefing 无实现泄漏 | 见下方禁写清单 |
+ 
+-详尽模式先选择文件整理粒度；三档都加深金字塔和切面，但决定模块文件表如何覆盖源文件：
++`coverage` 的 `enforce` 为真：缺 spec 或缺 source-map 不得 `finalize`。Scenario 是否写满由 Agent 对照 [checklist.md](checklist.md) 自检；`validate` 在 `build_status=built` 且 `reconstructable` 时检查 spec 页含 `Requirement` 与 `Scenario`。
+ 
+-| `detail_level` | 可验证的文件处理 |
+-|----------------|------------------|
+-| `complete` | inventory 中每个文件都要有模块归属与说明；代码文件深入公开入口和行为承载符号，补参数、返回、关键分支与副作用。测试、生成代码和纯胶水保持文件级简述 |
+-| `important`（默认） | 范围内文件都要出现，**不得整份省略**；`important_paths` 命中的文件或前缀写深行为承载符号，其余文件简述。测试只写覆盖意图 |
+-| `lightweight` | 代码层只保留入口、领域规则、状态转换、持久化和协议等必要证据；普通文件可省略。领域、流程、契约和投影仍按 detailed 写深 |
++「完整映射」= 已识别的用户可见能力都有 spec，缺口显式写在 INDEX。不是 inventory 每个代码文件都有一行。
+ 
+-三档均不是“一文件一页”。`complete` 与 `important` 的文件覆盖以 inventory 为准，职责相同的简单文件可以按明确目录范围合并登记；`lightweight` 只保留必要清单。业务入口、领域规则、状态转换、持久化和协议证据必须单独保留，不能并进简述行了事。
++## 功能一致（L2–L3）
+ 
+-写完文件表后跑 `$SPECCTL coverage`，不要手对 `inventory`。`missing` 只针对范围内代码文件；目录范围行可以覆盖其子路径。`enforce` 为真时必须清掉 `missing`。
++新实现满足 agent spec 即视为功能一致：
+ 
+-在简约之上**加深同一批页**，不复制一棵源文件树：
++- 所有已 specified 能力的 Requirement / Scenario 成立
++- 对外表面（API / CLI / 事件 / 错误分类）与 `agent/surface/` 一致
++- 领域不变式与状态机与 `agent/model/` 一致
++- 持久化语义（存什么、一致性、保留）与 `agent/data/` 一致
+ 
+-| 层 | 加深什么 |
+-|----|----------|
+-| 模块 README | `important` 至少达到下方最低密度（核心方法写完整逻辑）；`complete` 再补参数、返回、副作用。测试方法两档都只简述 |
+-| 实体 | 领域字段、约束、不变式 |
+-| 处理线 | 每步落到模块 + 符号 + 失败形态 |
+-| 恢复投影 | 同一批 INDEX（及 `surface/config.md`）写深：邻接协议、存储差、接口目录、拓扑、可再生命令 |
+-| 契约 | 能追溯 SOURCE；切片尽量到 specified |
+-| `notes/` | 分档位：`concise` / `lightweight` 不建；`detail_level=important` 默认不建、用户点名才建；`detail_level=complete` **必建** ≥5 篇，按下方 5 类触发条件清单枚举（满足任一类即建 1 篇） |
++明确不要求：同一语言、框架、文件布局、进程名、端口、构建命令、监控埋点名。这些若用户坚持要「复原当前栈」，才写入可选的 `evidence/realization/`。
+ 
+-### `detail_level=complete` 下 notes/ 的 5 类触发条件
++## briefing 禁写清单
+ 
+-满足**任一**类即建 1 篇 notes/，整体 ≥5 篇、覆盖 ≥3 个模块：
++出现在 `briefing/` 即视为泄漏，必须改写或移到 `agent/` / `evidence/`：
+ 
+-1. **跨文件契约**（builder 配对、init→extract 时序、依赖注入矩阵、shared l0_rfm 共享）—— 这些契约写在任何单个模块 README 都会破坏层级。
+-2. **一致性失败路径与正常路径不同**（parse 失败 ≠ throw、L1 抽 vs L0/L2 不抛、silent corruption）—— 失败处理是"正确性契约"，不写出来下游会按 happy path 假设。
+-3. **并发/锁的 race 分析**（shared_mutex double-check、is_done_ 标记、`lock_guard`+double-check 防 race）—— 阅读源码看不出"为什么要写两遍 if"。
+-4. **监控盲区**（声明了 bvar 但未 <<1、FE_ERROR 无对应 counter、`AddCounter` 接错 msg 维度）—— 运维看不到失败率。
+-5. **框架/预处理器的使用约束**（BOOST_PP_SEQ_FOR_EACH 宏展开顺序、字段名规范、ABI 兼容性、`--ff-only` 而非默认 pull）—— 写入宏展开顺序的硬规则，下次扩展不会破 ABI。
++- 以源相对路径为主的「文件」表
++- 函数/方法逐步走读（「完整逻辑」）
++- 语言、包管理器、运行时版本、锁文件
++- compose / 端口 / 副本 / 启动命令
++- 锁实现、预处理器、监控指标名
+ 
+-notes/ 的**命名**是 topic（易踩坑的概念，如 `options-builder-sequencing.md` / `md5-cluster-id-gen.md`），不是源相对路径。源路径仅在 notes/ 页内 `真身路径` 一栏标注，与 [routing.md](routing.md) 的 `notes/<source-rel>.md` 命名并列存在，按需选用。`complete` 模式下两种命名都允许，topic 是默认推荐。
++`symbols` 只在撰写 Scenario 时对照源码，不要把候选名单倒进 briefing。密钥、`AppKey` / `SecretKey` 等值写 `<REDACTED>`。
+ 
++## 范围
+ 
+-
+-`symbols` 只提供候选，不是语言级完备索引。Agent 必须结合源码、路由、测试和调用关系识别行为承载符号并写人话，禁止把 AST/正则结果原样倒进 Markdown，也禁止仅凭候选数量声称“全部方法已覆盖”。不要对全 inventory 或测试文件机械逐方法抽取。
+-
+-### 方法怎么写（important / complete）
+-
+-单位是行为，不是语法节点。concise 仍可只列核心符号；important 的选定路径与 complete 的行为代码按下表：
+-
+-| 种类 | 写什么 | 适用 |
+-|------|--------|------|
+-| 核心方法 | **完整逻辑**：有序步骤、关键分支、成功/失败如何结束、副作用。不是一句话职责，也不是贴源码 | important 与 complete |
+-| 影响行为的辅助方法 | 当它改变分支、协议、状态或副作用时列名并简述；纯 getter/setter/格式化可由所属核心逻辑概括 | important 与 complete |
+-| 测试方法 | 只简述（覆盖什么即可）。不要写每个 `Test*` 的步骤或断言 | important 与 complete |
+-
+-- 核心方法：对外入口、领域不变式、处理线必经、协议编解码、状态转换。
+-- 辅助方法是否单列取决于行为价值，不以 public/private 或提取器是否命中作为唯一标准。
+-- 测试方法：`Test*` / `Benchmark*` / `Example*`、表驱动用例、测试辅助。测试文件在文件表一行简述即可；若列方法也只写一句覆盖范围。
+-
+-### important 模块页（最低密度）
+-
+-`important` 的阅读叶子仍是模块 README，不是每文件一页。每个模块至少写到下面这个密度；少于此视为没写完。标题必须是「根」「文件」（或 `Roots` / `Files`），不要改成「根路径」「文件一览」，否则 update 路由会失效。
+-
+-```markdown
+-# `notify-client/` 通知回调客户端（最简 JSON，无签名）
+-
+-把投递结果回传给上游；不含签名与对账。
+-
+-## 根
+-
+-| 路径前缀 | 角色 |
+-|----------|------|
+-| `internal/notify/client/` | 客户端包 |
+-
+-## 文件
+-
+-| 文件 | 职责 |
+-|------|------|
+-| `private_params.go` | 注入产品标识 `appId="demo_client"`；鉴权 `AppKey` / `SecretKey` 值 `<REDACTED>` |
+-| `http_client.go` | `Service` / `NewService` / `CheckInput` / `SetEndpoint` |
+-| `http_request.go` | `Do` + `transferByte` + `OutPut` |
+-| `http_request_test.go` | 表驱动测试，覆盖 Do 成功与错误码 |
+-
+-## 核心符号
+-
+-### 整理（核心方法，完整逻辑）
+-
+-- `Do`
+-  1. `CheckInput` 校验必填；失败直接返回
+-  2. `transferByte` 组 JSON（注入 `appId`；鉴权字段值 `<REDACTED>`）
+-  3. POST 到已设 endpoint；非 2xx 或超时记失败并结束
+-  4. 解码为 `OutPut`；`GetStatus` 为假则业务失败，否则把 `GetTaskIds` 交给调用方
+-- `transferByte`
+-  1. 从输入取 `requestId`、`accountId` 等字段
+-  2. 写入产品标识 `appId`
+-  3. 序列化为 JSON 字节；缺字段则返回错误，不发请求
+-
+-### 简述（影响行为的辅助方法）
+-
+-- `NewService` — 构造客户端
+-- `SetEndpoint` — 覆盖请求地址
+-- `CheckInput` — 校验必填字段是否齐全
+-- `OutPut.GetTaskIds` — 返回命中的任务 ID 列表
+-- `OutPut.GetStatus` — `code == 0` 为成功
+-```
+-
+-「整理」一个文件 = 文件表一行 + 写清行为承载方法：核心方法写完整逻辑，影响行为的辅助方法简述；纯机械辅助可由核心逻辑概括。
+-「简述」一个文件 = 文件表一行，不要求抽方法。测试文件无论 important / complete 都按文件简述（或方法一句话），不写完整逻辑。
+-不要把源码常量赋值整段贴进职责列。`AppKey` / `SecretKey` / AccessKey / token / password 等凭据字面量必须 `<REDACTED>`；可以写字段名与注入方式。
+-
+-## 范围与热点
+-
+-`detail_level` 通过 `$SPECCTL init --mode detailed --detail-level ...` 或 `$SPECCTL set-sync --mode detailed --detail-level ...` 保存；旧镜像若是 detailed 且缺少该字段，按 `important` 解释。`mode=concise` 时该字段固定为 `null`，传 `--detail-level` 属于错误。
+-
+-- `scope`：知识覆盖的源路径前缀；空表示全库（仍走 inventory 忽略规则）。与是否建 `notes/` 无关。
+-- `important_paths`：important 中写深的源相对路径或目录前缀；通过重复的 `$SPECCTL set-sync --important-path <path>` 整表写回。完成 important build/update 前必须明确，后续 update 沿用
+-- 简约默认全库。详尽应对 `scope` 或 `inventory --path` 收窄要写深的模块，而不是「详页文件清单」。
+-- `inventory.file_count` 只作状态展示，**不**再作为是否生成叶子页的开关。
+-- `set-sync --mode` 与实际写成的粒度必须一致；完成 build/update 时同时传 `--built`，CLI 会先校验骨架再推进状态。
+-
+-`important_paths` 与 `hotspots` 相互独立：前者决定模块 README 哪些代码证据写深，后者才允许建立 `notes/`。路径命中 important 不会自动创建详注页。
+-
+-旧镜像处于 `detailed + important` 且缺少 `important_paths` 时可以读取；下一次完成 update 时必须让用户确认并写回，不能继续靠 Agent 临时猜测。
+-
+-### 热点 `notes/`（opt-in）
+-
+-路径与源树同构：`modules/<module>/notes/<source-rel>.md`（例如 `notes/internal/order/service.go.md`）。不要把 `/` 拍成 `__`。
+-
+-**何时建（须至少一条）：**
+-
+-- 用户点名文件或路径前缀；
+-- 该文件是某条切片的入口（路由/命令/消费者），且模块表写不下入口协议细节；
+-- 单文件承载多条处理线或非平凡状态机，表行无法说清。
+-
+-**何时不建：** 为了「详尽看起来完整」；inventory 里每一个代码文件；DTO/胶水/生成代码；已有对应实体页的纯结构体文件。
+-
+-用户要热点详注且未给路径时先问，优先建议切片入口。默认每批不超过约 **15** 个文件，便于审阅和回滚；用户明确确认更大的具体范围后可以执行，但先说明预计页数和维护成本。不得把模糊的“详细一点”解释为全库批量 `notes/`。
+-
+-页内写：真身路径、为何是热点、表里写不下的符号要点、链回模块/实体/处理线/切片。
+-
+-热点路径用 `$SPECCTL set-sync --hotspot <path>`（可重复，本轮列表整表写回）回写 `.mirror.json`，不要手改状态文件。模块 README「热点」表仍给人读。
++`scope` 通过 `$SPECCTL init --mode ...` 或 `$SPECCTL set-sync --mode ...` 保存。空表示全库（仍走 inventory 忽略规则）。它限制从哪些源路径识别能力，不决定是否给人写详页。
+ 
+ ## 更新时
+ 
+-按 [routing.md](routing.md) 把 `diff` 的文件映射到模块，再跟链接改知识层、恢复投影与切面。
++按 [routing.md](routing.md) 把 `diff` 映射到能力，再跟链接改 briefing 与模型。
+ 
+-- 简约：只改模块文件表和被波及的知识/投影/切面页。
+-- 详尽：同样改这些页并写深；不要为每个变更文件建或重写详页。
+-- rename（`status=R`）：改文件表路径（及已有 `notes/` 文件名），不当成删除 + 新增。
+-- 从 concise 升到 detailed：加深已有页；不要补全量 `files/` 或 `notes/`。
+-- 从 detailed 降到 concise：停更 `notes/`；除非用户要求删除，否则保留并在模块 README 注明可能过期。
+-- 遗留 `modules/*/files/`：停更、不自动删除；模块 README 注明可能过期。用户明确要求删除后再删，需要的热点按本节少量重建为 `notes/`。
++- 两档都改被波及的能力 spec 与 briefing 页。
++- rename：改 source-map 路径，不当成删除 + 新增。
++- 从 briefing 升到 reconstructable：补 Scenario 与未指定能力，不要补模块文件表。
++- 从 reconstructable 降到 briefing：停更未读能力的加细，briefing 保持干净。
++- 遗留 `modules/` `facets/` `runtime/` `build/`：停更、不自动删除。
+diff -ruN a/agents/skills/project-spec-mirror/references/projections.md b/agents/skills/project-spec-mirror/references/projections.md
+--- a/agents/skills/project-spec-mirror/references/projections.md	2026-08-30 02:21:20.399107721 +0800
++++ b/agents/skills/project-spec-mirror/references/projections.md	2026-09-05 20:28:55.742801920 +0800
+@@ -1,152 +1,64 @@
+-# 恢复投影（可运行系统）
++# Agent 契约层与可选本栈附录
+ 
+-金字塔回答「这是什么」。切面回答「怎样可验证地改、迁、验」。本文件的五层顶层回答「只凭镜像能否重建项目实际具备的可运行能力」。三者并存，不互相替代。
++金字塔式「这是什么」由 `briefing/` 承担。本文件说明 Agent 用来复现系统的三层：`surface` / `data` / `model`（模型细则见 [knowledge.md](knowledge.md)），以及默认不建的本栈附录 `evidence/realization/`。
+ 
+-适用能力应达到恢复档 C；不适用能力不要求虚构内容，而要写 `不适用`、判断依据和证据路径。例如纯库通常没有独立部署拓扑，静态站点通常没有业务存储迁移。不是源码逐行副本，也不是把测试正文抄进 Spec。
++功能等价不要求再生当前可运行拓扑。适用层写到行为可判定；不适用层在 INDEX 写 `不适用`、判断依据，不编造。
+ 
+-## 目录
++## agent/surface/
+ 
+-```text
+-<spec_root>/
+-├── context/
+-│   └── INDEX.md           # 系统在环境里的位置
+-├── data/
+-│   └── INDEX.md           # 持久化与一致性
+-├── surface/
+-│   ├── INDEX.md           # 对外接口目录
+-│   └── config.md          # 配置键表（值脱敏）
+-├── runtime/
+-│   └── INDEX.md           # 进程、部署、拓扑
+-└── build/
+-    └── INDEX.md           # 构建 / 测试 / 迁移 / 启动
+-```
+-
+-核心 INDEX 始终存在，便于稳定导航。先根据清单、入口和部署证据判定适用性：
+-
+-| 项目形态 | 通常重点 | 可能不适用 |
+-|----------|----------|------------|
+-| 服务 / worker | context、surface、data、runtime、build | 无 |
+-| 库 / SDK | context、surface、build | 独立 data、runtime |
+-| CLI | surface、build，按需 data/runtime | traffic、独立拓扑 |
+-| 静态站点 / 文档 | surface、build | data、服务端 runtime |
+-
+-这只是判断起点，以实际证据为准。适用层写到可恢复；不适用层在 INDEX 用短段记录理由与来源，不扩写空表。仅当 INDEX 放不下时再加页。不要为每个源文件或每张表建页。
+-
+-`init` 必须创建上列六个文件；已有镜像在 update 时若缺则先补骨架再改正文。
+-
+-## 与金字塔 / 切面的分工
+-
+-| 已有层 | 回答 | 不要塞进这里 |
+-|--------|------|----------------|
+-| 概念 / 实体 | 领域词与对象 | 库实例、迁移、一致性模型 |
+-| 处理线 | 一次业务怎么走完 | 系统级超时/重试/降级目录 |
+-| 模块 | 代码如何落地 | 进程、端口、部署单元 |
+-| SOURCE | 事实从哪来 | 配置键语义与环境差 |
+-| 结构契约 | 必须为真的路由/schema 名 | 完整对外目录与兼容策略 |
+-| `contracts/runtime.md` | 指标、灰度条件、回滚条件 | 拓扑与启动顺序（走 `runtime/`） |
+-| VERIFY / TRAFFIC | 如何证明仍真、如何发布回滚 | 构建配方（走 `build/`） |
+-
+-交叉链接：context → surface / runtime；surface → 结构契约 / 处理线；data → 实体；runtime → build / 模块；build → runtime / VERIFY。
+-
+-## context/
+-
+-系统在环境中的位置。没有这页，模块和切片都是悬空的。
+-
+-INDEX 最少包含：
+-
+-1. **一句话** — 这个系统对谁、在哪条链上负责什么
+-2. **使用者** — actor / 角色；没有真人用户则写调用方系统
+-3. **邻接系统** — 表：邻接 / 方向（入|出|双向） / 协议 / 责任切在哪
+-4. **信任边界** — 哪些调用过鉴权、哪些是内网、租户如何隔离
+-5. **质量属性** — 延迟、吞吐、可用、容量中实际约束设计的项；没有则写「未知」并给推断来源
+-6. **安全** — 认证、鉴权、租户；密钥只写「存在 / 轮换方式」，值写 `<REDACTED>`
+-
+-不确定就写「未知 / 推断」并标路径。不要编造邻接系统。
+-
+-## data/
+-
+-持久化与一致性。实体是领域对象；本层是数据怎么活。
++必须对上的对外表面。对不上就不是同一个产品。
+ 
+ INDEX 最少包含：
+ 
+-1. **存储实例** — 表：名称 / 引擎 / 角色（主数据|缓存|队列|对象存储） / 谁读写
+-2. **与实体的差** — 哪些实体落在哪；哪些表/集合没有对应实体页（胶水表注明即可）
+-3. **迁移与索引** — 迁移目录或工具；关键索引与唯一约束（链路径，不贴 SQL 全文）
+-4. **一致性与保留** — 事务边界、重复投递、保留/归档/删除；没有则写「未知」
+-
+-多个存储且一张表说不清时，可加 `data/<store>.md`，INDEX 只留地图。
+-
+-## surface/
+-
+-必须对上的对外表面。对不上就不是同一个系统。
+-
+-`INDEX.md` 最少包含：
+-
+-1. **接口目录** — 表：入口（路由/命令/消息名） / 协议 / 版本 / 一句话 / 处理线或切片
+-2. **兼容** — 版本策略、废弃、错误码习惯；没有版本则写「无」
++1. **接口目录** — 入口（路由/命令/消息名） / 协议 / 版本 / 一句话 / 能力
++2. **兼容** — 版本策略、废弃、错误分类；没有版本则写「无」
+ 3. **对内接口** — 仅当它也是稳定契约时列入，并标明「对内」
+ 
+-`config.md` 最少包含：
++写行为：输入、输出、错误、幂等。不要写处理函数名、框架注解或源文件路径。配置若构成对外契约（功能开关名、必填环境语义），写键名与语义，值 `<REDACTED>`。
+ 
+-1. **键表** — 名 / 语义 / 默认 / 环境差（dev/staging/prod 只写差，不写值）
+-2. **开关** — feature flag 名与默认开闭
+-3. 值、口令、连接串一律 `<REDACTED>`
++## agent/data/
+ 
+-SOURCE 仍登记配置文件路径；本页只写键语义。结构契约仍登记必须为真的 schema 名；完整目录以本层为准。
++逻辑持久化与一致性。实体是对象；本层是数据怎么活。
+ 
+-## runtime/
++INDEX 最少包含：
+ 
+-进程与部署拓扑。`facets/contracts/runtime.md` 仍写指标与灰度/回滚条件，不写拓扑。
++1. **逻辑存储** — 名称 / 角色（主数据|缓存|队列|对象） / 谁读写（能力名）
++2. **与实体的差** — 哪些实体落在哪；哪些集合没有对应实体页
++3. **一致性与保留** — 事务边界、重复投递、保留/归档/删除
++4. **迁移语义** — 需要哪些迁移步骤才能保持数据含义；不贴 SQL 全文，不绑定某个引擎品牌，除非对外契约就是该引擎
+ 
+-INDEX 最少包含：
++多个逻辑存储且一张表说不清时，可加 `agent/data/<store>.md`。
+ 
+-1. **拓扑** — 表：进程或容器 / 角色 / 端口 / 副本或实例关系
+-2. **网络与依赖** — 谁连谁、发现方式；链到 context 邻接
+-3. **启动顺序** — 先存储/总线再应用等；链到 `build/` 的启动命令
+-4. **健康检查** — 探活路径或命令；没有则写「无」
+-5. **故障与弹性** — 超时、重试、降级、幂等中实际存在的策略
+-6. **可观测** — 关键日志/指标/追踪/告警/SLO；没有则写「未知」
++## 与 briefing 的分工
+ 
+-compose / 清单 / 单元文件是证据路径，不要把整份 YAML 贴进本页。
++| 层 | 回答 | 不要塞进 briefing |
++|----|------|-------------------|
++| 概念 / 处理线 | 人能讲清的词与路径 | 字段级不变式、错误码全集 |
++| 架构 | 邻接与信任 | 配置键表、存储引擎 |
++| 能力 spec | 可判定的行为 | 源路径、函数步骤 |
++| surface / data | 对上表面与数据语义 | 进程端口、compose、构建命令 |
+ 
+-## build/
++交叉链接：surface → 能力；data → 实体；briefing 架构 → 邻接；能力 → 处理线。
+ 
+-可再生配方：从干净环境到可运行。不是项目对外 README，也不代替 README。
++## evidence/realization/（可选）
+ 
+-INDEX 最少包含：
++仅当用户明确要求「复原当前这个栈 / 按现有 compose 跑起来」时创建。默认不建，也不纳入 `validate` 必填。
+ 
+-1. **工具链** — 语言/运行时版本、包管理器；锁文件只列路径
+-2. **依赖** — 必连的外部服务；第三方只列包名与影响运行的约束，不抄 lock、不打开 `vendor/` 或外来仓源码
+-3. **构建** — 一条可复制的构建命令与产物路径
+-4. **测试** — 一条可复制的测试命令；链到 VERIFY，不抄测试正文
+-5. **迁移** — 如何套用 `data/` 里的迁移
+-6. **启动** — 如何把 `runtime/` 拓扑跑起来（命令或 compose 名）
++若创建，INDEX 可写：工具链版本、进程/端口、构建与启动命令、当前存储引擎。这是本栈附录，**不是**复现验收。密钥仍 `<REDACTED>`。
+ 
+-缺命令就写「未知」并标清单文件路径，不要编造 `make` 目标。
++旧镜像的 `runtime/` `build/` `context/` 顶层：视为 realization 的遗留位置，停更；用户要本栈附录时把仍有效的内容迁到 `evidence/realization/`。
+ 
+-## 恢复完备自检
++## 复现完备自检
+ 
+-build / update 结束前核对这些项；适用能力做不到就在页内写「未知」与缺口，不要假装可恢复；不适用能力写判断证据：
++build / update 结束前核对这些项。做不到就在页内写「未知」与缺口，不要假装可换栈复现：
+ 
+ | 检查 | 通过标准 |
+ |------|----------|
+-| 边界 | 只读 `context/` 能说出 actor、邻接与责任切 |
+-| 表面 | 只读 `surface/` 能列出对外入口与配置键 |
+-| 数据 | 只读 `data/` + 实体能重建存储与一致性 |
+-| 拓扑 | 只读 `runtime/` 能画出进程/端口/启动顺序 |
+-| 再生 | 只读 `build/` 能构建、迁移、启动（命令可执行或标明未知） |
+-| 脱敏 | 无密钥、连接串、`.env` 原文，亦无 `AppKey` / `SecretKey` / token 等字面量 |
+-| 适用性 | 标为 `不适用` 的层有项目类型或源码/清单证据，不是为了省略工作 |
+-
+-`validate` 只检查这六个文件存在，不判断正文是否写满。
+-
+-## 维护
+-
+-| 动作 | 做法 |
+-|------|------|
+-| 新增 | 源码或清单里能划清的邻接/存储/入口/进程/命令，补进对应 INDEX |
+-| 更新 | 按 [routing.md](routing.md) 落到投影页，再跟链接改契约/切片/实体 |
+-| 删除 | 源已消失：表行删除或标废弃；保留 `<!-- manual -->` |
+-| 已有镜像 | 缺骨架则先建上列六个文件的 stub，再填正文；不删金字塔 |
++| 能力 | 只读 `agent/INDEX.md` + specs 能列出必须实现的功能 |
++| 表面 | 只读 `agent/surface/` 能列出对外入口与错误分类 |
++| 数据 | 只读 `agent/data/` + model 能重建逻辑存储与一致性 |
++| 人读 | 只读 `briefing/` 能讲清架构与主路径，且无实现泄漏 |
++| 脱敏 | 无密钥、连接串、`.env` 原文 |
++| 去栈 | agent 页没有把语言/框架/目录树写成硬性要求 |
+ 
+-简约只写表和必填节；详尽加深同一批页，见 [modes.md](modes.md)。
++`validate` 检查骨架文件存在；`reconstructable` 且已 built 时再检查 spec 页含 Requirement / Scenario。
+diff -ruN a/agents/skills/project-spec-mirror/references/routing.md b/agents/skills/project-spec-mirror/references/routing.md
+--- a/agents/skills/project-spec-mirror/references/routing.md	2026-08-30 12:03:39.326763301 +0800
++++ b/agents/skills/project-spec-mirror/references/routing.md	2026-09-05 20:29:14.149861359 +0800
+@@ -1,50 +1,43 @@
+-# 更新路由：文件 → 页
++# 更新路由：文件 → 能力
+ 
+-源文件是 git 的变更单位，不是规格的阅读单位。`diff` 给出改了哪些路径；本文件规定如何把它们映射到已有金字塔/切面页。
++源文件是 git 的变更单位，能力 spec 是规格的阅读与复现单位。`diff` 给出改了哪些路径；本文件规定如何把它们映射到 `agent/specs/`。
+ 
+-update 必须跑 `$SPECCTL route`，用它的 JSON（模块命中、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」。`route` 只返回模块 README；知识层仍由 Agent 跟链接。
++update 必须跑 `$SPECCTL route`，用它的 JSON（`capabilities`、`pages`、rename、unmapped、`not_built`）。不要手算、不要绕过 CLI。不得改回「一变更文件一详页」或模块文件表路由。
+ 
+ ## 输入边界
+ 
+ `inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，已经丢弃这些：`.gitignore` 当前命中的路径、已知二进制扩展与内容检测为二进制的文件、构建产物与密钥、包管理器安装树（`vendor/`、`node_modules/`、虚拟环境及同类目录）、git submodule 与树内嵌套仓库、`replace` / Composer path / 同级克隆指向的外来仓。
+ 
+-它们不是镜像输入：不要当 `unmapped` 去建模块、文件表行、`notes/`、概念或切片；CLI 万一仍给出这类路径，丢弃。依赖的其他仓库只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束；要给那个仓做镜像，另开一次会话、切换 active target 并显式 `--source`。
++它们不是镜像输入：不要当 `unmapped` 去建能力、source-map 行或 briefing 页；CLI 万一仍给出这类路径，丢弃。依赖的其他仓库只在 `briefing/architecture.md` 记邻接；要给那个仓做镜像，另开一次会话并显式 `--source`。
+ 
+ ## 算法
+ 
+-对 `$SPECCTL diff` 的每一条（`status` / `path`，rename 另有 `from`）：
+-
+-1. **Rename（`status` 为 `R`）**：用 `from` 找旧归属，把该模块文件表那一行改成 `path`。若已有 `notes/<from>.md`，改名为 `notes/<path>.md` 并更新真身。禁止当成删除 + 新增。
+-2. **文件表精确匹配** `path`（rename 则先匹配 `from`）→ 落入含该行的模块。
+-3. 未命中 → **最长前缀**匹配该模块 README「根」表第一列。
+-4. 仍未命中 → 记入 `unmapped`：并入最近模块或新建模块，不得丢弃，也不得为此建文件详页。
+-5. 从命中的模块 README **跟随已有链接** → 实体 / 处理线 / 切片 / 契约 / 恢复投影。只改被波及的页。`overview.md` 仅在模块地图或主路径变了才改。
+-6. 非代码、配置、测试：先按下方「与切面的分工」落到恢复投影或 `facets/source.md`，其次才是模块表。
++`route` 读取 `evidence/source-map.md` 的表（列：能力 / 源路径 / spec）。没有有效源路径行 → `not_built: true`，全部 `unmapped`，进入 `build` 而不是硬编路由。
+ 
+-标题约定（与 [layout.md](layout.md) 一致，便于日后 CLI 解析）：「根」或 `Roots`；「文件」或 `Files`。不要靠扫全库反引号路径做路由（易误伤）。
++对 `$SPECCTL diff` 的每一条（`status` / `path`，rename 另有 `from`）：
+ 
+-无模块 README（刚 init 未 build）→ `route` 返回 `not_built: true`，全部 `unmapped`，进入 `build` 而不是硬编路由。
++1. **Rename（`status` 为 `R`）**：用 `from` 找旧能力，把 source-map 那一行改成 `path`。禁止当成删除 + 新增。
++2. **精确匹配** source-map 的源路径。
++3. 未命中 → **最长前缀**匹配源路径。
++4. 仍未命中 → 记入 `unmapped`：并入最近能力或新识别一条能力，不得丢弃，也不得为此建文件详页。
++5. 从命中的能力 **跟随已有链接** → 处理线 / 模型 / 表面。只改被波及的页。`briefing/overview.md` 仅在能力地图或主路径变了才改。
+ 
+-## 与切面的分工
++## 与各层的分工
+ 
+ | 变更像什么 | 优先改 |
+ |------------|--------|
+-| 领域包、入口、符号 | 模块 README 文件表；跟链接的实体/处理线 |
+-| 路由 / OpenAPI / proto / 消息名 | `surface/INDEX.md` 与结构契约、切片 |
+-| schema / migration | `data/` 与结构契约 |
+-| 配置键、`.env.example`、feature flag | `surface/config.md`；路径仍登记 SOURCE |
+-| compose / 编排 / Dockerfile / 单元文件 | `runtime/` |
+-| Makefile、CI、包清单、启动脚本 | `build/` |
+-| 邻接客户端、网关、鉴权入口 | `context/` |
+-| 测试名、断言 | VERIFY 与行为/副作用契约 |
+-| 放量、发布、回滚 | `traffic.md`（无发布机制则写「无」） |
+-
+-切片是垂直切口，穿过多个文件。不要为切片里的每个文件建页；入口文件成为热点的条件见 [modes.md](modes.md)。
++| 领域行为、入口、状态机 | 对应能力 spec；跟链接的处理线 / 模型 |
++| 路由 / OpenAPI / proto / 消息名 | `agent/surface/` 与能力 spec |
++| schema / 逻辑存储 | `agent/data/` 与模型 |
++| 配置键、功能开关 | `agent/surface/`（若构成对外契约） |
++| 邻接客户端、鉴权入口 | `briefing/architecture.md` |
++| 测试名、断言 | 能力 Scenario 的证据，不要抄测试正文 |
++| compose / Makefile / 工具链 | 默认忽略（不是复现输入）；仅当用户要 realization 时写入 `evidence/realization/` |
+ 
+ ## 维护时
+ 
+-- 每个模块 README 必须有「根」表与「文件」表，否则下一步 update 无法路由。
+-- 新增源文件：先落入某模块的根前缀，再补文件表一行。
+-- 源文件消失：文件表删行或标明废弃；不要默默删 `<!-- manual -->`。
+-- 增删后跑 `$SPECCTL coverage`；`missing` / `extra` 以 CLI 为准，不要手对清单。
++- `evidence/source-map.md` 必须有表头「能力」「源路径」；否则下一步 update 无法路由。
++- 新增源文件：先落入某能力的路径前缀，再补 source-map 一行。
++- 源文件消失：source-map 删行或标明废弃；不要默默删 `<!-- manual -->`。
++- 增删后跑 `$SPECCTL coverage`；`missing` / `extra` 以 CLI 为准。
+ - `<!-- manual -->` 块不得覆盖。
+diff -ruN a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py	2026-08-30 12:34:53.262550287 +0800
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py	2026-09-05 20:30:51.359180053 +0800
+@@ -1,8 +1,8 @@
+ #!/usr/bin/env python3
+ """specctl — project-spec-mirror 的机械管理工作。
+ 
+-只做路径探测、目录骨架、git 版本、文件清单、符号提取、文件表覆盖与镜像状态。
+-给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
++只做路径探测、目录骨架、git 版本、文件清单、符号提取、能力覆盖与镜像状态。
++briefing 与 agent spec 正文由 Agent 撰写。
+ 
+ stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
+ """
+@@ -38,7 +38,9 @@
+         "Gemfile",
+     }
+ )
+-DETAIL_LEVELS = ("complete", "important", "lightweight")
++MODES = ("briefing", "reconstructable")
++REQUIREMENT_RE = re.compile(r"^#{2,4}\s+Requirement\b", re.I | re.M)
++SCENARIO_RE = re.compile(r"^#{2,4}\s+Scenario\b", re.I | re.M)
+ IGNORE_DIR_NAMES = frozenset(
+     {
+         ".git",
+@@ -825,7 +827,7 @@
+     branch_text = branch or "（无）"
+     return f"""# {project}
+ 
+-从这里读这个项目：先总览，再恢复投影，再按需下钻。
++从这里读这个项目：人走 briefing，Agent 走能力 spec。
+ 
+ | 项 | 值 |
+ |----|-----|
+@@ -836,27 +838,22 @@
+ 
+ ## 怎么读
+ 
+-1. [overview.md](overview.md)
+-2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
+-3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
+-4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
++1. 人：[总览](briefing/overview.md) · [架构](briefing/architecture.md) · [处理线](briefing/flows/INDEX.md) · [图](briefing/diagrams/INDEX.md)
++2. Agent：[能力](agent/INDEX.md) · [模型](agent/model/INDEX.md) · [表面](agent/surface/INDEX.md) · [数据](agent/data/INDEX.md)
+ 
+ ## 地图
+ 
+-| 层 | 路径 | 回答什么 |
+-|----|------|----------|
+-| 总览 | overview.md | 这是什么、边界在哪 |
+-| 上下文 | context/ | 系统在环境里的位置 |
+-| 表面 | surface/ | 对外接口与配置键 |
+-| 数据 | data/ | 持久化与一致性 |
+-| 运行时 | runtime/ | 进程、部署、拓扑 |
+-| 构建 | build/ | 如何构建、迁移、启动 |
+-| 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
+-| 概念 | concepts/ | 领域用语 |
+-| 实体 | entities/ | 关键对象及其关系 |
+-| 处理线 | flows/ | 一次业务怎么走完 |
+-| 模块 | modules/ | 代码如何落地 |
+-| 图 | diagrams/ | 结构 / 流程 / 时序 / 数据流 / 状态 |
++| 层 | 路径 | 给谁 | 回答什么 |
++|----|------|------|----------|
++| 总览 | briefing/overview.md | 人 | 这是什么、边界在哪 |
++| 架构 | briefing/architecture.md | 人 | 邻接、信任、能力如何拼在一起 |
++| 处理线 | briefing/flows/ | 人 | 一次业务怎么走完 |
++| 概念 | briefing/concepts/ | 人 | 领域用语 |
++| 图 | briefing/diagrams/ | 人 | 结构 / 流程 / 状态 |
++| 能力 | agent/specs/ | Agent | 可验证、可复现的功能契约 |
++| 模型 | agent/model/ | Agent | 实体、不变式、状态机 |
++| 表面 | agent/surface/ | Agent | 对外行为必须对上什么 |
++| 数据 | agent/data/ | Agent | 逻辑持久化与一致性 |
+ """
+ 
+ 
+@@ -871,30 +868,30 @@
+ - 目标：
+ - 非目标：
+ 
+-## 恢复入口
++## 能力地图
+ 
+-- [上下文](context/INDEX.md)
+-- [表面](surface/INDEX.md) · [配置键](surface/config.md)
+-- [数据](data/INDEX.md)
+-- [运行时](runtime/INDEX.md)
+-- [构建](build/INDEX.md)
++| 能力 | 一句话 | 页 |
++|------|--------|-----|
++
++## 主处理线
+ 
+-## 模块地图
++（链到 `briefing/flows/`。）
++"""
+ 
+-| 模块 | 职责 | 入口 |
+-|------|------|------|
+ 
+-## 主处理线
++def skeleton_architecture() -> str:
++    return """# 架构
+ 
+-（链到 `flows/`。）
++（待 build：系统对谁负责、邻接与信任边界。）
+ 
+-## 主切片
++## 使用者
+ 
+-（链到 `facets/slices/`。）
++## 邻接系统
+ 
+-## 关键概念与实体
++| 邻接 | 方向 | 协议 | 责任切在哪 |
++|------|------|------|------------|
+ 
+-（链到 `concepts/` 与 `entities/`。）
++## 信任边界
+ """
+ 
+ 
+@@ -906,27 +903,30 @@
+ """
+ 
+ 
+-def skeleton_changelog() -> str:
+-    return """# 镜像同步
++def skeleton_capability_index() -> str:
++    return """# 能力
+ 
+-尚未同步。
++| 能力 | 一句话 | 状态 | 页 |
++|------|--------|------|-----|
+ """
+ 
+ 
+-def skeleton_facets_index() -> str:
+-    return """# 工程切面
++def skeleton_source_map() -> str:
++    return """# 源映射
+ 
+-| 切面 | 一句话 | 页 |
+-|------|--------|-----|
+-| SOURCE | 现状事实从哪来 | [source.md](source.md) |
+-| CONTRACT | 必须保持为真的约定 | [contracts/INDEX.md](contracts/INDEX.md) |
+-| SLICE | 可独立交付的垂直切口 | [slices/INDEX.md](slices/INDEX.md) |
+-| VERIFY | 如何对照验证 | [verify.md](verify.md) |
+-| TRAFFIC | 影子 / 灰度 / 切换 / 回滚 | [traffic.md](traffic.md) |
++| 能力 | 源路径 | spec |
++|------|--------|------|
++"""
++
++
++def skeleton_changelog() -> str:
++    return """# 镜像同步
++
++尚未同步。
+ """
+ 
+ 
+-def skeleton_facet_stub(title: str, hint: str) -> str:
++def skeleton_stub(title: str, hint: str) -> str:
+     return f"""# {title}
+ 
+ （待 build：{hint}）
+@@ -941,7 +941,6 @@
+     source: Path,
+     branch: str | None,
+     mode: str,
+-    detail_level: str | None,
+ ) -> None:
+     spec_root.mkdir(parents=True, exist_ok=True)
+     source_rel = rel_to(source, spec_root)
+@@ -952,10 +951,7 @@
+         "source": source_rel,
+         "branch": branch,
+         "mode": mode,
+-        "detail_level": detail_level,
+         "scope": [],
+-        "important_paths": [],
+-        "hotspots": [],
+         "build_status": "skeleton",
+         "built_at": None,
+         "synced_commit": None,
+@@ -964,58 +960,26 @@
+     }
+     write_state(spec_root, state)
+     write_text(spec_root / "README.md", skeleton_readme(project, mode, branch))
+-    write_text(spec_root / "overview.md", skeleton_overview(project))
+     write_text(spec_root / "changelog.md", skeleton_changelog())
+-    write_text(spec_root / "concepts" / "INDEX.md", skeleton_index("概念"))
+-    write_text(spec_root / "entities" / "INDEX.md", skeleton_index("实体"))
+-    write_text(spec_root / "flows" / "INDEX.md", skeleton_index("业务处理线"))
+-    write_text(spec_root / "modules" / "INDEX.md", skeleton_index("模块"))
+-    write_text(spec_root / "facets" / "INDEX.md", skeleton_facets_index())
+-    write_text(
+-        spec_root / "facets" / "source.md",
+-        skeleton_facet_stub("现状来源", "代码、配置、测试、脱敏样本。"),
+-    )
+-    write_text(spec_root / "facets" / "contracts" / "INDEX.md", skeleton_index("契约"))
+-    write_text(spec_root / "facets" / "slices" / "INDEX.md", skeleton_index("垂直切片"))
+-    write_text(
+-        spec_root / "facets" / "verify.md",
+-        skeleton_facet_stub(
+-            "对照验证",
+-            "如何证明行为仍真：测试、性质、对照差分。单实现也须写测试/性质；差分没有则写无。",
+-        ),
+-    )
+-    write_text(
+-        spec_root / "facets" / "traffic.md",
+-        skeleton_facet_stub(
+-            "流量控制",
+-            "如何发布与回滚。无灰度也须写发布步骤与回滚；完全没有发布机制则写无。",
+-        ),
+-    )
+-    write_text(
+-        spec_root / "context" / "INDEX.md",
+-        skeleton_facet_stub("系统上下文", "actor、邻接系统、协议、信任边界、质量属性、安全。"),
+-    )
+-    write_text(
+-        spec_root / "data" / "INDEX.md",
+-        skeleton_facet_stub("数据面", "存储实例、与实体的差、迁移、一致性与保留。"),
+-    )
++    write_text(spec_root / "briefing" / "overview.md", skeleton_overview(project))
++    write_text(spec_root / "briefing" / "architecture.md", skeleton_architecture())
++    write_text(spec_root / "briefing" / "concepts" / "INDEX.md", skeleton_index("概念"))
++    write_text(spec_root / "briefing" / "flows" / "INDEX.md", skeleton_index("业务处理线"))
++    write_text(spec_root / "briefing" / "diagrams" / "INDEX.md", skeleton_index("图表"))
++    write_text(spec_root / "agent" / "INDEX.md", skeleton_capability_index())
+     write_text(
+-        spec_root / "surface" / "INDEX.md",
+-        skeleton_facet_stub("对外表面", "接口目录、版本与兼容；配置键见 config.md。"),
++        spec_root / "agent" / "model" / "INDEX.md",
++        skeleton_stub("模型", "实体、不变式、状态机。"),
+     )
+     write_text(
+-        spec_root / "surface" / "config.md",
+-        skeleton_facet_stub("配置键", "键、语义、默认、环境差；值写 <REDACTED>。"),
++        spec_root / "agent" / "surface" / "INDEX.md",
++        skeleton_stub("对外表面", "接口目录、版本与错误分类。"),
+     )
+     write_text(
+-        spec_root / "runtime" / "INDEX.md",
+-        skeleton_facet_stub("运行时", "进程/容器/端口、启动顺序、健康检查、故障弹性。"),
++        spec_root / "agent" / "data" / "INDEX.md",
++        skeleton_stub("数据", "逻辑存储、一致性与保留。"),
+     )
+-    write_text(
+-        spec_root / "build" / "INDEX.md",
+-        skeleton_facet_stub("构建与再生", "工具链、构建/测试/迁移/启动命令与产物。"),
+-    )
+-    write_text(spec_root / "diagrams" / "INDEX.md", skeleton_index("图表"))
++    write_text(spec_root / "evidence" / "source-map.md", skeleton_source_map())
+ 
+ 
+ def parse_name_status(text: str) -> list[dict[str, str]]:
+@@ -1033,16 +997,18 @@
+     return files
+ 
+ 
+-ROOT_HEADINGS = frozenset({"根", "roots"})
+-FILE_HEADINGS = frozenset({"文件", "files"})
+ HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+ 
+ 
+-def first_table_cell(row: str) -> str:
++def table_cells(row: str) -> list[str]:
+     raw = row.strip()
+     if not raw.startswith("|"):
+-        return ""
+-    parts = [part.strip() for part in raw.strip("|").split("|")]
++        return []
++    return [part.strip() for part in raw.strip("|").split("|")]
++
++
++def first_table_cell(row: str) -> str:
++    parts = table_cells(row)
+     return parts[0] if parts else ""
+ 
+ 
+@@ -1056,11 +1022,11 @@
+     return cell.strip().lstrip("./")
+ 
+ 
+-def parse_pipe_table(lines: list[str], start: int) -> tuple[list[str], int]:
++def parse_table_rows(lines: list[str], start: int) -> tuple[list[list[str]], int]:
+     i = start
+     header_skipped = False
+     sep_skipped = False
+-    cells: list[str] = []
++    rows: list[list[str]] = []
+     while i < len(lines) and lines[i].lstrip().startswith("|"):
+         row = lines[i]
+         if not header_skipped:
+@@ -1071,54 +1037,67 @@
+             sep_skipped = True
+             i += 1
+             continue
+-        value = normalize_path_cell(first_table_cell(row))
+-        if value:
+-            cells.append(value)
++        cells = table_cells(row)
++        if any(cell.strip() for cell in cells):
++            rows.append(cells)
+         i += 1
++    return rows, i
++
++
++def parse_pipe_table(lines: list[str], start: int) -> tuple[list[str], int]:
++    rows, i = parse_table_rows(lines, start)
++    cells = [normalize_path_cell(row[0]) for row in rows if row and normalize_path_cell(row[0])]
+     return cells, i
+ 
+ 
+-def parse_module_readme(text: str) -> tuple[list[str], list[str]]:
+-    roots: list[str] = []
+-    files: list[str] = []
++def iter_markdown_tables(text: str) -> list[list[list[str]]]:
++    tables: list[list[list[str]]] = []
+     lines = text.splitlines()
+     i = 0
+-    current = ""
+     while i < len(lines):
+-        match = HEADING_RE.match(lines[i])
+-        if match:
+-            current = match.group(2).strip().lower()
+-            i += 1
+-            continue
+-        if lines[i].lstrip().startswith("|") and current in ROOT_HEADINGS | FILE_HEADINGS:
+-            cells, i = parse_pipe_table(lines, i)
+-            if current in ROOT_HEADINGS:
+-                roots.extend(cells)
+-            else:
+-                files.extend(cells)
++        if lines[i].lstrip().startswith("|"):
++            rows, i = parse_table_rows(lines, i)
++            if rows:
++                tables.append(rows)
+             continue
+         i += 1
+-    return roots, files
++    return tables
+ 
+ 
+-def load_modules(spec_root: Path) -> list[dict[str, Any]]:
+-    modules_dir = spec_root / "modules"
++def load_capabilities(spec_root: Path) -> list[dict[str, Any]]:
++    index = spec_root / "agent" / "INDEX.md"
++    if not index.is_file():
++        return []
+     found: list[dict[str, Any]] = []
+-    if not modules_dir.is_dir():
+-        return found
+-    for readme in sorted(modules_dir.glob("*/README.md")):
+-        name = readme.parent.name
+-        if name.startswith("."):
+-            continue
+-        roots, files = parse_module_readme(readme.read_text(encoding="utf-8"))
+-        found.append(
+-            {
+-                "name": name,
+-                "readme": f"modules/{name}/README.md",
+-                "roots": roots,
+-                "files": files,
+-            }
+-        )
++    seen: set[str] = set()
++    for table in iter_markdown_tables(index.read_text(encoding="utf-8")):
++        for row in table:
++            name = normalize_path_cell(row[0]) if row else ""
++            if not name or name in seen:
++                continue
++            seen.add(name)
++            status = row[2].strip() if len(row) > 2 else ""
++            found.append({"name": name, "status": status})
++    return found
++
++
++def load_source_map(spec_root: Path) -> list[dict[str, Any]]:
++    path = spec_root / "evidence" / "source-map.md"
++    if not path.is_file():
++        return []
++    found: list[dict[str, Any]] = []
++    for table in iter_markdown_tables(path.read_text(encoding="utf-8")):
++        for row in table:
++            if len(row) < 2:
++                continue
++            name = normalize_path_cell(row[0])
++            source_path = normalize_path_cell(row[1])
++            if not name or not source_path:
++                continue
++            spec = ""
++            if len(row) > 2:
++                spec = row[2].strip()
++            found.append({"name": name, "path": source_path, "spec": spec})
+     return found
+ 
+ 
+@@ -1152,15 +1131,8 @@
+     return Path(rel).suffix.lower() in CODE_EXTS
+ 
+ 
+-def collect_file_table_entries(modules: list[dict[str, Any]]) -> list[str]:
+-    entries: list[str] = []
+-    seen: set[str] = set()
+-    for module in modules:
+-        for rel in module.get("files") or []:
+-            if rel and rel not in seen:
+-                seen.add(rel)
+-                entries.append(rel)
+-    return entries
++def capability_spec_rel(name: str) -> str:
++    return f"agent/specs/{name}/spec.md"
+ 
+ 
+ def collect_coverage(
+@@ -1170,84 +1142,85 @@
+     *,
+     path: str | None = None,
+ ) -> dict[str, Any]:
++    del path
++    del source
+     scope = normalize_scope(state.get("scope"))
+-    files = inventory_files(source, path)
+-    code_files = [item for item in files if is_code_file(item)]
+-    modules = load_modules(spec_root)
+-    entries = collect_file_table_entries(modules)
+-    required = [item for item in code_files if in_scope(item, scope)]
+-    unscoped = [item for item in code_files if item not in required]
+-    missing = [
+-        item
+-        for item in required
+-        if not any(prefix_matches(item, entry) for entry in entries)
+-    ]
+-    extra = [
+-        entry
+-        for entry in entries
+-        if not any(prefix_matches(item, entry) for item in files)
+-    ]
+-    mode = state.get("mode") or "concise"
+-    detail_level = state.get("detail_level", "important")
+-    if detail_level not in DETAIL_LEVELS:
+-        detail_level = "important"
+-    enforce = mode == "detailed" and detail_level in {"important", "complete"}
++    capabilities = load_capabilities(spec_root)
++    mapping = load_source_map(spec_root)
++    mapped = {item["name"] for item in mapping}
++    missing: list[str] = []
++    for item in capabilities:
++        name = item["name"]
++        spec_file = spec_root / "agent" / "specs" / name / "spec.md"
++        if not spec_file.is_file():
++            missing.append(f"{name}:spec")
++        if name not in mapped:
++            missing.append(f"{name}:source-map")
++    extra = sorted(
++        name for name in mapped if name not in {item["name"] for item in capabilities}
++    )
++    mode = state.get("mode") or "briefing"
++    enforce = mode == "reconstructable"
++    if enforce and not capabilities:
++        missing.append("<no capabilities identified>")
+     ok = not (enforce and missing)
+     return {
+         "ok": ok,
+         "result": "coverage",
+         "spec_root": str(spec_root),
+         "mode": mode,
+-        "detail_level": detail_level,
+         "enforce": enforce,
+         "scope": scope,
+-        "path": path,
+-        "inventory_count": len(files),
+-        "code_file_count": len(code_files),
+-        "required_count": len(required),
+-        "covered_count": len(required) - len(missing),
++        "required_count": len(capabilities),
++        "covered_count": max(0, len(capabilities) - len({item.split(":", 1)[0] for item in missing if item != "<no capabilities identified>"})),
+         "missing": missing,
+         "extra": extra,
+-        "unscoped": unscoped,
+-        "not_built": not bool(modules),
++        "unscoped": [],
++        "not_built": not bool(mapping),
++        "capabilities": [item["name"] for item in capabilities],
+     }
+ 
+ 
+-def match_file_table(path: str, modules: list[dict[str, Any]]) -> list[str]:
+-    return [module["name"] for module in modules if path in module["files"]]
+-
+-
+-def match_root_prefix(path: str, modules: list[dict[str, Any]]) -> list[str]:
++def match_source_map(path: str, mapping: list[dict[str, Any]]) -> list[str]:
++    exact = [item["name"] for item in mapping if item["path"] == path]
++    if exact:
++        seen: list[str] = []
++        for name in exact:
++            if name not in seen:
++                seen.append(name)
++        return seen
+     best_len = -1
+     best: list[str] = []
+-    for module in modules:
+-        for root in module["roots"]:
+-            if not prefix_matches(path, root):
+-                continue
+-            length = len(root.strip().rstrip("/"))
+-            if length > best_len:
+-                best_len = length
+-                best = [module["name"]]
+-            elif length == best_len and module["name"] not in best:
+-                best.append(module["name"])
++    for item in mapping:
++        if not prefix_matches(path, item["path"]):
++            continue
++        length = len(item["path"].strip().rstrip("/"))
++        if length > best_len:
++            best_len = length
++            best = [item["name"]]
++        elif length == best_len and item["name"] not in best:
++            best.append(item["name"])
+     return best
+ 
+ 
+ def match_change(
+-    item: dict[str, str], modules: list[dict[str, Any]]
++    item: dict[str, str], mapping: list[dict[str, Any]]
+ ) -> tuple[list[str], str]:
+     status = item.get("status", "")
+     path = item["path"]
+     from_path = item.get("from")
+     lookups = [from_path, path] if status == "R" and from_path else [path]
+     for lookup in lookups:
+-        names = match_file_table(lookup, modules)
+-        if names:
+-            return names, "file-table"
+-    for lookup in lookups:
+-        names = match_root_prefix(lookup, modules)
++        if lookup is None:
++            continue
++        names = match_source_map(lookup, mapping)
+         if names:
+-            return names, "root-prefix"
++            via = (
++                "source-map"
++                if any(row["path"] == lookup for row in mapping)
++                else "source-prefix"
++            )
++            return names, via
+     return [], "unmapped"
+ 
+ 
+@@ -1384,18 +1357,10 @@
+             summary=f"init: occupied {spec_root}",
+         )
+     mode = args.mode
+-    if mode == "concise" and args.detail_level is not None:
+-        raise SpecError(
+-            "--detail-level is only valid with --mode detailed",
+-            reason="invalid_mode_combination",
+-        )
+-    detail_level = args.detail_level or ("important" if mode == "detailed" else None)
+     info = git_info(source, args.branch)
+     branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
+     if not args.confirm:
+         confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
+-        if detail_level:
+-            confirm_args.extend(["--detail-level", detail_level])
+         if args.project:
+             confirm_args.extend(["--project", args.project])
+         if args.source:
+@@ -1415,7 +1380,6 @@
+                 "project": project,
+                 "branch": branch,
+                 "mode": mode,
+-                "detail_level": detail_level,
+                 "prompt": (
+                     f"将创建 spec 镜像目录 {spec_root} "
+                     f"（placement={layout['placement']}，source={source}）。"
+@@ -1433,7 +1397,6 @@
+         source=source,
+         branch=branch,
+         mode=mode,
+-        detail_level=detail_level,
+     )
+     return emit(
+         {
+@@ -1446,7 +1409,6 @@
+             "placement": layout["placement"],
+             "branch": branch,
+             "mode": mode,
+-            "detail_level": detail_level,
+         },
+         summary=f"init: created {spec_root}",
+     )
+@@ -1654,18 +1616,18 @@
+         to=args.to,
+         path=args.path,
+     )
+-    modules = load_modules(spec_root)
+-    not_built = not modules
++    mapping = load_source_map(spec_root)
++    not_built = not mapping
+     changes: list[dict[str, Any]] = []
+     unmapped: list[str] = []
+     renames: list[dict[str, Any]] = []
+-    hit_modules: list[str] = []
++    hit_caps: list[str] = []
+     for item in diff_payload["files"]:
+-        names, via = ([], "unmapped") if not_built else match_change(item, modules)
++        names, via = ([], "unmapped") if not_built else match_change(item, mapping)
+         rec: dict[str, Any] = {
+             "status": item.get("status", ""),
+             "path": item["path"],
+-            "modules": names,
++            "capabilities": names,
+             "via": via,
+         }
+         if item.get("from"):
+@@ -1675,16 +1637,16 @@
+             unmapped.append(item["path"])
+         else:
+             for name in names:
+-                if name not in hit_modules:
+-                    hit_modules.append(name)
++                if name not in hit_caps:
++                    hit_caps.append(name)
+         if item.get("status") == "R" and item.get("from"):
+             rename_rec: dict[str, Any] = {"from": item["from"], "to": item["path"]}
+             if names:
+-                rename_rec["module"] = names[0]
++                rename_rec["capability"] = names[0]
+                 if len(names) > 1:
+-                    rename_rec["modules"] = names
++                    rename_rec["capabilities"] = names
+             renames.append(rename_rec)
+-    pages = [f"modules/{name}/README.md" for name in hit_modules]
++    pages = [capability_spec_rel(name) for name in hit_caps]
+     payload: dict[str, Any] = {
+         "ok": True,
+         "result": "route",
+@@ -1693,7 +1655,7 @@
+         "to": diff_payload.get("to"),
+         "full": diff_payload.get("full", False),
+         "not_built": not_built,
+-        "modules": hit_modules,
++        "capabilities": hit_caps,
+         "pages": pages,
+         "renames": renames,
+         "unmapped": unmapped,
+@@ -1704,32 +1666,24 @@
+     summary = (
+         f"route: not_built {len(unmapped)} unmapped"
+         if not_built
+-        else f"route: {len(hit_modules)} modules {len(unmapped)} unmapped"
++        else f"route: {len(hit_caps)} capabilities {len(unmapped)} unmapped"
+     )
+     return emit(payload, summary=summary)
+ 
+ 
+ REQUIRED_MIRROR_FILES = (
+     "README.md",
+-    "overview.md",
+     "changelog.md",
+-    "concepts/INDEX.md",
+-    "entities/INDEX.md",
+-    "flows/INDEX.md",
+-    "modules/INDEX.md",
+-    "facets/INDEX.md",
+-    "facets/source.md",
+-    "facets/contracts/INDEX.md",
+-    "facets/slices/INDEX.md",
+-    "facets/verify.md",
+-    "facets/traffic.md",
+-    "context/INDEX.md",
+-    "data/INDEX.md",
+-    "surface/INDEX.md",
+-    "surface/config.md",
+-    "runtime/INDEX.md",
+-    "build/INDEX.md",
+-    "diagrams/INDEX.md",
++    "briefing/overview.md",
++    "briefing/architecture.md",
++    "briefing/concepts/INDEX.md",
++    "briefing/flows/INDEX.md",
++    "briefing/diagrams/INDEX.md",
++    "agent/INDEX.md",
++    "agent/model/INDEX.md",
++    "agent/surface/INDEX.md",
++    "agent/data/INDEX.md",
++    "evidence/source-map.md",
+ )
+ 
+ 
+@@ -1742,19 +1696,15 @@
+ 
+ def render_readme_metadata(text: str, state: dict[str, Any]) -> str:
+     mode = state.get("mode")
+-    detail = state.get("detail_level") if mode == "detailed" else "不适用"
+     branch = state.get("branch") or "（无）"
+     commit = state.get("synced_commit")
+     commit_text = f"`{commit[:12]}`" if commit else "尚未同步"
+     replacements = {
+         "粒度": str(mode),
+-        "文件粒度": str(detail),
+         "分支": str(branch),
+         "同步 commit": commit_text,
+     }
+     lines = text.splitlines()
+-    found: set[str] = set()
+-    mode_index: int | None = None
+     for index, line in enumerate(lines):
+         if not line.lstrip().startswith("|"):
+             continue
+@@ -1763,11 +1713,6 @@
+             continue
+         key = cells[0]
+         lines[index] = f"| {key} | {replacements[key]} |"
+-        found.add(key)
+-        if key == "粒度":
+-            mode_index = index
+-    if "文件粒度" not in found and mode_index is not None:
+-        lines.insert(mode_index + 1, f"| 文件粒度 | {replacements['文件粒度']} |")
+     return "\n".join(lines) + "\n"
+ 
+ 
+@@ -1777,7 +1722,7 @@
+         if not line.lstrip().startswith("|"):
+             continue
+         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+-        if len(cells) >= 2 and cells[0] in {"粒度", "文件粒度", "分支", "同步 commit"}:
++        if len(cells) >= 2 and cells[0] in {"粒度", "分支", "同步 commit"}:
+             result[cells[0]] = cells[1].strip("`")
+     return result
+ 
+@@ -1814,46 +1759,31 @@
+         if key not in state:
+             issues.append(f"state missing {key}")
+     mode = state.get("mode")
+-    detail_level = state.get("detail_level")
+-    if mode not in {"concise", "detailed"}:
++    if mode not in MODES:
+         issues.append(f"invalid mode {mode!r}")
+-    elif mode == "concise" and detail_level is not None:
+-        issues.append("concise mode requires detail_level null")
+-    elif mode == "detailed" and (detail_level or "important") not in DETAIL_LEVELS:
+-        issues.append(f"invalid detail_level {detail_level!r}")
+     explicit_build_status = state.get("build_status")
+     if explicit_build_status is not None and explicit_build_status not in {"skeleton", "built"}:
+         issues.append(f"invalid build_status {explicit_build_status!r}")
+-    important_paths = state.get("important_paths", [])
+-    if important_paths is None:
+-        important_paths = []
+-    if not isinstance(important_paths, list) or any(
+-        not isinstance(item, str) for item in important_paths
++    if (
++        mode == "reconstructable"
++        and effective_build_status(state) == "built"
+     ):
+-        issues.append("important_paths must be a list of strings")
+-    else:
+-        for item in important_paths:
+-            try:
+-                normalized = normalize_source_path(item, "important")
+-            except SpecError as exc:
+-                issues.append(str(exc))
++        for item in load_capabilities(spec_root):
++            spec_file = spec_root / "agent" / "specs" / item["name"] / "spec.md"
++            if not spec_file.is_file():
++                issues.append(f"missing spec for {item['name']}")
+                 continue
+-            if normalized != item:
+-                issues.append(f"important path is not normalized: {item!r}")
+-    if important_paths and (mode != "detailed" or detail_level != "important"):
+-        issues.append("important_paths require detailed + important")
+-    hotspots = state.get("hotspots", [])
+-    if hotspots is None:
+-        hotspots = []
+-    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
+-        issues.append("hotspots must be a list of strings")
++            text = spec_file.read_text(encoding="utf-8")
++            if not REQUIREMENT_RE.search(text):
++                issues.append(f"{item['name']} spec missing Requirement")
++            if not SCENARIO_RE.search(text):
++                issues.append(f"{item['name']} spec missing Scenario")
+     if readme_text is None and (spec_root / "README.md").is_file():
+         readme_text = (spec_root / "README.md").read_text(encoding="utf-8")
+     if readme_text is not None:
+         metadata = readme_metadata(readme_text)
+         expected = {
+             "粒度": str(mode),
+-            "文件粒度": str(detail_level if mode == "detailed" else "不适用"),
+             "分支": str(state.get("branch") or "（无）"),
+             "同步 commit": str(state.get("synced_commit") or "尚未同步")[:12],
+         }
+@@ -1871,51 +1801,13 @@
+     state["build_status"] = effective_build_status(current)
+     if args.mode:
+         state["mode"] = args.mode
+-    mode = state.get("mode")
+-    if mode == "concise":
+-        if args.detail_level is not None:
+-            raise SpecError(
+-                "--detail-level is only valid with --mode detailed",
+-                reason="invalid_mode_combination",
+-            )
+-        state["detail_level"] = None
+-        state["important_paths"] = []
+-    elif mode == "detailed":
+-        state["detail_level"] = args.detail_level or state.get("detail_level") or "important"
+-        if state["detail_level"] != "important":
+-            if args.important_path is not None:
+-                raise SpecError(
+-                    "--important-path requires --detail-level important",
+-                    reason="invalid_mode_combination",
+-                )
+-            state["important_paths"] = []
+     if args.branch:
+         state["branch"] = args.branch
+     if args.scope is not None:
+         state["scope"] = list(args.scope)
+-    if args.important_path is not None:
+-        state["important_paths"] = normalize_source_paths(
+-            list(args.important_path), "important"
+-        )
+-    elif "important_paths" not in state:
+-        state["important_paths"] = []
+-    if (
+-        args.built
+-        and mode == "detailed"
+-        and state.get("detail_level") == "important"
+-        and not state.get("important_paths")
+-    ):
+-        raise SpecError(
+-            "detailed important build requires --important-path",
+-            reason="important_paths_required",
+-        )
+-    if args.hotspot is not None:
+-        seen: list[str] = []
+-        for item in args.hotspot:
+-            rel = str(item).strip().lstrip("./")
+-            if rel and rel not in seen:
+-                seen.append(rel)
+-        state["hotspots"] = seen
++    state.pop("detail_level", None)
++    state.pop("important_paths", None)
++    state.pop("hotspots", None)
+     info = git_info(source, state.get("branch"))
+     if info.get("is_git"):
+         if args.built and args.commit is None:
+@@ -1983,12 +1875,6 @@
+     probe = dict(load_state(spec_root))
+     if args.mode:
+         probe["mode"] = args.mode
+-    if probe.get("mode") == "detailed":
+-        probe["detail_level"] = (
+-            args.detail_level or probe.get("detail_level") or "important"
+-        )
+-    else:
+-        probe["detail_level"] = None
+     if args.scope is not None:
+         probe["scope"] = list(args.scope)
+     source = resolve_source(spec_root, probe)
+@@ -2041,7 +1927,6 @@
+     state = load_state(spec_root)
+     issues = validation_issues(spec_root, state)
+     mode = state.get("mode")
+-    detail_level = state.get("detail_level")
+     source_ok = True
+     try:
+         source = resolve_source(spec_root, state)
+@@ -2058,9 +1943,7 @@
+         "source_ok": source_ok,
+         "source": str(source) if source else None,
+         "mode": mode,
+-        "detail_level": detail_level,
+         "build_status": effective_build_status(state),
+-        "important_paths": state.get("important_paths", []),
+     }
+     return emit(
+         payload,
+@@ -2118,10 +2001,9 @@
+     init.add_argument("--confirm", action="store_true")
+     init.add_argument(
+         "--mode",
+-        choices=("concise", "detailed"),
+-        default="concise",
++        choices=MODES,
++        default="briefing",
+     )
+-    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+ 
+     add("status", help="镜像状态与 git 新鲜度")
+     add("git-info", help="源仓库分支与 commit")
+@@ -2138,31 +2020,18 @@
+     diff.add_argument("--to", dest="to", default=None)
+     diff.add_argument("--path", default=None)
+ 
+-    coverage = add("coverage", help="对照 inventory 与模块文件表")
+-    coverage.add_argument("--path", default=None, help="仅核对此前缀下的文件")
++    coverage = add("coverage", help="对照能力 INDEX、spec 页与 source-map")
++    coverage.add_argument("--path", default=None, help="保留参数；能力覆盖不按文件前缀过滤")
+ 
+-    route = add("route", help="把 diff 文件映射到模块 README")
++    route = add("route", help="把 diff 文件映射到能力 spec")
+     route.add_argument("--from", dest="from_commit", default=None)
+     route.add_argument("--to", dest="to", default=None)
+     route.add_argument("--path", default=None)
+ 
+     def add_sync_args(target: argparse.ArgumentParser) -> None:
+         target.add_argument("--commit", default=None)
+-        target.add_argument("--mode", choices=("concise", "detailed"), default=None)
+-        target.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
+-        target.add_argument(
+-            "--important-path",
+-            action="append",
+-            default=None,
+-            help="important 模式写深的源相对路径或前缀，可重复；整表写回",
+-        )
++        target.add_argument("--mode", choices=MODES, default=None)
+         target.add_argument("--scope", action="append", default=None)
+-        target.add_argument(
+-            "--hotspot",
+-            action="append",
+-            default=None,
+-            help="热点源路径，可重复；本轮给出的列表整表写回",
+-        )
+ 
+     set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
+     set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
+@@ -2172,7 +2041,7 @@
+     add_sync_args(finalize)
+     finalize.add_argument("--path", default=None, help="coverage 只核对此前缀下的文件")
+ 
+-    add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
++    add("validate", help="检查双读者骨架与状态文件")
+     return parser
+ 
+ 
+diff -ruN a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md	2026-08-30 12:34:53.262550287 +0800
++++ b/agents/skills/project-spec-mirror/SKILL.md	2026-09-05 20:28:10.231656333 +0800
+@@ -1,11 +1,7 @@
+ ---
+-id: project-spec-mirror
+ name: project-spec-mirror
+-description: >-
+-  创建或增量维护给人读的 project spec 镜像，包含金字塔、适用的恢复投影与工程切面，
+-  支持 concise/detailed 及代码证据粒度；Git 源按 commit 更新，非 Git 源按 coverage 对照文件表。
+-  在用户要求 project spec 镜像、spec 孪生、可读规格目录、工程切面或恢复项目运行知识时使用。
+-  不用于 OpenSpec change、实现代码或只读问答；用户要求图表时委托 archify。
++id: project-spec-mirror
++description: 创建或增量维护项目的双读者 spec 镜像：briefing 给人扫读架构与业务流，agent spec 用 OpenSpec 形态写可换栈复现的功能契约。Git 源按 commit 更新。在用户要求 project spec 镜像、spec 孪生、可读规格、功能复现 spec 时使用。不用于 OpenSpec change、实现代码或只读问答；用户要求图表时委托 archify。
+ compatibility: Requires Python 3.10+; Git is required for commit-diff updates. Requested diagrams additionally require Node.js and an installed archify skill.
+ ---
+ 
+@@ -13,7 +9,13 @@
+ 
+ 面向用户默认使用简体中文。命令、路径、代码、标识符与既成术语保持原文。
+ 
+-为目标 project 维护给人读的规格孪生，不是实现契约、不是源码副本。机械工作只通过 `specctl`；金字塔、恢复投影、切面正文由 Agent 撰写。验收目标：只凭镜像能重建该项目**实际具备**的可运行能力；不适用能力要有证据地标明。用户明确要求结构图、流程、时序、数据流或状态机时，委托 skill `archify`（[tt-a1i/archify](https://github.com/tt-a1i/archify)），产物放 `diagrams/`。
++为目标 project 维护双读者规格孪生：**不是源码副本，也不是本栈复原手册。** 机械工作只通过 `specctl`；briefing 与 agent spec 由 Agent 撰写。
++
++验收：
++
++1. 人只读 `briefing/`，能在约 15 分钟内讲清系统是什么、主路径怎么走。
++2. Agent 只读 `agent/`（可不读源码与 `evidence/`）能做出**功能等价**实现，允许换语言与框架。
++3. 「功能一致」指对外契约、领域不变式与关键失败形态（L2–L3），不是同一目录树、同一工具链或同一进程端口。
+ 
+ ```bash
+ SPECCTL=$(command -v specctl || echo "python3 <this-skill>/scripts/specctl.py")
+@@ -24,14 +26,14 @@
+ 
+ ## 非目标
+ 
+-- 不是 OpenSpec / `openspec/` / 实现 change；不要把镜像写进那些目录。
++- 不是 OpenSpec change，不要把镜像写进目标仓的 `openspec/`。Agent 层只是**借用** Requirement / Scenario 格式，落在 `spec_root/agent/specs/`。
+ - 不修改目标 project 的源码、测试、构建或依赖。
+-- 不代替 README 成为项目对外文档；镜像服务「给人把项目读清楚」。
++- 不代替 README 成为项目对外文档。
+ - 不自动 commit / push；不把密钥、`.env`、凭据或源码里的密钥字面量写进镜像。
+-- 默认不把每个源文件做成规格页；文件主要作为清单行、路由键和证据路径。
+-- 不把 `modules/<m>/notes/` 退化为 "一文件一详页"；topic notes（易踩坑的概念）与源文件级 `notes/<source-rel>.md` 并列。后者仅热点清单约束；前者在 `detail_level=complete` 下必建，其余模式仅用户明确接受维护成本后才建，不把它误称为默认 detailed 行为。
+-- 不整理三方依赖源码，也不整理所依赖的其他仓库的代码；镜像只覆盖当前 `--source` 工程自己的代码。外来仓只在 `context/` 记邻接协议，在 `build/` 点到包名与版本约束。
+-- 只梳理文本文件。`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，具体跳过哪些路径见 [routing.md](references/routing.md)。
++- 不整理三方依赖源码，也不整理所依赖的其他仓库；外来仓只在 briefing 架构里记邻接，在 `evidence/source-map.md` 不列对方源文件。
++- 默认不生成 `facets/`、`modules/` 文件表、方法走读，也不生成 `evidence/realization/`。那些是「改这个仓 / 复原这个栈」的可选附录。
++- 只梳理文本文件。`inventory` / `diff` / `route` / `symbols` 共用同一条输入边界，见 [routing.md](references/routing.md)。
++- 旧镜像若仍是金字塔 + 恢复投影布局：本轮按新树 **rebuild**，不要在旧目录上继续加深文件表。
+ 
+ ## 放置规则
+ 
+@@ -45,7 +47,7 @@
+ 
+ - **当前仓 / host**：cwd 为 project 根时即 cwd；`--in-project` 时为向上找到的 project 根。身份优先用 git 根比较，否则用 project 根路径。
+ - project 根：目录含 `.git`，或含 `go.mod` / `package.json` / `pyproject.toml` / `Cargo.toml` 等语言清单（完整列表见 `specctl detect`）。
+-- `--in-project` 只在目标仍是 host 时把镜像放到仓库根 `spec/`。目标是外来仓时忽略该旗标，走 `spec/<project>/`，避免占掉当前仓自己的镜像位。
++- `--in-project` 只在目标仍是 host 时把镜像放到仓库根 `spec/`。目标是外来仓时忽略该旗标，走 `spec/<project>/`。
+ - `<project>` 来自 `--project`；未给时用 `--source` 的目录名。外来仓或非工程目录首次 init 必须能确定 project 名；外来仓还必须有 `--source`。
+ - `spec/`（或 `spec/<project>/`）不存在时：**先确认再创建**。`init` 无 `--confirm` 时退出码 2。
+ - 目录已存在但没有 `.mirror.json`：视为占用，退出码 2，禁止覆盖。
+@@ -60,12 +62,12 @@
+ | 阶段 | 做什么 | 先读 |
+ |------|--------|------|
+ | `init` | 探测、确认、写骨架 | 本文件 |
+-| `build` | 按粒度生成金字塔 + 恢复投影 + 切面 | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[projections.md](references/projections.md)、[facets.md](references/facets.md)、[diagrams.md](references/diagrams.md)、[routing.md](references/routing.md) |
+-| `update` | 用 git diff 把变更文件路由到已有页 | 同上，只加载受影响层 |
+-| `maintain` | 改概念/实体/流/模块/切面/图/恢复投影中的指定条目 | 对应 reference |
++| `build` | 写 briefing + agent spec + source-map | [layout.md](references/layout.md)、[modes.md](references/modes.md)、[knowledge.md](references/knowledge.md)、[projections.md](references/projections.md)、[diagrams.md](references/diagrams.md)、[routing.md](references/routing.md) |
++| `update` | 用 git diff 把变更文件路由到能力 spec | 同上，只加载受影响能力 |
++| `maintain` | 改指定 briefing / 能力 / 模型 / 图 | 对应 reference |
+ | `status` | 只读同步状态 | 本文件 |
+ 
+-同一时刻只维护**一个 active target** 和一个 `spec_root`。用户要求批量项目时可顺序处理：完成并汇报当前 target 后重新 `detect` 下一个；禁止在一次写入步骤中混用两个项目的状态或输出目录。
++同一时刻只维护**一个 active target** 和一个 `spec_root`。用户要求批量项目时可顺序处理：完成并汇报当前 target 后重新 `detect` 下一个。
+ 
+ ## specctl
+ 
+@@ -75,26 +77,26 @@
+ | `init` | 建目录骨架与 `.mirror.json`；缺确认时退出 2 |
+ | `status` | 镜像状态 + git 新鲜度 |
+ | `inventory` | 源文件清单（已忽略构建产物、密钥、三方安装树与外来仓） |
+-| `symbols` | 从代码文件提取函数/类型/变量候选，供详尽模式核对行为承载符号；不作为完备证明 |
++| `symbols` | 从代码提取符号候选，供撰写 Scenario 时对照；不作为完备证明，也不写入 briefing |
+ | `git-info` | 是否 git、默认分支、指定分支的 commit |
+-| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更（同样忽略三方/外来仓） |
+-| `coverage` | 对照 `inventory` 与模块「文件」表：`missing` / `extra` / `unscoped` |
+-| `route` | 把 `diff` 的文件映射到模块 README（文件表 / 根前缀 / unmapped / rename） |
+-| `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / scope / hotspots / 时间，并同步 README 状态表 |
+-| `finalize` | 收尾一条命令：先按本轮粒度跑 coverage 门禁，通过才回写状态，再复验骨架 |
+-| `validate` | 金字塔、恢复投影、切面骨架与 `.mirror.json` 完整性 |
++| `diff` | 相对 `synced_commit`（或 `--from`）的文件级变更 |
++| `coverage` | 对照能力 INDEX、`agent/specs/` 与 `evidence/source-map.md` |
++| `route` | 把 `diff` 的文件映射到能力 spec |
++| `set-sync` | 正文写完且骨架校验通过后回写 build 状态、commit / branch / mode / 时间，并同步 README 状态表 |
++| `finalize` | 收尾：按本轮模式跑 coverage 门禁，通过才回写状态，再复验骨架 |
++| `validate` | 双读者骨架与 `.mirror.json` 完整性 |
+ 
+ 完整参数以 `$SPECCTL <command> --help` 为准。常用全局：`--cwd`、`--spec`、`--source`、`--project`、`--branch`。
+ 
+ ## 公共执行契约
+ 
+ 1. 任何写入阶段都先 `detect`（或 `status`）。不要手建目录绕过 `init`。
+-2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编流程。
++2. 自然语言、分层叙述、交叉链接由 Agent 完成。CLI 不写概述、不抽概念、不编 Scenario。
+ 3. 目标是 git 仓库时：默认跟踪**默认分支**（`origin/HEAD` → `main`/`master` 回退）。用户指定 `--branch` 则记录该分支的 commit，而不是随意的工作区 HEAD。
+-4. 非 git 源：仍可 init/build/maintain；完成 build 后用 `set-sync --built` 写 `build_status=built`，不得伪造 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 对照文件表并说明限制。
++4. 非 git 源：仍可 init/build/maintain；完成 build 后用 `set-sync --built` 写 `build_status=built`，不得伪造 commit；`update` 不能做 commit diff，改为跑 `$SPECCTL coverage` 并说明限制。
+ 5. 更新时保留 `<!-- manual -->` … `<!-- /manual -->` 块，不得覆盖。
+-6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略，不把原文抄进 spec。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**；可以写「存在某鉴权字段、从何处注入」，禁止把赋值抄进文件表、核心符号或配置说明。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
+-7. 核对模块文件表覆盖必须跑 `$SPECCTL coverage`，不要手对 `inventory`。只要求代码文件（`CODE_EXTS`）出现在「文件」表；配置/CI/compose 等走恢复投影。`detailed` 且 `important`/`complete` 时 `enforce` 为真，`missing` 必须清空才能 `set-sync`。concise / lightweight 把 `missing` 当提示。文件表可用精确路径或目录范围。
++6. 发现密钥形态内容：镜像里写 `<REDACTED>`，并在输出中说明省略。包括源码常量/字段里的 `AppKey`、`SecretKey`、AccessKey、token、password、私钥、连接串等**值**。非机密的产品标识（如 `appId`）可以写；值若像随机密钥、长 hex/base64 或口令，仍按密钥处理。
++7. 能力覆盖必须跑 `$SPECCTL coverage`，不要手对 INDEX。`reconstructable` 时 `enforce` 为真：至少识别 1 条能力，且每条都有 spec 页和 source-map 行。`briefing` 把缺口当提示。
+ 
+ ## 工作流
+ 
+@@ -107,32 +109,29 @@
+ 
+ ### build
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL inventory`；详尽模式先确认 `detail_level`（默认 `important`）。important 还要明确将写深的源相对路径或前缀；对这些路径及 complete 中的行为代码按需跑 `symbols`，再结合源码核对行为承载符号。候选为空或不完整时如实说明，不声称方法全集完备；测试文件不逐方法抽取
+-2. 读 [layout.md](references/layout.md) 按金字塔写正文；粒度见 [modes.md](references/modes.md)
+-3. 识别项目实际能力并维护恢复投影（上下文、数据、表面、运行时、构建），见 [projections.md](references/projections.md)。适用层写到可恢复；不适用层保留 INDEX 并写判断证据。结束前做恢复完备自检
+-4. 识别并维护概念、实体、业务处理线，见 [knowledge.md](references/knowledge.md)
+-5. 识别并维护适用的工程切面（来源、契约、切片、验证、流量），见 [facets.md](references/facets.md)。切片不必等全部契约写完；先 identified / characterized 再补 specified。VERIFY 至少写现有测试/性质；完全没有部署或流量切换能力时，TRAFFIC 写 `不适用` 与证据，不编发布方案
+-6. 按 [diagrams.md](references/diagrams.md) 为复杂业务逻辑和用户点名的图本轮交付 archify HTML。主处理线若有分叉、状态机或跨模块时序，必须有图并链到 `diagrams/`。线性三步用列表即可。缺 archify 时把必配图列为未完成，禁止假 HTML 或占位
+-7. 每个模块 README 都要有「根」表与「文件」表（[routing.md](references/routing.md)）。下一轮 update 靠这两个标题把变更文件路由到页，缺一个这个模块就只能重建
+-8. 详尽模式选定一种 `detail_level`，文件表按它覆盖：`complete` 覆盖全部 inventory 文件并深入行为承载符号；`important`（默认）覆盖范围内文件，对显式 important 路径写深，其余简述；`lightweight` 只保留必要代码证据，领域、流程、契约与投影照样加深。测试只写覆盖意图，不展开方法步骤。三档细则见 [modes.md](references/modes.md)
+-9. 用户要「每个文件一页」时先说明模块 README 才是阅读单位，再问他要的是 `complete` 还是某几处热点；要源文件级热点详注却没给路径时同样先问（建议切片入口或分批），没谈拢就不批量建源文件级 `notes/`。遗留 `modules/*/files/` 停更、不删，在模块 README 注明可能过期。本工作区若已有其他项目的镜像，先扫一眼它们的 `modules/*/notes/` 主题列表对齐维度（只看主题，不复制内容），省得每个仓从零想选题
+-10. **`detail_level=complete` 必建 `modules/<m>/notes/` 详注**，不是 opt-in：跨文件契约、易踩坑的设计选择、监控盲区等"读源码看不出来"的内容落到 notes/ 而不是塞进模块 README。按 [modes.md](references/modes.md) 的"5 类触发条件"清单枚举，每个模块挑 ≥1 类、整体 ≥5 篇。命名是 topic（易踩坑的概念）而非源相对路径
+-11. 写完文件表后跑 `$SPECCTL finalize` 收尾（不要手对清单）：它先按本轮粒度做 coverage 门禁，`enforce` 为真且有 `missing` 就停在这一步并列出缺哪些文件；通过后回写 build 状态并复验骨架与 README 状态表。Git 源 `$SPECCTL finalize --commit <id> --branch <name> --mode <concise|detailed>`，非 Git 源去掉 `--commit`。只有 detailed 才加 `--detail-level <complete|important|lightweight>`（默认 `important`）；important 对每个选定路径重复传 `--important-path <path>`，有热点则加 `--hotspot`。需要分步排查时仍可单独跑 `$SPECCTL coverage` / `set-sync` / `validate`
+-12. 向用户给出镜像根路径、怎么读（先 overview，再恢复投影，再切面/金字塔）、同步 commit
++1. `$SPECCTL status` 与 `$SPECCTL inventory`。确认模式：默认 `briefing`；用户要「可复现 / 换栈重建」→ `reconstructable`
++2. 读 [layout.md](references/layout.md) 与 [modes.md](references/modes.md)
++3. 写 `briefing/`：总览、架构、短词表、主业务流。禁止源文件表、方法走读、工具链/端口/compose
++4. 识别产品能力，维护 `agent/INDEX.md` 与 `agent/specs/<capability>/spec.md`（Purpose / Requirement / Scenario），见 [knowledge.md](references/knowledge.md)、[projections.md](references/projections.md)
++5. 写 `agent/model/`、`agent/surface/`、`agent/data/`：实体不变式、对外行为契约、逻辑数据与一致性。不写当前语言或存储引擎品牌，除非那就是对外契约
++6. 维护 `evidence/source-map.md`：能力 → 源路径前缀，只供 update 路由
++7. 按 [diagrams.md](references/diagrams.md) 为复杂业务逻辑和用户点名的图本轮交付 archify HTML，放到 `briefing/diagrams/`。主处理线若有分叉、状态机或跨系统时序，必须有图。线性三步用列表即可。缺 archify 时把必配图列为未完成，禁止假 HTML
++8. 只有用户明确要「复原当前这个栈」时才写 `evidence/realization/`；只有用户明确要「改这个仓」时才读 [facets.md](references/facets.md) 并生成切面。默认不建
++9. 写完能力 INDEX 与 source-map 后跑 `$SPECCTL finalize`。Git 源 `$SPECCTL finalize --commit <id> --branch <name> --mode <briefing|reconstructable>`，非 Git 源去掉 `--commit`
++10. 向用户给出镜像根路径、怎么读（人走 briefing，Agent 走 agent）、同步 commit
+ 
+ ### update
+ 
+-1. `$SPECCTL status` 与 `$SPECCTL route`（内部用与 `diff` 相同的 `synced_commit..目标分支 commit`；可加 `--from` / `--to`）。按返回的 `modules` / `pages` / `renames` / `unmapped` 改页，不要手算、不要绕过 `route`
+-2. 只改映射到的模块 README 与跟链接的概念、实体、处理线、恢复投影、切面与相关图；rename（`status=R`）改文件表路径，不当删+增。上层概述若结论变了才改
+-3. 若缺 `context/` `data/` `surface/` `runtime/` `build/`、`facets/` 或 `diagrams/` 骨架，先补 INDEX（及 `surface/config.md`、切面短页），再改正文；不删已有金字塔
+-4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准，不要把未提交改动默认为已同步
++1. `$SPECCTL status` 与 `$SPECCTL route`。按返回的 `capabilities` / `pages` / `renames` / `unmapped` 改页，不要手算
++2. 只改映射到的能力 spec、跟链接的 briefing 流/架构、模型与表面。rename（`status=R`）改 source-map 路径，不当删+增。上层 overview 若结论变了才改
++3. 若缺 briefing / agent / evidence 骨架，先补 INDEX，再改正文；旧金字塔目录停更，本轮按新树补齐后不要继续写旧模块文件表
++4. 工作区脏或当前分支与记录分支不一致：在输出中说明，仍以 `--branch`（默认默认分支）的 commit 为准
+ 5. `synced_commit` 不是目标 commit 祖先（变基/改写）：报告风险，请用户选增量尝试或全量 `build`
+-6. 遗留 `modules/*/files/`：本轮不删、不停更以外的重写
+-7. changelog 追加本轮摘要；改完文件表后跑 `$SPECCTL finalize`，参数与 build 收尾一致（Git 源带 `--commit`，非 Git 源不带）
++6. changelog 追加本轮摘要；改完 source-map 后跑 `$SPECCTL finalize`
+ 
+ ### maintain
+ 
+-用户点名改某一概念/实体/流/模块/切面/图/上下文/数据/表面/运行时/构建时：只改对应文件与相关 INDEX/链接，不触发全量重写。点名某个源文件：按当前 `detail_level` 更新该模块文件表，再跑 `$SPECCTL coverage`；命中 `important_paths` 时写深模块页，但不会自动建立 `notes/`。只有用户明确要热点详注或该路径已在 `hotspots` 时才建或改源文件级 `notes/<path>.md`。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改，避免规格落后。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
++用户点名改某一概念/流/能力/图/模型/表面时：只改对应文件与相关 INDEX/链接，不触发全量重写。若代码已变，先 `diff` 再按 [routing.md](references/routing.md) 改。需要新图或改图时走 [diagrams.md](references/diagrams.md)。
+ 
+ ### status
+ 
+@@ -144,7 +143,7 @@
+ ## Spec 镜像
+ - 项目：<name>
+ - 根：`<spec_root>`
+-- 粒度：concise | detailed
++- 粒度：briefing | reconstructable
+ - 分支 / commit：<branch> / `<short-sha>`（非 git 则写无）
+ - 本轮：init | build | update | maintain
+ - 变更：<改了哪些层>
+@@ -152,6 +151,6 @@
+ 
+ ## 质量检查
+ 
+-完成镜像任务前对照 [checklist.md](references/checklist.md) 核对本轮涉及的条目，并运行 `specctl validate`。任一条不满足就先修镜像输出再给回执，不要带着已知缺口声称完成。
++完成镜像任务前对照 [checklist.md](references/checklist.md) 核对本轮涉及的条目，并运行 `specctl validate`。任一条不满足就先修镜像输出再给回执。
+ 
+ `examples/`、`evals/`、`experience/` 与 `tests/` 只存在于本 Skill 的源仓库，安装到 agent 目录后不随行，所以运行现场能读到的自检表就是上面那份 checklist。维护本 Skill 自身时（改 SKILL.md、references 或 specctl）另外跑 `evals/cases.yaml` 的完整回归与 `python3 -m unittest discover -s <skill-dir>/tests`。普通镜像任务不写这些目录，也不自行修改本 Skill；只有用户明确要求维护 Skill 时才进入外部维护流程。
+diff -ruN a/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py b/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py	2026-09-04 11:30:34.402479442 +0800
++++ b/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py	2026-09-05 20:32:22.318484643 +0800
+@@ -65,26 +65,28 @@
+         ):
+             self.assertTrue((SKILL_ROOT / rel).is_file(), rel)
+ 
+-    def test_important_briefs_not_omits(self) -> None:
+-        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
++    def test_dual_audience_contract(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        self.assertIn("简述", modes)
+-        self.assertIn("不得整份省略", modes)
+-        self.assertNotIn("只能忽略没有业务含义的文件", modes)
+-        self.assertIn("简述", skill)
+-        self.assertNotIn("只能忽略无业务含义文件", skill)
++        layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
++        modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
++        self.assertIn("briefing/", skill)
++        self.assertIn("agent/specs/", skill)
++        self.assertIn("evidence/", skill)
++        self.assertIn("reconstructable", skill)
++        self.assertIn("briefing", modes)
++        self.assertIn("reconstructable", modes)
++        self.assertIn("briefing/", layout)
++        self.assertIn("agent/specs/", layout)
++        self.assertIn("合法值只有 `briefing` | `reconstructable`", modes)
++        self.assertNotIn("detail_level", skill)
+ 
+-    def test_important_behavior_is_deep_but_not_fake_complete(self) -> None:
++    def test_briefing_forbids_implementation_leak(self) -> None:
+         modes = (SKILL_ROOT / "references" / "modes.md").read_text(encoding="utf-8")
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+-        self.assertIn("完整逻辑", modes)
+-        self.assertIn("important_paths", modes)
+-        self.assertIn("不是语言级完备索引", modes)
+-        self.assertRegex(modes, r"测试方法\s*\|\s*只简述")
+-        self.assertIn("深入行为承载符号", skill)
+-        self.assertIn("测试只写覆盖意图", skill)
++        self.assertIn("禁写", modes)
++        self.assertIn("方法逐步走读", modes)
++        self.assertIn("禁止源文件表", skill)
+         self.assertIn("不作为完备证明", skill)
+-        self.assertNotIn("用返回名单核对方法不得漏列", skill)
+ 
+     def test_secret_literals_must_redact(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+@@ -93,8 +95,6 @@
+         self.assertIn("AppKey", skill)
+         self.assertIn("SecretKey", skill)
+         self.assertIn("<REDACTED>", modes)
+-        self.assertIn("AppKey", modes)
+-        self.assertIn("SecretKey", modes)
+ 
+     def test_reader_pages_use_project_voice(self) -> None:
+         layout = (SKILL_ROOT / "references" / "layout.md").read_text(encoding="utf-8")
+@@ -131,6 +131,13 @@
+         self.assertIn("不得覆盖", skill)
+         self.assertIn("外来仓", skill)
+ 
++    def test_facets_are_opt_in(self) -> None:
++        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
++        facets = (SKILL_ROOT / "references" / "facets.md").read_text(encoding="utf-8")
++        self.assertIn("默认不生成", skill)
++        self.assertIn("默认不生成", facets)
++        self.assertIn("evidence/realization", skill)
++
+     def test_checklist_is_the_installable_selfcheck(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+         checklist = (SKILL_ROOT / "references" / "checklist.md").read_text(encoding="utf-8")
+diff -ruN a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py	2026-08-30 12:34:53.262651409 +0800
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py	2026-09-05 20:32:32.617519472 +0800
+@@ -223,22 +223,23 @@
+             spec = root / "spec"
+             self.assertTrue((spec / ".mirror.json").is_file())
+             self.assertTrue((spec / "README.md").is_file())
+-            self.assertTrue((spec / "concepts" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "context" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "data" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "surface" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "surface" / "config.md").is_file())
+-            self.assertTrue((spec / "runtime" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "build" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "facets" / "INDEX.md").is_file())
+-            self.assertTrue((spec / "diagrams" / "INDEX.md").is_file())
++            self.assertTrue((spec / "briefing" / "overview.md").is_file())
++            self.assertTrue((spec / "briefing" / "architecture.md").is_file())
++            self.assertTrue((spec / "briefing" / "concepts" / "INDEX.md").is_file())
++            self.assertTrue((spec / "briefing" / "flows" / "INDEX.md").is_file())
++            self.assertTrue((spec / "briefing" / "diagrams" / "INDEX.md").is_file())
++            self.assertTrue((spec / "agent" / "INDEX.md").is_file())
++            self.assertTrue((spec / "agent" / "model" / "INDEX.md").is_file())
++            self.assertTrue((spec / "agent" / "surface" / "INDEX.md").is_file())
++            self.assertTrue((spec / "agent" / "data" / "INDEX.md").is_file())
++            self.assertTrue((spec / "evidence" / "source-map.md").is_file())
++            self.assertFalse((spec / "facets" / "INDEX.md").exists())
++            self.assertFalse((spec / "runtime" / "INDEX.md").exists())
+             state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))
+             self.assertEqual(state["placement"], "in-project")
+             self.assertEqual(state["source"], "..")
+-            self.assertEqual(state["mode"], "concise")
+-            self.assertIsNone(state["detail_level"])
+-            self.assertEqual(state.get("hotspots"), [])
+-            self.assertEqual(state.get("important_paths"), [])
++            self.assertEqual(state["mode"], "briefing")
++            self.assertNotIn("detail_level", state)
+             self.assertEqual(state["build_status"], "skeleton")
+             self.assertIsNone(state["built_at"])
+             self.assertIsNone(state["synced_commit"])
+@@ -268,34 +269,20 @@
+             self.assertTrue((root / "spec" / ".mirror.json").is_file())
+             self.assertEqual(payload["placement"], "in-project")
+ 
+-    def test_detailed_defaults_to_important(self) -> None:
++    def test_reconstructable_init_mode(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             code, payload = run(
+-                "init", "--cwd", str(root), "--mode", "detailed", "--confirm"
++                "init", "--cwd", str(root), "--mode", "reconstructable", "--confirm"
+             )
+             self.assertEqual(code, 0, payload)
+-            self.assertEqual(payload["detail_level"], "important")
+-
+-    def test_concise_rejects_detail_level(self) -> None:
+-        import tempfile
+-
+-        with tempfile.TemporaryDirectory() as raw:
+-            root = make_repo(Path(raw) / "example-api")
+-            code, payload = run(
+-                "init",
+-                "--cwd",
+-                str(root),
+-                "--mode",
+-                "concise",
+-                "--detail-level",
+-                "complete",
+-                "--confirm",
++            self.assertEqual(payload["mode"], "reconstructable")
++            state = json.loads(
++                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
+             )
+-            self.assertEqual(code, 1, payload)
+-            self.assertEqual(payload["reason"], "invalid_mode_combination")
++            self.assertEqual(state["mode"], "reconstructable")
+ 
+ 
+ class GitAndSyncTest(unittest.TestCase):
+@@ -344,7 +331,8 @@
+             self.assertEqual(payload["build_status"], "built")
+             readme = (root / "spec" / "README.md").read_text(encoding="utf-8")
+             self.assertIn(f"| 同步 commit | `{new_sha[:12]}` |", readme)
+-            self.assertIn("| 文件粒度 | 不适用 |", readme)
++            self.assertIn("| 粒度 | briefing |", readme)
++            self.assertNotIn("文件粒度", readme)
+ 
+     def test_non_git_build_has_status_without_fake_commit(self) -> None:
+         import tempfile
+@@ -375,7 +363,7 @@
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+-            (root / "spec" / "overview.md").unlink()
++            (root / "spec" / "briefing" / "overview.md").unlink()
+             code, payload = run(
+                 "set-sync", "--cwd", str(root), "--built", "--commit", sha
+             )
+@@ -387,7 +375,7 @@
+             self.assertEqual(state["build_status"], "skeleton")
+             self.assertIsNone(state["synced_commit"])
+ 
+-    def test_important_paths_required_and_persisted(self) -> None:
++    def test_set_sync_built_does_not_require_file_paths(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+@@ -398,7 +386,7 @@
+                     "--cwd",
+                     str(root),
+                     "--mode",
+-                    "detailed",
++                    "reconstructable",
+                     "--confirm",
+                 )[0],
+                 0,
+@@ -407,38 +395,11 @@
+             code, payload = run(
+                 "set-sync", "--cwd", str(root), "--built", "--commit", sha
+             )
+-            self.assertEqual(code, 1, payload)
+-            self.assertEqual(payload["reason"], "important_paths_required")
+-
+-            code, payload = run(
+-                "set-sync",
+-                "--cwd",
+-                str(root),
+-                "--built",
+-                "--commit",
+-                sha,
+-                "--important-path",
+-                "internal/order.go",
+-            )
+             self.assertEqual(code, 0, payload)
+-            self.assertEqual(
+-                payload["state"]["important_paths"], ["internal/order.go"]
+-            )
++            self.assertEqual(payload["state"]["mode"], "reconstructable")
++            self.assertNotIn("important_paths", payload["state"])
+             self.assertEqual(run("validate", "--cwd", str(root))[0], 0)
+ 
+-            code, payload = run(
+-                "set-sync",
+-                "--cwd",
+-                str(root),
+-                "--built",
+-                "--commit",
+-                sha,
+-                "--important-path",
+-                "/etc/passwd",
+-            )
+-            self.assertEqual(code, 1, payload)
+-            self.assertEqual(payload["reason"], "invalid_source_path")
+-
+     def test_inventory_skips_secrets_and_vendor(self) -> None:
+         import tempfile
+ 
+@@ -555,22 +516,25 @@
+             self.assertEqual(code, 1, payload)
+             self.assertIn("invalid build_status 'unknown'", payload["issues"])
+ 
+-    def test_validate_rejects_unsafe_important_path_state(self) -> None:
++    def test_validate_rejects_legacy_mode(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+-            run("init", "--cwd", str(root), "--mode", "detailed", "--confirm")
++            run("init", "--cwd", str(root), "--confirm")
+             state_path = root / "spec" / ".mirror.json"
+             state = json.loads(state_path.read_text(encoding="utf-8"))
+-            state["important_paths"] = ["../other"]
++            state["mode"] = "detailed"
+             state_path.write_text(
+                 json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+                 encoding="utf-8",
+             )
+             code, payload = run("validate", "--cwd", str(root))
+             self.assertEqual(code, 1, payload)
+-            self.assertIn("invalid important path: '../other'", payload["issues"])
++            self.assertTrue(
++                any("invalid mode" in item for item in payload["issues"]),
++                payload["issues"],
++            )
+ 
+     def test_direct_helpers_secret_skip(self) -> None:
+         self.assertTrue(specctl.should_skip_file(".env.local"))
+@@ -690,52 +654,69 @@
+             self.assertEqual(item["symbols"], [])
+ 
+ 
+-ORDER_README = """# order
++CHECKOUT_SPEC = """# checkout
+ 
+-## 根
++## Purpose
++下单。
+ 
+-| 路径前缀 | 角色 |
+-|----------|------|
+-| `internal` | 领域包 |
++## Requirements
+ 
+-## 文件
++### Requirement: 可以下单
++系统 SHALL 接受有效订单。
+ 
+-| 文件 | 职责 | 核心 |
+-|------|------|------|
+-| `internal/order.go` | 下单与取消 | `Place`, `Cancel` |
++#### Scenario: 成功
++- **WHEN** 库存充足
++- **THEN** 订单创建
+ """
+ 
+ 
+-def write_order_module(spec: Path) -> None:
+-    readme = spec / "modules" / "order" / "README.md"
+-    readme.parent.mkdir(parents=True, exist_ok=True)
+-    readme.write_text(ORDER_README, encoding="utf-8")
++def write_checkout_capability(spec: Path, source_path: str = "internal/order.go") -> None:
++    (spec / "agent").mkdir(parents=True, exist_ok=True)
++    (spec / "evidence").mkdir(parents=True, exist_ok=True)
++    (spec / "agent" / "INDEX.md").write_text(
++        """# 能力
++
++| 能力 | 一句话 | 状态 | 页 |
++|------|--------|------|-----|
++| checkout | 下单 | specified | [checkout](specs/checkout/spec.md) |
++""",
++        encoding="utf-8",
++    )
++    spec_page = spec / "agent" / "specs" / "checkout" / "spec.md"
++    spec_page.parent.mkdir(parents=True, exist_ok=True)
++    spec_page.write_text(CHECKOUT_SPEC, encoding="utf-8")
++    (spec / "evidence" / "source-map.md").write_text(
++        f"""# 源映射
++
++| 能力 | 源路径 | spec |
++|------|--------|------|
++| checkout | `{source_path}` | [checkout](../agent/specs/checkout/spec.md) |
++""",
++        encoding="utf-8",
++    )
+ 
+ 
+ class RouteParseTest(unittest.TestCase):
+-    def test_parse_root_and_files_tables(self) -> None:
+-        roots, files = specctl.parse_module_readme(ORDER_README)
+-        self.assertEqual(roots, ["internal"])
+-        self.assertEqual(files, ["internal/order.go"])
+-
+-    def test_parse_english_headings(self) -> None:
+-        text = """# billing
+-
+-## Roots
++    def test_parse_source_map_rows(self) -> None:
++        import tempfile
+ 
+-| prefix | role |
+-|--------|------|
+-| `internal/bill` | domain |
++        with tempfile.TemporaryDirectory() as raw:
++            spec = Path(raw) / "spec"
++            spec.mkdir()
++            write_checkout_capability(spec, "internal")
++            rows = specctl.load_source_map(spec)
++            self.assertEqual(rows[0]["name"], "checkout")
++            self.assertEqual(rows[0]["path"], "internal")
+ 
+-## Files
++    def test_parse_capability_index(self) -> None:
++        import tempfile
+ 
+-| file | duty |
+-|------|------|
+-| [`internal/bill/calc.go`](unused) | calc |
+-"""
+-        roots, files = specctl.parse_module_readme(text)
+-        self.assertEqual(roots, ["internal/bill"])
+-        self.assertEqual(files, ["internal/bill/calc.go"])
++        with tempfile.TemporaryDirectory() as raw:
++            spec = Path(raw) / "spec"
++            spec.mkdir()
++            write_checkout_capability(spec)
++            caps = specctl.load_capabilities(spec)
++            self.assertEqual(caps[0]["name"], "checkout")
+ 
+ 
+ class RouteTest(unittest.TestCase):
+@@ -749,16 +730,16 @@
+             self.assertEqual(code, 0, payload)
+             self.assertTrue(payload["not_built"])
+             self.assertEqual(payload["note"], "not_built")
+-            self.assertEqual(payload["modules"], [])
++            self.assertEqual(payload["capabilities"], [])
+             self.assertIn("internal/order.go", payload["unmapped"])
+ 
+-    def test_file_table_and_root_prefix_and_unmapped(self) -> None:
++    def test_source_map_exact_prefix_and_unmapped(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            write_order_module(root / "spec")
++            write_checkout_capability(root / "spec", "internal/order.go")
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+             self.assertEqual(
+                 run(
+@@ -777,26 +758,28 @@
+             (root / "scripts" / "one-off.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+             git(root, "add", ".")
+             git(root, "commit", "-q", "-m", "more files")
++            # prefix row so extra.go also maps
++            write_checkout_capability(root / "spec", "internal")
+             code, payload = run("route", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+             self.assertFalse(payload["not_built"])
+             by_path = {item["path"]: item for item in payload["changes"]}
+-            self.assertEqual(by_path["internal/order.go"]["via"], "file-table")
+-            self.assertEqual(by_path["internal/order.go"]["modules"], ["order"])
+-            self.assertEqual(by_path["internal/extra.go"]["via"], "root-prefix")
+-            self.assertEqual(by_path["internal/extra.go"]["modules"], ["order"])
++            self.assertEqual(by_path["internal/order.go"]["via"], "source-prefix")
++            self.assertEqual(by_path["internal/order.go"]["capabilities"], ["checkout"])
++            self.assertEqual(by_path["internal/extra.go"]["via"], "source-prefix")
++            self.assertEqual(by_path["internal/extra.go"]["capabilities"], ["checkout"])
+             self.assertEqual(by_path["scripts/one-off.sh"]["via"], "unmapped")
+             self.assertIn("scripts/one-off.sh", payload["unmapped"])
+-            self.assertEqual(payload["modules"], ["order"])
+-            self.assertEqual(payload["pages"], ["modules/order/README.md"])
++            self.assertEqual(payload["capabilities"], ["checkout"])
++            self.assertEqual(payload["pages"], ["agent/specs/checkout/spec.md"])
+ 
+-    def test_rename_uses_from_file_table(self) -> None:
++    def test_rename_uses_from_source_map(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            write_order_module(root / "spec")
++            write_checkout_capability(root / "spec", "internal/order.go")
+             sha = git(root, "rev-parse", "HEAD").stdout.strip()
+             self.assertEqual(
+                 run(
+@@ -810,43 +793,34 @@
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["renames"][0]["from"], "internal/order.go")
+             self.assertEqual(payload["renames"][0]["to"], "internal/placed.go")
+-            self.assertEqual(payload["renames"][0]["module"], "order")
++            self.assertEqual(payload["renames"][0]["capability"], "checkout")
+             rec = payload["changes"][0]
+-            self.assertEqual(rec["via"], "file-table")
++            self.assertEqual(rec["via"], "source-map")
+             self.assertEqual(rec["from"], "internal/order.go")
+ 
+-    def test_set_sync_hotspot_replaces_list(self) -> None:
++    def test_set_sync_drops_legacy_hotspot_fields(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            code, payload = run(
+-                "set-sync",
+-                "--cwd",
+-                str(root),
+-                "--hotspot",
+-                "internal/order.go",
+-                "--hotspot",
+-                "cmd/orderd/main.go",
+-            )
+-            self.assertEqual(code, 0, payload)
+-            self.assertEqual(
+-                payload["state"]["hotspots"],
+-                ["internal/order.go", "cmd/orderd/main.go"],
+-            )
+-            code, payload = run(
+-                "set-sync", "--cwd", str(root), "--hotspot", "internal/extra.go"
++            state_path = root / "spec" / ".mirror.json"
++            state = json.loads(state_path.read_text(encoding="utf-8"))
++            state["hotspots"] = ["internal/order.go"]
++            state_path.write_text(
++                json.dumps(state, ensure_ascii=False, indent=2) + "\n",
++                encoding="utf-8",
+             )
++            code, payload = run("set-sync", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+-            self.assertEqual(payload["state"]["hotspots"], ["internal/extra.go"])
++            self.assertNotIn("hotspots", payload["state"])
+             code, payload = run("validate", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["issues"], [])
+ 
+ 
+ class CoverageTest(unittest.TestCase):
+-    def test_concise_reports_missing_without_failing(self) -> None:
++    def test_briefing_reports_missing_without_failing(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+@@ -856,104 +830,47 @@
+             self.assertEqual(code, 0, payload)
+             self.assertFalse(payload["enforce"])
+             self.assertTrue(payload["not_built"])
+-            self.assertIn("internal/order.go", payload["missing"])
+-            self.assertNotIn("README.md", payload["missing"])
+-            self.assertNotIn("go.mod", payload["missing"])
++            self.assertEqual(payload["missing"], [])
+ 
+-    def test_detailed_important_fails_until_file_table_covers_code(self) -> None:
++    def test_reconstructable_fails_until_capability_is_mapped(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+             self.assertEqual(
+-                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
++                run("set-sync", "--cwd", str(root), "--mode", "reconstructable")[0], 0
+             )
+             code, payload = run("coverage", "--cwd", str(root))
+             self.assertEqual(code, 1, payload)
+             self.assertTrue(payload["enforce"])
+-            self.assertIn("internal/order.go", payload["missing"])
+-            write_order_module(root / "spec")
++            self.assertIn("<no capabilities identified>", payload["missing"])
++            write_checkout_capability(root / "spec")
+             code, payload = run("coverage", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["missing"], [])
+             self.assertEqual(payload["covered_count"], payload["required_count"])
+ 
+-    def test_directory_range_covers_and_extra_does_not_fail(self) -> None:
++    def test_extra_source_map_does_not_fail(self) -> None:
+         import tempfile
+ 
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            self.assertEqual(
+-                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
+-            )
+-            (root / "internal" / "extra.go").write_text(
+-                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
+-            )
+-            git(root, "add", "internal/extra.go")
+-            git(root, "commit", "-q", "-m", "extra")
+-            write_order_module(root / "spec")
+-            code, payload = run("coverage", "--cwd", str(root))
+-            self.assertEqual(code, 1, payload)
+-            self.assertIn("internal/extra.go", payload["missing"])
+-            readme = root / "spec" / "modules" / "order" / "README.md"
+-            readme.write_text(
+-                """# order
+-
+-## 根
+-
+-| 路径前缀 | 角色 |
+-|----------|------|
+-| `internal` | 领域包 |
+-
+-## 文件
+-
+-| 文件 | 职责 |
+-|------|------|
+-| `internal` | 领域包全部源文件 |
+-| `internal/gone.go` | 已删除 |
++            write_checkout_capability(root / "spec")
++            (root / "spec" / "evidence" / "source-map.md").write_text(
++                """# 源映射
++
++| 能力 | 源路径 | spec |
++|------|--------|------|
++| checkout | `internal/order.go` | [checkout](../agent/specs/checkout/spec.md) |
++| ghost | `internal/gone.go` | [ghost](../agent/specs/ghost/spec.md) |
+ """,
+                 encoding="utf-8",
+             )
+             code, payload = run("coverage", "--cwd", str(root))
+             self.assertEqual(code, 0, payload)
+-            self.assertEqual(payload["missing"], [])
+-            self.assertIn("internal/gone.go", payload["extra"])
+-
+-    def test_scope_and_path_limit_required_files(self) -> None:
+-        import tempfile
+-
+-        with tempfile.TemporaryDirectory() as raw:
+-            root = make_repo(Path(raw) / "example-api")
+-            (root / "cmd").mkdir()
+-            (root / "cmd" / "main.go").write_text(
+-                "package main\n\nfunc main() {}\n", encoding="utf-8"
+-            )
+-            git(root, "add", "cmd/main.go")
+-            git(root, "commit", "-q", "-m", "cmd")
+-            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            self.assertEqual(
+-                run(
+-                    "set-sync",
+-                    "--cwd",
+-                    str(root),
+-                    "--mode",
+-                    "detailed",
+-                    "--scope",
+-                    "internal",
+-                )[0],
+-                0,
+-            )
+-            write_order_module(root / "spec")
+-            code, payload = run("coverage", "--cwd", str(root))
+-            self.assertEqual(code, 0, payload)
+-            self.assertIn("cmd/main.go", payload["unscoped"])
+-            self.assertNotIn("cmd/main.go", payload["missing"])
+-            code, payload = run("coverage", "--cwd", str(root), "--path", "cmd")
+-            self.assertEqual(code, 0, payload)
+-            self.assertEqual(payload["required_count"], 0)
+-            self.assertIn("cmd/main.go", payload["unscoped"])
++            self.assertIn("ghost", payload["extra"])
+ 
+ 
+ class FinalizeTest(unittest.TestCase):
+@@ -969,16 +886,16 @@
+                 "--cwd",
+                 str(root),
+                 "--mode",
+-                "detailed",
+-                "--detail-level",
+-                "complete",
++                "reconstructable",
+                 "--commit",
+                 head,
+             )
+             self.assertEqual(code, 1, payload)
+             self.assertEqual(payload["stage"], "coverage")
+             self.assertEqual(payload["reason"], "coverage_missing")
+-            self.assertIn("internal/order.go", payload["coverage"]["missing"])
++            self.assertIn(
++                "<no capabilities identified>", payload["coverage"]["missing"]
++            )
+             state = json.loads(
+                 (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
+             )
+@@ -991,23 +908,24 @@
+         with tempfile.TemporaryDirectory() as raw:
+             root = make_repo(Path(raw) / "example-api")
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            write_order_module(root / "spec")
++            write_checkout_capability(root / "spec")
+             head = git(root, "rev-parse", "HEAD").stdout.strip()
+             code, payload = run(
+                 "finalize",
+                 "--cwd",
+                 str(root),
+                 "--mode",
+-                "detailed",
+-                "--detail-level",
+-                "complete",
++                "reconstructable",
+                 "--commit",
+                 head,
+             )
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["stage"], "done")
+             self.assertEqual(payload["issues"], [])
+-            self.assertEqual(payload["coverage"]["required_count"], payload["coverage"]["covered_count"])
++            self.assertEqual(
++                payload["coverage"]["required_count"],
++                payload["coverage"]["covered_count"],
++            )
+             self.assertEqual(payload["state"]["build_status"], "built")
+             self.assertEqual(payload["state"]["synced_commit"], head)
+ 
+@@ -1022,8 +940,7 @@
+                 "package order\n\nfunc Place() {}\n", encoding="utf-8"
+             )
+             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+-            write_order_module(root / "spec")
+-            code, payload = run("finalize", "--cwd", str(root), "--mode", "concise")
++            code, payload = run("finalize", "--cwd", str(root), "--mode", "briefing")
+             self.assertEqual(code, 0, payload)
+             self.assertEqual(payload["state"]["build_status"], "built")
+             self.assertIsNone(payload["state"]["synced_commit"])

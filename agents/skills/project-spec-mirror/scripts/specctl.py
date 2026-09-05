@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """specctl — project-spec-mirror 的机械管理工作。
 
-只做路径探测、目录骨架、git 版本、文件清单、符号提取、文件表覆盖与镜像状态。
-给人读的金字塔、恢复投影与切面正文由 Agent 撰写。
+只做路径探测、目录骨架、git 新鲜度、diff 路由与 finalize 门禁。
+briefing 与 agent spec 正文由 Agent 撰写。
 
 stdout 只输出 JSON，stderr 是一行摘要。退出码：0 成功，1 硬失败，2 需要用户确认。
 """
@@ -38,7 +38,9 @@ PROJECT_FILE_MARKERS = frozenset(
         "Gemfile",
     }
 )
-DETAIL_LEVELS = ("complete", "important", "lightweight")
+MODES = ("briefing", "reconstructable")
+REQUIREMENT_RE = re.compile(r"^#{2,4}\s+Requirement\b", re.I | re.M)
+SCENARIO_RE = re.compile(r"^#{2,4}\s+Scenario\b", re.I | re.M)
 IGNORE_DIR_NAMES = frozenset(
     {
         ".git",
@@ -142,6 +144,15 @@ CODE_EXTS = frozenset(
         ".cs",
         ".swift",
         ".scala",
+        ".ex",
+        ".exs",
+        ".erl",
+        ".lua",
+        ".zig",
+        ".m",
+        ".mm",
+        ".vue",
+        ".svelte",
     }
 )
 MIRROR_VERSION = 1
@@ -275,6 +286,21 @@ def rel_to(path: Path, start: Path) -> str:
 
 def mirror_path(spec_root: Path) -> Path:
     return spec_root / ".mirror.json"
+
+
+CURRENT_LAYOUT_FILES = (
+    "briefing/overview.md",
+    "agent/INDEX.md",
+    "evidence/source-map.md",
+)
+
+
+def mirror_layout(spec_root: Path) -> str:
+    if not mirror_path(spec_root).is_file():
+        return "none"
+    if all((spec_root / rel).is_file() for rel in CURRENT_LAYOUT_FILES):
+        return "current"
+    return "legacy"
 
 
 def load_state(spec_root: Path) -> dict[str, Any]:
@@ -427,6 +453,7 @@ def detect_layout(
     exists = spec_root.is_dir()
     initialized = mirror_path(spec_root).is_file()
     occupied = exists and not initialized and any(spec_root.iterdir())
+    layout = mirror_layout(spec_root) if initialized else "none"
 
     result: dict[str, Any] = {
         "cwd": str(cwd),
@@ -440,6 +467,7 @@ def detect_layout(
         "spec_exists": exists,
         "initialized": initialized,
         "occupied": occupied,
+        "layout": layout,
     }
     if source_path is not None:
         result["git"] = git_info(source_path, None)
@@ -825,7 +853,7 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
     branch_text = branch or "（无）"
     return f"""# {project}
 
-从这里读这个项目：先总览，再恢复投影，再按需下钻。
+从这里读这个项目：人走 briefing，Agent 走能力 spec。
 
 | 项 | 值 |
 |----|-----|
@@ -836,27 +864,22 @@ def skeleton_readme(project: str, mode: str, branch: str | None) -> str:
 
 ## 怎么读
 
-1. [overview.md](overview.md)
-2. [上下文](context/INDEX.md) · [表面](surface/INDEX.md) · [数据](data/INDEX.md) · [运行时](runtime/INDEX.md) · [构建](build/INDEX.md)
-3. [切面](facets/INDEX.md) · [概念](concepts/INDEX.md) · [实体](entities/INDEX.md) · [处理线](flows/INDEX.md)
-4. 需要看代码承载时再进 [模块](modules/INDEX.md)；看图进 [diagrams/INDEX.md](diagrams/INDEX.md)
+1. 人：[总览](briefing/overview.md) · [架构](briefing/architecture.md) · [处理线](briefing/flows/INDEX.md) · [图](briefing/diagrams/INDEX.md)
+2. Agent：[能力](agent/INDEX.md) · [模型](agent/model/INDEX.md) · [表面](agent/surface/INDEX.md) · [数据](agent/data/INDEX.md)
 
 ## 地图
 
-| 层 | 路径 | 回答什么 |
-|----|------|----------|
-| 总览 | overview.md | 这是什么、边界在哪 |
-| 上下文 | context/ | 系统在环境里的位置 |
-| 表面 | surface/ | 对外接口与配置键 |
-| 数据 | data/ | 持久化与一致性 |
-| 运行时 | runtime/ | 进程、部署、拓扑 |
-| 构建 | build/ | 如何构建、迁移、启动 |
-| 切面 | facets/ | 来源、契约、切片、如何验证与放量 |
-| 概念 | concepts/ | 领域用语 |
-| 实体 | entities/ | 关键对象及其关系 |
-| 处理线 | flows/ | 一次业务怎么走完 |
-| 模块 | modules/ | 代码如何落地 |
-| 图 | diagrams/ | 结构 / 流程 / 时序 / 数据流 / 状态 |
+| 层 | 路径 | 给谁 | 回答什么 |
+|----|------|------|----------|
+| 总览 | briefing/overview.md | 人 | 这是什么、边界在哪 |
+| 架构 | briefing/architecture.md | 人 | 邻接、信任、能力如何拼在一起 |
+| 处理线 | briefing/flows/ | 人 | 一次业务怎么走完 |
+| 概念 | briefing/concepts/ | 人 | 领域用语 |
+| 图 | briefing/diagrams/ | 人 | 结构 / 流程 / 状态 |
+| 能力 | agent/specs/ | Agent | 可验证、可复现的功能契约 |
+| 模型 | agent/model/ | Agent | 实体、不变式、状态机 |
+| 表面 | agent/surface/ | Agent | 对外行为必须对上什么 |
+| 数据 | agent/data/ | Agent | 逻辑持久化与一致性 |
 """
 
 
@@ -871,30 +894,30 @@ def skeleton_overview(project: str) -> str:
 - 目标：
 - 非目标：
 
-## 恢复入口
+## 能力地图
 
-- [上下文](context/INDEX.md)
-- [表面](surface/INDEX.md) · [配置键](surface/config.md)
-- [数据](data/INDEX.md)
-- [运行时](runtime/INDEX.md)
-- [构建](build/INDEX.md)
-
-## 模块地图
-
-| 模块 | 职责 | 入口 |
-|------|------|------|
+| 能力 | 一句话 | 页 |
+|------|--------|-----|
 
 ## 主处理线
 
-（链到 `flows/`。）
+（链到 `briefing/flows/`。）
+"""
 
-## 主切片
 
-（链到 `facets/slices/`。）
+def skeleton_architecture() -> str:
+    return """# 架构
 
-## 关键概念与实体
+（待 build：系统对谁负责、邻接与信任边界。）
 
-（链到 `concepts/` 与 `entities/`。）
+## 使用者
+
+## 邻接系统
+
+| 邻接 | 方向 | 协议 | 责任切在哪 |
+|------|------|------|------------|
+
+## 信任边界
 """
 
 
@@ -906,6 +929,27 @@ def skeleton_index(title: str) -> str:
 """
 
 
+def skeleton_capability_index() -> str:
+    return """# 能力
+
+| 能力 | 一句话 | 状态 | 页 |
+|------|--------|------|-----|
+
+## 未指定
+
+| 路径 | 原因 |
+|------|------|
+"""
+
+
+def skeleton_source_map() -> str:
+    return """# 源映射
+
+| 能力 | 源路径 | spec |
+|------|--------|------|
+"""
+
+
 def skeleton_changelog() -> str:
     return """# 镜像同步
 
@@ -913,20 +957,7 @@ def skeleton_changelog() -> str:
 """
 
 
-def skeleton_facets_index() -> str:
-    return """# 工程切面
-
-| 切面 | 一句话 | 页 |
-|------|--------|-----|
-| SOURCE | 现状事实从哪来 | [source.md](source.md) |
-| CONTRACT | 必须保持为真的约定 | [contracts/INDEX.md](contracts/INDEX.md) |
-| SLICE | 可独立交付的垂直切口 | [slices/INDEX.md](slices/INDEX.md) |
-| VERIFY | 如何对照验证 | [verify.md](verify.md) |
-| TRAFFIC | 影子 / 灰度 / 切换 / 回滚 | [traffic.md](traffic.md) |
-"""
-
-
-def skeleton_facet_stub(title: str, hint: str) -> str:
+def skeleton_stub(title: str, hint: str) -> str:
     return f"""# {title}
 
 （待 build：{hint}）
@@ -941,7 +972,6 @@ def create_skeleton(
     source: Path,
     branch: str | None,
     mode: str,
-    detail_level: str | None,
 ) -> None:
     spec_root.mkdir(parents=True, exist_ok=True)
     source_rel = rel_to(source, spec_root)
@@ -952,10 +982,6 @@ def create_skeleton(
         "source": source_rel,
         "branch": branch,
         "mode": mode,
-        "detail_level": detail_level,
-        "scope": [],
-        "important_paths": [],
-        "hotspots": [],
         "build_status": "skeleton",
         "built_at": None,
         "synced_commit": None,
@@ -964,58 +990,26 @@ def create_skeleton(
     }
     write_state(spec_root, state)
     write_text(spec_root / "README.md", skeleton_readme(project, mode, branch))
-    write_text(spec_root / "overview.md", skeleton_overview(project))
     write_text(spec_root / "changelog.md", skeleton_changelog())
-    write_text(spec_root / "concepts" / "INDEX.md", skeleton_index("概念"))
-    write_text(spec_root / "entities" / "INDEX.md", skeleton_index("实体"))
-    write_text(spec_root / "flows" / "INDEX.md", skeleton_index("业务处理线"))
-    write_text(spec_root / "modules" / "INDEX.md", skeleton_index("模块"))
-    write_text(spec_root / "facets" / "INDEX.md", skeleton_facets_index())
+    write_text(spec_root / "briefing" / "overview.md", skeleton_overview(project))
+    write_text(spec_root / "briefing" / "architecture.md", skeleton_architecture())
+    write_text(spec_root / "briefing" / "concepts" / "INDEX.md", skeleton_index("概念"))
+    write_text(spec_root / "briefing" / "flows" / "INDEX.md", skeleton_index("业务处理线"))
+    write_text(spec_root / "briefing" / "diagrams" / "INDEX.md", skeleton_index("图表"))
+    write_text(spec_root / "agent" / "INDEX.md", skeleton_capability_index())
     write_text(
-        spec_root / "facets" / "source.md",
-        skeleton_facet_stub("现状来源", "代码、配置、测试、脱敏样本。"),
-    )
-    write_text(spec_root / "facets" / "contracts" / "INDEX.md", skeleton_index("契约"))
-    write_text(spec_root / "facets" / "slices" / "INDEX.md", skeleton_index("垂直切片"))
-    write_text(
-        spec_root / "facets" / "verify.md",
-        skeleton_facet_stub(
-            "对照验证",
-            "如何证明行为仍真：测试、性质、对照差分。单实现也须写测试/性质；差分没有则写无。",
-        ),
+        spec_root / "agent" / "model" / "INDEX.md",
+        skeleton_stub("模型", "实体、不变式、状态机。"),
     )
     write_text(
-        spec_root / "facets" / "traffic.md",
-        skeleton_facet_stub(
-            "流量控制",
-            "如何发布与回滚。无灰度也须写发布步骤与回滚；完全没有发布机制则写无。",
-        ),
+        spec_root / "agent" / "surface" / "INDEX.md",
+        skeleton_stub("对外表面", "接口目录、版本与错误分类。"),
     )
     write_text(
-        spec_root / "context" / "INDEX.md",
-        skeleton_facet_stub("系统上下文", "actor、邻接系统、协议、信任边界、质量属性、安全。"),
+        spec_root / "agent" / "data" / "INDEX.md",
+        skeleton_stub("数据", "逻辑存储、一致性与保留。"),
     )
-    write_text(
-        spec_root / "data" / "INDEX.md",
-        skeleton_facet_stub("数据面", "存储实例、与实体的差、迁移、一致性与保留。"),
-    )
-    write_text(
-        spec_root / "surface" / "INDEX.md",
-        skeleton_facet_stub("对外表面", "接口目录、版本与兼容；配置键见 config.md。"),
-    )
-    write_text(
-        spec_root / "surface" / "config.md",
-        skeleton_facet_stub("配置键", "键、语义、默认、环境差；值写 <REDACTED>。"),
-    )
-    write_text(
-        spec_root / "runtime" / "INDEX.md",
-        skeleton_facet_stub("运行时", "进程/容器/端口、启动顺序、健康检查、故障弹性。"),
-    )
-    write_text(
-        spec_root / "build" / "INDEX.md",
-        skeleton_facet_stub("构建与再生", "工具链、构建/测试/迁移/启动命令与产物。"),
-    )
-    write_text(spec_root / "diagrams" / "INDEX.md", skeleton_index("图表"))
+    write_text(spec_root / "evidence" / "source-map.md", skeleton_source_map())
 
 
 def parse_name_status(text: str) -> list[dict[str, str]]:
@@ -1033,17 +1027,24 @@ def parse_name_status(text: str) -> list[dict[str, str]]:
     return files
 
 
-ROOT_HEADINGS = frozenset({"根", "roots"})
-FILE_HEADINGS = frozenset({"文件", "files"})
-HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+CAPABILITY_HEADERS = frozenset({"能力", "capability"})
+UNSPECIFIED_HEADERS = frozenset({"未指定", "路径", "path", "unspecified"})
+CAPABILITY_STATUSES = frozenset({"draft", "ready"})
+LEAK_COMPLETE_LOGIC = re.compile(r"完整逻辑|full logic|complete logic", re.I)
+LEAK_FILE_HEADING = re.compile(r"^#{1,3}\s+(文件|files)\s*$", re.I | re.M)
+LEAK_TOOLCHAIN = re.compile(
+    r"(go\.mod|package\.json|Cargo\.toml|pyproject\.toml|"
+    r"composer\.json|Gemfile|pom\.xml|mix\.exs).{0,80}\d+\.\d+",
+    re.I,
+)
+STUB_RE = re.compile(r"待 build|to be built|\(TODO:\s*describe", re.I)
 
 
-def first_table_cell(row: str) -> str:
+def table_cells(row: str) -> list[str]:
     raw = row.strip()
     if not raw.startswith("|"):
-        return ""
-    parts = [part.strip() for part in raw.strip("|").split("|")]
-    return parts[0] if parts else ""
+        return []
+    return [part.strip() for part in raw.strip("|").split("|")]
 
 
 def normalize_path_cell(cell: str) -> str:
@@ -1056,69 +1057,98 @@ def normalize_path_cell(cell: str) -> str:
     return cell.strip().lstrip("./")
 
 
-def parse_pipe_table(lines: list[str], start: int) -> tuple[list[str], int]:
+def header_name(cell: str) -> str:
+    return normalize_path_cell(cell).lower()
+
+
+def parse_markdown_table(
+    lines: list[str], start: int
+) -> tuple[list[str], list[list[str]], int]:
     i = start
-    header_skipped = False
-    sep_skipped = False
-    cells: list[str] = []
-    while i < len(lines) and lines[i].lstrip().startswith("|"):
-        row = lines[i]
-        if not header_skipped:
-            header_skipped = True
-            i += 1
-            continue
-        if not sep_skipped:
-            sep_skipped = True
-            i += 1
-            continue
-        value = normalize_path_cell(first_table_cell(row))
-        if value:
-            cells.append(value)
+    headers: list[str] = []
+    rows: list[list[str]] = []
+    if i < len(lines) and lines[i].lstrip().startswith("|"):
+        headers = table_cells(lines[i])
         i += 1
-    return cells, i
+    if i < len(lines) and lines[i].lstrip().startswith("|"):
+        i += 1
+    while i < len(lines) and lines[i].lstrip().startswith("|"):
+        cells = table_cells(lines[i])
+        if any(cell.strip() for cell in cells):
+            rows.append(cells)
+        i += 1
+    return headers, rows, i
 
 
-def parse_module_readme(text: str) -> tuple[list[str], list[str]]:
-    roots: list[str] = []
-    files: list[str] = []
+def iter_markdown_tables(text: str) -> list[tuple[list[str], list[list[str]]]]:
+    tables: list[tuple[list[str], list[list[str]]]] = []
     lines = text.splitlines()
     i = 0
-    current = ""
     while i < len(lines):
-        match = HEADING_RE.match(lines[i])
-        if match:
-            current = match.group(2).strip().lower()
-            i += 1
-            continue
-        if lines[i].lstrip().startswith("|") and current in ROOT_HEADINGS | FILE_HEADINGS:
-            cells, i = parse_pipe_table(lines, i)
-            if current in ROOT_HEADINGS:
-                roots.extend(cells)
-            else:
-                files.extend(cells)
+        if lines[i].lstrip().startswith("|"):
+            headers, rows, i = parse_markdown_table(lines, i)
+            if headers:
+                tables.append((headers, rows))
             continue
         i += 1
-    return roots, files
+    return tables
 
 
-def load_modules(spec_root: Path) -> list[dict[str, Any]]:
-    modules_dir = spec_root / "modules"
+def load_capabilities(spec_root: Path) -> list[dict[str, Any]]:
+    index = spec_root / "agent" / "INDEX.md"
+    if not index.is_file():
+        return []
     found: list[dict[str, Any]] = []
-    if not modules_dir.is_dir():
-        return found
-    for readme in sorted(modules_dir.glob("*/README.md")):
-        name = readme.parent.name
-        if name.startswith("."):
+    seen: set[str] = set()
+    for headers, rows in iter_markdown_tables(index.read_text(encoding="utf-8")):
+        if not headers or header_name(headers[0]) not in CAPABILITY_HEADERS:
             continue
-        roots, files = parse_module_readme(readme.read_text(encoding="utf-8"))
-        found.append(
-            {
-                "name": name,
-                "readme": f"modules/{name}/README.md",
-                "roots": roots,
-                "files": files,
-            }
-        )
+        for row in rows:
+            name = normalize_path_cell(row[0]) if row else ""
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            status = row[2].strip() if len(row) > 2 else ""
+            found.append({"name": name, "status": status})
+    return found
+
+
+def load_unspecified(spec_root: Path) -> list[str]:
+    index = spec_root / "agent" / "INDEX.md"
+    if not index.is_file():
+        return []
+    found: list[str] = []
+    seen: set[str] = set()
+    for headers, rows in iter_markdown_tables(index.read_text(encoding="utf-8")):
+        if not headers or header_name(headers[0]) not in UNSPECIFIED_HEADERS:
+            continue
+        for row in rows:
+            path = normalize_path_cell(row[0]) if row else ""
+            if not path or path in seen:
+                continue
+            seen.add(path)
+            found.append(path)
+    return found
+
+
+def load_source_map(spec_root: Path) -> list[dict[str, Any]]:
+    path = spec_root / "evidence" / "source-map.md"
+    if not path.is_file():
+        return []
+    found: list[dict[str, Any]] = []
+    for headers, rows in iter_markdown_tables(path.read_text(encoding="utf-8")):
+        del headers
+        for row in rows:
+            if len(row) < 2:
+                continue
+            name = normalize_path_cell(row[0])
+            source_path = normalize_path_cell(row[1])
+            if not name or not source_path:
+                continue
+            spec = ""
+            if len(row) > 2:
+                spec = row[2].strip()
+            found.append({"name": name, "path": source_path, "spec": spec})
     return found
 
 
@@ -1129,125 +1159,219 @@ def prefix_matches(path: str, root: str) -> bool:
     return path == root or path.startswith(root + "/")
 
 
-def normalize_scope(raw: object) -> list[str]:
-    if not raw:
-        return []
-    if not isinstance(raw, list):
-        return []
-    seen: list[str] = []
-    for item in raw:
-        rel = str(item).strip().lstrip("./")
-        if rel and rel not in seen:
-            seen.append(rel)
-    return seen
-
-
-def in_scope(path: str, prefixes: list[str]) -> bool:
-    if not prefixes:
-        return True
-    return any(prefix_matches(path, prefix) for prefix in prefixes)
+def path_accounted(path: str, prefixes: list[str]) -> bool:
+    return any(prefix_matches(path, prefix) for prefix in prefixes if prefix)
 
 
 def is_code_file(rel: str) -> bool:
     return Path(rel).suffix.lower() in CODE_EXTS
 
 
-def collect_file_table_entries(modules: list[dict[str, Any]]) -> list[str]:
-    entries: list[str] = []
+def capability_spec_rel(name: str) -> str:
+    return f"agent/specs/{name}/spec.md"
+
+
+def count_flows(spec_root: Path) -> int:
+    flows = spec_root / "briefing" / "flows"
+    if not flows.is_dir():
+        return 0
+    extra = [p for p in flows.glob("*.md") if p.name != "INDEX.md"]
+    rows = 0
+    index = flows / "INDEX.md"
+    if index.is_file():
+        for _headers, data in iter_markdown_tables(index.read_text(encoding="utf-8")):
+            rows += len(data)
+    return max(rows, len(extra))
+
+
+def overview_is_stub(spec_root: Path) -> bool:
+    path = spec_root / "briefing" / "overview.md"
+    if not path.is_file():
+        return True
+    return bool(STUB_RE.search(path.read_text(encoding="utf-8")))
+
+
+def source_map_empty(mapping: list[dict[str, Any]]) -> bool:
+    return not mapping
+
+
+def unmapped_code_files(spec_root: Path, source: Path) -> list[str]:
+    mapping = load_source_map(spec_root)
+    prefixes = [item["path"] for item in mapping] + load_unspecified(spec_root)
+    found: list[str] = []
+    for rel in inventory_files(source):
+        if not is_code_file(rel):
+            continue
+        if path_accounted(rel, prefixes):
+            continue
+        found.append(rel)
+    return found
+
+
+def gone_map_paths(spec_root: Path, source: Path) -> list[str]:
+    files = inventory_files(source)
+    gone: list[str] = []
     seen: set[str] = set()
-    for module in modules:
-        for rel in module.get("files") or []:
-            if rel and rel not in seen:
-                seen.add(rel)
-                entries.append(rel)
-    return entries
+    for item in load_source_map(spec_root):
+        prefix = item["path"]
+        if prefix in seen:
+            continue
+        seen.add(prefix)
+        if any(prefix_matches(rel, prefix) for rel in files):
+            continue
+        gone.append(prefix)
+    return gone
+
+
+def briefing_leaks(spec_root: Path) -> list[str]:
+    briefing = spec_root / "briefing"
+    if not briefing.is_dir():
+        return []
+    leaks: list[str] = []
+    for path in sorted(briefing.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        rel = rel_to(path, spec_root)
+        if LEAK_COMPLETE_LOGIC.search(text):
+            leaks.append(f"{rel}:完整逻辑")
+        if LEAK_FILE_HEADING.search(text):
+            leaks.append(f"{rel}:文件表")
+        if LEAK_TOOLCHAIN.search(text):
+            leaks.append(f"{rel}:工具链版本")
+    return leaks
+
+
+def apply_source_map_renames(spec_root: Path, renames: list[dict[str, Any]]) -> int:
+    path = spec_root / "evidence" / "source-map.md"
+    if not path.is_file() or not renames:
+        return 0
+    text = path.read_text(encoding="utf-8")
+    changed = 0
+    for rec in renames:
+        old = rec.get("from") or ""
+        new = rec.get("to") or ""
+        if not old or not new:
+            continue
+        needle = f"`{old}`"
+        if needle in text:
+            text = text.replace(needle, f"`{new}`")
+            changed += 1
+    if changed:
+        write_text(path, text)
+    return changed
 
 
 def collect_coverage(
     spec_root: Path,
     source: Path,
     state: dict[str, Any],
-    *,
-    path: str | None = None,
 ) -> dict[str, Any]:
-    scope = normalize_scope(state.get("scope"))
-    files = inventory_files(source, path)
-    code_files = [item for item in files if is_code_file(item)]
-    modules = load_modules(spec_root)
-    entries = collect_file_table_entries(modules)
-    required = [item for item in code_files if in_scope(item, scope)]
-    unscoped = [item for item in code_files if item not in required]
-    missing = [
-        item
-        for item in required
-        if not any(prefix_matches(item, entry) for entry in entries)
-    ]
-    extra = [
-        entry
-        for entry in entries
-        if not any(prefix_matches(item, entry) for item in files)
-    ]
-    mode = state.get("mode") or "concise"
-    detail_level = state.get("detail_level", "important")
-    if detail_level not in DETAIL_LEVELS:
-        detail_level = "important"
-    enforce = mode == "detailed" and detail_level in {"important", "complete"}
-    ok = not (enforce and missing)
+    capabilities = load_capabilities(spec_root)
+    mapping = load_source_map(spec_root)
+    mapped = {item["name"] for item in mapping}
+    missing: list[str] = []
+    if overview_is_stub(spec_root):
+        missing.append("overview:stub")
+    if count_flows(spec_root) < 1:
+        missing.append("flows:none")
+    if not capabilities:
+        missing.append("<no capabilities identified>")
+    if source_map_empty(mapping):
+        missing.append("source-map:empty")
+    for item in capabilities:
+        name = item["name"]
+        status = item.get("status") or ""
+        if status not in CAPABILITY_STATUSES:
+            missing.append(f"{name}:status")
+        spec_file = spec_root / "agent" / "specs" / name / "spec.md"
+        if not spec_file.is_file():
+            missing.append(f"{name}:spec")
+        if name not in mapped:
+            missing.append(f"{name}:source-map")
+    extra = sorted(
+        name for name in mapped if name not in {item["name"] for item in capabilities}
+    )
+    unmapped = unmapped_code_files(spec_root, source)
+    mode = state.get("mode") or "briefing"
+    enforce = mode == "reconstructable"
+    if enforce:
+        for item in capabilities:
+            spec_file = spec_root / "agent" / "specs" / item["name"] / "spec.md"
+            if not spec_file.is_file():
+                continue
+            text = spec_file.read_text(encoding="utf-8")
+            if not REQUIREMENT_RE.search(text):
+                missing.append(f"{item['name']}:Requirement")
+            if not SCENARIO_RE.search(text):
+                missing.append(f"{item['name']}:Scenario")
+        for rel in unmapped:
+            missing.append(f"unmapped:{rel}")
+        for name in extra:
+            missing.append(f"ghost:{name}")
+    named_missing = {
+        item.split(":", 1)[0]
+        for item in missing
+        if item not in {"overview:stub", "flows:none", "source-map:empty", "<no capabilities identified>"}
+        and not item.startswith("unmapped:")
+        and not item.startswith("ghost:")
+    }
+    covered = max(0, len(capabilities) - len(named_missing & {item["name"] for item in capabilities}))
+    ok = not missing
     return {
         "ok": ok,
         "result": "coverage",
         "spec_root": str(spec_root),
         "mode": mode,
-        "detail_level": detail_level,
         "enforce": enforce,
-        "scope": scope,
-        "path": path,
-        "inventory_count": len(files),
-        "code_file_count": len(code_files),
-        "required_count": len(required),
-        "covered_count": len(required) - len(missing),
+        "required_count": len(capabilities),
+        "covered_count": covered,
         "missing": missing,
         "extra": extra,
-        "unscoped": unscoped,
-        "not_built": not bool(modules),
+        "unmapped_files": unmapped,
+        "not_built": not bool(mapping),
+        "capabilities": [item["name"] for item in capabilities],
     }
 
 
-def match_file_table(path: str, modules: list[dict[str, Any]]) -> list[str]:
-    return [module["name"] for module in modules if path in module["files"]]
-
-
-def match_root_prefix(path: str, modules: list[dict[str, Any]]) -> list[str]:
+def match_source_map(path: str, mapping: list[dict[str, Any]]) -> list[str]:
+    exact = [item["name"] for item in mapping if item["path"] == path]
+    if exact:
+        seen: list[str] = []
+        for name in exact:
+            if name not in seen:
+                seen.append(name)
+        return seen
     best_len = -1
     best: list[str] = []
-    for module in modules:
-        for root in module["roots"]:
-            if not prefix_matches(path, root):
-                continue
-            length = len(root.strip().rstrip("/"))
-            if length > best_len:
-                best_len = length
-                best = [module["name"]]
-            elif length == best_len and module["name"] not in best:
-                best.append(module["name"])
+    for item in mapping:
+        if not prefix_matches(path, item["path"]):
+            continue
+        length = len(item["path"].strip().rstrip("/"))
+        if length > best_len:
+            best_len = length
+            best = [item["name"]]
+        elif length == best_len and item["name"] not in best:
+            best.append(item["name"])
     return best
 
 
 def match_change(
-    item: dict[str, str], modules: list[dict[str, Any]]
+    item: dict[str, str], mapping: list[dict[str, Any]]
 ) -> tuple[list[str], str]:
     status = item.get("status", "")
     path = item["path"]
     from_path = item.get("from")
     lookups = [from_path, path] if status == "R" and from_path else [path]
     for lookup in lookups:
-        names = match_file_table(lookup, modules)
+        if lookup is None:
+            continue
+        names = match_source_map(lookup, mapping)
         if names:
-            return names, "file-table"
-    for lookup in lookups:
-        names = match_root_prefix(lookup, modules)
-        if names:
-            return names, "root-prefix"
+            via = (
+                "source-map"
+                if any(row["path"] == lookup for row in mapping)
+                else "source-prefix"
+            )
+            return names, via
     return [], "unmapped"
 
 
@@ -1384,18 +1508,10 @@ def cmd_init(args: argparse.Namespace) -> int:
             summary=f"init: occupied {spec_root}",
         )
     mode = args.mode
-    if mode == "concise" and args.detail_level is not None:
-        raise SpecError(
-            "--detail-level is only valid with --mode detailed",
-            reason="invalid_mode_combination",
-        )
-    detail_level = args.detail_level or ("important" if mode == "detailed" else None)
     info = git_info(source, args.branch)
     branch = args.branch or (info.get("default_branch") if info.get("is_git") else None)
     if not args.confirm:
         confirm_args = ["init", "--confirm", "--cwd", str(cwd), "--mode", mode]
-        if detail_level:
-            confirm_args.extend(["--detail-level", detail_level])
         if args.project:
             confirm_args.extend(["--project", args.project])
         if args.source:
@@ -1415,7 +1531,6 @@ def cmd_init(args: argparse.Namespace) -> int:
                 "project": project,
                 "branch": branch,
                 "mode": mode,
-                "detail_level": detail_level,
                 "prompt": (
                     f"将创建 spec 镜像目录 {spec_root} "
                     f"（placement={layout['placement']}，source={source}）。"
@@ -1433,7 +1548,6 @@ def cmd_init(args: argparse.Namespace) -> int:
         source=source,
         branch=branch,
         mode=mode,
-        detail_level=detail_level,
     )
     return emit(
         {
@@ -1446,10 +1560,44 @@ def cmd_init(args: argparse.Namespace) -> int:
             "placement": layout["placement"],
             "branch": branch,
             "mode": mode,
-            "detail_level": detail_level,
         },
         summary=f"init: created {spec_root}",
     )
+
+
+def infer_phase(spec_root: Path, state: dict[str, Any]) -> str:
+    layout = mirror_layout(spec_root)
+    if layout == "legacy":
+        return "rebuild"
+    if layout == "none":
+        return "init"
+    if effective_build_status(state) == "built":
+        return "update"
+    return "build"
+
+
+def inspect_symbols(
+    source: Path, rel: str, *, include_private: bool = False
+) -> dict[str, Any]:
+    path = (source / rel).resolve()
+    try:
+        path.relative_to(source.resolve())
+    except ValueError as exc:
+        raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
+    gitlinks = list_gitlinks(source)
+    ignored = ignored_paths(source, [rel])
+    if rel in ignored:
+        return {"path": rel, "skipped": True, "reason": "ignored", "symbols": []}
+    if skip_inventory_path(source, rel, gitlinks=gitlinks):
+        return {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
+    if not text_path(source, rel):
+        return {"path": rel, "skipped": True, "reason": "non_text", "symbols": []}
+    if not path.is_file():
+        return {"path": rel, "missing": True, "symbols": []}
+    return {
+        "path": rel,
+        "symbols": extract_symbols(path, include_private=include_private),
+    }
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -1462,6 +1610,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     branch = args.branch or state.get("branch")
     info = git_info(source, branch)
     build_status = effective_build_status(state)
+    layout = mirror_layout(spec_root)
+    phase = infer_phase(spec_root, state)
     synced = state.get("synced_commit")
     freshness: dict[str, Any] = {"kind": "none"}
     if info.get("is_git") and info.get("commit"):
@@ -1480,10 +1630,14 @@ def cmd_status(args: argparse.Namespace) -> int:
             )
             freshness["is_ancestor"] = proc.returncode == 0
     elif not info.get("is_git"):
+        unmapped = unmapped_code_files(spec_root, source)
+        gone = gone_map_paths(spec_root, source)
         freshness = {
             "kind": "non-git",
-            "in_sync": build_status == "built",
-            "note": "no commit diff; compare inventory",
+            "in_sync": build_status == "built" and not unmapped and not gone,
+            "unmapped": unmapped,
+            "gone": gone,
+            "note": "no commit diff; compare inventory vs source-map",
         }
     payload = {
         "ok": True,
@@ -1491,111 +1645,15 @@ def cmd_status(args: argparse.Namespace) -> int:
         "spec_root": str(spec_root),
         "state": state,
         "build_status": build_status,
-        "phase": "update" if build_status == "built" else "build",
+        "layout": layout,
+        "phase": phase,
         "source": str(source),
         "git": info,
         "freshness": freshness,
     }
     return emit(
         payload,
-        summary=f"status: {state.get('project')} {freshness.get('kind')}",
-    )
-
-
-def cmd_git_info(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    if args.source:
-        source = Path(args.source).expanduser().resolve()
-    else:
-        spec_root = find_spec_root(
-            cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-        )
-        source = resolve_source(spec_root, load_state(spec_root))
-    info = git_info(source, args.branch)
-    return emit(
-        {"ok": True, "result": "git-info", "source": str(source), **info},
-        summary=f"git-info: git={info.get('is_git')}",
-    )
-
-
-def cmd_inventory(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-    )
-    state = load_state(spec_root)
-    source = resolve_source(spec_root, state)
-    prefix = args.path
-    files = inventory_files(source, prefix)
-    code_files = [item for item in files if Path(item).suffix.lower() in CODE_EXTS]
-    return emit(
-        {
-            "ok": True,
-            "result": "inventory",
-            "spec_root": str(spec_root),
-            "source": str(source),
-            "path": prefix,
-            "file_count": len(files),
-            "code_file_count": len(code_files),
-            "files": files,
-        },
-        summary=f"inventory: {len(files)} files",
-    )
-
-
-def cmd_symbols(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-    )
-    state = load_state(spec_root)
-    source = resolve_source(spec_root, state)
-    targets = list(args.file)
-    if not targets:
-        raise SpecError("symbols requires one or more --file", reason="usage")
-    gitlinks = list_gitlinks(source)
-    ignored = ignored_paths(source, targets)
-    files_out: list[dict[str, Any]] = []
-    for rel in targets:
-        path = (source / rel).resolve()
-        try:
-            path.relative_to(source.resolve())
-        except ValueError as exc:
-            raise SpecError(f"file outside source: {rel}", reason="path_escape") from exc
-        if rel in ignored:
-            files_out.append(
-                {"path": rel, "skipped": True, "reason": "ignored", "symbols": []}
-            )
-            continue
-        if skip_inventory_path(source, rel, gitlinks=gitlinks):
-            files_out.append(
-                {"path": rel, "skipped": True, "reason": "third_party", "symbols": []}
-            )
-            continue
-        if not text_path(source, rel):
-            files_out.append(
-                {"path": rel, "skipped": True, "reason": "non_text", "symbols": []}
-            )
-            continue
-        if not path.is_file():
-            files_out.append({"path": rel, "missing": True, "symbols": []})
-            continue
-        files_out.append(
-            {
-                "path": rel,
-                "symbols": extract_symbols(
-                    path, include_private=args.private
-                ),
-            }
-        )
-    return emit(
-        {
-            "ok": True,
-            "result": "symbols",
-            "source": str(source),
-            "files": files_out,
-        },
-        summary=f"symbols: {len(files_out)} files",
+        summary=f"status: {state.get('project')} {layout} {phase}",
     )
 
 
@@ -1622,21 +1680,77 @@ def cmd_diff(args: argparse.Namespace) -> int:
     return emit({"ok": True, "result": "diff", **payload}, summary=summary)
 
 
-def cmd_coverage(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
+def collect_route(
+    spec_root: Path,
+    source: Path,
+    state: dict[str, Any],
+    *,
+    branch: str | None = None,
+    from_commit: str | None = None,
+    to: str | None = None,
+    path: str | None = None,
+    apply_renames: bool = False,
+) -> dict[str, Any]:
+    diff_payload = collect_diff_files(
+        source,
+        state,
+        branch=branch,
+        from_commit=from_commit,
+        to=to,
+        path=path,
     )
-    state = load_state(spec_root)
-    source = resolve_source(spec_root, state)
-    payload = collect_coverage(spec_root, source, state, path=args.path)
-    missing_n = len(payload["missing"])
-    extra_n = len(payload["extra"])
-    summary = (
-        f"coverage: {payload['covered_count']}/{payload['required_count']} "
-        f"missing={missing_n} extra={extra_n}"
-    )
-    return emit(payload, code=0 if payload["ok"] else 1, summary=summary)
+    mapping = load_source_map(spec_root)
+    not_built = not mapping
+    unspecified = load_unspecified(spec_root)
+    changes: list[dict[str, Any]] = []
+    unmapped: list[str] = []
+    renames: list[dict[str, Any]] = []
+    hit_caps: list[str] = []
+    for item in diff_payload["files"]:
+        names, via = ([], "unmapped") if not_built else match_change(item, mapping)
+        rec: dict[str, Any] = {
+            "status": item.get("status", ""),
+            "path": item["path"],
+            "capabilities": names,
+            "via": via,
+        }
+        if item.get("from"):
+            rec["from"] = item["from"]
+        changes.append(rec)
+        if not names:
+            if not path_accounted(item["path"], unspecified):
+                unmapped.append(item["path"])
+        else:
+            for name in names:
+                if name not in hit_caps:
+                    hit_caps.append(name)
+        if item.get("status") == "R" and item.get("from"):
+            rename_rec: dict[str, Any] = {"from": item["from"], "to": item["path"]}
+            if names:
+                rename_rec["capability"] = names[0]
+                if len(names) > 1:
+                    rename_rec["capabilities"] = names
+            renames.append(rename_rec)
+    applied = apply_source_map_renames(spec_root, renames) if apply_renames else 0
+    pages = [capability_spec_rel(name) for name in hit_caps]
+    payload: dict[str, Any] = {
+        "ok": True,
+        "result": "route",
+        "spec_root": str(spec_root),
+        "from": diff_payload.get("from"),
+        "to": diff_payload.get("to"),
+        "full": diff_payload.get("full", False),
+        "not_built": not_built,
+        "capabilities": hit_caps,
+        "pages": pages,
+        "renames": renames,
+        "renames_applied": applied,
+        "unmapped": unmapped,
+        "changes": changes,
+    }
+    if not_built:
+        payload["note"] = "not_built"
+    return payload
 
 
 def cmd_route(args: argparse.Namespace) -> int:
@@ -1646,90 +1760,38 @@ def cmd_route(args: argparse.Namespace) -> int:
     )
     state = load_state(spec_root)
     source = resolve_source(spec_root, state)
-    diff_payload = collect_diff_files(
+    payload = collect_route(
+        spec_root,
         source,
         state,
         branch=args.branch,
         from_commit=args.from_commit,
         to=args.to,
         path=args.path,
+        apply_renames=True,
     )
-    modules = load_modules(spec_root)
-    not_built = not modules
-    changes: list[dict[str, Any]] = []
-    unmapped: list[str] = []
-    renames: list[dict[str, Any]] = []
-    hit_modules: list[str] = []
-    for item in diff_payload["files"]:
-        names, via = ([], "unmapped") if not_built else match_change(item, modules)
-        rec: dict[str, Any] = {
-            "status": item.get("status", ""),
-            "path": item["path"],
-            "modules": names,
-            "via": via,
-        }
-        if item.get("from"):
-            rec["from"] = item["from"]
-        changes.append(rec)
-        if not names:
-            unmapped.append(item["path"])
-        else:
-            for name in names:
-                if name not in hit_modules:
-                    hit_modules.append(name)
-        if item.get("status") == "R" and item.get("from"):
-            rename_rec: dict[str, Any] = {"from": item["from"], "to": item["path"]}
-            if names:
-                rename_rec["module"] = names[0]
-                if len(names) > 1:
-                    rename_rec["modules"] = names
-            renames.append(rename_rec)
-    pages = [f"modules/{name}/README.md" for name in hit_modules]
-    payload: dict[str, Any] = {
-        "ok": True,
-        "result": "route",
-        "spec_root": str(spec_root),
-        "from": diff_payload.get("from"),
-        "to": diff_payload.get("to"),
-        "full": diff_payload.get("full", False),
-        "not_built": not_built,
-        "modules": hit_modules,
-        "pages": pages,
-        "renames": renames,
-        "unmapped": unmapped,
-        "changes": changes,
-    }
-    if not_built:
-        payload["note"] = "not_built"
+    unmapped = payload["unmapped"]
     summary = (
         f"route: not_built {len(unmapped)} unmapped"
-        if not_built
-        else f"route: {len(hit_modules)} modules {len(unmapped)} unmapped"
+        if payload.get("not_built")
+        else f"route: {len(payload['capabilities'])} capabilities {len(unmapped)} unmapped"
     )
     return emit(payload, summary=summary)
 
 
 REQUIRED_MIRROR_FILES = (
     "README.md",
-    "overview.md",
     "changelog.md",
-    "concepts/INDEX.md",
-    "entities/INDEX.md",
-    "flows/INDEX.md",
-    "modules/INDEX.md",
-    "facets/INDEX.md",
-    "facets/source.md",
-    "facets/contracts/INDEX.md",
-    "facets/slices/INDEX.md",
-    "facets/verify.md",
-    "facets/traffic.md",
-    "context/INDEX.md",
-    "data/INDEX.md",
-    "surface/INDEX.md",
-    "surface/config.md",
-    "runtime/INDEX.md",
-    "build/INDEX.md",
-    "diagrams/INDEX.md",
+    "briefing/overview.md",
+    "briefing/architecture.md",
+    "briefing/concepts/INDEX.md",
+    "briefing/flows/INDEX.md",
+    "briefing/diagrams/INDEX.md",
+    "agent/INDEX.md",
+    "agent/model/INDEX.md",
+    "agent/surface/INDEX.md",
+    "agent/data/INDEX.md",
+    "evidence/source-map.md",
 )
 
 
@@ -1742,19 +1804,15 @@ def effective_build_status(state: dict[str, Any]) -> str:
 
 def render_readme_metadata(text: str, state: dict[str, Any]) -> str:
     mode = state.get("mode")
-    detail = state.get("detail_level") if mode == "detailed" else "不适用"
     branch = state.get("branch") or "（无）"
     commit = state.get("synced_commit")
     commit_text = f"`{commit[:12]}`" if commit else "尚未同步"
     replacements = {
         "粒度": str(mode),
-        "文件粒度": str(detail),
         "分支": str(branch),
         "同步 commit": commit_text,
     }
     lines = text.splitlines()
-    found: set[str] = set()
-    mode_index: int | None = None
     for index, line in enumerate(lines):
         if not line.lstrip().startswith("|"):
             continue
@@ -1763,11 +1821,6 @@ def render_readme_metadata(text: str, state: dict[str, Any]) -> str:
             continue
         key = cells[0]
         lines[index] = f"| {key} | {replacements[key]} |"
-        found.add(key)
-        if key == "粒度":
-            mode_index = index
-    if "文件粒度" not in found and mode_index is not None:
-        lines.insert(mode_index + 1, f"| 文件粒度 | {replacements['文件粒度']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -1777,7 +1830,7 @@ def readme_metadata(text: str) -> dict[str, str]:
         if not line.lstrip().startswith("|"):
             continue
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) >= 2 and cells[0] in {"粒度", "文件粒度", "分支", "同步 commit"}:
+        if len(cells) >= 2 and cells[0] in {"粒度", "分支", "同步 commit"}:
             result[cells[0]] = cells[1].strip("`")
     return result
 
@@ -1814,46 +1867,31 @@ def validation_issues(
         if key not in state:
             issues.append(f"state missing {key}")
     mode = state.get("mode")
-    detail_level = state.get("detail_level")
-    if mode not in {"concise", "detailed"}:
+    if mode not in MODES:
         issues.append(f"invalid mode {mode!r}")
-    elif mode == "concise" and detail_level is not None:
-        issues.append("concise mode requires detail_level null")
-    elif mode == "detailed" and (detail_level or "important") not in DETAIL_LEVELS:
-        issues.append(f"invalid detail_level {detail_level!r}")
     explicit_build_status = state.get("build_status")
     if explicit_build_status is not None and explicit_build_status not in {"skeleton", "built"}:
         issues.append(f"invalid build_status {explicit_build_status!r}")
-    important_paths = state.get("important_paths", [])
-    if important_paths is None:
-        important_paths = []
-    if not isinstance(important_paths, list) or any(
-        not isinstance(item, str) for item in important_paths
+    if (
+        mode == "reconstructable"
+        and effective_build_status(state) == "built"
     ):
-        issues.append("important_paths must be a list of strings")
-    else:
-        for item in important_paths:
-            try:
-                normalized = normalize_source_path(item, "important")
-            except SpecError as exc:
-                issues.append(str(exc))
+        for item in load_capabilities(spec_root):
+            spec_file = spec_root / "agent" / "specs" / item["name"] / "spec.md"
+            if not spec_file.is_file():
+                issues.append(f"missing spec for {item['name']}")
                 continue
-            if normalized != item:
-                issues.append(f"important path is not normalized: {item!r}")
-    if important_paths and (mode != "detailed" or detail_level != "important"):
-        issues.append("important_paths require detailed + important")
-    hotspots = state.get("hotspots", [])
-    if hotspots is None:
-        hotspots = []
-    if not isinstance(hotspots, list) or any(not isinstance(item, str) for item in hotspots):
-        issues.append("hotspots must be a list of strings")
+            text = spec_file.read_text(encoding="utf-8")
+            if not REQUIREMENT_RE.search(text):
+                issues.append(f"{item['name']} spec missing Requirement")
+            if not SCENARIO_RE.search(text):
+                issues.append(f"{item['name']} spec missing Scenario")
     if readme_text is None and (spec_root / "README.md").is_file():
         readme_text = (spec_root / "README.md").read_text(encoding="utf-8")
     if readme_text is not None:
         metadata = readme_metadata(readme_text)
         expected = {
             "粒度": str(mode),
-            "文件粒度": str(detail_level if mode == "detailed" else "不适用"),
             "分支": str(state.get("branch") or "（无）"),
             "同步 commit": str(state.get("synced_commit") or "尚未同步")[:12],
         }
@@ -1863,88 +1901,49 @@ def validation_issues(
     return issues
 
 
-def sync_state(spec_root: Path, args: argparse.Namespace) -> dict[str, Any]:
-    """按 args 计算并写回同步状态。写盘前先校验骨架，失败则抛错不推进。"""
+def sync_state(
+    spec_root: Path,
+    *,
+    commit: str | None = None,
+    mode: str | None = None,
+    branch: str | None = None,
+) -> dict[str, Any]:
+    """回写 built / commit。写盘前校验骨架，失败则抛错不推进。"""
     current = load_state(spec_root)
     source = resolve_source(spec_root, current)
     state = dict(current)
-    state["build_status"] = effective_build_status(current)
-    if args.mode:
-        state["mode"] = args.mode
-    mode = state.get("mode")
-    if mode == "concise":
-        if args.detail_level is not None:
-            raise SpecError(
-                "--detail-level is only valid with --mode detailed",
-                reason="invalid_mode_combination",
-            )
-        state["detail_level"] = None
-        state["important_paths"] = []
-    elif mode == "detailed":
-        state["detail_level"] = args.detail_level or state.get("detail_level") or "important"
-        if state["detail_level"] != "important":
-            if args.important_path is not None:
-                raise SpecError(
-                    "--important-path requires --detail-level important",
-                    reason="invalid_mode_combination",
-                )
-            state["important_paths"] = []
-    if args.branch:
-        state["branch"] = args.branch
-    if args.scope is not None:
-        state["scope"] = list(args.scope)
-    if args.important_path is not None:
-        state["important_paths"] = normalize_source_paths(
-            list(args.important_path), "important"
-        )
-    elif "important_paths" not in state:
-        state["important_paths"] = []
-    if (
-        args.built
-        and mode == "detailed"
-        and state.get("detail_level") == "important"
-        and not state.get("important_paths")
-    ):
-        raise SpecError(
-            "detailed important build requires --important-path",
-            reason="important_paths_required",
-        )
-    if args.hotspot is not None:
-        seen: list[str] = []
-        for item in args.hotspot:
-            rel = str(item).strip().lstrip("./")
-            if rel and rel not in seen:
-                seen.append(rel)
-        state["hotspots"] = seen
+    if mode:
+        state["mode"] = mode
+    if branch:
+        state["branch"] = branch
+    state.pop("scope", None)
+    state.pop("detail_level", None)
+    state.pop("important_paths", None)
+    state.pop("hotspots", None)
     info = git_info(source, state.get("branch"))
     if info.get("is_git"):
-        if args.built and args.commit is None:
+        if commit is None:
             raise SpecError(
-                "Git source requires --commit when using --built",
+                "Git source requires --commit",
                 reason="commit_required",
             )
-        if args.commit:
-            state["synced_commit"] = commit_of(source, args.commit)
-            state["synced_at"] = utc_now()
-        elif args.commit == "":
-            state["synced_commit"] = None
-            state["synced_at"] = None
+        if commit == "":
+            raise SpecError(
+                "Git source requires --commit",
+                reason="commit_required",
+            )
+        state["synced_commit"] = commit_of(source, commit)
+        state["synced_at"] = utc_now()
     else:
-        if args.commit not in {None, ""}:
+        if commit not in {None, ""}:
             raise SpecError(
                 "non-Git source cannot record a commit",
                 reason="commit_not_supported",
             )
         state["synced_commit"] = None
         state["synced_at"] = None
-    if args.commit is not None and not args.built and state["build_status"] == "skeleton":
-        raise SpecError(
-            "initial sync requires --built",
-            reason="build_status_required",
-        )
-    if args.built:
-        state["build_status"] = "built"
-        state["built_at"] = utc_now()
+    state["build_status"] = "built"
+    state["built_at"] = utc_now()
     state["updated_at"] = utc_now()
     readme_path = spec_root / "README.md"
     readme = readme_path.read_text(encoding="utf-8") if readme_path.is_file() else ""
@@ -1952,7 +1951,7 @@ def sync_state(spec_root: Path, args: argparse.Namespace) -> dict[str, Any]:
     issues = validation_issues(spec_root, state, readme_text=rendered_readme)
     if issues:
         raise SpecError(
-            "mirror validation failed before set-sync",
+            "mirror validation failed before finalize",
             reason="invalid_mirror",
             issues=issues,
         )
@@ -1961,38 +1960,51 @@ def sync_state(spec_root: Path, args: argparse.Namespace) -> dict[str, Any]:
     return state
 
 
-def cmd_set_sync(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-    )
-    state = sync_state(spec_root, args)
-    return emit(
-        {"ok": True, "result": "set-sync", "spec_root": str(spec_root), "state": state},
-        summary=f"set-sync: {state.get('synced_commit') or 'none'}",
-    )
-
-
 def cmd_finalize(args: argparse.Namespace) -> int:
-    """收尾：coverage 门禁 → 回写 build 状态 → 复验骨架，一条命令三步。"""
+    """唯一能标 built 的对外命令：layout → unmapped → coverage → leak → 回写。"""
     cwd = Path(args.cwd).expanduser().resolve()
     spec_root = find_spec_root(
         cwd, Path(args.spec).expanduser() if args.spec else None, args.project
     )
-    args.built = True
+    if mirror_layout(spec_root) == "legacy":
+        return emit(
+            {
+                "ok": False,
+                "result": "finalize",
+                "stage": "layout",
+                "reason": "legacy_layout",
+                "layout": "legacy",
+                "spec_root": str(spec_root),
+            },
+            code=1,
+            summary="finalize: legacy layout; rebuild current tree first",
+        )
     probe = dict(load_state(spec_root))
     if args.mode:
         probe["mode"] = args.mode
-    if probe.get("mode") == "detailed":
-        probe["detail_level"] = (
-            args.detail_level or probe.get("detail_level") or "important"
-        )
-    else:
-        probe["detail_level"] = None
-    if args.scope is not None:
-        probe["scope"] = list(args.scope)
     source = resolve_source(spec_root, probe)
-    coverage = collect_coverage(spec_root, source, probe, path=args.path)
+    if probe.get("synced_commit"):
+        routed = collect_route(
+            spec_root,
+            source,
+            probe,
+            branch=args.branch or probe.get("branch"),
+            apply_renames=True,
+        )
+        if routed["unmapped"]:
+            return emit(
+                {
+                    "ok": False,
+                    "result": "finalize",
+                    "stage": "route",
+                    "reason": "unmapped_pending",
+                    "spec_root": str(spec_root),
+                    "unmapped": routed["unmapped"],
+                },
+                code=1,
+                summary=f"finalize: unmapped={len(routed['unmapped'])}",
+            )
+    coverage = collect_coverage(spec_root, source, probe)
     if not coverage["ok"]:
         return emit(
             {
@@ -2006,7 +2018,26 @@ def cmd_finalize(args: argparse.Namespace) -> int:
             code=1,
             summary=f"finalize: coverage missing={len(coverage['missing'])}",
         )
-    state = sync_state(spec_root, args)
+    leaks = briefing_leaks(spec_root)
+    if leaks:
+        return emit(
+            {
+                "ok": False,
+                "result": "finalize",
+                "stage": "leak",
+                "reason": "briefing_leak",
+                "spec_root": str(spec_root),
+                "leaks": leaks,
+            },
+            code=1,
+            summary=f"finalize: briefing leak={len(leaks)}",
+        )
+    state = sync_state(
+        spec_root,
+        commit=args.commit,
+        mode=args.mode,
+        branch=args.branch,
+    )
     issues = validation_issues(spec_root, state)
     ok = not issues
     return emit(
@@ -2020,6 +2051,7 @@ def cmd_finalize(args: argparse.Namespace) -> int:
                 "required_count": coverage["required_count"],
                 "covered_count": coverage["covered_count"],
                 "extra": coverage["extra"],
+                "unmapped_files": coverage["unmapped_files"],
             },
             "issues": issues,
             "state": state,
@@ -2033,55 +2065,13 @@ def cmd_finalize(args: argparse.Namespace) -> int:
     )
 
 
-def cmd_validate(args: argparse.Namespace) -> int:
-    cwd = Path(args.cwd).expanduser().resolve()
-    spec_root = find_spec_root(
-        cwd, Path(args.spec).expanduser() if args.spec else None, args.project
-    )
-    state = load_state(spec_root)
-    issues = validation_issues(spec_root, state)
-    mode = state.get("mode")
-    detail_level = state.get("detail_level")
-    source_ok = True
-    try:
-        source = resolve_source(spec_root, state)
-    except SpecError as exc:
-        source_ok = False
-        source = None
-        issues.append(str(exc))
-    ok = not issues
-    payload = {
-        "ok": ok,
-        "result": "validate",
-        "spec_root": str(spec_root),
-        "issues": issues,
-        "source_ok": source_ok,
-        "source": str(source) if source else None,
-        "mode": mode,
-        "detail_level": detail_level,
-        "build_status": effective_build_status(state),
-        "important_paths": state.get("important_paths", []),
-    }
-    return emit(
-        payload,
-        code=0 if ok else 1,
-        summary="validate: ok" if ok else "validate: issues",
-    )
-
-
 COMMANDS = {
     "detect": cmd_detect,
     "init": cmd_init,
     "status": cmd_status,
-    "git-info": cmd_git_info,
-    "inventory": cmd_inventory,
-    "symbols": cmd_symbols,
     "diff": cmd_diff,
-    "coverage": cmd_coverage,
     "route": cmd_route,
-    "set-sync": cmd_set_sync,
     "finalize": cmd_finalize,
-    "validate": cmd_validate,
 }
 
 
@@ -2118,61 +2108,25 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--confirm", action="store_true")
     init.add_argument(
         "--mode",
-        choices=("concise", "detailed"),
-        default="concise",
+        choices=MODES,
+        default="briefing",
     )
-    init.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
 
-    add("status", help="镜像状态与 git 新鲜度")
-    add("git-info", help="源仓库分支与 commit")
-
-    inventory = add("inventory", help="源文件清单")
-    inventory.add_argument("--path", default=None, help="仅列出此前缀下的文件")
-
-    symbols = add("symbols", help="提取代码符号")
-    symbols.add_argument("--file", action="append", default=[], help="相对 source 的路径，可重复")
-    symbols.add_argument("--private", action="store_true", help="包含 _ 前缀符号")
+    add("status", help="阶段、layout、git 新鲜度")
 
     diff = add("diff", help="相对已同步 commit 的文件变更")
     diff.add_argument("--from", dest="from_commit", default=None)
     diff.add_argument("--to", dest="to", default=None)
     diff.add_argument("--path", default=None)
 
-    coverage = add("coverage", help="对照 inventory 与模块文件表")
-    coverage.add_argument("--path", default=None, help="仅核对此前缀下的文件")
-
-    route = add("route", help="把 diff 文件映射到模块 README")
+    route = add("route", help="把 diff 文件映射到能力 spec；rename 回写 source-map")
     route.add_argument("--from", dest="from_commit", default=None)
     route.add_argument("--to", dest="to", default=None)
     route.add_argument("--path", default=None)
 
-    def add_sync_args(target: argparse.ArgumentParser) -> None:
-        target.add_argument("--commit", default=None)
-        target.add_argument("--mode", choices=("concise", "detailed"), default=None)
-        target.add_argument("--detail-level", choices=DETAIL_LEVELS, default=None)
-        target.add_argument(
-            "--important-path",
-            action="append",
-            default=None,
-            help="important 模式写深的源相对路径或前缀，可重复；整表写回",
-        )
-        target.add_argument("--scope", action="append", default=None)
-        target.add_argument(
-            "--hotspot",
-            action="append",
-            default=None,
-            help="热点源路径，可重复；本轮给出的列表整表写回",
-        )
-
-    set_sync = add("set-sync", help="回写 .mirror.json 同步指针")
-    set_sync.add_argument("--built", action="store_true", help="标记正文已完成 build/update")
-    add_sync_args(set_sync)
-
-    finalize = add("finalize", help="收尾：coverage 门禁 + 回写状态 + 复验")
-    add_sync_args(finalize)
-    finalize.add_argument("--path", default=None, help="coverage 只核对此前缀下的文件")
-
-    add("validate", help="检查金字塔、恢复投影、切面骨架与状态文件")
+    finalize = add("finalize", help="唯一收尾：门禁后回写 built / commit")
+    finalize.add_argument("--commit", default=None)
+    finalize.add_argument("--mode", choices=MODES, default=None)
     return parser
 
 

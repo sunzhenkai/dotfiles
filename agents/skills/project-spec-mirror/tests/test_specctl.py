@@ -223,22 +223,24 @@ class InitTest(unittest.TestCase):
             spec = root / "spec"
             self.assertTrue((spec / ".mirror.json").is_file())
             self.assertTrue((spec / "README.md").is_file())
-            self.assertTrue((spec / "concepts" / "INDEX.md").is_file())
-            self.assertTrue((spec / "context" / "INDEX.md").is_file())
-            self.assertTrue((spec / "data" / "INDEX.md").is_file())
-            self.assertTrue((spec / "surface" / "INDEX.md").is_file())
-            self.assertTrue((spec / "surface" / "config.md").is_file())
-            self.assertTrue((spec / "runtime" / "INDEX.md").is_file())
-            self.assertTrue((spec / "build" / "INDEX.md").is_file())
-            self.assertTrue((spec / "facets" / "INDEX.md").is_file())
-            self.assertTrue((spec / "diagrams" / "INDEX.md").is_file())
+            self.assertTrue((spec / "briefing" / "overview.md").is_file())
+            self.assertTrue((spec / "briefing" / "architecture.md").is_file())
+            self.assertTrue((spec / "briefing" / "concepts" / "INDEX.md").is_file())
+            self.assertTrue((spec / "briefing" / "flows" / "INDEX.md").is_file())
+            self.assertTrue((spec / "briefing" / "diagrams" / "INDEX.md").is_file())
+            self.assertTrue((spec / "agent" / "INDEX.md").is_file())
+            self.assertTrue((spec / "agent" / "model" / "INDEX.md").is_file())
+            self.assertTrue((spec / "agent" / "surface" / "INDEX.md").is_file())
+            self.assertTrue((spec / "agent" / "data" / "INDEX.md").is_file())
+            self.assertTrue((spec / "evidence" / "source-map.md").is_file())
+            self.assertFalse((spec / "facets" / "INDEX.md").exists())
+            self.assertFalse((spec / "runtime" / "INDEX.md").exists())
             state = json.loads((spec / ".mirror.json").read_text(encoding="utf-8"))
             self.assertEqual(state["placement"], "in-project")
             self.assertEqual(state["source"], "..")
-            self.assertEqual(state["mode"], "concise")
-            self.assertIsNone(state["detail_level"])
-            self.assertEqual(state.get("hotspots"), [])
-            self.assertEqual(state.get("important_paths"), [])
+            self.assertEqual(state["mode"], "briefing")
+            self.assertNotIn("detail_level", state)
+            self.assertNotIn("scope", state)
             self.assertEqual(state["build_status"], "skeleton")
             self.assertIsNone(state["built_at"])
             self.assertIsNone(state["synced_commit"])
@@ -268,44 +270,31 @@ class InitTest(unittest.TestCase):
             self.assertTrue((root / "spec" / ".mirror.json").is_file())
             self.assertEqual(payload["placement"], "in-project")
 
-    def test_detailed_defaults_to_important(self) -> None:
+    def test_reconstructable_init_mode(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             code, payload = run(
-                "init", "--cwd", str(root), "--mode", "detailed", "--confirm"
+                "init", "--cwd", str(root), "--mode", "reconstructable", "--confirm"
             )
             self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["detail_level"], "important")
-
-    def test_concise_rejects_detail_level(self) -> None:
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as raw:
-            root = make_repo(Path(raw) / "example-api")
-            code, payload = run(
-                "init",
-                "--cwd",
-                str(root),
-                "--mode",
-                "concise",
-                "--detail-level",
-                "complete",
-                "--confirm",
+            self.assertEqual(payload["mode"], "reconstructable")
+            state = json.loads(
+                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(code, 1, payload)
-            self.assertEqual(payload["reason"], "invalid_mode_combination")
+            self.assertEqual(state["mode"], "reconstructable")
 
 
 class GitAndSyncTest(unittest.TestCase):
-    def test_diff_then_set_sync(self) -> None:
+    def test_diff_then_finalize(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             code, _ = run("init", "--cwd", str(root), "--confirm")
             self.assertEqual(code, 0)
+            write_minimum_content(root / "spec")
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
             code, payload = run("diff", "--cwd", str(root))
             self.assertEqual(code, 0)
@@ -320,9 +309,7 @@ class GitAndSyncTest(unittest.TestCase):
             git(root, "commit", "-q", "-m", "add Get")
             new_sha = git(root, "rev-parse", "HEAD").stdout.strip()
 
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", sha
-            )
+            code, payload = run("finalize", "--cwd", str(root), "--commit", sha)
             self.assertEqual(code, 0, payload)
             code, payload = run("diff", "--cwd", str(root))
             self.assertEqual(code, 0, payload)
@@ -332,19 +319,20 @@ class GitAndSyncTest(unittest.TestCase):
 
             code, payload = run("status", "--cwd", str(root))
             self.assertEqual(code, 0)
+            self.assertEqual(payload["layout"], "current")
             self.assertFalse(payload["freshness"]["in_sync"])
             self.assertTrue(payload["freshness"]["is_ancestor"])
 
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", new_sha
-            )
-            self.assertEqual(code, 0)
+            code, payload = run("finalize", "--cwd", str(root), "--commit", new_sha)
+            self.assertEqual(code, 0, payload)
             code, payload = run("status", "--cwd", str(root))
             self.assertTrue(payload["freshness"]["in_sync"])
             self.assertEqual(payload["build_status"], "built")
+            self.assertEqual(payload["phase"], "update")
             readme = (root / "spec" / "README.md").read_text(encoding="utf-8")
             self.assertIn(f"| 同步 commit | `{new_sha[:12]}` |", readme)
-            self.assertIn("| 文件粒度 | 不适用 |", readme)
+            self.assertIn("| 粒度 | briefing |", readme)
+            self.assertNotIn("文件粒度", readme)
 
     def test_non_git_build_has_status_without_fake_commit(self) -> None:
         import tempfile
@@ -354,40 +342,38 @@ class GitAndSyncTest(unittest.TestCase):
             root.mkdir()
             (root / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            code, payload = run("set-sync", "--cwd", str(root), "--built")
+            write_minimum_content(root / "spec")
+            code, payload = run("finalize", "--cwd", str(root))
             self.assertEqual(code, 0, payload)
             self.assertEqual(payload["state"]["build_status"], "built")
             self.assertIsNone(payload["state"]["synced_commit"])
             code, status = run("status", "--cwd", str(root))
             self.assertEqual(code, 0, status)
             self.assertEqual(status["phase"], "update")
+            self.assertEqual(status["freshness"]["kind"], "non-git")
 
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", "fake"
-            )
+            code, payload = run("finalize", "--cwd", str(root), "--commit", "fake")
             self.assertEqual(code, 1, payload)
             self.assertEqual(payload["reason"], "commit_not_supported")
 
-    def test_set_sync_does_not_advance_invalid_skeleton(self) -> None:
+    def test_finalize_does_not_advance_invalid_skeleton(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
-            (root / "spec" / "overview.md").unlink()
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", sha
-            )
+            (root / "spec" / "briefing" / "overview.md").unlink()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", sha)
             self.assertEqual(code, 1, payload)
-            self.assertEqual(payload["reason"], "invalid_mirror")
+            self.assertIn(payload["reason"], {"coverage_missing", "legacy_layout"})
             state = json.loads(
                 (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
             )
             self.assertEqual(state["build_status"], "skeleton")
             self.assertIsNone(state["synced_commit"])
 
-    def test_important_paths_required_and_persisted(self) -> None:
+    def test_empty_reconstructable_cannot_mark_built(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
@@ -398,46 +384,24 @@ class GitAndSyncTest(unittest.TestCase):
                     "--cwd",
                     str(root),
                     "--mode",
-                    "detailed",
+                    "reconstructable",
                     "--confirm",
                 )[0],
                 0,
             )
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", sha
-            )
+            code, payload = run("finalize", "--cwd", str(root), "--commit", sha)
             self.assertEqual(code, 1, payload)
-            self.assertEqual(payload["reason"], "important_paths_required")
+            self.assertEqual(payload["reason"], "coverage_missing")
 
-            code, payload = run(
-                "set-sync",
-                "--cwd",
-                str(root),
-                "--built",
-                "--commit",
-                sha,
-                "--important-path",
-                "internal/order.go",
-            )
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(
-                payload["state"]["important_paths"], ["internal/order.go"]
-            )
-            self.assertEqual(run("validate", "--cwd", str(root))[0], 0)
-
-            code, payload = run(
-                "set-sync",
-                "--cwd",
-                str(root),
-                "--built",
-                "--commit",
-                sha,
-                "--important-path",
-                "/etc/passwd",
-            )
+    def test_retired_commands_are_not_public(self) -> None:
+        code, payload = run("set-sync")
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload["reason"], "usage")
+        for name in ("validate", "coverage", "inventory", "symbols", "git-info"):
+            code, payload = run(name)
             self.assertEqual(code, 1, payload)
-            self.assertEqual(payload["reason"], "invalid_source_path")
+            self.assertEqual(payload["reason"], "usage")
 
     def test_inventory_skips_secrets_and_vendor(self) -> None:
         import tempfile
@@ -451,10 +415,7 @@ class GitAndSyncTest(unittest.TestCase):
             (root / "node_modules" / "pkg" / "index.js").write_text("module.exports = 1\n", encoding="utf-8")
             git(root, "add", "-f", ".env", "vendor/lib.go", "node_modules/pkg/index.js")
             git(root, "commit", "-q", "-m", "noise")
-            run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("inventory", "--cwd", str(root))
-            self.assertEqual(code, 0)
-            names = payload["files"]
+            names = specctl.inventory_files(root)
             self.assertNotIn(".env", names)
             self.assertTrue(all(not item.startswith("vendor/") for item in names))
             self.assertTrue(all(not item.startswith("node_modules/") for item in names))
@@ -475,23 +436,14 @@ class GitAndSyncTest(unittest.TestCase):
             )
             git(root, "add", ".gitignore")
             git(root, "commit", "-q", "-m", "ignore generated log")
-            run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("inventory", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertNotIn("ignored.log", payload["files"])
-            self.assertNotIn("opaque.data", payload["files"])
-            self.assertIn(".gitignore", payload["files"])
-
-            code, symbols = run(
-                "symbols", "--cwd", str(root), "--file", "ignored.log"
-            )
-            self.assertEqual(code, 0, symbols)
-            self.assertEqual(symbols["files"][0]["reason"], "ignored")
-            code, symbols = run(
-                "symbols", "--cwd", str(root), "--file", "opaque.data"
-            )
-            self.assertEqual(code, 0, symbols)
-            self.assertEqual(symbols["files"][0]["reason"], "non_text")
+            names = specctl.inventory_files(root)
+            self.assertNotIn("ignored.log", names)
+            self.assertNotIn("opaque.data", names)
+            self.assertIn(".gitignore", names)
+            ignored = specctl.inspect_symbols(root, "ignored.log")
+            self.assertEqual(ignored["reason"], "ignored")
+            opaque = specctl.inspect_symbols(root, "opaque.data")
+            self.assertEqual(opaque["reason"], "non_text")
 
 
 class SymbolsTest(unittest.TestCase):
@@ -512,11 +464,11 @@ class SymbolsTest(unittest.TestCase):
             )
             code, payload = run("init", "--cwd", str(root), "--confirm")
             self.assertEqual(code, 0, payload)
-            code, payload = run(
-                "symbols", "--cwd", str(root), "--file", "app.py", "--file", "order.go"
-            )
-            self.assertEqual(code, 0, payload)
-            by_path = {item["path"]: item["symbols"] for item in payload["files"]}
+            files = [
+                specctl.inspect_symbols(root, "app.py"),
+                specctl.inspect_symbols(root, "order.go"),
+            ]
+            by_path = {item["path"]: item["symbols"] for item in files}
             py_names = {item["name"] for item in by_path["app.py"]}
             self.assertIn("VALUE", py_names)
             self.assertIn("Order", py_names)
@@ -534,9 +486,9 @@ class ValidateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("validate", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["issues"], [])
+            spec = root / "spec"
+            issues = specctl.validation_issues(spec, specctl.load_state(spec))
+            self.assertEqual(issues, [])
 
     def test_validate_rejects_explicit_invalid_build_status(self) -> None:
         import tempfile
@@ -551,26 +503,24 @@ class ValidateTest(unittest.TestCase):
                 json.dumps(state, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
-            code, payload = run("validate", "--cwd", str(root))
-            self.assertEqual(code, 1, payload)
-            self.assertIn("invalid build_status 'unknown'", payload["issues"])
+            issues = specctl.validation_issues(root / "spec", specctl.load_state(root / "spec"))
+            self.assertIn("invalid build_status 'unknown'", issues)
 
-    def test_validate_rejects_unsafe_important_path_state(self) -> None:
+    def test_validate_rejects_legacy_mode(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
-            run("init", "--cwd", str(root), "--mode", "detailed", "--confirm")
+            run("init", "--cwd", str(root), "--confirm")
             state_path = root / "spec" / ".mirror.json"
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            state["important_paths"] = ["../other"]
+            state["mode"] = "detailed"
             state_path.write_text(
                 json.dumps(state, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
-            code, payload = run("validate", "--cwd", str(root))
-            self.assertEqual(code, 1, payload)
-            self.assertIn("invalid important path: '../other'", payload["issues"])
+            issues = specctl.validation_issues(root / "spec", specctl.load_state(root / "spec"))
+            self.assertTrue(any("invalid mode" in item for item in issues), issues)
 
     def test_direct_helpers_secret_skip(self) -> None:
         self.assertTrue(specctl.should_skip_file(".env.local"))
@@ -596,12 +546,11 @@ class ValidateTest(unittest.TestCase):
             (root / "app.py").write_text("print('ok')\n", encoding="utf-8")
             (root / "blob").write_bytes(b"\x00\x01\x02")
             run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("inventory", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertIn("app.py", payload["files"])
-            self.assertIn(".gitignore", payload["files"])
-            self.assertNotIn("cache/generated.txt", payload["files"])
-            self.assertNotIn("blob", payload["files"])
+            names = specctl.inventory_files(root)
+            self.assertIn("app.py", names)
+            self.assertIn(".gitignore", names)
+            self.assertNotIn("cache/generated.txt", names)
+            self.assertNotIn("blob", names)
 
     def test_diff_skips_vendor_changes(self) -> None:
         import tempfile
@@ -609,10 +558,9 @@ class ValidateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             run("init", "--cwd", str(root), "--confirm")
+            write_minimum_content(root / "spec")
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
-            run(
-                "set-sync", "--cwd", str(root), "--built", "--commit", sha
-            )
+            self.assertEqual(run("finalize", "--cwd", str(root), "--commit", sha)[0], 0)
             (root / "vendor" / "lib.go").parent.mkdir()
             (root / "vendor" / "lib.go").write_text("package vendor\n", encoding="utf-8")
             (root / "internal" / "order.go").write_text(
@@ -639,9 +587,7 @@ class ValidateTest(unittest.TestCase):
             nested = make_repo(Path(raw) / "app" / "libs" / "other")
             self.assertTrue((nested / "internal" / "order.go").is_file())
             run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("inventory", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            names = payload["files"]
+            names = specctl.inventory_files(root)
             self.assertIn("src/App.php", names)
             self.assertTrue(all(not item.startswith("libs/other") for item in names))
 
@@ -661,9 +607,7 @@ class ValidateTest(unittest.TestCase):
             )
             git(root, "commit", "-q", "-m", "gitlink")
             run("init", "--cwd", str(root), "--confirm")
-            code, payload = run("inventory", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            names = payload["files"]
+            names = specctl.inventory_files(root)
             self.assertIn("internal/order.go", names)
             self.assertNotIn("libs/other-lib", names)
             self.assertTrue(all(not item.startswith("libs/other-lib") for item in names))
@@ -679,63 +623,105 @@ class ValidateTest(unittest.TestCase):
             )
             git(root, "add", "-f", "vendor/lib.go")
             git(root, "commit", "-q", "-m", "vendor")
-            run("init", "--cwd", str(root), "--confirm")
-            code, payload = run(
-                "symbols", "--cwd", str(root), "--file", "vendor/lib.go"
-            )
-            self.assertEqual(code, 0, payload)
-            item = payload["files"][0]
+            item = specctl.inspect_symbols(root, "vendor/lib.go")
             self.assertTrue(item.get("skipped"))
             self.assertEqual(item.get("reason"), "third_party")
             self.assertEqual(item["symbols"], [])
 
 
-ORDER_README = """# order
+CHECKOUT_SPEC = """# checkout
 
-## 根
+## Purpose
+下单。
 
-| 路径前缀 | 角色 |
-|----------|------|
-| `internal` | 领域包 |
+## Requirements
 
-## 文件
+### Requirement: 可以下单
+系统 SHALL 接受有效订单。
 
-| 文件 | 职责 | 核心 |
-|------|------|------|
-| `internal/order.go` | 下单与取消 | `Place`, `Cancel` |
+#### Scenario: 成功
+- **WHEN** 库存充足
+- **THEN** 订单创建
 """
 
 
-def write_order_module(spec: Path) -> None:
-    readme = spec / "modules" / "order" / "README.md"
-    readme.parent.mkdir(parents=True, exist_ok=True)
-    readme.write_text(ORDER_README, encoding="utf-8")
+def write_checkout_capability(spec: Path, source_path: str = "internal") -> None:
+    (spec / "agent").mkdir(parents=True, exist_ok=True)
+    (spec / "evidence").mkdir(parents=True, exist_ok=True)
+    (spec / "agent" / "INDEX.md").write_text(
+        """# 能力
+
+| 概念 | 一句话 |
+|------|--------|
+| 订单 | 不要当能力 |
+
+| 能力 | 一句话 | 状态 | 页 |
+|------|--------|------|-----|
+| checkout | 下单 | ready | [checkout](specs/checkout/spec.md) |
+
+## 未指定
+
+| 路径 | 原因 |
+|------|------|
+""",
+        encoding="utf-8",
+    )
+    spec_page = spec / "agent" / "specs" / "checkout" / "spec.md"
+    spec_page.parent.mkdir(parents=True, exist_ok=True)
+    spec_page.write_text(CHECKOUT_SPEC, encoding="utf-8")
+    (spec / "evidence" / "source-map.md").write_text(
+        f"""# 源映射
+
+| 能力 | 源路径 | spec |
+|------|--------|------|
+| checkout | `{source_path}` | [checkout](../agent/specs/checkout/spec.md) |
+""",
+        encoding="utf-8",
+    )
+
+
+def write_minimum_content(spec: Path, *, source_path: str = "internal") -> None:
+    (spec / "briefing").mkdir(parents=True, exist_ok=True)
+    (spec / "briefing" / "overview.md").write_text(
+        "# example-api\n\n给店铺用的下单 API。\n",
+        encoding="utf-8",
+    )
+    flows = spec / "briefing" / "flows"
+    flows.mkdir(parents=True, exist_ok=True)
+    (flows / "INDEX.md").write_text(
+        """# 业务处理线
+
+| 名称 | 一句话 | 页 |
+|------|--------|-----|
+| checkout | 下单 | [checkout](checkout.md) |
+""",
+        encoding="utf-8",
+    )
+    (flows / "checkout.md").write_text("# 下单\n\n买家提交订单。\n", encoding="utf-8")
+    write_checkout_capability(spec, source_path)
 
 
 class RouteParseTest(unittest.TestCase):
-    def test_parse_root_and_files_tables(self) -> None:
-        roots, files = specctl.parse_module_readme(ORDER_README)
-        self.assertEqual(roots, ["internal"])
-        self.assertEqual(files, ["internal/order.go"])
+    def test_parse_source_map_rows(self) -> None:
+        import tempfile
 
-    def test_parse_english_headings(self) -> None:
-        text = """# billing
+        with tempfile.TemporaryDirectory() as raw:
+            spec = Path(raw) / "spec"
+            spec.mkdir()
+            write_checkout_capability(spec, "internal")
+            rows = specctl.load_source_map(spec)
+            self.assertEqual(rows[0]["name"], "checkout")
+            self.assertEqual(rows[0]["path"], "internal")
 
-## Roots
+    def test_parse_capability_index(self) -> None:
+        import tempfile
 
-| prefix | role |
-|--------|------|
-| `internal/bill` | domain |
-
-## Files
-
-| file | duty |
-|------|------|
-| [`internal/bill/calc.go`](unused) | calc |
-"""
-        roots, files = specctl.parse_module_readme(text)
-        self.assertEqual(roots, ["internal/bill"])
-        self.assertEqual(files, ["internal/bill/calc.go"])
+        with tempfile.TemporaryDirectory() as raw:
+            spec = Path(raw) / "spec"
+            spec.mkdir()
+            write_checkout_capability(spec)
+            caps = specctl.load_capabilities(spec)
+            self.assertEqual([item["name"] for item in caps], ["checkout"])
 
 
 class RouteTest(unittest.TestCase):
@@ -749,21 +735,19 @@ class RouteTest(unittest.TestCase):
             self.assertEqual(code, 0, payload)
             self.assertTrue(payload["not_built"])
             self.assertEqual(payload["note"], "not_built")
-            self.assertEqual(payload["modules"], [])
+            self.assertEqual(payload["capabilities"], [])
             self.assertIn("internal/order.go", payload["unmapped"])
 
-    def test_file_table_and_root_prefix_and_unmapped(self) -> None:
+    def test_source_map_exact_prefix_and_unmapped(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            write_order_module(root / "spec")
+            write_minimum_content(root / "spec", source_path="internal/order.go")
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
             self.assertEqual(
-                run(
-                    "set-sync", "--cwd", str(root), "--built", "--commit", sha
-                )[0],
+                run("finalize", "--cwd", str(root), "--commit", sha)[0],
                 0,
             )
             (root / "internal" / "order.go").write_text(
@@ -777,31 +761,31 @@ class RouteTest(unittest.TestCase):
             (root / "scripts" / "one-off.sh").write_text("#!/bin/sh\n", encoding="utf-8")
             git(root, "add", ".")
             git(root, "commit", "-q", "-m", "more files")
+            # prefix row so extra.go also maps
+            write_checkout_capability(root / "spec", "internal")
             code, payload = run("route", "--cwd", str(root))
             self.assertEqual(code, 0, payload)
             self.assertFalse(payload["not_built"])
             by_path = {item["path"]: item for item in payload["changes"]}
-            self.assertEqual(by_path["internal/order.go"]["via"], "file-table")
-            self.assertEqual(by_path["internal/order.go"]["modules"], ["order"])
-            self.assertEqual(by_path["internal/extra.go"]["via"], "root-prefix")
-            self.assertEqual(by_path["internal/extra.go"]["modules"], ["order"])
+            self.assertEqual(by_path["internal/order.go"]["via"], "source-prefix")
+            self.assertEqual(by_path["internal/order.go"]["capabilities"], ["checkout"])
+            self.assertEqual(by_path["internal/extra.go"]["via"], "source-prefix")
+            self.assertEqual(by_path["internal/extra.go"]["capabilities"], ["checkout"])
             self.assertEqual(by_path["scripts/one-off.sh"]["via"], "unmapped")
             self.assertIn("scripts/one-off.sh", payload["unmapped"])
-            self.assertEqual(payload["modules"], ["order"])
-            self.assertEqual(payload["pages"], ["modules/order/README.md"])
+            self.assertEqual(payload["capabilities"], ["checkout"])
+            self.assertEqual(payload["pages"], ["agent/specs/checkout/spec.md"])
 
-    def test_rename_uses_from_file_table(self) -> None:
+    def test_rename_uses_from_source_map(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            write_order_module(root / "spec")
+            write_minimum_content(root / "spec", source_path="internal/order.go")
             sha = git(root, "rev-parse", "HEAD").stdout.strip()
             self.assertEqual(
-                run(
-                    "set-sync", "--cwd", str(root), "--built", "--commit", sha
-                )[0],
+                run("finalize", "--cwd", str(root), "--commit", sha)[0],
                 0,
             )
             git(root, "mv", "internal/order.go", "internal/placed.go")
@@ -810,150 +794,180 @@ class RouteTest(unittest.TestCase):
             self.assertEqual(code, 0, payload)
             self.assertEqual(payload["renames"][0]["from"], "internal/order.go")
             self.assertEqual(payload["renames"][0]["to"], "internal/placed.go")
-            self.assertEqual(payload["renames"][0]["module"], "order")
+            self.assertEqual(payload["renames"][0]["capability"], "checkout")
+            self.assertGreaterEqual(payload["renames_applied"], 1)
             rec = payload["changes"][0]
-            self.assertEqual(rec["via"], "file-table")
+            self.assertEqual(rec["via"], "source-map")
             self.assertEqual(rec["from"], "internal/order.go")
+            mapped = specctl.load_source_map(root / "spec")
+            self.assertEqual(mapped[0]["path"], "internal/placed.go")
 
-    def test_set_sync_hotspot_replaces_list(self) -> None:
+    def test_finalize_drops_legacy_hotspot_fields(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            code, payload = run(
-                "set-sync",
-                "--cwd",
-                str(root),
-                "--hotspot",
-                "internal/order.go",
-                "--hotspot",
-                "cmd/orderd/main.go",
+            write_minimum_content(root / "spec")
+            state_path = root / "spec" / ".mirror.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["hotspots"] = ["internal/order.go"]
+            state_path.write_text(
+                json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
             )
+            sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", sha)
             self.assertEqual(code, 0, payload)
-            self.assertEqual(
-                payload["state"]["hotspots"],
-                ["internal/order.go", "cmd/orderd/main.go"],
-            )
-            code, payload = run(
-                "set-sync", "--cwd", str(root), "--hotspot", "internal/extra.go"
-            )
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["state"]["hotspots"], ["internal/extra.go"])
-            code, payload = run("validate", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["issues"], [])
+            self.assertNotIn("hotspots", payload["state"])
+            issues = specctl.validation_issues(root / "spec", payload["state"])
+            self.assertEqual(issues, [])
 
 
 class CoverageTest(unittest.TestCase):
-    def test_concise_reports_missing_without_failing(self) -> None:
+    def test_empty_skeleton_fails_content_gates(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
+            spec = root / "spec"
+            payload = specctl.collect_coverage(
+                spec, root, specctl.load_state(spec)
+            )
+            self.assertFalse(payload["ok"])
             self.assertFalse(payload["enforce"])
-            self.assertTrue(payload["not_built"])
-            self.assertIn("internal/order.go", payload["missing"])
-            self.assertNotIn("README.md", payload["missing"])
-            self.assertNotIn("go.mod", payload["missing"])
+            self.assertIn("overview:stub", payload["missing"])
+            self.assertIn("flows:none", payload["missing"])
+            self.assertIn("<no capabilities identified>", payload["missing"])
+            self.assertIn("source-map:empty", payload["missing"])
 
-    def test_detailed_important_fails_until_file_table_covers_code(self) -> None:
+    def test_reconstructable_fails_until_capability_is_mapped(self) -> None:
         import tempfile
 
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
-            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            self.assertEqual(
-                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
-            )
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 1, payload)
-            self.assertTrue(payload["enforce"])
-            self.assertIn("internal/order.go", payload["missing"])
-            write_order_module(root / "spec")
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["missing"], [])
-            self.assertEqual(payload["covered_count"], payload["required_count"])
-
-    def test_directory_range_covers_and_extra_does_not_fail(self) -> None:
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as raw:
-            root = make_repo(Path(raw) / "example-api")
-            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            self.assertEqual(
-                run("set-sync", "--cwd", str(root), "--mode", "detailed")[0], 0
-            )
-            (root / "internal" / "extra.go").write_text(
-                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
-            )
-            git(root, "add", "internal/extra.go")
-            git(root, "commit", "-q", "-m", "extra")
-            write_order_module(root / "spec")
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 1, payload)
-            self.assertIn("internal/extra.go", payload["missing"])
-            readme = root / "spec" / "modules" / "order" / "README.md"
-            readme.write_text(
-                """# order
-
-## 根
-
-| 路径前缀 | 角色 |
-|----------|------|
-| `internal` | 领域包 |
-
-## 文件
-
-| 文件 | 职责 |
-|------|------|
-| `internal` | 领域包全部源文件 |
-| `internal/gone.go` | 已删除 |
-""",
-                encoding="utf-8",
-            )
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["missing"], [])
-            self.assertIn("internal/gone.go", payload["extra"])
-
-    def test_scope_and_path_limit_required_files(self) -> None:
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as raw:
-            root = make_repo(Path(raw) / "example-api")
-            (root / "cmd").mkdir()
-            (root / "cmd" / "main.go").write_text(
-                "package main\n\nfunc main() {}\n", encoding="utf-8"
-            )
-            git(root, "add", "cmd/main.go")
-            git(root, "commit", "-q", "-m", "cmd")
-            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
             self.assertEqual(
                 run(
-                    "set-sync",
+                    "init",
                     "--cwd",
                     str(root),
                     "--mode",
-                    "detailed",
-                    "--scope",
-                    "internal",
+                    "reconstructable",
+                    "--confirm",
                 )[0],
                 0,
             )
-            write_order_module(root / "spec")
-            code, payload = run("coverage", "--cwd", str(root))
-            self.assertEqual(code, 0, payload)
-            self.assertIn("cmd/main.go", payload["unscoped"])
-            self.assertNotIn("cmd/main.go", payload["missing"])
-            code, payload = run("coverage", "--cwd", str(root), "--path", "cmd")
-            self.assertEqual(code, 0, payload)
-            self.assertEqual(payload["required_count"], 0)
-            self.assertIn("cmd/main.go", payload["unscoped"])
+            spec = root / "spec"
+            payload = specctl.collect_coverage(
+                spec, root, specctl.load_state(spec)
+            )
+            self.assertFalse(payload["ok"])
+            self.assertTrue(payload["enforce"])
+            self.assertIn("<no capabilities identified>", payload["missing"])
+            write_minimum_content(spec)
+            payload = specctl.collect_coverage(
+                spec, root, specctl.load_state(spec)
+            )
+            self.assertTrue(payload["ok"], payload)
+            self.assertEqual(payload["missing"], [])
+            self.assertEqual(payload["covered_count"], payload["required_count"])
+
+    def test_unspecified_covers_reconstructable_unmapped(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            (root / "cmd" / "legacy.go").parent.mkdir()
+            (root / "cmd" / "legacy.go").write_text("package main\n", encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-q", "-m", "legacy cmd")
+            self.assertEqual(
+                run(
+                    "init",
+                    "--cwd",
+                    str(root),
+                    "--mode",
+                    "reconstructable",
+                    "--confirm",
+                )[0],
+                0,
+            )
+            spec = root / "spec"
+            write_minimum_content(spec)
+            payload = specctl.collect_coverage(
+                spec, root, specctl.load_state(spec)
+            )
+            self.assertFalse(payload["ok"], payload)
+            self.assertIn("unmapped:cmd/legacy.go", payload["missing"])
+            index = (spec / "agent" / "INDEX.md").read_text(encoding="utf-8")
+            (spec / "agent" / "INDEX.md").write_text(
+                index.replace(
+                    "| 路径 | 原因 |\n|------|------|\n",
+                    "| 路径 | 原因 |\n|------|------|\n| `cmd/legacy.go` | 一次性脚本 |\n",
+                ),
+                encoding="utf-8",
+            )
+            payload = specctl.collect_coverage(
+                spec, root, specctl.load_state(spec)
+            )
+            self.assertTrue(payload["ok"], payload)
+
+    def test_briefing_extra_source_map_does_not_fail(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_minimum_content(root / "spec")
+            (root / "spec" / "evidence" / "source-map.md").write_text(
+                """# 源映射
+
+| 能力 | 源路径 | spec |
+|------|--------|------|
+| checkout | `internal` | [checkout](../agent/specs/checkout/spec.md) |
+| ghost | `internal/gone.go` | [ghost](../agent/specs/ghost/spec.md) |
+""",
+                encoding="utf-8",
+            )
+            payload = specctl.collect_coverage(
+                root / "spec", root, specctl.load_state(root / "spec")
+            )
+            self.assertTrue(payload["ok"], payload)
+            self.assertIn("ghost", payload["extra"])
+
+    def test_reconstructable_ghost_map_fails(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(
+                run(
+                    "init",
+                    "--cwd",
+                    str(root),
+                    "--mode",
+                    "reconstructable",
+                    "--confirm",
+                )[0],
+                0,
+            )
+            write_minimum_content(root / "spec")
+            (root / "spec" / "evidence" / "source-map.md").write_text(
+                """# 源映射
+
+| 能力 | 源路径 | spec |
+|------|--------|------|
+| checkout | `internal` | [checkout](../agent/specs/checkout/spec.md) |
+| ghost | `internal/gone.go` | [ghost](../agent/specs/ghost/spec.md) |
+""",
+                encoding="utf-8",
+            )
+            payload = specctl.collect_coverage(
+                root / "spec", root, specctl.load_state(root / "spec")
+            )
+            self.assertFalse(payload["ok"])
+            self.assertIn("ghost:ghost", payload["missing"])
 
 
 class FinalizeTest(unittest.TestCase):
@@ -969,16 +983,16 @@ class FinalizeTest(unittest.TestCase):
                 "--cwd",
                 str(root),
                 "--mode",
-                "detailed",
-                "--detail-level",
-                "complete",
+                "reconstructable",
                 "--commit",
                 head,
             )
             self.assertEqual(code, 1, payload)
             self.assertEqual(payload["stage"], "coverage")
             self.assertEqual(payload["reason"], "coverage_missing")
-            self.assertIn("internal/order.go", payload["coverage"]["missing"])
+            self.assertIn(
+                "<no capabilities identified>", payload["coverage"]["missing"]
+            )
             state = json.loads(
                 (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
             )
@@ -991,23 +1005,24 @@ class FinalizeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = make_repo(Path(raw) / "example-api")
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            write_order_module(root / "spec")
+            write_minimum_content(root / "spec")
             head = git(root, "rev-parse", "HEAD").stdout.strip()
             code, payload = run(
                 "finalize",
                 "--cwd",
                 str(root),
                 "--mode",
-                "detailed",
-                "--detail-level",
-                "complete",
+                "reconstructable",
                 "--commit",
                 head,
             )
             self.assertEqual(code, 0, payload)
             self.assertEqual(payload["stage"], "done")
             self.assertEqual(payload["issues"], [])
-            self.assertEqual(payload["coverage"]["required_count"], payload["coverage"]["covered_count"])
+            self.assertEqual(
+                payload["coverage"]["required_count"],
+                payload["coverage"]["covered_count"],
+            )
             self.assertEqual(payload["state"]["build_status"], "built")
             self.assertEqual(payload["state"]["synced_commit"], head)
 
@@ -1022,11 +1037,159 @@ class FinalizeTest(unittest.TestCase):
                 "package order\n\nfunc Place() {}\n", encoding="utf-8"
             )
             self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
-            write_order_module(root / "spec")
-            code, payload = run("finalize", "--cwd", str(root), "--mode", "concise")
+            write_minimum_content(root / "spec")
+            code, payload = run("finalize", "--cwd", str(root), "--mode", "briefing")
             self.assertEqual(code, 0, payload)
             self.assertEqual(payload["state"]["build_status"], "built")
             self.assertIsNone(payload["state"]["synced_commit"])
+
+    def test_empty_skeleton_finalize_fails(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            head = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", head)
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["reason"], "coverage_missing")
+            self.assertIn("overview:stub", payload["coverage"]["missing"])
+            state = json.loads(
+                (root / "spec" / ".mirror.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(state["build_status"], "skeleton")
+
+    def test_legacy_layout_is_rebuild(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            spec = root / "spec"
+            (spec / "briefing" / "overview.md").unlink()
+            (spec / "modules").mkdir()
+            (spec / "modules" / "INDEX.md").write_text("# 旧表\n", encoding="utf-8")
+            code, payload = run("detect", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["layout"], "legacy")
+            code, status = run("status", "--cwd", str(root))
+            self.assertEqual(code, 0, status)
+            self.assertEqual(status["layout"], "legacy")
+            self.assertEqual(status["phase"], "rebuild")
+            head = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", head)
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["reason"], "legacy_layout")
+
+    def test_briefing_leak_blocks_built(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_minimum_content(root / "spec")
+            (root / "spec" / "briefing" / "overview.md").write_text(
+                "# example-api\n\n完整逻辑如下。\n",
+                encoding="utf-8",
+            )
+            head = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", head)
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["reason"], "briefing_leak")
+            self.assertTrue(any("完整逻辑" in item for item in payload["leaks"]))
+
+    def test_english_stub_and_leak_patterns(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            spec = Path(raw) / "spec"
+            (spec / "briefing").mkdir(parents=True)
+            (spec / "briefing" / "overview.md").write_text(
+                "# demo\n\n(to be built: say what this is.)\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(specctl.overview_is_stub(spec))
+            (spec / "briefing" / "overview.md").write_text(
+                "# demo\n\nA shop checkout API.\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(specctl.overview_is_stub(spec))
+            (spec / "briefing" / "flow.md").write_text(
+                "# flow\n\n## Files\n\n- a.py\nSee Cargo.toml 1.2.3 and full logic.\n",
+                encoding="utf-8",
+            )
+            leaks = specctl.briefing_leaks(spec)
+            self.assertTrue(any("文件表" in item for item in leaks), leaks)
+            self.assertTrue(any("工具链版本" in item for item in leaks), leaks)
+            self.assertTrue(any("完整逻辑" in item for item in leaks), leaks)
+
+    def test_capability_header_accepts_english(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            spec = Path(raw) / "spec"
+            (spec / "agent").mkdir(parents=True)
+            (spec / "agent" / "INDEX.md").write_text(
+                """# Capabilities
+
+| Capability | Summary | Status | Page |
+|------------|---------|--------|------|
+| checkout | place order | ready | x |
+""",
+                encoding="utf-8",
+            )
+            caps = specctl.load_capabilities(spec)
+            self.assertEqual([item["name"] for item in caps], ["checkout"])
+
+    def test_finalize_rejects_undigested_unmapped(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = make_repo(Path(raw) / "example-api")
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_minimum_content(root / "spec", source_path="internal/order.go")
+            sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            self.assertEqual(run("finalize", "--cwd", str(root), "--commit", sha)[0], 0)
+            (root / "scripts").mkdir()
+            (root / "scripts" / "one-off.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-q", "-m", "script")
+            new_sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            code, payload = run("finalize", "--cwd", str(root), "--commit", new_sha)
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["reason"], "unmapped_pending")
+            self.assertIn("scripts/one-off.sh", payload["unmapped"])
+
+    def test_status_nongit_reports_new_and_gone_entries(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "plain-project"
+            (root / "internal").mkdir(parents=True)
+            (root / "go.mod").write_text("module example.com/plain\n", encoding="utf-8")
+            (root / "internal" / "order.go").write_text(
+                "package order\n\nfunc Place() {}\n", encoding="utf-8"
+            )
+            self.assertEqual(run("init", "--cwd", str(root), "--confirm")[0], 0)
+            write_minimum_content(root / "spec", source_path="internal")
+            self.assertEqual(run("finalize", "--cwd", str(root))[0], 0)
+            (root / "internal" / "extra.go").write_text(
+                "package order\n\nfunc Extra() {}\n", encoding="utf-8"
+            )
+            (root / "spec" / "evidence" / "source-map.md").write_text(
+                """# 源映射
+
+| 能力 | 源路径 | spec |
+|------|--------|------|
+| checkout | `missing/path` | [checkout](../agent/specs/checkout/spec.md) |
+""",
+                encoding="utf-8",
+            )
+            code, payload = run("status", "--cwd", str(root))
+            self.assertEqual(code, 0, payload)
+            self.assertIn("internal/order.go", payload["freshness"]["unmapped"])
+            self.assertIn("internal/extra.go", payload["freshness"]["unmapped"])
+            self.assertIn("missing/path", payload["freshness"]["gone"])
 
 
 if __name__ == "__main__":

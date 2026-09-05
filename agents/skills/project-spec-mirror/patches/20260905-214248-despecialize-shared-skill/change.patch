@@ -1,0 +1,724 @@
+diff -ruN a/agents/skills/project-spec-mirror/evals/cases.yaml b/agents/skills/project-spec-mirror/evals/cases.yaml
+--- a/agents/skills/project-spec-mirror/evals/cases.yaml	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/evals/cases.yaml	2026-09-05 21:43:24.000000000 +0800
+@@ -247,7 +247,7 @@
+     expect:
+       must:
+         - 注明遗留目录可能过期
+-        - 按新树补 briefing/ agent/ evidence/ 后再继续
++        - 按 references/appendix.md 补 briefing/ agent/ evidence/ 后再继续
+       must_not:
+         - 未要求删除就删掉遗留目录
+         - 继续加深旧模块文件表
+diff -ruN a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/decision.md b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/decision.md
+--- a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/decision.md	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/decision.md	2026-09-05 21:43:16.000000000 +0800
+@@ -1,28 +1,9 @@
+ # Decision — 20260829-complete-mode-notes-mandatory
+ 
+-- Status: promoted
++- Status: superseded
+ - Date: 2026-08-29
+ - Risk: medium
+-- Eval: pass (see eval.md)
+ 
+-## Promotion
++当时把「complete 必建 notes」写进了生产稿。该档位已由后来的双读者模型取代，本决策**不要再执行**。
+ 
+-`SKILL.md` / `references/modes.md` / `evals/cases.yaml` 已覆盖到生产稿，3 个文件 byte-identical to candidate。
+-
+-## Modified files
+-
+-| 文件 | 变更摘要 |
+-|------|---------|
+-| `SKILL.md` | 非目标段 +1 条（notes 命名是 topic）；build 步骤 7 末 +1 句（build 前 grep）；新增步骤 8.5（complete 必建） |
+-| `references/modes.md` | 表格行改为分档位（concise/lightweight 不建 / important opt-in / complete 必建）；新增 5 类触发条件清单 |
+-| `evals/cases.yaml` | 新增 `complete-mode-notes-mandatory` case；`hotspot-notes-need-scope` 加 complete-mode must |
+-
+-## Post-promotion
+-
+-- 生产稿已改，**未自动 commit / push / sync**
+-- 用户需在 dotfiles 仓下：`git add SKILL.md references/modes.md evals/cases.yaml experience/ evolutions/` → commit → push
+-- 然后跑 sync（`scripts/agents/sync.sh` 或 `dotf agents -c`）把变更推到 `~/.agents/skills/project-spec-mirror/` 镜像
+-
+-## Rejected alternative
+-
+-保留候选稿作为演化历史。后续如需 revert，可从 git 历史恢复。
++需要追溯当时 diff 时看同目录 `*.patch` / `*.candidate`，不要把其中的本机同步步骤或项目细节当成现行维护协议。
+diff -ruN a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/eval.md b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/eval.md
+--- a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/eval.md	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/eval.md	2026-09-05 21:43:23.000000000 +0800
+@@ -1,107 +1,8 @@
+ # Evaluation — 20260829-complete-mode-notes-mandatory
+ 
+-## Candidates
+-- `SKILL.md.candidate` / `skill.md.patch`
+-- `modes.md.candidate` / `modes.md.patch`
+-- `cases.yaml.candidate` / `cases.yaml.patch`
++- Status: superseded
++- Date: 2026-08-29
+ 
+-## Regression: existing success paths still work
++当时按旧 eval 集验证过「complete 必建 notes」。现行验收已改为 briefing / reconstructable，本评测**不要重跑或当作通过条件**。
+ 
+-| Case | Status | Note |
+-|------|--------|------|
+-| `specctl-json-exit-codes` | unchanged | patch 不碰 specctl.py 或执行契约 |
+-| `infer-phase-from-state` | unchanged | patch 只在 build 步骤 7 末尾 +1 句 + 新增 8.5，不改阶段推断 |
+-| `init-confirm-then-build` | unchanged | --confirm 流程未变 |
+-| `placement-in-vs-external` | unchanged | placement 规则未动 |
+-| `git-default-branch-commit` | unchanged | git 同步流程未动 |
+-| `pyramid-knowledge-on-build` | unchanged | 金字塔结构未动；notes/ 是补充而非替代 |
+-| `facets-and-archify` | unchanged | 切面 + archify 流程未动 |
+-| `recovery-projections-runnable` | unchanged | 5 投影 INDEX 仍必建 |
+-| `delivery-summary-fields` | unchanged | 输出格式未动 |
+-| `preserve-manual-blocks` | unchanged | `<!-- manual -->` 块未动 |
+-| `exit-2-wait-user` | unchanged | confirm 行为未动 |
+-| `no-secrets-or-auto-commit` | unchanged | 脱敏与不自动 commit 未动 |
+-| `detailed-deepens-pages-not-files-tree` | unchanged | `complete` 仍深化已有页、未批量建 files/ |
+-| `detailed-file-granularity-choice` | unchanged | 档位含义保留 |
+-| `hotspot-notes-need-scope` | **patched** | 加 must：`detail=complete` 必须 ≥5 篇 notes/；must_not 例外说明 |
+-| `update-routes-from-diff` | unchanged | update 路径不变 |
+-| `rename-updates-file-table` | unchanged | rename 处理不变 |
+-| `legacy-files-dir-preserved` | unchanged | files/ 停更规则不变 |
+-| `reject-per-file-catalog-request` | unchanged | 拒绝反模式规则不变 |
+-| `skip-third-party-and-foreign-repos` | unchanged | 三方/外来仓规则不变 |
+-
+-## Pattern: the missed case now fails-fast
+-
+-| Failure | Old behavior | New behavior |
+-|---------|--------------|--------------|
+-| detail=complete build 漏 notes/ | Agent 按 modes.md "opt-in" 字面理解 → 不建 → 用户 review 后才发现 | build 步骤 8.5 强制要求 ≥5 篇 + 5 类清单 + 主题命名；evals `complete-mode-notes-mandatory` 拦截；`hotspot-notes-need-scope` 加必须项 |
+-
+-**正向校验**：用真实数据 `algogear-bidder/feature-extraction-lib`（detail=complete，本次 build 后已补 6 个 notes/）对照候选稿：
+-
+-| 触发条件类 | 已建 notes/ | 命中 |
+-|-----------|------------|------|
+-| 1. 跨文件契约 | options-builder-sequencing | ✓ |
+-| 2. 一致性失败路径差异 | l1-throws-vs-l0l2-no-throw, ruf-parse-resilience | ✓ |
+-| 3. race 分析 | demand-cache-double-check | ✓ |
+-| 4. 监控盲区 | ruf-parse-resilience（"声明了 bvar 但未 <<1"） | ✓ |
+-| 5. 框架宏约束 | preprocessor-feature-macros | ✓ |
+-| **覆盖类数** | 5/5 | ✓ |
+-| **总篇数** | 6 篇（≥5） | ✓ |
+-| **topic 命名** | 6/6 全是 topic（如 `options-builder-sequencing.md`） | ✓ |
+-| **grep 同 group 已镜像 notes/** | task 1.10（external）6 个 notes/ 在 build 期间未主动 grep | ✗ 但候选稿要求"build 前先 grep"——本案例作为反例驱动规则 |
+-
+-正向校验通过（5 类覆盖 / 6 篇 / topic 命名），但暴露了"build 前先 grep"这条新规则在生产实操中曾被忽略——这也是为什么补丁里加了这条。
+-
+-**另一正向对照**：`algogear-bidder/external`（task 1.10，detail=complete，已有 6 个 notes/）：
+-
+-| 触发条件类 | 已建 notes/（推断） |
+-|-----------|------------|
+-| 1. 跨文件契约 | config 注入矩阵（待 confirm） |
+-| 2. 一致性失败路径差异 | lazada 接口偏离根因 |
+-| 3. race 分析 | （需 confirm） |
+-| 4. 监控盲区 | tiktok 双层 HMAC（疑似） |
+-| 5. 框架宏约束 | rta DialOption |
+-
+-5 类大概率都有覆盖（外层细节需 1 个 sub-agent 复核）。
+-
+-## 反向校验：non-complete 模式仍不建 notes/
+-
+-| Mode | Expected notes/ count | 候选稿是否破坏 |
+-|------|----------------------|---------------|
+-| `concise` | 0 | modes.md 表行 `concise / lightweight → 不建`，未改 |
+-| `lightweight` | 0 | 同上 |
+-| `detail_level=important` | 0（默认）；用户点名时按 ≤15 篇 | 表行改为 "默认不建、用户点名才建"，未引入 "≥5 篇" 强制 |
+-
+-反向校验通过：候选稿只对 `detail_level=complete` 引入 "必建 ≥5 篇" 规则，其他档位保持原行为。
+-
+-## Contract: scripts / public API 不变
+-
+-- `scripts/specctl.py` 未动
+-- CLI 命令名 / 退出码 / JSON 输出格式未动
+-- `set-sync` / `validate` / `route` 行为未动
+-- `--hotspot` 标记语义未动（"用户单点指定的热点" 仍由 `set-sync --hotspot` 维护，与 topic 命名并列）
+-
+-## Side effects
+-
+-| 维度 | 评估 |
+-|------|------|
+-| 触发范围 | 仅 `detail_level=complete` 的 build 阶段；其他模式 / 阶段未受影响 |
+-| 权限 | 未变（specctl 不写源码，只读 + 写 spec/） |
+-| 破坏性 | 无（候选稿只 add 新 must / 新 case，未删既有规则） |
+-| KPI / bvar / 契约 | 无影响（specctl.py 未改） |
+-
+-## Verdict
+-
+-**PASS**
+-
+-候选稿满足：
+-
+-- 解决真实失败模式（task 1.11 漏 6 个 notes/，已在用户 review 后补）
+-- 不破坏既有成功路径
+-- 触发条件可执行（5 类清单）而非主观判断
+-- 与已镜像仓的 `external` 行为对齐（6 个 notes/ 主题符合 5 类清单）
+-- 风险评估为 medium（default 行为变化范围明确，仅 detail=complete）
+-
+-下一步：等用户确认后晋升（promote），覆盖生产稿 `SKILL.md` / `references/modes.md` / `evals/cases.yaml`。
+-
+-如不接受，可 reject：候选稿留在 evolutions/ 作为否决记录。
++对照旧 diff 时使用同目录 `*.patch`，不要把其中的项目名或监控实现细节写进新镜像。
+diff -ruN a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/proposal.yaml b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/proposal.yaml
+--- a/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/proposal.yaml	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/evolutions/20260829-complete-mode-notes-mandatory/proposal.yaml	2026-09-05 21:43:22.000000000 +0800
+@@ -1,76 +1,14 @@
+ skill: project-spec-mirror
++status: superseded
+ 
+ problem: |
+-  `detail_level=complete` 模式下 `modules/<m>/notes/` 详注长期被理解为 opt-in。
+-  Agent 按 modes.md line 52 "默认不建，只对用户点名或符合热点条件的路径建"
+-  字面理解 → 不建 → 用户 review 后才指出漏掉。
+-  已镜像的 algogear-bidder/external（detail=complete）建了 6 个 notes/，但本次
+-  build 未参照此先例。245 个 mirror task 中只要后续 task 仍走 detail=complete，
+-  同样会漏。
++  旧模型把 `detail_level=complete` 下的 `modules/*/notes/` 理解成 opt-in，
++  导致跨文件契约写不全。该档位已删除，本提案不要再落地。
+ 
+ evidence:
+   - experience/failures/20260829-notes-missed-in-complete-mode.md
+-  - 同一 OpenSpec change 的 task 1.10（external）已完成 6 个 notes/：
+-    ali_express DPA URL 清洗、lazada 接口偏离根因、shein ID 大写、tiktok 双层
+-    HMAC、rta DialOption、config 注入矩阵
+-  - 6 个应该建但未建的 notes（已补）：options-builder-sequencing /
+-    l1-throws-vs-l0l2-no-throw / demand-cache-double-check /
+-    ruf-parse-resilience / md5-cluster-id-gen / preprocessor-feature-macros
+-  - SKILL.md build 步骤第 7 步只列文件表 + 详尽档位说明，没列 "写 notes/"
+ 
+-pattern: |
+-  detail=complete + 跨文件契约丰富（如 builder 链、并发缓存、多源解析、
+-  框架宏）的仓，应识别 ≥5 类 hot-spot 并各建一个 notes/。
+-  触发条件当前是"用户点名或符合热点条件"——但"热点条件"无可执行判据。
+-
+-proposed_change: |
+-  在 SKILL.md build 步骤末加一条规则，在 modes.md 重新定义 notes/ 的
+-  "default vs mandatory" 边界：
+-
+-  1. SKILL.md build 步骤新增 8.5：
+-     "在 modules/*/README.md 完成后，按跨文件契约清单建 5–8 个
+-     modules/<m>/notes/<topic>.md（topic 由触发条件决定，不必与源路径同构）。
+-     `detail_level=complete` 默认必建；其他档位保持 opt-in。"
+-
+-  2. modes.md line 52 那段改为两段：
+-     - `concise / lightweight`：notes/ 不建
+-     - `detail_level=important`：notes/ 默认不建，仅在用户点名时建
+-     - `detail_level=complete`：notes/ **必建**（5–8 个），按以下触发条件
+-       枚举至少 5 类
+-  - 触发条件列表（满足任一即建一个）：
+-     a. 跨 ≥2 个文件的契约（builder 配对、init→extract 时序、依赖注入矩阵）
+-     b. 一致性失败路径与正常路径不同（parse 失败 ≠ throw、L1 抛 vs L0/L2 不抛）
+-     c. 并发/锁的 race 分析（shared_mutex double-check、is_done_ 标记）
+-     d. 监控盲区（声明了 bvar 但未 <<1、FE_ERROR 无对应 counter）
+-     e. 框架/预处理器的使用约束（宏展开顺序、字段名规范、ABI 兼容性）
+-
+-  3. SKILL.md 非目标（"不要..." 段）补一条负面约束：
+-     "不要把每个源文件做成 notes/ 一页一页；notes/ 的命名是 topic（易踩坑
+-     的概念），不是源相对路径" —— 避免 notes/ 退化为 "一文件一详页" 反模式
+-
+-  4. evals/cases.yaml 加一个新 case：
+-     id: complete-mode-notes-mandatory
+-     检查 detail=complete 的镜像存在 ≥5 个 modules/<m>/notes/*.md，
+-     且至少 5 类触发条件各占一篇。
+-
+-  5. evals/cases.yaml 改造 hotspot-notes-need-scope：
+-     加一段 "但 detail=complete 不在此限，按上述清单必建"
+-
+-  6. SKILL.md "build 步骤 7" 末尾 +1 句："build 前先 grep
+-     spec/<group>/<已镜像仓>/modules/*/notes/ 主题列表，作为本仓 notes/ 选题
+-     参考（不要复制内容，仅对齐主题维度）"
+-
+-expected_improvement: |
+-  - detail=complete 的 mirror 不再漏 notes/，与已有 task 1.10（external）
+-    行为一致
+-  - 245 个 mirror task 中后续 detail=complete 的不必每次都靠用户 review 发现
+-  - 触发条件可执行（5 类清单），Agent 不需要主观判断"算不算热点"
+-  - 跨仓主题一致性：同 group 内多个仓的 notes/ 主题可以横向对照
+-
+-risk: medium
+-# medium 因为：
+-# 1. 把 "opt-in" 改成 "complete 模式下必建" 改变了默认行为，但范围明确（只限
+-#    detail=complete），其他档位不动
+-# 2. 不删除既有规则，只加新分支
+-# 3. 不修改 scripts/specctl.py
+-# 4. 不修改 contracts（callers 看不到 notes/）
++proposal: |
++  历史方案曾要求 complete 必建若干 notes。现行替代是 agent spec 的
++  Requirement / Scenario，以及 briefing 总结。不要恢复 notes 必建或
++  「对照同组已镜像仓」。
+diff -ruN a/agents/skills/project-spec-mirror/evolutions/README.md b/agents/skills/project-spec-mirror/evolutions/README.md
+--- a/agents/skills/project-spec-mirror/evolutions/README.md	2026-08-30 12:06:36.000000000 +0800
++++ b/agents/skills/project-spec-mirror/evolutions/README.md	2026-09-05 21:43:14.000000000 +0800
+@@ -1,16 +1,7 @@
+-# evolutions（历史归档）
++# evolutions（历史归档，勿执行）
+ 
+-本目录只有一条记录 `20260829-complete-mode-notes-mandatory`，由 `skill-evolver` 按它的
+-proposal / candidate / eval / decision 结构产生。对应改动早已应用到 `SKILL.md` 与
+-`references/modes.md`，保留它是为了能追溯当时的判断依据。
++本目录不再接收新条目。现行维护走 `patches/`。
+ 
+-注意其中的 `*.candidate` 是当时的全文副本，不是现行版本；判断当前规则请读
+-`SKILL.md` 和 `references/`。
++`20260829-complete-mode-notes-mandatory` 记录的是已删除的 `detail_level=complete` / `modules/notes/` 规则。其中 `*.candidate` 是当时全文副本，**不是现行版本**。判断当前规则只读 `SKILL.md` 与 `references/`。
+ 
+-本 Skill 现在的维护协议是 `patches/`：一次改动一个目录，先写 `proposal.md` 与
+-`change.patch`，`git apply --check` 通过、风险门禁过了才应用，最后写 `result.md`。
+-两套协议并存会让下一个维护者不知道该往哪写，所以这里不再新增条目；
+-需要按真实执行经验演进时，同样把结果落成一个新的 `patches/<timestamp>-<slug>/`。
+-
+-`experience/` 与本目录的关系：`experience/` 记录真实执行中的成功、失败与模式，是输入；
+-`patches/` 是据此做出的改动，是输出。
++记录里的实现细节、仓名和本机同步命令已从可执行摘要中去掉；留下的 candidate/patch 仅供对照旧 diff，不要抄进新镜像。
+diff -ruN a/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md b/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md
+--- a/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md	2026-08-28 22:06:54.000000000 +0800
++++ b/agents/skills/project-spec-mirror/experience/failures/20260828-important-method-one-liners.md	2026-09-05 21:43:53.000000000 +0800
+@@ -1,16 +1,16 @@
+-# important 把核心方法写成一句话
++# 旧详尽档把方法写成一句话（已作废）
+ 
+ - Date: 2026-08-28
+ - Kind: failure
+ - Skill: project-spec-mirror
+-- Context: detailed / important 写模块核心符号时，把方法层理解成「名字 + 一句话」
++- Status: superseded
++- Context: 旧模型 detailed / important 曾要求在模块页写方法步骤
+ 
+ ## What happened
+ 
+-Agent 补上了文件表覆盖，但仍把核心方法写成一句话职责，并漏列工具方法。测试方法在 complete 下被展开成用例步骤。
++当时文件表有了，但方法说明过短；另一极端是把测试断言逐步抄进镜像。
+ 
+ ## Lesson
+ 
+-- 核心方法必须梳理完整逻辑（步骤、分支、成败、副作用），不是一句话点到为止。
+-- 工具方法可以简述，但必须列名，不得漏列。
+-- 测试方法只简述覆盖范围；important 与 complete 都不得写断言步骤。
++- **不得**再要求 briefing 写「完整逻辑」或方法逐步走读。那是旧档位，现行禁写。
++- 可验证行为写进能力 Scenario；briefing 只保留总结。
+diff -ruN a/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md b/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md
+--- a/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md	2026-08-28 22:06:54.000000000 +0800
++++ b/agents/skills/project-spec-mirror/experience/failures/20260828-secret-literals-in-spec.md	2026-09-05 21:43:10.000000000 +0800
+@@ -1,16 +1,16 @@
+-# 源码密钥字面量被抄进模块页
++# 源码密钥字面量被抄进镜像
+ 
+ - Date: 2026-08-28
+ - Kind: failure
+ - Skill: project-spec-mirror
+-- Context: detailed / important 整理模块文件表时，源码常量含 AppKey / SecretKey 一类凭据
++- Status: current
++- Context: 整理能力或源映射时，源码常量含 AppKey / SecretKey 一类凭据
+ 
+ ## What happened
+ 
+-Agent 把源码里的鉴权常量赋值写进文件表「职责」或核心符号说明，镜像因此带上密钥原文。同时 important 把非重要文件整份省略，模块页信息过少。
++Agent 把鉴权常量的赋值写进说明文字，镜像因此带上密钥原文。
+ 
+ ## Lesson
+ 
+-- important 对范围内文件写简述，不得因「不重要」漏行。
+ - 凭据只写字段名与注入方式，值一律 `<REDACTED>`；产品标识不是密钥。
+-- 可复用于后续 build/update；已写入 modes 与公共执行契约。
++- 可复用于后续 build/update。
+diff -ruN a/agents/skills/project-spec-mirror/experience/failures/20260829-notes-missed-in-complete-mode.md b/agents/skills/project-spec-mirror/experience/failures/20260829-notes-missed-in-complete-mode.md
+--- a/agents/skills/project-spec-mirror/experience/failures/20260829-notes-missed-in-complete-mode.md	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/experience/failures/20260829-notes-missed-in-complete-mode.md	2026-09-05 21:43:12.000000000 +0800
+@@ -1,41 +1,16 @@
+-# complete 模式下漏掉 modules/notes/ 详注
++# 旧详尽档漏掉跨文件契约（已作废）
+ 
+ - Date: 2026-08-29
+ - Kind: failure
+ - Skill: project-spec-mirror
+-- Context: detailed / detail_level=complete 给 algogear-bidder/feature-extraction-lib 跑 mirror，按 SKILL.md build 步骤写金字塔 + 切面 + 概念/实体/流/模块页
++- Status: superseded
++- Context: 旧模型 `detail_level=complete` 曾要求按模块文件表写镜像
+ 
+ ## What happened
+ 
+-按 SKILL.md 的 build 步骤完成 5 投影 INDEX + facets × 5 + concepts × 5 + entities × 6 + flows × 3 + modules × 12 + 4 张 archify 图；validate 通过；set-sync 锁定 commit 9d239e9。用户 review 后明确指出："怎么没整理 nodes 文件？"
+-
+-复盘：
+-
+-- `detail_level=complete` 要求"完整整理所有源文件、不得遗漏"——但模块 README 已经把每个文件的核心方法完整逻辑写完，再补什么？
+-- modes.md line 52 说 `notes/` 默认不建，只对"用户点名或符合热点条件的路径"建——但没给"热点条件"的可执行判据
+-- 已知 `algogear-bidder/external` mirror（更早 task）建了 6 个 notes/——但本次 build 时没扫已镜像仓的 `modules/*/notes/` 做对照
+-- 真正应该进 notes/ 的内容（"读源码看不出来"的隐性契约）：OptionsBuilder 的 `THROW_ON_EMPTY_OPTIONAL` 抛错契约、L1 抛 vs L0/L2 不抛的异常边界、shared_mutex double-check 的 race 分析、ruf/duf 4 层解析失败的 silent corruption 风险、WipeSize Apple 设备 hack、BOOST_PP 扩展规则的 4 步流程
++当时按文件表交卷后，用户指出跨文件契约、失败路径差异和并发假设没有单独写清。旧规则把这类内容放在 `modules/*/notes/`，且曾误用「同组已镜像仓」做对照。
+ 
+ ## Lesson
+ 
+-- `detail_level=complete` 模式下 `notes/` 是**必建**，不是 opt-in："完整覆盖"含"显式写跨文件契约与易踩坑的设计选择"
+-- 至少 5–8 个 notes/，按"跨文件契约 / 异常边界 / race 分析 / 解析容错 / 框架机制"5 类组织
+-- 触发条件（满足任一即建）：
+-  1. 跨 ≥2 个文件的契约（builder 配对、init→extract 时序、依赖注入矩阵）
+-  2. 一致性 fail 路径与正常路径不同（parse 失败 ≠ throw、L1 抽 vs L0/L2 不抛）
+-  3. 并发/锁的 race 分析（shared_mutex double-check、is_done_ 标记）
+-  4. 监控盲区（声明了 bvar 但未 <<1、FE_ERROR 无对应 counter）
+-  5. 框架/预处理器的使用约束（宏展开顺序、字段名规范、ABI 兼容性）
+-- build 流程应在 modules README 之后加一步："列出跨文件契约 → 写 5–8 个 notes/"，不与已建模块冲突
+-- 复用对照：build 前先 grep `spec/<group>/<已镜像仓>/modules/*/notes/` 看同 group 内已有 mirror 的 notes/ 主题
+-
+-## Reusable for
+-
+-- 后续 245 个 mirror task（mirror-repos-from-list change）
+-- 所有 detail=complete 的初次 build 与 update 后新增 hot path
+-
+-## Action
+-
+-- 已就地补 6 个 notes/：options-builder-sequencing / l1-throws-vs-l0l2-no-throw / demand-cache-double-check / ruf-parse-resilience / md5-cluster-id-gen / preprocessor-feature-macros
+-- 写 experience/patterns/ 提示"build 末尾 grep 已镜像 notes/ 主题列表"
+-- 启动 skill-evolver 提议：把 modes.md 的"opt-in"改成"complete 模式下必建"，加 eval case
++- **不得**再按 complete / notes / 同组对照执行。现行模型把可验证行为写进 `agent/specs/` 的 Requirement / Scenario，人读写 `briefing/`。
++- 本条只说明为何丢掉了旧档位，不恢复那些目录。
+diff -ruN a/agents/skills/project-spec-mirror/experience/patterns/20260829-notes-mandatory-in-complete-mode.md b/agents/skills/project-spec-mirror/experience/patterns/20260829-notes-mandatory-in-complete-mode.md
+--- a/agents/skills/project-spec-mirror/experience/patterns/20260829-notes-mandatory-in-complete-mode.md	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/experience/patterns/20260829-notes-mandatory-in-complete-mode.md	2026-09-05 21:43:13.000000000 +0800
+@@ -1,35 +1,18 @@
+-# detail_level=complete 下必须建 modules/notes/
++# 旧详尽档的 notes 必建（已作废）
+ 
+ - Date: 2026-08-29
+ - Kind: pattern
+ - Skill: project-spec-mirror
+-- Status: 候选 → 晋升后成为正式规则
++- Status: superseded
+ 
+ ## Evidence
+ 
+-- `experience/failures/20260829-notes-missed-in-complete-mode.md`（task 1.11 feature-extraction-lib 漏 6 个 notes/）
+-- task 1.10（algogear-bidder/external，detail=complete）已建 6 个 notes/ 主题：ali_express DPA URL 清洗 / lazada 接口偏离根因 / shein ID 大写 / tiktok 双层 HMAC / rta DialOption / config 注入矩阵
++- `experience/failures/20260829-notes-missed-in-complete-mode.md`
+ 
+ ## Pattern
+ 
+-`detail_level=complete` 模式下，模块 README 已写完每个文件核心方法，剩余"读源码看不出来"的内容（跨文件契约、异常边界、race 分析、监控盲区、框架宏约束）必须落到 `modules/<m>/notes/`，而不是塞进模块 README。
+-
+-触发条件（满足任一即建 1 篇 notes/，整体 ≥5 篇、覆盖 ≥3 类）：
+-
+-1. 跨文件契约（builder 配对 / init→extract 时序 / 依赖注入矩阵 / shared l0_rfm 共享）
+-2. 一致性失败路径与正常路径不同（parse 失败 ≠ throw / L1 抛 vs L0/L2 不抛 / silent corruption）
+-3. 并发/锁的 race 分析（shared_mutex double-check / is_done_ 标记 / lock_guard+double-check）
+-4. 监控盲区（声明了 bvar 但未 <<1 / FE_ERROR 无对应 counter / AddCounter 接错 msg 维度）
+-5. 框架/预处理器的使用约束（BOOST_PP_SEQ_FOR_EACH 宏展开顺序 / 字段名规范 / ABI 兼容性 / --ff-only 而非默认 pull）
+-
+-notes/ 的**命名**是 topic（易踩坑的概念）而非源相对路径；与已有 `notes/<source-rel>.md` 命名并列。
++旧模型曾要求：文件表写完方法后，把「读源码看不出来」的跨文件契约写进 `modules/*/notes/`。该档位与默认产物已删除。
+ 
+ ## Action
+ 
+-- modes.md 改档位分支（complete 必建 / important opt-in / concise+lightweight 不建）
+-- SKILL.md build 步骤新增 8.5 + build 前 grep 同 group 已镜像 notes/ 做参考
+-- evals/cases.yaml 新增 complete-mode-notes-mandatory case
+-
+-## Reusable for
+-
+-后续 245 个 mirror task（mirror-repos-from-list change）；任何 detail=complete 的初次 build 或 update 后新增 hot path。
++不要把本条写回 `SKILL.md` 或 `modes.md`。现行替代：能力 Scenario 写清契约与失败路径；briefing 保持总结性。
+diff -ruN a/agents/skills/project-spec-mirror/experience/README.md b/agents/skills/project-spec-mirror/experience/README.md
+--- a/agents/skills/project-spec-mirror/experience/README.md	2026-08-30 02:21:20.000000000 +0800
++++ b/agents/skills/project-spec-mirror/experience/README.md	2026-09-05 21:43:10.000000000 +0800
+@@ -10,12 +10,18 @@
+ patterns/  → 从多个案例中提炼出的可复用规律
+ ```
+ 
++## 现行规则优先
++
++现行验收是 `briefing` / `reconstructable`。标了 `superseded` 的条目只作考古，不得驱动现行行为（包括已删除的 concise/detailed/complete、`modules/notes/`、按 group 对照已镜像仓）。
++
+ ## 何时写入
+ 
+ - 失败、用户纠正、明显成功
+ - 新的有效执行方法
+ - 可复用的经验
+ 
++写入时用虚构或脱敏项目，不写真实仓名、公司业务细节、本机路径或同步命令。
++
+ ## 何时不写入
+ 
+ - 一次性环境问题（网络闪断、用户打错字）
+diff -ruN a/agents/skills/project-spec-mirror/references/appendix.md b/agents/skills/project-spec-mirror/references/appendix.md
+--- a/agents/skills/project-spec-mirror/references/appendix.md	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/references/appendix.md	2026-09-05 21:42:57.000000000 +0800
+@@ -1,6 +1,16 @@
+ # 附录（默认不读）
+ 
+-仅当用户明确要求时使用。不要在普通 build 加载本文件。
++仅当用户明确要求、或 `status.layout=legacy` 时使用。不要在普通 build 预加载本文件。
++
++## 旧金字塔镜像
++
++上一版 Skill 用顶层 `modules/` `facets/` `runtime/` `build/` `context/` 当阅读树。这不是通用工程约定。
++
++若 `detect` / `status` 报 `layout=legacy`：
++
++- 阶段按 `rebuild`（当 build），按现行 `briefing/` + `agent/` + `evidence/` 重写。
++- 遗留目录停更、不删，除非用户要求删除。
++- 不要继续加深旧模块文件表或 `notes/`。
+ 
+ ## 改这个仓
+ 
+diff -ruN a/agents/skills/project-spec-mirror/references/checklist.md b/agents/skills/project-spec-mirror/references/checklist.md
+--- a/agents/skills/project-spec-mirror/references/checklist.md	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/references/checklist.md	2026-09-05 21:42:58.000000000 +0800
+@@ -11,13 +11,13 @@
+ 
+ ## 双读者
+ 
+-- 人读 `briefing/`，无「完整逻辑」、无「## 文件」表、无工具链版本行。
++- 人读 `briefing/`，无「完整逻辑」/ full logic、无「## 文件」/ `## Files` 表、无清单文件版本行。
+ - Agent 读 `agent/specs/`，格式 Purpose / Requirement / Scenario。
+ - 没有默认生成 `facets/` 或 `evidence/realization/`。
+ 
+ ## 门禁
+ 
+-- `finalize` 已成功。`layout=legacy` 时本轮是 rebuild，不是在旧文件表上 update。
++- `finalize` 已成功。若 `layout=legacy`，按 [appendix.md](appendix.md) rebuild，不要在旧文件表上 update。
+ - `reconstructable`：未映射代码入口已进 source-map 或「未指定」；无幽灵 map 行。
+ - update 的 `unmapped` 已消化。
+ - **复现抽检（reconstructable）：** 只读 `agent/`（不打开源码与 evidence），口述 1 条主 Scenario 的 WHEN/THEN。答不出不得称完成。
+diff -ruN a/agents/skills/project-spec-mirror/references/diagrams.md b/agents/skills/project-spec-mirror/references/diagrams.md
+--- a/agents/skills/project-spec-mirror/references/diagrams.md	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/references/diagrams.md	2026-09-05 21:43:54.000000000 +0800
+@@ -9,7 +9,7 @@
+ 
+ **本轮必须交付：** 复杂业务逻辑（分叉、补偿、状态机、跨系统时序、非平凡数据路径）；overview 点名的这类主处理线。线性三步可省略。「没有图不算失败」只适用于可省略的图。
+ 
+-执行：加载已安装的 `archify` Skill（`Read ~/.agents/skills/archify/SKILL.md`），然后：
++执行：加载已安装的 `archify` Skill（按各 agent 的 skills 目录查找，不要写死家目录），然后：
+ 
+ ```bash
+ node bin/archify.mjs validate <type> <spec_root>/briefing/diagrams/<slug>.json --json
+diff -ruN a/agents/skills/project-spec-mirror/references/layout.md b/agents/skills/project-spec-mirror/references/layout.md
+--- a/agents/skills/project-spec-mirror/references/layout.md	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/references/layout.md	2026-09-05 21:42:56.000000000 +0800
+@@ -26,7 +26,7 @@
+ └── evidence/source-map.md
+ ```
+ 
+-旧顶层 `modules/` `facets/` `runtime/` `build/` `context/`：停更、不删。`status.layout=legacy` 时按本树重建。
++遇到旧顶层目录时见 [appendix.md](appendix.md)，不要在本文件展开迁就规则。
+ 
+ ## `.mirror.json`
+ 
+@@ -34,7 +34,7 @@
+ 
+ ## 人读
+ 
+-`briefing/overview.md`：一句话、背景/目标/非目标、能力地图、主处理线。不要「待 build」占位交卷。
++`briefing/overview.md`：一句话、背景/目标/非目标、能力地图、主处理线。不要「待 build」/ to be built 占位交卷。
+ 
+ `briefing/architecture.md`：谁用、邻接、信任边界。
+ 
+@@ -44,7 +44,7 @@
+ 
+ ## Agent
+ 
+-`agent/INDEX.md` 只维护**一张**能力表（表头第一列必须是 `能力`）：
++`agent/INDEX.md` 只维护**一张**能力表（表头第一列是 `能力` 或 `Capability`）：
+ 
+ | 能力 | 一句话 | 状态 | 页 |
+ |------|--------|------|-----|
+@@ -52,7 +52,7 @@
+ 
+ 状态：`draft`（有 Purpose）| `ready`（每条 Requirement 至少一条 WHEN/THEN Scenario）。
+ 
+-未覆盖的代码入口写入同一文件的「未指定」表（表头第一列 `未指定` 或 `路径`）：
++未覆盖的代码入口写入同一文件的「未指定」表（表头第一列 `未指定`、`路径` 或 `Path`）：
+ 
+ | 路径 | 原因 |
+ |------|------|
+@@ -82,7 +82,7 @@
+ 
+ | 模式 | 必须 |
+ |------|------|
+-| 两者 | overview 已写（无「待 build」）；≥1 条处理线；≥1 条能力；source-map 非空；briefing 无禁写泄漏 |
++| 两者 | overview 已写（无「待 build」/ to be built）；≥1 条处理线；≥1 条能力；source-map 非空；briefing 无禁写泄漏 |
+ | `reconstructable` | 每条能力有 spec 且含 Requirement 与 Scenario；代码文件都被 map 或「未指定」；无幽灵 map 行 |
+ | `update` | 本轮 `unmapped` 已消化（并入能力或「未指定」） |
+ 
+diff -ruN a/agents/skills/project-spec-mirror/scripts/specctl.py b/agents/skills/project-spec-mirror/scripts/specctl.py
+--- a/agents/skills/project-spec-mirror/scripts/specctl.py	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/scripts/specctl.py	2026-09-05 21:43:06.000000000 +0800
+@@ -144,6 +144,15 @@
+         ".cs",
+         ".swift",
+         ".scala",
++        ".ex",
++        ".exs",
++        ".erl",
++        ".lua",
++        ".zig",
++        ".m",
++        ".mm",
++        ".vue",
++        ".svelte",
+     }
+ )
+ MIRROR_VERSION = 1
+@@ -1021,12 +1030,14 @@
+ CAPABILITY_HEADERS = frozenset({"能力", "capability"})
+ UNSPECIFIED_HEADERS = frozenset({"未指定", "路径", "path", "unspecified"})
+ CAPABILITY_STATUSES = frozenset({"draft", "ready"})
+-LEAK_COMPLETE_LOGIC = re.compile(r"完整逻辑")
+-LEAK_FILE_HEADING = re.compile(r"^#{1,3}\s+文件\s*$", re.M)
++LEAK_COMPLETE_LOGIC = re.compile(r"完整逻辑|full logic|complete logic", re.I)
++LEAK_FILE_HEADING = re.compile(r"^#{1,3}\s+(文件|files)\s*$", re.I | re.M)
+ LEAK_TOOLCHAIN = re.compile(
+-    r"(go\.mod|package\.json).{0,80}\d+\.\d+",
++    r"(go\.mod|package\.json|Cargo\.toml|pyproject\.toml|"
++    r"composer\.json|Gemfile|pom\.xml|mix\.exs).{0,80}\d+\.\d+",
+     re.I,
+ )
++STUB_RE = re.compile(r"待 build|to be built|\(TODO:\s*describe", re.I)
+ 
+ 
+ def table_cells(row: str) -> list[str]:
+@@ -1177,7 +1188,7 @@
+     path = spec_root / "briefing" / "overview.md"
+     if not path.is_file():
+         return True
+-    return "待 build" in path.read_text(encoding="utf-8")
++    return bool(STUB_RE.search(path.read_text(encoding="utf-8")))
+ 
+ 
+ def source_map_empty(mapping: list[dict[str, Any]]) -> bool:
+diff -ruN a/agents/skills/project-spec-mirror/SKILL.md b/agents/skills/project-spec-mirror/SKILL.md
+--- a/agents/skills/project-spec-mirror/SKILL.md	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/SKILL.md	2026-09-05 21:42:53.000000000 +0800
+@@ -7,7 +7,7 @@
+ 
+ # Project Spec Mirror
+ 
+-面向用户默认使用简体中文。命令、路径、代码与既成术语保持原文。
++面向用户沿用其语言（本文件用简体中文写成）。命令、路径、代码与既成术语保持原文。
+ 
+ 机械工作只通过 `specctl`。正文由 Agent 写。验收：
+ 
+@@ -28,7 +28,7 @@
+ - 不改目标源码、测试、构建；不自动 commit / push。
+ - 密钥与凭据值写 `<REDACTED>`（含 `AppKey` / `SecretKey` / token / password）。
+ - 不整理三方树或外来仓。默认不生成 `facets/`、模块文件表、`evidence/realization/`。
+-- 旧金字塔布局：`status` 报 `layout=legacy`，阶段为 `rebuild`，按新树重写，不要增量改旧文件表。
++- 若 `status.layout=legacy`：阶段为 `rebuild`，见 [references/appendix.md](references/appendix.md)，不要在主路径继续写旧文件表。
+ 
+ ## 目录
+ 
+@@ -43,7 +43,7 @@
+ 
+ ## 禁写（briefing）
+ 
+-禁止源文件表、方法逐步走读（「完整逻辑」）、语言/包管理器版本、compose/端口/启动命令。
++禁止源文件表、方法逐步走读（「完整逻辑」/ full logic）、语言/包管理器版本、compose/端口/启动命令。
+ 
+ ## Agent spec 形态
+ 
+@@ -95,7 +95,7 @@
+ 
+ **update：** `status` + `route`，只改命中的能力与跟链接的 briefing。`unmapped` 必须并入能力或写入 INDEX「未指定」。改完 `finalize`。细则见 [references/routing.md](references/routing.md)。
+ 
+-保留 `<!-- manual -->` 块。`rebuild` 补齐新树后再 `finalize`，不要继续写旧 `modules/` 文件表。
++保留 `<!-- manual -->` 块。旧树 rebuild 的目录对照见 [references/appendix.md](references/appendix.md)。
+ 
+ ## 完成回执
+ 
+diff -ruN a/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py b/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py
+--- a/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/tests/test_project_spec_mirror_contract.py	2026-09-05 21:43:54.000000000 +0800
+@@ -158,6 +158,41 @@
+         self.assertIn("唯一能把状态写成 `built`", layout)
+         self.assertIn("layout=legacy", skill)
+         self.assertIn("rebuild", skill)
++        appendix = (SKILL_ROOT / "references" / "appendix.md").read_text(
++            encoding="utf-8"
++        )
++        self.assertIn("旧金字塔", appendix)
++
++    def test_shared_skill_has_no_private_project_names(self) -> None:
++        forbidden = (
++            "algogear",
++            "ali_express",
++            "feature-extraction-lib",
++            "dotf agents",
++            "dotfiles 仓",
++        )
++        roots = [
++            SKILL_ROOT / "SKILL.md",
++            SKILL_ROOT / "experience",
++            SKILL_ROOT / "evals",
++            SKILL_ROOT / "references",
++            SKILL_ROOT / "examples",
++            SKILL_ROOT / "evolutions" / "README.md",
++            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "proposal.yaml",
++            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "decision.md",
++            SKILL_ROOT / "evolutions" / "20260829-complete-mode-notes-mandatory" / "eval.md",
++        ]
++        blob = []
++        for path in roots:
++            if path.is_file():
++                blob.append(path.read_text(encoding="utf-8"))
++            else:
++                for child in path.rglob("*"):
++                    if child.is_file() and child.suffix in {".md", ".yaml", ".yml"}:
++                        blob.append(child.read_text(encoding="utf-8"))
++        text = "\n".join(blob).lower()
++        for needle in forbidden:
++            self.assertNotIn(needle.lower(), text, needle)
+ 
+     def test_checklist_is_the_installable_selfcheck(self) -> None:
+         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+diff -ruN a/agents/skills/project-spec-mirror/tests/test_specctl.py b/agents/skills/project-spec-mirror/tests/test_specctl.py
+--- a/agents/skills/project-spec-mirror/tests/test_specctl.py	2026-09-05 21:16:52.000000000 +0800
++++ b/agents/skills/project-spec-mirror/tests/test_specctl.py	2026-09-05 21:43:32.000000000 +0800
+@@ -1098,6 +1098,49 @@
+             self.assertEqual(payload["reason"], "briefing_leak")
+             self.assertTrue(any("完整逻辑" in item for item in payload["leaks"]))
+ 
++    def test_english_stub_and_leak_patterns(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            spec = Path(raw) / "spec"
++            (spec / "briefing").mkdir(parents=True)
++            (spec / "briefing" / "overview.md").write_text(
++                "# demo\n\n(to be built: say what this is.)\n",
++                encoding="utf-8",
++            )
++            self.assertTrue(specctl.overview_is_stub(spec))
++            (spec / "briefing" / "overview.md").write_text(
++                "# demo\n\nA shop checkout API.\n",
++                encoding="utf-8",
++            )
++            self.assertFalse(specctl.overview_is_stub(spec))
++            (spec / "briefing" / "flow.md").write_text(
++                "# flow\n\n## Files\n\n- a.py\nSee Cargo.toml 1.2.3 and full logic.\n",
++                encoding="utf-8",
++            )
++            leaks = specctl.briefing_leaks(spec)
++            self.assertTrue(any("文件表" in item for item in leaks), leaks)
++            self.assertTrue(any("工具链版本" in item for item in leaks), leaks)
++            self.assertTrue(any("完整逻辑" in item for item in leaks), leaks)
++
++    def test_capability_header_accepts_english(self) -> None:
++        import tempfile
++
++        with tempfile.TemporaryDirectory() as raw:
++            spec = Path(raw) / "spec"
++            (spec / "agent").mkdir(parents=True)
++            (spec / "agent" / "INDEX.md").write_text(
++                """# Capabilities
++
++| Capability | Summary | Status | Page |
++|------------|---------|--------|------|
++| checkout | place order | ready | x |
++""",
++                encoding="utf-8",
++            )
++            caps = specctl.load_capabilities(spec)
++            self.assertEqual([item["name"] for item in caps], ["checkout"])
++
+     def test_finalize_rejects_undigested_unmapped(self) -> None:
+         import tempfile
+ 

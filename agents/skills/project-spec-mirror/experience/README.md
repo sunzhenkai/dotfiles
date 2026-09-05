@@ -10,11 +10,17 @@ successes/ → 成功案例
 patterns/  → 从多个案例中提炼出的可复用规律
 ```
 
+## 现行规则优先
+
+现行验收是 `briefing` / `reconstructable`。标了 `superseded` 的条目只作考古，不得驱动现行行为（包括已删除的 concise/detailed/complete、`modules/notes/`、按 group 对照已镜像仓）。
+
 ## 何时写入
 
 - 失败、用户纠正、明显成功
 - 新的有效执行方法
 - 可复用的经验
+
+写入时用虚构或脱敏项目，不写真实仓名、公司业务细节、本机路径或同步命令。
 
 ## 何时不写入
 
