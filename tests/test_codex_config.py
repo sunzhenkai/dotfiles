@@ -107,6 +107,28 @@ def test_merge_appends_local_projects() -> None:
     assert "XDG dotf overlay" in out
 
 
+def test_merge_harvests_runtime_projects_and_prefers_overlay() -> None:
+    base = (VENDOR / "config.toml").read_text(encoding="utf-8")
+    kimi = (VENDOR / "kimi.config.toml").read_text(encoding="utf-8")
+    minimax = (VENDOR / "minimax.config.toml").read_text(encoding="utf-8")
+    actual = merge(base, kimi, None)
+    actual += (
+        '\n[projects."/tmp/runtime"]\n'
+        'trust_level = "trusted"\n'
+        '\n[projects."/tmp/overlay"]\n'
+        'trust_level = "untrusted"\n'
+    )
+    local = '[projects."/tmp/overlay"]\ntrust_level = "trusted"\n'
+    out = merge(base, minimax, local, actual=actual)
+    preamble = out.split("[model_providers")[0]
+    assert 'model_provider = "minimax"' in preamble
+    assert 'model = "MiniMax-M3"' in preamble
+    assert 'model_provider = "kimi"' not in preamble
+    parsed = tomllib.loads(out)
+    assert parsed["projects"]["/tmp/runtime"]["trust_level"] == "trusted"
+    assert parsed["projects"]["/tmp/overlay"]["trust_level"] == "trusted"
+
+
 def test_all_profile_catalog_references_are_valid_repository_json() -> None:
     inputs = [VENDOR / "config.toml", *sorted(VENDOR.glob("*.config.toml"))]
     referenced: set[str] = set()
@@ -175,6 +197,35 @@ def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
     assert "unchanged" in second.stdout
     assert {path: path.stat().st_mtime_ns for path in mtimes} == mtimes
     assert manifest_path.read_bytes() == manifest_before
+
+
+def test_install_codex_reconciles_runtime_projects_when_switching_profile(
+    tmp_home: Path,
+) -> None:
+    first = _install(tmp_home, profile="kimi")
+    assert first.returncode == 0, first.stdout + first.stderr
+    cfg_path = tmp_home / ".codex" / "config.toml"
+    cfg_path.write_text(
+        cfg_path.read_text(encoding="utf-8")
+        + '\n[projects."/tmp/runtime"]\ntrust_level = "trusted"\n',
+        encoding="utf-8",
+    )
+
+    switched = _install(tmp_home, profile="minimax")
+    assert switched.returncode == 0, switched.stdout + switched.stderr
+    cfg = cfg_path.read_text(encoding="utf-8")
+    preamble = cfg.split("[model_providers")[0]
+    assert 'model_provider = "minimax"' in preamble
+    assert 'model = "MiniMax-M3"' in preamble
+    parsed = tomllib.loads(cfg)
+    assert parsed["projects"]["/tmp/runtime"]["trust_level"] == "trusted"
+
+    again = _install(tmp_home, profile="minimax")
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert "unchanged" in again.stdout
+    assert tomllib.loads(cfg_path.read_text(encoding="utf-8"))["projects"]["/tmp/runtime"][
+        "trust_level"
+    ] == "trusted"
 
 
 def test_install_codex_expands_company_url(tmp_home: Path) -> None:

@@ -275,11 +275,17 @@ def _codex_factory(repo_root: Path, home: Path):
         except OverlayError as exc:
             raise ConfigDeployError(f"Codex external overlay is invalid: {exc}") from exc
 
+        actual_raw = context.actual_files.get("config.toml")
+        actual_text: str | None = None
+        if actual_raw is not None:
+            actual_text, _ = _toml_document(actual_raw, label="Codex target")
+
         outputs = [
             ProducedFile(
                 "config.toml",
-                merge_module.merge(base, profile_text, local),
+                merge_module.merge(base, profile_text, local, actual=actual_text),
                 format="toml",
+                reconcile_owned=actual_raw is not None,
             )
         ]
         for relative in sorted(catalog_paths):

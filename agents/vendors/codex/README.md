@@ -72,12 +72,13 @@ Codex 首次信任一个项目时，会自动把 `[projects."<path>"]` 追加进
 | `~/.codex/config.toml` | — | 安装时由 base + profile overlay + local **合并生成**（普通文件，非软链） |
 | `~/.codex/model-catalogs/*.json` | — | 被配置引用的 catalog；由 manifest 管理的真实文件，非软链 |
 
-`dotf codex -c` 使用默认 MiniMax；`dotf codex -f <name>` 用 `config.toml`（base）+ 选中的仓库 profile overlay + XDG overlay `codex.local_toml`（local）**重新 merge 生成** `~/.codex/config.toml`。profile 列表的当前项从已安装 `config.toml` 的 `model_provider` 推导；未安装或无法识别时确定性回退到 `minimax`。因此：
+`dotf codex -c` 使用默认 MiniMax；`dotf codex -f <name>` 用 `config.toml`（base）+ 选中的仓库 profile overlay + XDG overlay `codex.local_toml`（local）+ 已安装文件里尚未入库的 `[projects]` **重新 merge 生成** `~/.codex/config.toml`。profile 列表的当前项从已安装 `config.toml` 的 `model_provider` 推导；未安装或无法识别时确定性回退到 `minimax`。因此：
 
 - 稳定配置始终以仓库 `config.toml` 为单一来源；
 - projects 走 XDG overlay `codex.local_toml`（位于仓库外，不污染仓库）；
 - 不创建或读取 `.dotf-profile` marker；provider 选择仅体现在受管 `config.toml`；
-- codex 运行时新写入 `~/.codex/config.toml` 的信任**不会自动同步**进 local——需手动把 `[projects."<path>"]` 块加入 XDG overlay `codex.local_toml` 后重跑（否则下次安装会被覆盖，需重新确认一次，成本很低）。
+- `dotf codex -c` / `-f` 会从已安装的 `~/.codex/config.toml` **收回** Codex 运行时写入、且 overlay 尚未声明的 `[projects."<path>"]`，再套用仓库 profile。因此切 provider 不会再因「受管文件被 Codex 改过」而 `managed-target-modified`。
+- 这些运行时信任**不会自动同步**进 XDG overlay——换机或想把某条路径固化为本机来源时，仍需把对应块写入 `codex.local_toml`。overlay 与运行时同路径时，以 overlay 为准。
 
 > 这是 codex 的已知设计缺陷（[openai/codex#14601](https://github.com/openai/codex/issues/14601)、[#3120](https://github.com/openai/codex/issues/3120)），官方暂未支持 `projects` 独立文件，故由本仓库的安装脚本在外部解决。
 
@@ -97,7 +98,7 @@ dotf codex -c
 dotf codex -c
 ```
 
-（XDG overlay `codex.local_toml` 是 projects 的唯一来源，安装时会以其为准覆盖生成 `~/.codex/config.toml`。）
+（XDG overlay 是要固化的 projects 来源；安装时还会收回当前 `~/.codex/config.toml` 里 overlay 尚未声明的运行时信任。同路径冲突以 overlay 为准。）
 
 ## 模型能力目录（model catalog）
 

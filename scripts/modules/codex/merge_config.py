@@ -4,6 +4,8 @@
 Profile files (for example ``kimi.config.toml``) are merge inputs only. Their
 model / model_provider / model_catalog_json keys replace matching top-level
 keys in the base preamble; no profile auxiliary file is installed in HOME.
+When an installed ``config.toml`` is supplied, Codex-written ``[projects]``
+tables that are not already present in the managed output are harvested.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import os
 import re
 import stat
 import sys
+import tomllib
 from pathlib import Path
 
 TABLE_RE = re.compile(r"^\s*\[")
@@ -28,6 +31,8 @@ LOCAL_MARKER = (
     "\n# ============================================================\n"
     "# ↓↓↓ 以下来自 XDG dotf overlay（机器特定，不纳入 git） ↓↓↓\n"
 )
+
+PROJECT_HEADER_RE = re.compile(r"^\[projects(?:\.[^\]]*)?\]\s*$")
 
 
 def split_preamble(text: str) -> tuple[str, str]:
@@ -169,7 +174,66 @@ def expand_env(text: str, environ: dict[str, str] | None = None) -> str:
     return PLACEHOLDER_RE.sub(repl, text)
 
 
-def merge(base: str, profile: str | None, local: str | None) -> str:
+def project_keys(text: str) -> set[str]:
+    try:
+        document = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return set()
+    projects = document.get("projects")
+    if not isinstance(projects, dict):
+        return set()
+    return {str(key) for key in projects}
+
+
+def extract_project_tables(text: str) -> list[str]:
+    """Return raw ``[projects...]`` tables, omitting trailing comment footnotes."""
+    lines = text.splitlines(keepends=True)
+    blocks: list[str] = []
+    index = 0
+    while index < len(lines):
+        if not PROJECT_HEADER_RE.match(lines[index].rstrip("\n")):
+            index += 1
+            continue
+        start = index
+        index += 1
+        while index < len(lines) and not lines[index].lstrip().startswith("["):
+            index += 1
+        block_lines = lines[start:index]
+        while block_lines and block_lines[-1].lstrip().startswith("#"):
+            block_lines.pop()
+        while block_lines and not block_lines[-1].strip():
+            block_lines.pop()
+        if block_lines:
+            blocks.append("".join(block_lines).rstrip() + "\n")
+    return blocks
+
+
+def harvest_runtime_projects(managed: str, actual: str | None) -> str:
+    """Keep Codex-written ``[projects]`` that are not already in managed output."""
+    if not actual or not actual.strip():
+        return managed
+    existing = project_keys(managed)
+    extras: list[str] = []
+    for block in extract_project_tables(actual):
+        keys = project_keys(block)
+        if not keys or keys <= existing:
+            continue
+        extras.append(block if block.endswith("\n") else f"{block}\n")
+        existing |= keys
+    if not extras:
+        return managed
+    text = managed if managed.endswith("\n") else f"{managed}\n"
+    if not text.endswith("\n\n"):
+        text += "\n"
+    return text + "".join(extras)
+
+
+def merge(
+    base: str,
+    profile: str | None,
+    local: str | None,
+    actual: str | None = None,
+) -> str:
     text = overlay(base, profile or "")
     if local and local.strip():
         if not text.endswith("\n"):
@@ -177,7 +241,7 @@ def merge(base: str, profile: str | None, local: str | None) -> str:
         text += LOCAL_MARKER + local
         if not text.endswith("\n"):
             text += "\n"
-    return expand_env(text)
+    return expand_env(harvest_runtime_projects(text, actual))
 
 
 def main(argv: list[str] | None = None) -> int:
