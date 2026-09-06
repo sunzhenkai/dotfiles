@@ -108,6 +108,7 @@ class SkillsPlan:
     source_root: str
     owner_prefix: str
     identity_prefix: str
+    include_unlisted: bool
     manifest_status: Literal["missing", "ok", "malformed"]
     manifest_digest: str | None
     prior_manifest: ManagedManifest
@@ -302,6 +303,7 @@ def collect_runtime_files(
     source_root: Path | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
+    include_unlisted: bool = False,
 ) -> tuple[RuntimeFile, ...]:
     policy = load_runtime_policy(root)
     source_root = source_root or root / "agents" / "skills"
@@ -310,6 +312,29 @@ def collect_runtime_files(
     target_base = assert_path_confined(home, target_root)
     result: list[RuntimeFile] = []
     targets: set[str] = set()
+    declared = set(policy.files) | set(policy.sidecars) | set(policy.excluded)
+
+    def add_file(source: Path, relative: PurePosixPath, content: bytes) -> None:
+        target = assert_path_confined(home, target_base / Path(relative))
+        try:
+            target.relative_to(target_base)
+        except ValueError as exc:
+            raise AgentRuntimeError(f"runtime target escapes skills root: {target}") from exc
+        identity = (Path(identity_prefix) / Path(relative)).as_posix()
+        mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
+        item = RuntimeFile(owner, str(target), identity, _sha256(content), content, mode)
+        if item.target in targets:
+            raise AgentRuntimeError(f"runtime allowlist produced duplicate target: {item.target}")
+        targets.add(item.target)
+        result.append(item)
+
+    def add_directory(source_dir: Path, prefix: PurePosixPath) -> None:
+        if source_dir.is_symlink() or not source_dir.is_dir():
+            raise AgentRuntimeError(f"runtime sidecar is not a real directory: {source_dir}")
+        for source in _source_files(source_dir):
+            nested = source.relative_to(source_dir)
+            add_file(source, prefix / PurePosixPath(nested.as_posix()), source.read_bytes())
+
     for skill_dir in sorted(source_root.iterdir()):
         if not skill_dir.is_dir() or skill_dir.is_symlink():
             continue
@@ -325,41 +350,24 @@ def collect_runtime_files(
                     raise AgentRuntimeError(f"runtime file is missing or unsafe: {source}")
                 continue
             content = render_skill(skill_dir, skill_id) if filename == "SKILL.md" else source.read_bytes()
-            relative = PurePosixPath(skill_id) / filename
-            target = assert_path_confined(home, target_base / Path(relative))
-            try:
-                target.relative_to(target_base)
-            except ValueError as exc:
-                raise AgentRuntimeError(f"runtime target escapes skills root: {target}") from exc
-            identity = (Path(identity_prefix) / Path(relative)).as_posix()
-            mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
-            item = RuntimeFile(owner, str(target), identity, _sha256(content), content, mode)
-            if item.target in targets:
-                raise AgentRuntimeError(f"runtime allowlist produced duplicate target: {item.target}")
-            targets.add(item.target)
-            result.append(item)
+            add_file(source, PurePosixPath(skill_id) / filename, content)
         for sidecar in policy.sidecars:
             source_dir = skill_dir / sidecar
             if not source_dir.exists():
                 continue
-            if source_dir.is_symlink() or not source_dir.is_dir():
-                raise AgentRuntimeError(f"runtime sidecar is not a real directory: {source_dir}")
-            for source in _source_files(source_dir):
-                nested = source.relative_to(source_dir)
-                relative = PurePosixPath(skill_id) / sidecar / PurePosixPath(nested.as_posix())
-                target = assert_path_confined(home, target_base / Path(relative))
-                try:
-                    target.relative_to(target_base)
-                except ValueError as exc:
-                    raise AgentRuntimeError(f"runtime target escapes skills root: {target}") from exc
-                identity = (Path(identity_prefix) / Path(relative)).as_posix()
-                content = source.read_bytes()
-                mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
-                item = RuntimeFile(owner, str(target), identity, _sha256(content), content, mode)
-                if item.target in targets:
-                    raise AgentRuntimeError(f"runtime allowlist produced duplicate target: {item.target}")
-                targets.add(item.target)
-                result.append(item)
+            add_directory(source_dir, PurePosixPath(skill_id) / sidecar)
+        if include_unlisted:
+            for child in sorted(skill_dir.iterdir(), key=lambda path: path.name):
+                if child.name in declared or child.name.startswith("."):
+                    continue
+                if child.is_symlink():
+                    raise AgentRuntimeError(f"runtime source contains symlink: {child}")
+                if child.is_file():
+                    add_file(child, PurePosixPath(skill_id) / child.name, child.read_bytes())
+                elif child.is_dir():
+                    add_directory(child, PurePosixPath(skill_id) / child.name)
+                else:
+                    raise AgentRuntimeError(f"runtime source contains unsupported entry: {child}")
     return tuple(sorted(result, key=lambda item: item.target))
 
 
@@ -448,6 +456,7 @@ def compile_skills_plan(
     source_root: Path | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
+    include_unlisted: bool = False,
 ) -> SkillsPlan:
     """Compile expected first-party runtime and ownership decisions without writes."""
     repo = root.expanduser().absolute()
@@ -461,6 +470,7 @@ def compile_skills_plan(
         source_root=resolved_source_root,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
+        include_unlisted=include_unlisted,
     )
     snapshot = _read_manifest(base_home, state)
     prior_by_target = {
@@ -578,6 +588,7 @@ def compile_skills_plan(
         str(resolved_source_root),
         owner_prefix,
         identity_prefix,
+        include_unlisted,
         snapshot.status,
         snapshot.digest,
         snapshot.manifest,
@@ -843,6 +854,7 @@ def apply_skills_plan(
             state_home=state_home, target_root=target_root,
             source_root=Path(plan.source_root), owner_prefix=plan.owner_prefix,
             identity_prefix=plan.identity_prefix,
+            include_unlisted=plan.include_unlisted,
         )
         if _expected_signature(current) != _expected_signature(plan):
             raise AgentRuntimeConflict("runtime source changed after planning")

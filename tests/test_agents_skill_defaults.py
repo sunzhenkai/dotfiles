@@ -21,13 +21,20 @@ def _load(name: str):
     return importlib.import_module(name)
 
 
-def test_repository_defaults_use_empty_strict_lock_without_invented_approvals() -> None:
+def test_repository_defaults_match_strict_lock_without_first_party_overlap() -> None:
     defaults = _load("defaults")
     lock = defaults.load_catalog(ROOT)
+    catalog = yaml.safe_load((ROOT / "agents" / "skills-defaults.yaml").read_text())
+    ids = [item.id for item in lock.skills]
     assert lock.kind == "third-party-skills-lock"
     assert lock.schema_version == 1
-    assert lock.skills == ()
-    assert yaml.safe_load((ROOT / "agents" / "skills-defaults.yaml").read_text())["skills"] == []
+    assert catalog["skills"] == ids
+    assert "ui-template-apply" in ids
+    assert "ui-template-author" in ids
+    assert "setup-matt-pocock-skills" in ids
+    assert "ask-matt" not in ids
+    assert set(ids).isdisjoint(defaults.first_party_skill_ids(ROOT))
+    assert all(item.audit.status == "approved" for item in lock.skills)
 
 
 def test_unlocked_or_floating_catalog_fails_closed(tmp_path: Path) -> None:
@@ -159,3 +166,56 @@ def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownershi
     assert defaults.install_defaults(repo, dest_roots=(shared_destination, kiro_destination)) == 0
     assert shared_target.stat().st_mtime_ns == shared_before
     assert kiro_target.stat().st_mtime_ns == kiro_before
+
+
+def test_third_party_install_copies_unlisted_runtime_files(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    (skill / "catalog").mkdir(parents=True)
+    (skill / "runtime").mkdir()
+    (skill / "patches").mkdir()
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    (skill / "catalog" / "index.md").write_text("catalog\n", encoding="utf-8")
+    (skill / "runtime" / "validate.py").write_text("print(1)\n", encoding="utf-8")
+    (skill / "template.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    (skill / "patches" / "private.txt").write_text("authoring\n", encoding="utf-8")
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    content_hash = third_party.tree_hash(skill)
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    (repo / "agents" / "skills-defaults.yaml").write_text(
+        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
+    )
+    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+        "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
+        "  - id: demo\n    source: https://github.com/example/demo\n"
+        f"    revision: '{revision}'\n    subdirectory: skill\n    content_hash: {content_hash}\n"
+        f"    license: {{spdx: MIT, file: LICENSE, hash: {license_hash}}}\n"
+        "    audit: {status: approved, date: '2026-09-04', tool: test-review-v1, evidence: https://example.com/audit/demo}\n",
+        encoding="utf-8",
+    )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    installed = destination / "demo"
+    assert (installed / "SKILL.md").is_file()
+    assert (installed / "catalog" / "index.md").read_text() == "catalog\n"
+    assert (installed / "runtime" / "validate.py").read_text() == "print(1)\n"
+    assert (installed / "template.sh").is_file()
+    assert not (installed / "patches").exists()

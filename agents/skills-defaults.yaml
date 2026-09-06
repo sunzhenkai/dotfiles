@@ -1,6 +1,19 @@
 # Third-party defaults are selected only by id; every selected id must have an
-# approved immutable entry in skills-defaults.lock.yaml. No current catalog
-# entry has repository-verifiable audit approval, so the safe default is empty.
+# approved immutable entry in skills-defaults.lock.yaml.
 version: 2
 lock: skills-defaults.lock.yaml
-skills: []
+skills:
+  - code-review
+  - codebase-design
+  - diagnosing-bugs
+  - domain-modeling
+  - grill-with-docs
+  - implement
+  - research
+  - setup-matt-pocock-skills
+  - tdd
+  - to-spec
+  - to-tickets
+  - ui-template-apply
+  - ui-template-author
+  - wayfinder

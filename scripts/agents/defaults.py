@@ -139,6 +139,7 @@ def install_defaults(
                     identity_prefix=(
                         f"agents/skills-defaults.lock.yaml@{lock.digest}{identity_suffix}"
                     ),
+                    include_unlisted=True,
                 )
                 result = apply_skills_plan(plan, renderer)
                 print(
