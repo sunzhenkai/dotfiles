@@ -138,6 +138,7 @@ modules:
     group: agents
     install: true
     doctor: true
+    enabled: false   # archived
 
   - name: dsh
     desc: 安装 DeepSeek Harness CLI（dsh，npm @deepseek-ai/dsh）
@@ -574,6 +575,7 @@ modules:
       preserve: [cache, data, history, db, dictionaries]
       exclude: [conf/cached_layouts]
     os: [linux]
+    enabled: false   # archived
 
   # ---------- config-only: tools ----------
   - name: yazi
@@ -610,6 +612,7 @@ modules:
     desc: Shell-GPT 配置
     group: utils
     doctor: true
+    enabled: false   # archived
     config:
       source: config/tools/shell_gpt
       target: ~/.config/shell_gpt
@@ -624,6 +627,7 @@ modules:
     desc: Logseq 笔记配置（~/.logseq 为真实目录，禁止整树软链）
     group: utils
     doctor: true
+    enabled: false   # archived
     config:
       source: config/tools/logseq
       target: ~/.logseq

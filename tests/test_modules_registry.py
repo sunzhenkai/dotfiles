@@ -86,12 +86,28 @@ def test_os_filter_config_modules() -> None:
     }
 
     assert "hypr" in linux_cfg
-    assert "fcitx5" in linux_cfg
+    # fcitx5 已归档：注册表保留 OS 能力，但不进默认列表。
+    assert "fcitx5" not in linux_cfg
     assert "iterm2" not in linux_cfg
 
     assert "iterm2" in darwin_cfg
     assert "hypr" not in darwin_cfg
     assert "fcitx5" not in darwin_cfg
+
+    linux_all_cfg = {
+        m["name"]
+        for m in modules.filter_modules(
+            mods, capability="config", os_id="linux", include_disabled=True
+        )
+    }
+    darwin_all_cfg = {
+        m["name"]
+        for m in modules.filter_modules(
+            mods, capability="config", os_id="darwin", include_disabled=True
+        )
+    }
+    assert "fcitx5" in linux_all_cfg
+    assert "fcitx5" not in darwin_all_cfg
 
     # 全平台模块两侧都应存在
     assert "nvim" in linux_cfg and "nvim" in darwin_cfg
@@ -100,12 +116,17 @@ def test_os_filter_config_modules() -> None:
 def test_disabled_modules_excluded_from_default_lists() -> None:
     mods = modules.load_registry()
     cpp = modules.find_module(mods, "cpp-dev")
+    archived_names = ("trae-cli", "fcitx5", "shell_gpt", "logseq")
     zcode = modules.find_module(mods, "zcode")
     kiro = modules.find_module(mods, "kiro")
     # 已移除的 vendor 不再注册
     for removed in ("claude", "qoder", "codebuddy-code", "minimax"):
         assert modules.find_module(mods, removed) is None
     assert cpp and not modules.is_enabled(cpp)
+    for name in archived_names:
+        module = modules.find_module(mods, name)
+        assert module is not None, name
+        assert not modules.is_enabled(module), name
     assert zcode and modules.is_enabled(zcode)
     assert kiro and modules.is_enabled(kiro)
     assert zcode.get("config")
