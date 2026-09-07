@@ -302,6 +302,13 @@ def _check_skills_plan(
 ) -> None:
     """Reuse the runtime planner; never approximate manifest/target drift."""
     try:
+        from desired_set import DesiredSetError, resolve_skill_desired_set
+
+        only_ids = None
+        try:
+            only_ids = resolve_skill_desired_set(root, home=home)
+        except DesiredSetError:
+            only_ids = None
         plan = compile_skills_plan(
             root,
             renderer,
@@ -312,6 +319,7 @@ def _check_skills_plan(
             identity_prefix=(
                 "agents/skills" if owner_prefix == "agents:skill:" else KIRO_SKILL_IDENTITY_PREFIX
             ),
+            only_ids=only_ids,
         )
     except (AgentRuntimeError, OSError, SystemExit, ValueError) as exc:
         planner_id = "planner" if label == "shared" else f"{label}-planner"

@@ -84,3 +84,21 @@ skills/commands runtime bundle 安装 SHALL 记录本系统拥有的目标、来
 - **WHEN** sync 安装第三方 skill
 - **THEN** 获取内容 SHALL 与 lock 中的 revision 和 hash 一致
 - **THEN** 不一致或审计未通过时 SHALL 在写入目标前失败
+
+### Requirement: sync 遵守本机 Skill Desired Set
+普通 skills sync SHALL 只安装当前 Desired Set 中的 Skill。从 Desired Set 移除且目标仍等于上次受管 hash 的 owned 副本 SHALL 被 prune。用户修改过的副本 SHALL 报 Conflict 且不得静默删除。OpenSpec 生成的已安装 skill SHALL 不被本 sync 当作 Desired Set 条目增删。
+
+#### Scenario: 停用的一手 skill 被 prune
+- **WHEN** overlay 停用 `grill-with-docs` 且 HOME 副本 owned 且未漂
+- **THEN** `dotf agents -c` SHALL 删除该 owned 目标
+- **THEN** SHALL 更新 managed manifest
+
+#### Scenario: 停用但已修改则 Conflict
+- **WHEN** overlay 停用某 Skill 且 HOME 副本 hash 已漂
+- **THEN** sync SHALL 报告 Conflict
+- **THEN** SHALL NOT 删除该目标
+
+#### Scenario: 未锁定内容仍拒绝
+- **WHEN** Desired Set 因错误 overlay 引用了未锁定第三方
+- **THEN** sync SHALL 在写入目标前失败
+- **THEN** SHALL NOT 从浮动上游安装

@@ -45,7 +45,9 @@ OS_PROFILES = [
     "darwin",
 ]
 
-ACTIONS = ("install", "config", "doctor")
+ACTIONS = ("install", "config", "doctor", "uninstall")
+HANDLER_ACTIONS = ACTIONS
+# deconfig 由 config 隐含，不要求专用 handler
 
 CONFIG_STRATEGIES = frozenset({"copy", "merge", "render", "symlink"})
 CONFIG_KEYS = frozenset(
@@ -242,6 +244,14 @@ def has_doctor(mod: dict[str, Any]) -> bool:
     return bool(mod.get("doctor"))
 
 
+def has_uninstall(mod: dict[str, Any]) -> bool:
+    return bool(mod.get("uninstall"))
+
+
+def has_deconfig(mod: dict[str, Any]) -> bool:
+    return has_config(mod)
+
+
 def is_enabled(mod: dict[str, Any]) -> bool:
     """enabled 缺省为 true；显式 false 时不参与自动全集/profile/--all。"""
     return mod.get("enabled", True) is not False
@@ -264,6 +274,31 @@ def module_depends_on(mod: dict[str, Any]) -> list[str]:
     if not isinstance(raw, list):
         return []
     return [str(x) for x in raw]
+
+
+def module_dependents(
+    registry: list[dict[str, Any]], name: str, *, transitive: bool = True
+) -> list[str]:
+    """Modules that depend on *name*, declaration order, unique."""
+    by_name = {mod["name"]: mod for mod in registry if mod.get("name")}
+    direct: dict[str, list[str]] = {key: [] for key in by_name}
+    for mod_name, mod in by_name.items():
+        for dep in module_depends_on(mod):
+            if dep in direct:
+                direct[dep].append(mod_name)
+    if not transitive:
+        return list(direct.get(name, []))
+    ordered: list[str] = []
+    seen: set[str] = set()
+    stack = list(direct.get(name, []))
+    while stack:
+        current = stack.pop(0)
+        if current in seen:
+            continue
+        seen.add(current)
+        ordered.append(current)
+        stack.extend(direct.get(current, []))
+    return ordered
 
 
 def module_group(mod: dict[str, Any]) -> str:
@@ -294,6 +329,10 @@ def filter_modules(
         if capability == "config" and not has_config(mod):
             continue
         if capability == "doctor" and not has_doctor(mod):
+            continue
+        if capability == "uninstall" and not has_uninstall(mod):
+            continue
+        if capability == "deconfig" and not has_deconfig(mod):
             continue
         if capability == "both" and not (has_install(mod) and has_config(mod)):
             continue
@@ -529,6 +568,8 @@ def validate_registry(
             errors.append(f"{name}: install 必须为 bool")
         if "doctor" in mod and not isinstance(mod["doctor"], bool):
             errors.append(f"{name}: doctor 必须为 bool")
+        if "uninstall" in mod and not isinstance(mod["uninstall"], bool):
+            errors.append(f"{name}: uninstall 必须为 bool")
         if "enabled" in mod and not isinstance(mod["enabled"], bool):
             errors.append(f"{name}: enabled 必须为 bool")
         if "bin" in mod and mod["bin"] is not None and not isinstance(mod["bin"], str):
@@ -610,18 +651,19 @@ def validate_registry(
     # 处理器声明一致性（迁移模式默认关闭严格失败）
     if hdir.is_dir() or strict_handlers:
         for name, mod in by_name.items():
-            for action in ACTIONS:
+            for action in HANDLER_ACTIONS:
                 declared = (
                     (action == "install" and has_install(mod))
                     or (action == "config" and has_config(mod))
                     or (action == "doctor" and has_doctor(mod))
+                    or (action == "uninstall" and has_uninstall(mod))
                 )
                 path = hdir / name / f"{action}.sh"
                 exists = path.is_file()
                 if declared and not exists and strict_handlers:
-                    # Config has a registry-backed generic fallback; install is
-                    # executable behavior and therefore still requires a handler.
-                    if action == "install":
+                    # Config has a registry-backed generic fallback; install and
+                    # uninstall are executable behavior and require a handler.
+                    if action in {"install", "uninstall"}:
                         errors.append(
                             f"{name}: 声明 {action} 但缺少处理器 "
                             f"scripts/modules/{name}/{action}.sh"
@@ -667,6 +709,8 @@ def cmd_get(args: argparse.Namespace) -> int:
         caps.append("config")
     if has_doctor(mod):
         caps.append("doctor")
+    if has_uninstall(mod):
+        caps.append("uninstall")
     print(f"name={mod['name']}")
     print(f"desc={mod.get('desc', '')}")
     print(f"capabilities={','.join(caps)}")
@@ -709,6 +753,10 @@ def cmd_has(args: argparse.Namespace) -> int:
         return 0 if has_config(mod) else 1
     if args.capability == "doctor":
         return 0 if has_doctor(mod) else 1
+    if args.capability == "uninstall":
+        return 0 if has_uninstall(mod) else 1
+    if args.capability == "deconfig":
+        return 0 if has_deconfig(mod) else 1
     return 1
 
 
@@ -814,7 +862,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="dotfiles 模块注册表 API")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    cap_choices = ["install", "config", "doctor", "both"]
+    cap_choices = ["install", "config", "doctor", "uninstall", "deconfig", "both"]
 
     p_list = sub.add_parser("list", help="列出模块名")
     p_list.add_argument(
@@ -848,7 +896,10 @@ def main() -> int:
 
     p_has = sub.add_parser("has", help="检查能力（exit 0/1）")
     p_has.add_argument("name")
-    p_has.add_argument("capability", choices=["install", "config", "doctor"])
+    p_has.add_argument(
+        "capability",
+        choices=["install", "config", "doctor", "uninstall", "deconfig"],
+    )
     p_has.set_defaults(func=cmd_has)
 
     p_exists = sub.add_parser("exists", help="模块是否存在（exit 0/1）")

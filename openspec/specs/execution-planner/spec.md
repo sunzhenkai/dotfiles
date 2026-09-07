@@ -4,7 +4,7 @@
 TBD - created by archiving change overhaul-dotfiles-lifecycle. Update Purpose after archive.
 ## Requirements
 ### Requirement: 所有入口共享执行计划
-系统 SHALL 使用同一 planner 为 `init`、全量动作、交互选择、显式模块动作和 retry 生成带版本的完整执行计划。计划 SHALL 在执行前完成严格注册表、能力、OS、profile、依赖和动作 schema 校验。执行器 SHALL 仅接受 planner 成功产生且具有唯一成功标记、受支持版本和完整字段的计划；任何生成、读取或校验异常 SHALL fail-closed。
+系统 SHALL 使用同一 planner 为 `init`、全量动作、交互选择、显式模块动作、TUI 提交、反向动作和 retry 生成带版本的完整执行计划。计划 SHALL 在执行前完成严格注册表、能力、OS、profile、依赖和动作 schema 校验。执行器 SHALL 仅接受 planner 成功产生且具有唯一成功标记、受支持版本和完整字段的计划；任何生成、读取或校验异常 SHALL fail-closed。
 
 #### Scenario: 不同入口选择同一模块集合
 - **WHEN** 两个入口在相同 OS、profile、模块和动作输入下生成计划
@@ -27,6 +27,10 @@ TBD - created by archiving change overhaul-dotfiles-lifecycle. Update Purpose af
 - **WHEN** 注册表包含缺失 handler、非法部署策略或冲突安全元数据
 - **THEN** planner SHALL 非零失败
 - **THEN** SHALL NOT 产生可执行计划
+
+#### Scenario: TUI 入口也走 planner
+- **WHEN** 用户从 TUI 确认一组模块动作
+- **THEN** 执行器 SHALL 只接受本次 planner 成功产生的计划
 
 ### Requirement: 依赖展开与稳定拓扑排序
 planner SHALL 递归展开模块 `depends_on`，保证依赖动作先于依赖方，并检测未知依赖和依赖环。无依赖约束的模块 SHALL 按注册表声明顺序保持稳定。
@@ -92,3 +96,28 @@ planner SHALL 递归展开模块 `depends_on`，保证依赖动作先于依赖�
 #### Scenario: 跨 OS 实际执行
 - **WHEN** 用户在 Linux 上请求执行 Darwin 计划
 - **THEN** 系统 SHALL 在任何动作前失败并说明 OS 不一致
+
+### Requirement: 反向动作纳入同一 planner
+planner SHALL 为 uninstall、deconfig 以及 Skill / MCP 的 apply / remove 生成带版本的完整执行计划，并完成与 install/config/doctor 相同的严格校验。TUI 与 CLI 在相同输入下 SHALL 得到相同顺序的计划。uninstall 计划 SHALL 在执行前解析反向依赖：存在计划外 Dependent 时失败。apply / remove 计划 SHALL 同时包含 overlay 变更与对应 sync / prune 步骤。
+
+#### Scenario: TUI 与 CLI 计划一致
+- **WHEN** TUI 与 CLI 对同一模块请求 deconfig 且 OS / profile 相同
+- **THEN** 两份计划 SHALL 包含相同且顺序一致的动作
+
+#### Scenario: uninstall 因 Dependent 失败
+- **WHEN** 计划包含 `sdk` 的 uninstall，且存在计划外 Dependent
+- **THEN** planner SHALL 在执行前以非零失败
+- **THEN** SHALL NOT 产生可执行计划
+
+#### Scenario: remove 含 overlay 与 prune
+- **WHEN** 用户请求 remove 一条 Skill
+- **THEN** 计划 SHALL 包含写入 Desired Set 的步骤
+- **THEN** 计划 SHALL 包含对该 Skill owned 目标的 prune 或 Conflict 报告
+- **THEN** dry-run SHALL 展示这两步且不写盘
+
+### Requirement: 反向动作失败传播
+uninstall 或 deconfig 失败时，默认执行 SHALL 停止调度新动作，并将依赖这些结果的后续步骤标为 blocked。retry SHALL 能从最近摘要重试这些 failed 动作，且必须重新经过 planner。
+
+#### Scenario: deconfig 失败可 retry
+- **WHEN** `nvim` 的 deconfig 失败并记入最近摘要
+- **THEN** `dotf retry` SHALL 经 planner 重新生成仅含该失败动作的计划（能力仍满足时）

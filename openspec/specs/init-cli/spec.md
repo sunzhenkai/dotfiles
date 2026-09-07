@@ -183,3 +183,74 @@ CLI SHALL 提供 `dotf status` 与 `dotf retry` 独立命令，并支持适用�
 #### Scenario: 命令与动作混用
 - **WHEN** 用户将 `status` 或 `retry` 与模块动作旗标以不兼容方式混用
 - **THEN** CLI SHALL 在执行前以非零退出并显示正确用法
+
+### Requirement: 模块反动作旗标
+CLI SHALL 支持对已选模块请求 `--uninstall` 与 `--deconfig`（可与长选项等价形式并存）。这些动作 SHALL 走同一 planner / 确认 / runner，并支持 `--dry-run` 与 `--yes`。`--uninstall` 与 `--deconfig` SHALL NOT 与 `-i`/`-c`/`-d` 组合成新的隐式生命周期；用户要组合时 MUST 显式同时给出所请求的动作。无参数 `dotf` SHALL 仍显示帮助，其中包含反动作与 `tui`。
+
+#### Scenario: 卸载指定模块
+- **WHEN** 用户运行 `dotf grepom --uninstall --dry-run`
+- **THEN** planner SHALL 生成仅含该模块 uninstall（及因 Dependent 规则所需的校验）的计划
+- **THEN** SHALL NOT 执行卸载
+
+#### Scenario: 撤配置
+- **WHEN** 用户运行 `dotf nvim --deconfig --yes`
+- **THEN** 系统 SHALL 在计划校验成功后非交互执行 deconfig
+- **THEN** SHALL 遵守 owned / Conflict 规则
+
+#### Scenario: 未声明 uninstall 报错
+- **WHEN** 用户运行 `dotf nvim --uninstall`
+- **THEN** CLI SHALL 以非零退出并说明该模块无卸载步骤
+
+#### Scenario: 帮助列出新入口
+- **WHEN** 用户运行 `dotf -h`
+- **THEN** 帮助 SHALL 包含 `--uninstall`、`--deconfig` 与 `tui`
+
+### Requirement: tui 子命令
+CLI SHALL 将 `tui` 识别为独立命令，与 `status`、`retry`、`init` 一样不与模块动作旗标混淆。`dotf tui` SHALL 委托 TUI 实现；非 TTY SHALL 失败。
+
+#### Scenario: tui 不与 -i 混用
+- **WHEN** 用户运行 `dotf tui -i`
+- **THEN** CLI SHALL 在执行前以非零退出并显示正确用法
+
+#### Scenario: tui 委托
+- **WHEN** 用户在 TTY 运行 `dotf tui`
+- **THEN** CLI SHALL 打开 TUI 而不进入编号交互选择
+
+### Requirement: tui 子命令为 manager 模式
+`dotf tui` SHALL 进入 manager 模式（见 `dotf-tui-manager` spec）：五类顶部 tab、单行一项、动作键即时触发、批量走 plan、状态只读回显。非 TTY SHALL 失败；缺 Textual SHALL 失败并提示用户级安装。`dotf tui` SHALL NOT 在打开时修改 HOME、overlay、state、manifest 或仓库。
+
+#### Scenario: TTY 下进入 manager
+- **WHEN** 用户在 TTY 运行 `dotf tui`
+- **THEN** CLI SHALL 打开 manager TUI
+- **THEN** SHALL NOT 进入 Bash 编号点选交互选择
+
+#### Scenario: 非 TTY 拒绝
+- **WHEN** 用户在非 TTY 环境运行 `dotf tui`
+- **THEN** CLI SHALL 以非零退出并提示改用 CLI 动词
+
+#### Scenario: 缺依赖拒绝
+- **WHEN** 运行环境无 Textual
+- **THEN** CLI SHALL 以非零退出
+- **THEN** 错误 SHALL 给出用户级安装提示（不写系统包默认路径）
+
+#### Scenario: tui 不与 -i 混用
+- **WHEN** 用户运行 `dotf tui -i`
+- **THEN** CLI SHALL 在执行前以非零退出并显示正确用法
+
+#### Scenario: 打开时只读
+- **WHEN** TUI 启动
+- **THEN** SHALL NOT 触发任何 install / config / apply / remove
+- **THEN** SHALL NOT 写 HOME、overlay、state、manifest
+
+### Requirement: tui 帮助条目与拼写
+无参数 `dotf` 与 `dotf -h` SHALL 在帮助中列出 `tui`（manager 模式）入口与一句话说明。误输入 `dotf tui --install` 等混用 SHALL 在执行前以非零退出并显示正确用法。
+
+#### Scenario: 帮助列出 tui
+- **WHEN** 用户运行 `dotf`（无参数）或 `dotf -h`
+- **THEN** 帮助 SHALL 包含 `tui` 入口与"manager 模式"说明
+- **THEN** SHALL 同时列出 `--uninstall`、`--deconfig` 与 `status`、`retry`、`init`
+
+#### Scenario: 错误混用
+- **WHEN** 用户运行 `dotf tui --install`
+- **THEN** CLI SHALL 以非零退出
+- **THEN** 错误 SHALL 提示正确用法与「TUI 由快捷键触发动作」

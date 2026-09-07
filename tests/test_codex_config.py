@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import subprocess
 import sys
 import tomllib
@@ -154,6 +155,10 @@ def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
     (codex_home / "auth.json").write_text('{"token":"local-only"}\n', encoding="utf-8")
     (codex_home / "history.jsonl").write_text('{"local":true}\n', encoding="utf-8")
     (codex_home / "sessions" / "local.json").write_text("{}\n", encoding="utf-8")
+    sock = codex_home / "app-server-control" / "app-server-control.sock"
+    sock.parent.mkdir(parents=True)
+    os.mknod(sock, mode=stat.S_IFSOCK | 0o600)
+    (codex_home / "state_5.sqlite").write_bytes(b"runtime-db")
 
     first = _install(tmp_home)
     assert first.returncode == 0, first.stdout + first.stderr
@@ -177,6 +182,8 @@ def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
     assert (codex_home / "auth.json").read_text(encoding="utf-8") == '{"token":"local-only"}\n'
     assert (codex_home / "history.jsonl").read_text(encoding="utf-8") == '{"local":true}\n'
     assert (codex_home / "sessions" / "local.json").is_file()
+    assert stat.S_ISSOCK(sock.lstat().st_mode)
+    assert (codex_home / "state_5.sqlite").read_bytes() == b"runtime-db"
     assert not (codex_home / ".dotf-profile").exists()
     for profile in list_profiles(VENDOR):
         assert not (codex_home / f"{profile}.config.toml").exists()

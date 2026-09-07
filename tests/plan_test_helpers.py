@@ -42,6 +42,10 @@ def write_test_plan(
         item: dict = {"name": name, "doctor": True}
         if "install" in caps.get(name, set()):
             item["install"] = True
+        if "uninstall" in caps.get(name, set()):
+            item["uninstall"] = True
+        if "deconfig" in caps.get(name, set()):
+            pass  # deconfig is generic; no registry marker
         if "config" in caps.get(name, set()):
             source = sources / f"{name}.conf"
             source.write_text(f"fixture {name}\n", encoding="utf-8")

@@ -23,6 +23,14 @@ properties:
         type: array
         uniqueItems: true
         items: {type: string}
+      enabled_skills:
+        type: array
+        uniqueItems: true
+        items: {type: string}
+      disabled_skills:
+        type: array
+        uniqueItems: true
+        items: {type: string}
       browser:
         additionalProperties: false
         type: object

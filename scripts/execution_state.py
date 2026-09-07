@@ -173,7 +173,7 @@ def _validate_action(value: Any, *, terminal: bool) -> dict[str, Any]:
     _exact(value, ACTION_KEYS, "action")
     _integer(value["index"], "action.index")
     _text(value["module"], "action.module")
-    if value["action"] not in plan_protocol.ACTION_ORDER:
+    if value["action"] not in plan_protocol.ALL_ACTIONS:
         raise StateError("action.action 不受支持")
     allowed = TERMINAL_ACTION_STATES if terminal else ACTION_STATES
     if value["status"] not in allowed:
@@ -218,7 +218,7 @@ def _validate_journal(value: dict[str, Any], *, require_complete: bool | None = 
         _exact(current, CURRENT_KEYS, "current_action")
         _integer(current["index"], "current_action.index")
         _text(current["module"], "current_action.module")
-        if current["action"] not in plan_protocol.ACTION_ORDER:
+        if current["action"] not in plan_protocol.ALL_ACTIONS:
             raise StateError("current_action.action 无效")
     actions = value["actions"]
     if not isinstance(actions, list):

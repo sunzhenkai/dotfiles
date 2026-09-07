@@ -357,6 +357,133 @@ cmd_status() {
 }
 
 # 重试最近报告中的 failed 动作
+cmd_tui() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      echo "用法: dotf tui"
+      echo "  需要 TTY；缺 Textual 时失败并提示用户级安装"
+      echo "  提交后走与 CLI 相同的计划确认（/dev/tty）"
+      exit 0
+      ;;
+    -i | -c | -d | --install | --config | --doctor | --uninstall | --deconfig | -ic | -id | -cd | -icd | -a | --all)
+      echo "错误: tui 为独立命令，不能与动作旗标混用"
+      echo "请改用 CLI，例如: dotf nvim --deconfig 或 dotf agents skill apply <id>"
+      exit 1
+      ;;
+    *)
+      echo "错误: tui 不接受参数 '$1'"
+      echo "请改用 CLI 动词"
+      exit 1
+      ;;
+    esac
+    shift
+  done
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    echo "错误: dotf tui 需要 TTY。请改用 CLI，例如: dotf nvim --deconfig 或 dotf agents skill apply <id>" >&2
+    exit 2
+  fi
+  PYTHONPATH="$SCRIPT_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -m dotf_tui
+}
+
+cmd_agents_artifact() {
+  local kind="$1"
+  shift
+  local verb="${1:-}"
+  if [ -z "$verb" ]; then
+    echo "用法: dotf agents $kind apply|remove <id>"
+    exit 1
+  fi
+  shift
+  case "$kind" in
+  skill | mcp) ;;
+  *)
+    echo "错误: 未知 agents 制品 '$kind'"
+    exit 1
+    ;;
+  esac
+  case "$verb" in
+  apply | remove) ;;
+  *)
+    echo "用法: dotf agents $kind apply|remove <id>"
+    exit 1
+    ;;
+  esac
+
+  local id=""
+  local tool=""
+  local all_tools=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --tool)
+      shift
+      if [ -z "${1:-}" ]; then
+        echo "错误: --tool 需要参数"
+        exit 1
+      fi
+      tool="$1"
+      ;;
+    --all-tools)
+      all_tools=1
+      ;;
+    --yes | -y)
+      DOTF_YES=1
+      ;;
+    --dry-run)
+      DOTF_DRY_RUN=1
+      ;;
+    --continue-on-error)
+      DOTF_CONTINUE_ON_ERROR=1
+      ;;
+    --json)
+      DOTF_JSON=1
+      ;;
+    -*)
+      echo "错误: 未知选项 '$1'"
+      exit 1
+      ;;
+    *)
+      if [ -n "$id" ]; then
+        echo "错误: 多余参数 '$1'"
+        exit 1
+      fi
+      id="$1"
+      ;;
+    esac
+    shift
+  done
+  if [ -z "$id" ]; then
+    echo "错误: 需要 ${kind} id"
+    exit 1
+  fi
+
+  local action selector
+  if [ "$kind" = "skill" ]; then
+    if [ -n "$tool" ] || [ "$all_tools" -eq 1 ]; then
+      echo "错误: skill apply/remove 以本机为粒度，不接受 --tool/--all-tools"
+      exit 1
+    fi
+    action="skill.$verb"
+    selector="skill:$id"
+  else
+    if [ "$all_tools" -eq 1 ] && [ -n "$tool" ]; then
+      echo "错误: --tool 与 --all-tools 不能同时使用"
+      exit 1
+    fi
+    if [ "$all_tools" -eq 0 ] && [ -z "$tool" ]; then
+      echo "错误: mcp 需要 --tool <tool> 或显式 --all-tools"
+      exit 1
+    fi
+    action="mcp.$verb"
+    if [ "$all_tools" -eq 1 ]; then
+      selector="mcp:*/$id"
+    else
+      selector="mcp:$tool/$id"
+    fi
+  fi
+  plan_and_run "$action" --modules "$selector"
+}
+
 cmd_retry() {
   # shellcheck source=/dev/null
   source "$SCRIPT_DIR/scripts/lib/report.sh"
@@ -626,9 +753,11 @@ show_help() {
   echo "dotf — Dotfiles 管理工具"
   echo ""
   echo "用法: dotf <module...> -i|-c|-d|-ic|-id|-cd|-icd"
+  echo "      dotf <module...> --uninstall|--deconfig"
   echo "      dotf -i|-c|-d|...             # 无模块 → 交互选择"
   echo "      dotf -i -a | -c -a | -d -a    # 全量（按当前 OS 过滤）"
   echo "      dotf -a                       # 全量安装 + 配置（不含 doctor）"
+  echo "      dotf tui                      # TTY 管理面（同一 planner）"
   echo "      dotf <命令> [参数...]"
   echo ""
   echo "命令:"
@@ -636,6 +765,7 @@ show_help() {
   echo "                              按 OS + 使用场景 profile 初始化"
   echo "  status [--profile <name>]   只读环境状态（L0）"
   echo "  retry                       重试最近报告中的 failed 动作"
+  echo "  tui                         两区 TUI（需 TTY；无参数 dotf 仍是帮助）"
   echo "  pull                        拉取 dotfiles 最新更新（保护性 pull）"
   echo "  cd                          跳转到 dotfiles 目录（需 zsh wrapper）"
   echo ""
@@ -643,10 +773,13 @@ show_help() {
   echo "  -i, --install               安装"
   echo "  -c, --config                配置/链接"
   echo "  -d, --doctor                诊断（L0 或模块专用实现）"
+  echo "  --uninstall                 卸载（仅注册表声明且有 uninstall.sh 的模块）"
+  echo "  --deconfig                  撤回 owned 且未漂的配置（有 config 即隐含）"
   echo "  -ic                         先安装后配置"
   echo "  -id                         先安装后诊断"
   echo "  -cd                         先配置后诊断"
   echo "  -icd                        安装 → 配置 → 诊断"
+  echo "  没有独立 update 动词；再跑已有动作即 re-apply"
   echo "  -a, --all                   全量（配合 -i/-c/-d；单独 -a = 装+配，不含 doctor）"
   echo "  --dry-run                   只展示执行计划，不执行（允许跨 OS 预览）"
   echo "  --continue-on-error         失败后仅继续依赖无关动作；最终仍非零"
@@ -666,6 +799,10 @@ show_help() {
   echo "  dotf agents -d --json       # JSON 报告"
   echo "  dotf agents -cd             # 先同步再诊断"
   echo "  dotf agents -ic             # 先装后配"
+  echo "  dotf agents skill apply <id>"
+  echo "  dotf agents skill remove <id>   # 写本机 overlay 并 prune"
+  echo "  dotf agents mcp apply <id> --tool cursor"
+  echo "  dotf agents mcp remove <id> --all-tools"
   echo ""
   echo "示例:"
   echo "  dotf init                   # OS profile 完整初始化"
@@ -705,6 +842,8 @@ main() {
   local do_i=0
   local do_c=0
   local do_d=0
+  local do_uninstall=0
+  local do_deconfig=0
   local want_all=0
   local saw_action_flag=0
   local positional_before_action=0
@@ -712,7 +851,7 @@ main() {
   while [ $# -gt 0 ]; do
     case "$1" in
     pull)
-      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d" != "000" ]; then
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
         echo "错误: pull 为独立命令"
         exit 1
       fi
@@ -720,7 +859,7 @@ main() {
       exit $?
       ;;
     init)
-      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d" != "000" ]; then
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
         echo "错误: init 为独立命令"
         exit 1
       fi
@@ -728,8 +867,34 @@ main() {
       cmd_init "$@"
       exit $?
       ;;
+    tui)
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
+        echo "错误: tui 为独立命令，不能与模块或动作旗标混用"
+        exit 1
+      fi
+      shift
+      cmd_tui "$@"
+      exit $?
+      ;;
+    agents)
+      if [ "${2:-}" = "skill" ] || [ "${2:-}" = "mcp" ]; then
+        if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
+          echo "错误: agents skill|mcp 为独立命令"
+          exit 1
+        fi
+        shift
+        cmd_agents_artifact "$@"
+        exit $?
+      fi
+      if [ "$saw_action_flag" -eq 0 ]; then
+        positional_before_action=1
+      else
+        reject_legacy_syntax
+      fi
+      modules+=("agents")
+      ;;
     status)
-      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d" != "000" ]; then
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
         echo "错误: status 为独立命令"
         exit 1
       fi
@@ -738,7 +903,7 @@ main() {
       exit $?
       ;;
     retry)
-      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d" != "000" ]; then
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
         echo "错误: retry 为独立命令"
         exit 1
       fi
@@ -808,6 +973,22 @@ main() {
       ;;
     --skills-only | --env-only | --strict)
       config_extra+=("$1")
+      ;;
+    --uninstall)
+      if [ "$do_i$do_c$do_d" != "000" ]; then
+        echo "错误: --uninstall 不能与 -i/-c/-d 组合成新字母串"
+        exit 1
+      fi
+      saw_action_flag=1
+      do_uninstall=1
+      ;;
+    --deconfig)
+      if [ "$do_i$do_c$do_d" != "000" ]; then
+        echo "错误: --deconfig 不能与 -i/-c/-d 组合成新字母串"
+        exit 1
+      fi
+      saw_action_flag=1
+      do_deconfig=1
       ;;
     --dry-run)
       DOTF_DRY_RUN=1
@@ -896,6 +1077,11 @@ main() {
     shift
   done
 
+  if { [ "$do_uninstall" -eq 1 ] || [ "$do_deconfig" -eq 1 ]; } && [ "$do_i$do_c$do_d" != "000" ]; then
+    echo "错误: --uninstall/--deconfig 不能与 -i/-c/-d 组合成新字母串"
+    exit 1
+  fi
+
   # --- provider 切换：-f，以及 `dotf {codex,opencode} --profile <provider>` ---
   local has_codex_profile_flag=0
   local has_opencode_profile_flag=0
@@ -960,7 +1146,8 @@ main() {
   fi
 
   local has_action=0
-  if [ "$do_i" -eq 1 ] || [ "$do_c" -eq 1 ] || [ "$do_d" -eq 1 ]; then
+  if [ "$do_i" -eq 1 ] || [ "$do_c" -eq 1 ] || [ "$do_d" -eq 1 ] ||
+    [ "$do_uninstall" -eq 1 ] || [ "$do_deconfig" -eq 1 ]; then
     has_action=1
   fi
   # 只切 provider 时默认走配置
@@ -975,6 +1162,8 @@ main() {
   [ "$do_i" -eq 1 ] && actions_csv="${actions_csv:+$actions_csv,}install"
   [ "$do_c" -eq 1 ] && actions_csv="${actions_csv:+$actions_csv,}config"
   [ "$do_d" -eq 1 ] && actions_csv="${actions_csv:+$actions_csv,}doctor"
+  [ "$do_uninstall" -eq 1 ] && actions_csv="${actions_csv:+$actions_csv,}uninstall"
+  [ "$do_deconfig" -eq 1 ] && actions_csv="${actions_csv:+$actions_csv,}deconfig"
 
   # --- 全量模式 ---
   if [ "$want_all" -eq 1 ]; then
@@ -1006,7 +1195,7 @@ main() {
 
   # --- 必须有动作 ---
   if [ "$has_action" -eq 0 ]; then
-    echo "错误: 请指定动作 -i / -c / -d / -ic / -id / -cd / -icd"
+    echo "错误: 请指定动作 -i / -c / -d / -ic / -id / -cd / -icd 或 --uninstall / --deconfig"
     echo ""
     show_help
     exit 1

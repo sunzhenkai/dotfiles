@@ -135,6 +135,43 @@ runner_run_action() {
       # shellcheck source=/dev/null
       source "$handler" ${extra[@]+"${extra[@]}"}
     ) >"$capture" 2>&1 || rc=$?
+  elif [ "$action" = "deconfig" ]; then
+    runner_mark_loaded "$module" "deconfig" "registry"
+    (
+      set -euo pipefail
+      export DOTFILES_ROOT
+      export DOTF_MODULE="$module"
+      export DOTF_ACTION=deconfig
+      # shellcheck source=/dev/null
+      source "$DOTFILES_ROOT/scripts/lib/result.sh"
+      status="$(
+        PYTHONPATH="${DOTFILES_ROOT}/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+          python3 -m dotf_core.config_deploy deconfig \
+          --module "$module" \
+          --repo-root "$DOTFILES_ROOT" \
+          --home "${HOME}"
+      )"
+      case "$status" in
+      changed) dotf_result_changed "deconfigured owned targets" ;;
+      unchanged) dotf_result_unchanged "no owned unmodified targets" ;;
+      *)
+        echo "$status" >&2
+        exit 1
+        ;;
+      esac
+    ) >"$capture" 2>&1 || rc=$?
+  elif [[ "$action" == skill.* || "$action" == mcp.* ]]; then
+    runner_mark_loaded "$module" "$action" "agents"
+    (
+      set -euo pipefail
+      export DOTFILES_ROOT
+      export DOTF_MODULE="$module"
+      export DOTF_ACTION="$action"
+      # shellcheck source=/dev/null
+      source "$DOTFILES_ROOT/scripts/lib/result.sh"
+      PYTHONPATH="${DOTFILES_ROOT}/scripts:${DOTFILES_ROOT}/scripts/agents${PYTHONPATH:+:$PYTHONPATH}" \
+        python3 "$DOTFILES_ROOT/scripts/agents/desired_ops.py" "$action" "$module"
+    ) >"$capture" 2>&1 || rc=$?
   elif [ "$action" = "config" ]; then
     # Registry-declared config has one safe generic entry point. Specialized
     # modules retain a handler only when they need to parse module-specific args.

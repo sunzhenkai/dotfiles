@@ -17,6 +17,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, Iterable, Mapping
 
 import yaml
@@ -26,7 +27,15 @@ OVERLAY_KIND = "dotf-overlay"
 PROFILE_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 
 _TOP_KEYS = {"schema_version", "kind", "agents", "codex"}
-_AGENT_KEYS = {"profile", "enabled_servers", "disabled_servers", "browser", "exclude"}
+_AGENT_KEYS = {
+    "profile",
+    "enabled_servers",
+    "disabled_servers",
+    "enabled_skills",
+    "disabled_skills",
+    "browser",
+    "exclude",
+}
 _BROWSER_KEYS = {
     "provider",
     "headed",
@@ -50,6 +59,7 @@ class OverlayCatalog:
     profiles: frozenset[str]
     servers: frozenset[str]
     tools: frozenset[str]
+    skills: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +140,16 @@ def _validate_agents(value: Any, catalog: OverlayCatalog, label: str) -> dict[st
         unknown = sorted(set(refs) - catalog.servers)
         if unknown:
             raise OverlayError(f"{label}.{key} references unknown servers: {', '.join(unknown)}")
+    for key in ("enabled_skills", "disabled_skills"):
+        if key not in agents:
+            continue
+        refs = _string_list(agents[key], f"{label}.{key}")
+        openspec = sorted(item for item in refs if item.startswith("openspec-"))
+        if openspec:
+            raise OverlayError(f"{label}.{key} rejects OpenSpec skills: {', '.join(openspec)}")
+        unknown = sorted(set(refs) - catalog.skills)
+        if unknown:
+            raise OverlayError(f"{label}.{key} references unknown or unlocked skills: {', '.join(unknown)}")
     if "browser" in agents:
         browser = _mapping(agents["browser"], f"{label}.browser")
         _unknown(browser, _BROWSER_KEYS, f"{label}.browser")
@@ -302,7 +322,30 @@ def catalog_from_repo(repo_root: Path) -> OverlayCatalog:
         profiles=frozenset(profiles),
         servers=frozenset((servers.get("servers") or {}).keys()),
         tools=frozenset(manifest.get("tools") or []),
+        skills=_skill_catalog_ids(repo_root),
     )
+
+
+def _skill_catalog_ids(repo_root: Path) -> frozenset[str]:
+    ids: set[str] = set()
+    skills_root = repo_root / "agents" / "skills"
+    if skills_root.is_dir():
+        for path in skills_root.iterdir():
+            if (
+                path.is_dir()
+                and not path.is_symlink()
+                and (path / "SKILL.md").is_file()
+                and not path.name.startswith("openspec-")
+            ):
+                ids.add(path.name)
+    lock_path = repo_root / "agents" / "skills-defaults.lock.yaml"
+    if lock_path.is_file() and not lock_path.is_symlink():
+        raw = yaml.safe_load(lock_path.read_text(encoding="utf-8")) or {}
+        for item in raw.get("skills") or []:
+            if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]:
+                if not str(item["id"]).startswith("openspec-"):
+                    ids.add(str(item["id"]))
+    return frozenset(ids)
 
 
 def _ensure_external_destination(repo_root: Path, destination: Path) -> None:
@@ -328,6 +371,39 @@ def _write_new_overlay(repo_root: Path, destination: Path, data: Mapping[str, An
         os.fsync(fd)
     finally:
         os.close(fd)
+    return destination
+
+
+def upsert_local_overlay(
+    repo_root: Path,
+    mutate: Callable[[dict[str, Any]], None],
+    *,
+    home: Path | None = None,
+) -> Path:
+    """Create or update XDG ``00-local.yaml`` without writing the repository."""
+    from .atomic import atomic_write
+
+    destination = overlay_directory(home) / "00-local.yaml"
+    catalog = catalog_from_repo(repo_root)
+    if destination.is_file() and not destination.is_symlink():
+        data = validate_overlay_document(_read_yaml_file(destination), catalog, label=str(destination))
+    else:
+        data = {
+            "schema_version": OVERLAY_SCHEMA_VERSION,
+            "kind": OVERLAY_KIND,
+            "agents": {},
+        }
+    agents = data.setdefault("agents", {})
+    if not isinstance(agents, dict):
+        raise OverlayError("overlay.agents must be a mapping")
+    mutate(agents)
+    validated = validate_overlay_document(data, catalog, label=str(destination))
+    payload = yaml.safe_dump(validated, allow_unicode=True, sort_keys=False).encode("utf-8")
+    _ensure_external_destination(repo_root, destination)
+    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(destination.parent, 0o700)
+    boundary = destination.parent if home is None else xdg_config_home(home)
+    atomic_write(destination, payload, root=boundary, format="yaml", mode=0o600)
     return destination
 
 

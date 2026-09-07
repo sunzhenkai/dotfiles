@@ -5,6 +5,8 @@
 #   name       — 唯一模块名
 #   desc       — 人类可读描述
 #   install    — true 表示具备安装能力（由 scripts/install.sh 按名调度）
+#   uninstall  — true 表示具备撤软件能力（须有 scripts/modules/<name>/uninstall.sh）
+#                deconfig 由 config 隐含，不单独声明；system/homebrew/sdk 不声明 uninstall
 #   config     — 配置部署声明，必须显式包含:
 #                source/target、strategy(copy|merge|render|symlink)、
 #                writable/sensitive、target_mode（mode 为兼容别名）、
@@ -65,6 +67,7 @@ modules:
     group: tools
     depends_on: [golang]
     install: true
+    uninstall: true
     doctor: true
     bin: grepom
 

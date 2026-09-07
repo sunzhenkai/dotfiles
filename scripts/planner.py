@@ -16,7 +16,7 @@ import modules  # noqa: E402
 import plan_protocol  # noqa: E402
 
 
-ACTION_ORDER = ("install", "config", "doctor")
+ACTION_ORDER = plan_protocol.ACTION_ORDER
 
 # agents -i 展开为独立单工具 install 动作（不污染 agents -c）
 AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")
@@ -162,7 +162,40 @@ def module_has_action(mod: dict[str, Any], action: str) -> bool:
         return modules.has_config(mod)
     if action == "doctor":
         return modules.has_doctor(mod)
+    if action == "uninstall":
+        return modules.has_uninstall(mod)
+    if action == "deconfig":
+        return modules.has_deconfig(mod)
     return False
+
+
+def _split_selectors(names: list[str]) -> tuple[list[str], list[str]]:
+    registry: list[str] = []
+    artifacts: list[str] = []
+    for name in names:
+        if plan_protocol.is_artifact_module(name):
+            artifacts.append(name)
+        else:
+            registry.append(name)
+    return registry, artifacts
+
+
+def _check_uninstall_dependents(
+    uninstall_names: set[str],
+    by_name: dict[str, dict[str, Any]],
+    registry: list[dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    for name in sorted(uninstall_names):
+        leftover = [
+            dep for dep in modules.module_dependents(registry, name)
+            if dep not in uninstall_names and dep in by_name
+        ]
+        if leftover:
+            errors.append(
+                f"拒绝 uninstall {name}：仍有 Dependent {', '.join(leftover)}"
+            )
+    return errors
 
 
 def build_plan(
@@ -192,13 +225,13 @@ def build_plan(
             errors=["请求动作包含重复项"],
         )
     for a in want_actions:
-        if a not in ACTION_ORDER:
+        if a not in plan_protocol.ALL_ACTIONS:
             return Plan(
                 os_id=resolved_os,
                 profile=profile,
                 errors=[f"未知动作: {a}"],
             )
-    want_actions = [action for action in ACTION_ORDER if action in want_actions]
+    want_actions = plan_protocol.normalize_requested_actions(want_actions)
 
     by_name = {m["name"]: m for m in mod_list if m.get("name")}
     order_map = registry_order_map(mod_list)
@@ -255,6 +288,10 @@ def build_plan(
         if s not in seen_seed:
             seen_seed.add(s)
             unique_seeds.append(s)
+    registry_seeds, artifact_seeds = _split_selectors(unique_seeds)
+    unique_seeds = registry_seeds
+    for artifact in artifact_seeds:
+        reasons.setdefault(artifact, "explicit")
 
     # agents 聚合安装 → 拆成可展示的单工具 install（仅当请求含 install）
     if "install" in want_actions and "agents" in unique_seeds:
@@ -274,7 +311,7 @@ def build_plan(
         kept_seeds.append(s)
     unique_seeds = kept_seeds
 
-    if not unique_seeds and not errors:
+    if not unique_seeds and not artifact_seeds and not errors:
         # 允许空计划（例如空 profile）
         return Plan(
             os_id=resolved_os,
@@ -288,10 +325,18 @@ def build_plan(
             module_reasons={},
         )
 
-    selected, dep_reasons, dep_errors = expand_depends(unique_seeds, by_name)
-    errors.extend(dep_errors)
-    for k, v in dep_reasons.items():
-        reasons.setdefault(k, v)
+    module_actions = [item for item in want_actions if item in ACTION_ORDER]
+    expand_ok = bool(module_actions) and set(module_actions) - {"uninstall", "deconfig"}
+    if unique_seeds and expand_ok:
+        selected, dep_reasons, dep_errors = expand_depends(unique_seeds, by_name)
+        errors.extend(dep_errors)
+        for k, v in dep_reasons.items():
+            reasons.setdefault(k, v)
+    else:
+        selected = set(unique_seeds)
+        for name in unique_seeds:
+            if name not in by_name:
+                errors.append(f"未知模块: {name}")
 
     # OS 过滤：显式模块不适用则报错；profile/all 静默跳过；依赖不适用则报错
     filtered: set[str] = set()
@@ -328,6 +373,20 @@ def build_plan(
             module_reasons=reasons,
         )
 
+    if "uninstall" in want_actions:
+        uninstall_names = {
+            name for name in ordered
+            if module_has_action(by_name[name], "uninstall")
+            and reasons.get(name) == "explicit"
+        }
+        # profile/all 静默跳过无 uninstall 的模块；显式点名才进入集合
+        explicit_uninstall = {
+            name for name in ordered if reasons.get(name) == "explicit"
+        }
+        errors.extend(
+            _check_uninstall_dependents(uninstall_names, by_name, mod_list)
+        )
+
     plan_actions: list[PlanAction] = []
     idx = 0
     for name in ordered:
@@ -336,7 +395,7 @@ def build_plan(
         # 仅显式点名时缺能力报错；profile 按能力跳过（模块可只含 install 或 config）
         strict_caps = reason == "explicit"
         for action in ACTION_ORDER:
-            if action not in want_actions:
+            if action not in want_actions or action == "uninstall":
                 continue
             if not module_has_action(mod, action):
                 if strict_caps:
@@ -348,6 +407,44 @@ def build_plan(
                     module=name,
                     action=action,
                     reason=reason,
+                    index=idx,
+                )
+            )
+    if "uninstall" in want_actions:
+        for name in reversed(ordered):
+            mod = by_name[name]
+            reason = reasons.get(name, "unknown")
+            if not module_has_action(mod, "uninstall"):
+                if reason == "explicit":
+                    errors.append(f"模块 {name} 无 uninstall 能力")
+                continue
+            if reason != "explicit" and not expand_ok:
+                continue
+            if reason != "explicit":
+                continue
+            idx += 1
+            plan_actions.append(
+                PlanAction(module=name, action="uninstall", reason=reason, index=idx)
+            )
+    for artifact in artifact_seeds:
+        try:
+            plan_protocol.parse_artifact_selector(artifact)
+        except plan_protocol.ProtocolError as exc:
+            errors.append(str(exc))
+            continue
+        for action in plan_protocol.AGENT_ACTIONS:
+            if action not in want_actions:
+                continue
+            if artifact.startswith(plan_protocol.SKILL_PREFIX) and not action.startswith("skill."):
+                continue
+            if artifact.startswith(plan_protocol.MCP_PREFIX) and not action.startswith("mcp."):
+                continue
+            idx += 1
+            plan_actions.append(
+                PlanAction(
+                    module=artifact,
+                    action=action,
+                    reason=reasons.get(artifact, "explicit"),
                     index=idx,
                 )
             )
@@ -454,7 +551,7 @@ def build_retry_plan(
             errors.append(f"{name}/{action}: 递归依赖已漂移")
         closure.update(planned.ordered_modules)
 
-    requested_actions = [action for action in ACTION_ORDER if action in requested_actions]
+    requested_actions = plan_protocol.normalize_requested_actions(requested_actions)
     if profile is not None and not errors:
         profile_plan = build_plan(
             os_id=os_id,
@@ -468,6 +565,8 @@ def build_retry_plan(
         else:
             profile_modules = set(profile_plan.ordered_modules)
             for name in candidate_modules:
+                if plan_protocol.is_artifact_module(name):
+                    continue
                 if name not in profile_modules:
                     errors.append(f"模块 {name} 已不属于报告 profile={profile}")
 
@@ -484,8 +583,16 @@ def build_retry_plan(
     index = 0
     for name in ordered:
         for action in ACTION_ORDER:
-            if (name, action) not in pair_set:
+            if action == "uninstall" or (name, action) not in pair_set:
                 continue
+            index += 1
+            actions.append(PlanAction(module=name, action=action, reason="retry", index=index))
+    for name in reversed(ordered):
+        if (name, "uninstall") in pair_set:
+            index += 1
+            actions.append(PlanAction(module=name, action="uninstall", reason="retry", index=index))
+    for name, action in pair_set:
+        if plan_protocol.is_agent_action(action):
             index += 1
             actions.append(PlanAction(module=name, action=action, reason="retry", index=index))
     if len(actions) != len(pair_set):

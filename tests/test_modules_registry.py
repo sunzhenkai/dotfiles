@@ -47,6 +47,35 @@ def test_capability_queries() -> None:
     assert agents and modules.has_install(agents) and modules.has_config(agents)
     assert agents and modules.has_doctor(agents)
     assert system and modules.has_install(system) and not modules.has_doctor(system)
+    assert nvim and modules.has_deconfig(nvim) and not modules.has_uninstall(nvim)
+    grepom = modules.find_module(mods, "grepom")
+    assert grepom and modules.has_uninstall(grepom)
+
+
+def test_base_modules_do_not_declare_uninstall() -> None:
+    mods = modules.load_registry()
+    for name in ("system", "homebrew", "sdk"):
+        mod = modules.find_module(mods, name)
+        assert mod is not None, name
+        assert not modules.has_uninstall(mod), name
+    for mod in mods:
+        name = str(mod.get("name") or "")
+        assert "docker" not in name
+
+
+def test_uninstall_requires_handler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    handlers = tmp_path / "handlers"
+    handlers.mkdir()
+    registry = [
+        {"name": "ghost", "install": True, "uninstall": True, "doctor": True},
+    ]
+    errors = modules.validate_registry(
+        registry,
+        profiles_data={"version": 1, "default": "t", "profiles": {"t": {"modules": [], "includes": []}}},
+        strict_handlers=True,
+        handlers_dir=handlers,
+    )
+    assert any("ghost" in item and "uninstall" in item for item in errors)
 
 
 def test_os_filter_config_modules() -> None:
@@ -129,6 +158,9 @@ def test_cli_has_and_exists(repo_root: Path) -> None:
     assert run("has", "nvim", "install").returncode == 1
     assert run("has", "sdk", "doctor").returncode == 0
     assert run("has", "system", "doctor").returncode == 1
+    assert run("has", "grepom", "uninstall").returncode == 0
+    assert run("has", "nvim", "uninstall").returncode == 1
+    assert run("has", "nvim", "deconfig").returncode == 0
 
 
 def test_doctor_capability_list_excludes_system(repo_root: Path) -> None:
