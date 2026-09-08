@@ -97,9 +97,7 @@ dotf git zsh starship -ic
 
 ```bash
 dotf nvim tmux -ic
-# 桌面终端/输入法按需：
 dotf kitty alacritty -ic
-dotf hypr fcitx5 -i   # 系统级，shared 下须确认
 ```
 
 ### 4. tools — 开发与云工具
@@ -179,9 +177,13 @@ dotf agents -c
 ### 7. utils — 杂项
 
 ```bash
-dotf yazi k9s shell_gpt -i   # 按需
+dotf yazi k9s -i   # 按需
 dotf fonts -i                # 可能写系统字体目录，shared 下确认
 ```
+
+已归档模块（当前包括 `trae-cli`、`fcitx5`、`shell_gpt`、`logseq`）保留在
+`modules.yaml` 中但设为 `enabled: false`，不进入 full/profile/`--all`。需要恢复时
+显式执行，例如 `dotf logseq -c`。
 
 ## 完成检查
 

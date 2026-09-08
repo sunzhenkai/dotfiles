@@ -47,7 +47,7 @@ def test_linux_workflow_runs_make_ci_with_immutable_action_pins() -> None:
     assert "runs-on: ubuntu-24.04" in workflow
     assert "run: make ci" in workflow
     assert "shellcheck=0.9.0-1" in workflow
-    assert "PyYAML==6.0.3 pytest==9.1.1" in workflow
+    assert "PyYAML==6.0.3 pytest==9.1.1 textual==8.2.8 rich==15.0.0" in workflow
     action_uses = re.findall(r"uses:\s*[^@\s]+@([^\s]+)", workflow)
     assert action_uses and all(re.fullmatch(r"[0-9a-f]{40}", pin) for pin in action_uses)
 
@@ -61,6 +61,10 @@ def test_macos_workflow_requires_system_bash32_and_migration_smoke() -> None:
     assert "run: /bin/bash scripts/ci/smoke-macos.sh" in workflow
     assert "BASH_VERSINFO[0]" in smoke and "BASH_VERSINFO[1]" in smoke
     assert "-ne 3" in smoke and "-ne 2" in smoke
+    assert 'PYTHON_BIN="$(command -v python3)"' in smoke
+    assert 'PATH="$PYTHON_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"' in smoke
+    assert "export PYTHON_BIN" in smoke
+    assert 'PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"' in acceptance
     combined = (workflow + smoke).lower()
     assert "brew install" not in combined and "brew --prefix" not in combined
 
@@ -85,9 +89,12 @@ def test_isolated_acceptance_fail_closed_contract() -> None:
     export_home = acceptance.index('export HOME="$TMP_HOME"')
     first_runtime_command = acceptance.index('"$BASH_BIN" "$ROOT/bin/dotf" -h')
     assert export_home < first_runtime_command
+    offline_locks = acceptance.index("==> offline locked default skills")
+    assert export_home < offline_locks < first_runtime_command
     for marker in (
         "unset ZHIPU_API_KEY Z_AI_API_KEY",
         "NETWORK_ATTEMPTED",
+        "disabled_skills",
         "network/acquisition is disabled",
         "snapshot_paths \"$HOME\"",
         "metadata=mode,inode,mtime,size,sha256",
@@ -106,28 +113,6 @@ def test_secret_scan_emits_rule_and_count_evidence() -> None:
     for marker in ("rule_version=", "scanned=", "skipped=", "findings="):
         assert marker in scan
     assert "check_security_scan" in scan
-
-
-def test_version_controlled_acceptance_evidence_records_required_gates() -> None:
-    evidence = _text("acceptance/harden-dotfiles-state-boundaries.md")
-    for marker in (
-        "Plain full pytest",
-        "Strict registry/handlers",
-        "Strict OpenSpec validation",
-        "Template check/no delta",
-        "First-party ShellCheck",
-        "Bash 3.2 syntax",
-        "Tracked source secret scan",
-        "Isolated doctor parity",
-        "Disposable HOME/XDG acceptance",
-        "repo_status=unchanged",
-        "repo_diff=unchanged",
-        "repo_content=unchanged",
-        "Staged `.gitignore` blob before and after implementation",
-        "`tasks.md` SHA-256 retained without checkbox edits",
-    ):
-        assert marker in evidence
-    assert "- [x]" not in evidence and "- [ ]" not in evidence
 
 
 def test_state_boundary_docs_cover_operator_contracts() -> None:

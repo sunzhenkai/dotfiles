@@ -7,6 +7,8 @@ agents:
   # Safe low-risk default; browser/full require an explicit choice.
   profile: research
   disabled_servers: []
+  enabled_skills: []
+  disabled_skills: []
   exclude:
     opencode:
       servers: []

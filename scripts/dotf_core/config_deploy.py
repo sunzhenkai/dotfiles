@@ -15,7 +15,7 @@ import hashlib
 import json
 import os
 import stat
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -258,7 +258,7 @@ def _matches_path(relative: str, rules: tuple[str, ...]) -> bool:
 
 
 def _scan_tree(root: Path, path: Path, *, ignored: tuple[str, ...] = ()) -> dict[str, tuple[bytes, os.stat_result]]:
-    """Read a regular-file tree without following any source/target symlink."""
+    """Read a repository source tree. Live merge/render targets must not use this walk."""
     assert_no_symlinks(root, path, missing_ok=False)
     result: dict[str, tuple[bytes, os.stat_result]] = {}
 
@@ -329,6 +329,61 @@ def _snapshot_path(path: Path, *, ignored: tuple[str, ...] = ()) -> _PathSnapsho
                 visit(current / name, f"{relative}/{name}" if relative else name)
 
     visit(path, "")
+    return _PathSnapshot(digest.hexdigest())
+
+
+def _owned_relatives(declaration: ConfigDeclaration, manifest: ManagedManifest) -> tuple[str, ...]:
+    found: list[str] = []
+    for item in manifest.items:
+        if item.owner != declaration.owner:
+            continue
+        try:
+            relative = Path(item.target).relative_to(declaration.target).as_posix()
+        except ValueError:
+            continue
+        if relative != ".":
+            found.append(relative)
+    return tuple(found)
+
+
+def _actual_candidate_relatives(
+    source_keys: Iterable[str],
+    owned_relatives: Iterable[str],
+) -> tuple[str, ...]:
+    seen: dict[str, None] = {}
+
+    def add(relative: str) -> None:
+        if relative and relative != ".":
+            seen.setdefault(relative, None)
+
+    for key in source_keys:
+        add(key)
+        if key.endswith(".example"):
+            add(key[: -len(".example")])
+    for key in owned_relatives:
+        add(key)
+    return tuple(seen)
+
+
+def _snapshot_target_leaves(
+    home: Path,
+    declaration: ConfigDeclaration,
+    relatives: tuple[str, ...],
+) -> _PathSnapshot:
+    ignored = declaration.preserve + declaration.exclude
+    digest = hashlib.sha256(b"snapshot-leaves-v1\0")
+    for relative in sorted(relatives):
+        if _matches_path(relative, ignored):
+            continue
+        digest.update(relative.encode() + b"\0")
+        kind, content, item = _inspect_expected_target(home, declaration.target / relative)
+        digest.update(kind.encode() + b"\0")
+        if content is not None:
+            digest.update(content)
+        if item is not None:
+            digest.update(
+                f"{stat.S_IFMT(item.st_mode)}\0{stat.S_IMODE(item.st_mode)}\0".encode()
+            )
     return _PathSnapshot(digest.hexdigest())
 
 
@@ -538,16 +593,22 @@ def _producer_expected(
     actual_files: Mapping[str, bytes],
     producer: ContentProducer,
     state_manifest_path: Path,
+    home: Path,
+    audit_relatives: tuple[str, ...],
 ) -> list[_ExpectedFile]:
-    # Producers are reviewed in-repo callbacks. Audit their declared inputs and
-    # outputs, rather than recursively hashing unrelated runtime data preserved
-    # under a writable target (sessions, caches, credentials, and plugins).
-    before = (
-        _snapshot_path(declaration.source),
-        _snapshot_path(
+    # Audit declared source/actual leaves only. A writable live target is not a
+    # managed source tree; sockets, sqlite, and sandbox links stay out of it.
+    def target_snapshot() -> _PathSnapshot:
+        if source_is_dir:
+            return _snapshot_target_leaves(home, declaration, audit_relatives)
+        return _snapshot_path(
             declaration.target,
             ignored=declaration.preserve + declaration.exclude,
-        ),
+        )
+
+    before = (
+        _snapshot_path(declaration.source),
+        target_snapshot(),
         _snapshot_path(state_manifest_path),
     )
     context = ProducerContext(
@@ -619,10 +680,7 @@ def _producer_expected(
 
     after = (
         _snapshot_path(declaration.source),
-        _snapshot_path(
-            declaration.target,
-            ignored=declaration.preserve + declaration.exclude,
-        ),
+        target_snapshot(),
         _snapshot_path(state_manifest_path),
     )
     if before != after:
@@ -658,16 +716,16 @@ def _actual_files_for_producer(
     declaration: ConfigDeclaration,
     *,
     source_is_dir: bool,
-    legacy_directory_links: tuple[str, ...] = (),
+    relatives: tuple[str, ...] = (),
+    ignored: tuple[str, ...] = (),
 ) -> dict[str, bytes]:
-    """Return immutable actual bytes using the same relative keys as source files.
+    """Return actual bytes for candidate leaves only; never walk a live target tree.
 
-    A missing target is represented by an empty mapping. For a single-file
-    declaration, an existing regular target is read through the descriptor-
-    relative no-follow path and exposed as ``actual_files["."]``. Directory
-    declarations retain their path-mapped tree view. A single-file target
+    A missing target is an empty mapping. Single-file declarations expose an
+    existing regular target as ``actual_files["."]``. A single-file target
     symlink is never presented to a producer because merge/render must not
-    inspect or derive output through an undeclared link boundary.
+    inspect or derive output through an undeclared link boundary. Directory
+    candidates that are missing, sockets, FIFOs, or extra symlinks are omitted.
     """
     try:
         target_stat = declaration.target.lstat()
@@ -676,12 +734,14 @@ def _actual_files_for_producer(
     if source_is_dir:
         if stat.S_ISLNK(target_stat.st_mode) or not stat.S_ISDIR(target_stat.st_mode):
             return {}
-        scanned = _scan_tree(
-            home,
-            declaration.target,
-            ignored=declaration.preserve + declaration.exclude + legacy_directory_links,
-        )
-        return {relative: value[0] for relative, value in scanned.items()}
+        actual: dict[str, bytes] = {}
+        for relative in relatives:
+            if _matches_path(relative, ignored):
+                continue
+            kind, content, _item = _inspect_expected_target(home, declaration.target / relative)
+            if kind == "file" and content is not None:
+                actual[relative] = content
+        return actual
     if stat.S_ISLNK(target_stat.st_mode):
         raise PathBoundaryError(
             errno.ELOOP,
@@ -758,6 +818,7 @@ def _expected_files(
     producer: ContentProducer | None,
     manifest_path: Path,
     legacy_directory_links: tuple[str, ...] = (),
+    owned_relatives: tuple[str, ...] = (),
 ) -> tuple[list[_ExpectedFile], str, bool]:
     assert_no_symlinks(repo_root, declaration.source, missing_ok=False)
     source_stat = declaration.source.lstat()
@@ -791,6 +852,8 @@ def _expected_files(
             raise ConfigDeployError(
                 f"strategy {declaration.strategy} requires a pure expected-content producer"
             )
+        ignored = declaration.preserve + declaration.exclude + legacy_directory_links
+        relatives = _actual_candidate_relatives(source_files, owned_relatives)
         expected = _producer_expected(
             declaration,
             source_is_dir,
@@ -799,10 +862,13 @@ def _expected_files(
                 home,
                 declaration,
                 source_is_dir=source_is_dir,
-                legacy_directory_links=legacy_directory_links,
+                relatives=relatives,
+                ignored=ignored,
             ),
             producer,
             manifest_path,
+            home,
+            relatives,
         )
     else:
         raise ConfigDeployError("generic managed-file deployer does not install symlink strategy")
@@ -819,7 +885,10 @@ def _link_value(path: Path) -> str:
 def _link_points_to(path: Path, source: Path) -> bool:
     value = _link_value(path)
     resolved = Path(value) if os.path.isabs(value) else path.parent / value
-    return Path(os.path.abspath(resolved)) == Path(os.path.abspath(source))
+    try:
+        return os.path.samefile(resolved, source)
+    except OSError:
+        return False
 
 
 def _item_by_target(manifest: ManagedManifest) -> dict[str, ManagedItem]:
@@ -902,6 +971,7 @@ def compile_config_plan(
         producer,
         state_dir,
         legacy_directory_links,
+        _owned_relatives(declaration, manifest),
     )
     owned = _item_by_target(manifest)
     operations: list[ConfigOperation] = []
@@ -1354,6 +1424,30 @@ def _assert_operation_fresh(
             raise ConfigConflictError(f"stale target changed after planning: {target}")
 
 
+_CONFLICT_EXPLANATIONS: dict[str, str] = {
+    "foreign-directory-symlink": "目标是目录符号链接，且不指向本模块源目录",
+    "foreign-file-symlink": "目标是文件符号链接，且不是本模块源文件",
+    "unowned-real-target": "目标已存在且不受本模块管理",
+    "unexpected-target-symlink": "目标路径上出现了未预期的符号链接",
+    "foreign-managed-owner": "目标已被其他模块管理",
+    "managed-target-modified": "受管文件内容已与上次写入不一致",
+    "stale-target-modified-or-unsafe": "过期目标已被修改或不安全，不会删除",
+}
+
+
+def _format_conflict(item: PlanItem) -> str:
+    reason = item.conflict_reason or "conflict"
+    explanation = _CONFLICT_EXPLANATIONS.get(reason, reason)
+    extra = ""
+    target = Path(item.target)
+    try:
+        if target.is_symlink():
+            extra = f"（当前指向 {os.readlink(target)}）"
+    except OSError:
+        extra = ""
+    return f"拒绝写入 {item.target}：{explanation}{extra}"
+
+
 def apply_config_plan(
     plan: ConfigPlan,
     *,
@@ -1366,10 +1460,9 @@ def apply_config_plan(
     if not isinstance(plan, ConfigPlan) or plan.schema_version != PLAN_SCHEMA_VERSION:
         raise ConfigDeployError("unsupported config plan")
     if plan.conflicts:
-        reasons = ", ".join(
-            f"{item.target}: {item.conflict_reason}" for item in plan.conflicts
+        raise ConfigConflictError(
+            "；".join(_format_conflict(item) for item in plan.conflicts)
         )
-        raise ConfigConflictError(reasons)
     repo = Path(repo_root).absolute()
     home_path = Path(home).absolute()
     state = _state_home(home_path, state_home)
@@ -1524,6 +1617,81 @@ def deploy_config(
     )
 
 
+def deconfig_owned(
+    module_name: str,
+    *,
+    repo_root: os.PathLike[str] | str,
+    home: os.PathLike[str] | str,
+    state_home: os.PathLike[str] | str | None = None,
+    run_id: str | None = None,
+) -> ConfigApplyResult:
+    """Withdraw owned, unmodified config targets for one module."""
+    home_path = Path(home).expanduser().absolute()
+    state = _state_home(home_path, state_home)
+    owner = f"{_OWNER_PREFIX}{module_name}"
+    current_manifest, _digest = _read_manifest(home_path, state)
+    owned = [item for item in current_manifest.items if item.owner == owner]
+    if not owned:
+        return ConfigApplyResult(
+            status="unchanged",
+            changed=0,
+            unchanged=0,
+            pruned=0,
+            backups=(),
+            manifest=_manifest_paths(home_path, state)[1],
+        )
+    run = run_id or generate_run_id()
+    backup_root = Path(os.environ.get("DOTF_BACKUP_DIR", str(home_path / ".config" / "backups" / "dotf")))
+    kept: list[ManagedItem] = [item for item in current_manifest.items if item.owner != owner]
+    backups: list[Path] = []
+    pruned = 0
+    conflicts = 0
+    for item in owned:
+        target = Path(item.target)
+        kind, content, _stat = _inspect_expected_target(home_path, target)
+        if kind == "missing":
+            pruned += 1
+            continue
+        if kind != "file" or content is None:
+            conflicts += 1
+            kept.append(item)
+            continue
+        if _sha256(content) != item.installed_hash:
+            conflicts += 1
+            kept.append(item)
+            print(f"conflict: leaving drifted target {target}", file=os.sys.stderr)
+            continue
+        backup = backup_target(
+            target,
+            backup_root,
+            run,
+            home_path,
+            sensitive=item.sensitive,
+            remove_source=True,
+        )
+        backups.append(backup)
+        pruned += 1
+    new_manifest = ManagedManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        kind="managed-manifest",
+        generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        items=tuple(sorted(kept, key=lambda entry: entry.target)),
+    )
+    if new_manifest.items != current_manifest.items:
+        _write_manifest(home_path, state, new_manifest)
+    status = "unchanged" if pruned == 0 and conflicts == 0 else "changed"
+    if conflicts and pruned == 0:
+        status = "unchanged"
+    return ConfigApplyResult(
+        status=status,
+        changed=pruned,
+        unchanged=0,
+        pruned=pruned,
+        backups=tuple(backups),
+        manifest=_manifest_paths(home_path, state)[1],
+    )
+
+
 def _load_registry_module(repo_root: Path, name: str) -> Mapping[str, Any]:
     import sys
 
@@ -1546,8 +1714,9 @@ def _load_registry_module(repo_root: Path, name: str) -> Mapping[str, Any]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m dotf_core.config_deploy")
-    parser.add_argument("command", choices=("plan", "apply"))
-    parser.add_argument("module")
+    parser.add_argument("command", choices=("plan", "apply", "deconfig"))
+    parser.add_argument("module_pos", nargs="?", default="")
+    parser.add_argument("--module", dest="module_opt", default="")
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--home", default=os.environ.get("HOME"))
     parser.add_argument("--state-home", default=None)
@@ -1559,9 +1728,24 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if not args.home:
         raise SystemExit("HOME is required")
+    module_name = args.module_opt or args.module_pos
+    if not module_name:
+        print("module is required", file=os.sys.stderr)
+        return 2
     repo = Path(args.repo_root).absolute()
-    module = _load_registry_module(repo, args.module)
     try:
+        if args.command == "deconfig":
+            _load_registry_module(repo, module_name)
+            result = deconfig_owned(
+                module_name,
+                repo_root=repo,
+                home=args.home,
+                state_home=args.state_home,
+                run_id=args.run_id,
+            )
+            print(result.status)
+            return 0
+        module = _load_registry_module(repo, module_name)
         plan = compile_config_plan(
             module,
             repo_root=repo,

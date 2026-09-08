@@ -16,7 +16,11 @@ import modules  # noqa: E402
 PLAN_HEADER = "DOTF_EXECUTION_PLAN"
 PLAN_VERSION = 1
 PLAN_SUCCESS_MARKER = "DOTF_PLAN_COMPLETE_V1"
-ACTION_ORDER = ("install", "config", "doctor")
+ACTION_ORDER = ("install", "config", "doctor", "uninstall", "deconfig")
+AGENT_ACTIONS = ("skill.apply", "skill.remove", "mcp.apply", "mcp.remove")
+ALL_ACTIONS = ACTION_ORDER + AGENT_ACTIONS
+SKILL_PREFIX = "skill:"
+MCP_PREFIX = "mcp:"
 PLAN_KEYS = {
     "header",
     "version",
@@ -67,7 +71,51 @@ def _capabilities(mod: dict[str, Any]) -> list[str]:
         out.append("config")
     if modules.has_doctor(mod):
         out.append("doctor")
+    if modules.has_uninstall(mod):
+        out.append("uninstall")
     return out
+
+
+def is_agent_action(action: str) -> bool:
+    return action in AGENT_ACTIONS
+
+
+def is_artifact_module(name: str) -> bool:
+    return name.startswith(SKILL_PREFIX) or name.startswith(MCP_PREFIX)
+
+
+def parse_artifact_selector(name: str) -> tuple[str, str, str | None]:
+    """Return (kind, artifact_id, tool_or_none). tool is ``*`` for all MCP tools."""
+    if name.startswith(SKILL_PREFIX):
+        skill_id = name[len(SKILL_PREFIX) :]
+        if not skill_id or "/" in skill_id or skill_id.startswith("openspec-"):
+            raise ProtocolError(f"非法 skill 选择器: {name}")
+        return "skill", skill_id, None
+    if name.startswith(MCP_PREFIX):
+        rest = name[len(MCP_PREFIX) :]
+        if "/" not in rest:
+            raise ProtocolError(f"mcp 选择器必须是 mcp:<tool>/<id> 或 mcp:*/<id>: {name}")
+        tool, server_id = rest.split("/", 1)
+        if not tool or not server_id or "/" in server_id:
+            raise ProtocolError(f"非法 mcp 选择器: {name}")
+        return "mcp", server_id, tool
+    raise ProtocolError(f"不是制品选择器: {name}")
+
+
+def action_declared(action: str, caps: list[str]) -> bool:
+    if action == "deconfig":
+        return "config" in caps
+    return action in caps
+
+
+def artifact_dependency_digest(module: str, action: str) -> str:
+    return hashlib.sha256(_canonical({"module": module, "action": action})).hexdigest()
+
+
+def normalize_requested_actions(actions: list[str]) -> list[str]:
+    module_part = [item for item in ACTION_ORDER if item in actions]
+    agent_part = [item for item in AGENT_ACTIONS if item in actions]
+    return module_part + agent_part
 
 
 def handler_digest(
@@ -80,6 +128,8 @@ def handler_digest(
         if not isinstance(name, str):
             continue
         for action in ACTION_ORDER:
+            if action == "deconfig":
+                continue
             path = root / name / f"{action}.sh"
             if path.is_file():
                 records.append(
@@ -120,6 +170,15 @@ def module_records(
 
 def dependency_digest(document: dict[str, Any], name: str) -> str:
     """Hash one planned module's complete recursive dependency declaration."""
+    if is_artifact_module(name):
+        actions = [
+            item["action"]
+            for item in document.get("actions") or []
+            if isinstance(item, dict) and item.get("module") == name
+        ]
+        if not actions:
+            raise ProtocolError(f"依赖摘要引用未知制品: {name}")
+        return artifact_dependency_digest(name, ",".join(actions))
     records = document.get("modules")
     if not isinstance(records, list):
         raise ProtocolError("modules 必须为列表")
@@ -142,6 +201,8 @@ def dependency_digest(document: dict[str, Any], name: str) -> str:
         selected.add(current)
         for dependency in record["depends_on"]:
             if dependency not in by_name:
+                if _withdraw_only(list(document.get("requested_actions") or [])):
+                    continue
                 raise ProtocolError(f"模块 {current} 的依赖 {dependency} 不在计划中")
             pending.append(dependency)
     payload = [
@@ -219,13 +280,25 @@ def _text(value: Any, label: str, *, nullable: bool = False) -> str | None:
     return value
 
 
-def _topological_order(names: list[str], by_name: dict[str, dict[str, Any]], order: dict[str, int]) -> list[str]:
+def _withdraw_only(actions: list[str]) -> bool:
+    return bool(actions) and set(actions) <= {"uninstall", "deconfig"}
+
+
+def _topological_order(
+    names: list[str],
+    by_name: dict[str, dict[str, Any]],
+    order: dict[str, int],
+    *,
+    allow_missing_deps: bool = False,
+) -> list[str]:
     selected = set(names)
     indegree = {name: 0 for name in names}
     graph = {name: [] for name in names}
     for name in names:
         for dep in modules.module_depends_on(by_name[name]):
             if dep not in selected:
+                if allow_missing_deps:
+                    continue
                 raise ProtocolError(f"模块 {name} 的依赖 {dep} 未包含在完整计划中")
             graph[dep].append(name)
             indegree[name] += 1
@@ -283,11 +356,11 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
     requested_actions = document["requested_actions"]
     if not isinstance(requested_actions, list) or not requested_actions:
         raise ProtocolError("requested_actions 必须为非空列表")
-    if any(a not in ACTION_ORDER for a in requested_actions):
+    if any(a not in ALL_ACTIONS for a in requested_actions):
         raise ProtocolError("requested_actions 包含未知动作")
     if len(requested_actions) != len(set(requested_actions)):
         raise ProtocolError("requested_actions 包含重复动作")
-    if requested_actions != [a for a in ACTION_ORDER if a in requested_actions]:
+    if requested_actions != normalize_requested_actions(requested_actions):
         raise ProtocolError("requested_actions 生命周期顺序无效")
 
     registry = modules.load_registry()
@@ -330,6 +403,8 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
             raise ProtocolError(f"模块 {name} 包含未知 capability")
         if len(caps) != len(set(caps)):
             raise ProtocolError(f"模块 {name} 包含重复 capability")
+        if "deconfig" in caps:
+            raise ProtocolError(f"模块 {name} 不得把 deconfig 声明为 capability")
         if caps != _capabilities(mod):
             raise ProtocolError(f"模块 {name} capability 缺失、截断或注册表已漂移")
         planned_actions = record["planned_actions"]
@@ -341,7 +416,7 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
             raise ProtocolError(f"模块 {name} planned_actions 包含重复动作")
         if planned_actions != [action for action in ACTION_ORDER if action in planned_actions]:
             raise ProtocolError(f"模块 {name} planned_actions 生命周期顺序无效")
-        if any(action not in caps for action in planned_actions):
+        if any(not action_declared(action, caps) for action in planned_actions):
             raise ProtocolError(f"模块 {name} planned_actions 包含未声明 capability")
         if any(action not in requested_actions for action in planned_actions):
             raise ProtocolError(f"模块 {name} planned_actions 超出请求动作")
@@ -352,7 +427,12 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
             raise ProtocolError(f"模块 {name} 不适用于计划 OS={planned_os}")
         names.append(name)
 
-    if names != _topological_order(names, by_name, registry_order):
+    if names != _topological_order(
+        names,
+        by_name,
+        registry_order,
+        allow_missing_deps=_withdraw_only(requested_actions),
+    ):
         raise ProtocolError("模块顺序不是确定性的依赖优先/注册表顺序")
 
     raw_actions = document["actions"]
@@ -369,9 +449,12 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
         action = _text(action_record["action"], f"actions[{pos - 1}].action")
         name = _text(action_record["module"], f"actions[{pos - 1}].module")
         _text(action_record["reason"], f"actions[{pos - 1}].reason")
-        if action not in ACTION_ORDER:
+        if action not in ALL_ACTIONS:
             raise ProtocolError(f"未知动作: {action}")
-        if name not in names:
+        if is_agent_action(action):
+            if not is_artifact_module(name):
+                raise ProtocolError(f"制品动作必须使用 skill:/mcp: 选择器: {name}/{action}")
+        elif name not in names:
             raise ProtocolError(f"动作引用未知或截断模块: {name}")
         pair = (name, action)
         if pair in seen_pairs:
@@ -386,9 +469,20 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
         (name, action)
         for name in names
         for action in planned_by_module[name]
+        if action != "uninstall"
     ]
+    expected_pairs.extend(
+        (name, "uninstall")
+        for name in reversed(names)
+        if "uninstall" in planned_by_module.get(name, [])
+    )
+    expected_pairs.extend(
+        pair for pair in actual_pairs if is_agent_action(pair[1])
+    )
     if actual_pairs != expected_pairs:
         raise ProtocolError("动作缺失、截断或生命周期/依赖顺序无效")
+    if any(is_agent_action(action) and action not in requested_actions for _, action in actual_pairs):
+        raise ProtocolError("制品动作超出请求动作")
     return document
 
 

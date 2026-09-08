@@ -40,6 +40,14 @@ def first_party_skill_ids(root: Path) -> List[str]:
     return sorted(path.name for path in skills_root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file())
 
 
+def selected_default_ids(root: Path) -> List[str]:
+    catalog_path = root / CATALOG_REL
+    catalog = _yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict) or not isinstance(catalog.get("skills"), list):
+        raise ThirdPartyLockError("third-party defaults catalog skills are invalid")
+    return list(catalog["skills"])
+
+
 def load_catalog(root: Path) -> ThirdPartyLock:
     catalog_path = root / CATALOG_REL
     lock_path = root / LOCK_REL
@@ -56,12 +64,11 @@ def load_catalog(root: Path) -> ThirdPartyLock:
         raise ThirdPartyLockError("third-party defaults catalog skill ids are invalid or duplicate")
     lock = load_lock(lock_path)
     locked_ids = [item.id for item in lock.skills]
-    if ids != locked_ids:
-        missing = sorted(set(ids) - set(locked_ids))
-        extra = sorted(set(locked_ids) - set(ids))
+    missing = sorted(set(ids) - set(locked_ids))
+    if missing:
         raise ThirdPartyLockError(
-            "third-party defaults must exactly match the strict lock "
-            f"(unlocked={missing}, unselected={extra})"
+            "third-party defaults must be covered by the strict lock "
+            f"(unlocked={missing})"
         )
     overlap = sorted(set(ids).intersection(first_party_skill_ids(root)))
     if overlap:
@@ -105,6 +112,10 @@ def install_defaults(
 ) -> int:
     """Verify the strict lock; apply only bytes acquired and checked in private staging."""
     lock = load_catalog(root)
+    from desired_set import resolve_skill_desired_set
+
+    desired = resolve_skill_desired_set(root)
+    selected = tuple(item for item in lock.skills if item.id in desired)
     destinations = (
         _destination_specs((dest_root,))
         if dest_root is not None
@@ -113,18 +124,23 @@ def install_defaults(
     if dry_run:
         for destination, _, layout in destinations:
             print(f"==> locked default skills ({layout}) → {destination}")
-            for item in lock.skills:
+            for item in selected:
                 print(
-                    f"  + {item.id} revision={item.revision} content={item.content_hash} "
+                    f"    {item.id} revision={item.revision} content={item.content_hash} "
                     f"license={item.license.spdx} audit={item.audit.status}@{item.audit.date}/{item.audit.tool}"
                 )
-            print(f"  done defaults ({layout}, plan): locked={len(lock.skills)} network=none writes=none")
+            print(f"  done defaults ({layout}, plan): locked={len(selected)} network=none writes=none")
         return 0
 
     try:
         with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
             staging = Path(temporary) / "acquired"
-            source_root = acquire_all(lock, staging)
+            from dataclasses import replace
+
+            filtered = replace(lock, skills=selected)
+            source_root = acquire_all(filtered, staging) if selected else staging / "empty"
+            if not selected:
+                source_root.mkdir(parents=True, exist_ok=True)
             for destination, owner_prefix, layout in destinations:
                 home = _home_for_target(destination)
                 renderer = render_kiro_skill_bytes if layout == "kiro" else render_skill_bytes
@@ -140,6 +156,7 @@ def install_defaults(
                         f"agents/skills-defaults.lock.yaml@{lock.digest}{identity_suffix}"
                     ),
                     include_unlisted=True,
+                    only_ids=frozenset(item.id for item in selected),
                 )
                 result = apply_skills_plan(plan, renderer)
                 print(

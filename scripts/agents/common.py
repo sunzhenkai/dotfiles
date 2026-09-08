@@ -22,8 +22,8 @@ from catalog import (  # noqa: E402
     load_vendor_matrix,
 )
 from dotf_core.overlays import (  # noqa: E402
-    OverlayCatalog,
     OverlayError,
+    catalog_from_repo,
     load_overlays,
 )
 
@@ -78,11 +78,7 @@ class Catalog:
             try:
                 self.overlays = load_overlays(
                     repo_root=root,
-                    catalog=OverlayCatalog(
-                        profiles=frozenset(self.profiles),
-                        servers=frozenset(self.servers),
-                        tools=frozenset(self.manifest.get("tools") or TOOLS),
-                    ),
+                    catalog=catalog_from_repo(root),
                 )
             except OverlayError as exc:
                 die(f"overlay 校验失败: {exc}")

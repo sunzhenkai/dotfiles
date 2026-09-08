@@ -52,8 +52,10 @@ AI Agent 按分组初始化提示词见 [`Dotfiles.md`](./Dotfiles.md)。
 
 ```
 dotf <module...> -i|-c|-d|-ic|-id|-cd|-icd
+dotf <module...> --uninstall|--deconfig
 dotf -i|-c|-d|...                 # 交互选择（按 group 展示）
 dotf -i -a | -c -a | -d -a | -a   # 全量（按当前 OS 过滤；单独 -a 不含 doctor）
+dotf tui                          # TUI manager：顶部 tab / 按键即跑 / 状态栏动作（详见 agents/README.md）
 dotf init [--os <id>] [--profile <name>] [--yes] [--dry-run] [--list]
 dotf status [--profile <name>] [--json]
 dotf retry
@@ -63,10 +65,13 @@ Commands:
   init              OS + 使用场景 profile 初始化（统一 planner）
   status            只读 L0 环境状态
   retry             重试最近报告中的 failed 动作
+  tui               TTY 管理面；无参数 `dotf` 仍是帮助
   pull              Pull latest updates (with stash protection)
 
 Actions / controls:
   -i/-c/-d          Install / config / doctor
+  --uninstall       Remove a module that declares uninstall + uninstall.sh
+  --deconfig        Withdraw owned, unmodified config targets
   -a                Install all + config all
   --dry-run         Show plan only (cross-OS preview is dry-run only)
   --continue-on-error
@@ -75,6 +80,9 @@ Actions / controls:
   --json            Redacted execution summary JSON
   --deep            Enable doctor L1
   -h                Show help
+
+There is no standalone update verb; re-run install/config/apply to re-apply.
+Skill/MCP apply and remove only change this machine's XDG overlay, never the repo catalog or lock.
 
 Confirm model:
   Plan confirm before execute (default N); no per-module install/config prompts after.
@@ -88,6 +96,11 @@ Examples:
   dotf status --profile minimal
   dotf sdk golang -i --dry-run
   dotf nvim -c --yes
+  dotf grepom --uninstall --dry-run
+  dotf nvim --deconfig --yes
+  dotf agents skill remove grill-with-docs --yes
+  dotf agents mcp apply web-reader --tool cursor --yes
+  dotf tui
   dotf -d -a --dry-run
 ```
 
@@ -111,6 +124,10 @@ dotf cursor -i                 # 仅安装 Cursor CLI
 dotf cursor -c                 # 仅 vendor 配置（不隐式 sync）
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ MCP
 dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
+dotf agents skill apply grill-with-docs
+dotf agents skill remove grill-with-docs
+dotf agents mcp remove web-reader --tool cursor
+dotf agents mcp apply web-reader --all-tools
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/agents/sync.sh all --dry-run
 ```

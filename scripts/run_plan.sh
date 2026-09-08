@@ -4,6 +4,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DOTFILES_ROOT="$ROOT"
+# Forward test/isolated handler location to plan_protocol subprocess.
+[ -n "${DOTF_HANDLERS_DIR:-}" ] && export DOTF_HANDLERS_DIR
+[ -n "${DOTF_REGISTRY_PATH:-}" ] && export DOTF_REGISTRY_PATH
+[ -n "${DOTF_PROFILES_PATH:-}" ] && export DOTF_PROFILES_PATH
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/runner.sh"
 # shellcheck source=/dev/null
@@ -66,7 +70,7 @@ JSON_FD=""
 
 cleanup_run_plan() {
   rm -f "$NORMALIZED"
-  [ -n "$CURRENT_OUT" ] && rm -f "$CURRENT_OUT"
+  [ -n "$CURRENT_OUT" ] && rm -f "$CURRENT_OUT" "$CURRENT_OUT.sani"
   return 0
 }
 
@@ -354,6 +358,9 @@ for action_pos in "${!ACTIONS[@]}"; do
     [ "$module" = "agents" ] && [ ${#DOCTOR_EXTRA[@]} -gt 0 ] && extra=("${DOCTOR_EXTRA[@]}")
     ;;
   install) ;;
+  uninstall) ;;
+  deconfig) ;;
+  skill.apply | skill.remove | mcp.apply | mcp.remove) ;;
   *) echo "未知动作: $action" >&2; exit 2 ;;
   esac
 
@@ -368,9 +375,10 @@ for action_pos in "${!ACTIONS[@]}"; do
   fi
   rc=$?
   set -e
-  python3 "$ROOT/scripts/execution_state.py" sanitize-file "$out"
+  python3 "$ROOT/scripts/execution_state.py" sanitize-file "$out" >"$out.sani"
+  cat "$out.sani"
 
-  rline=$(grep -E $'^RESULT\t' "$out" 2>/dev/null | tail -n 1 || true)
+  rline=$(grep -E $'^RESULT\t' "$out.sani" 2>/dev/null | tail -n 1 || true)
   st="failed"
   _d=0
   _e="$rc"
@@ -384,10 +392,10 @@ for action_pos in "${!ACTIONS[@]}"; do
     skipped) SKIPPED=$((SKIPPED + 1)) ;;
     failed) FAILED_N=$((FAILED_N + 1)) ;;
     esac
-    [ "$st" = "failed" ] && FAILED_ITEMS+=("$module/$action: handler-failed")
+    [ "$st" = "failed" ] && FAILED_ITEMS+=("$module/$action: ${_reason:-handler-failed}")
   elif [ "$rc" -ne 0 ]; then
     FAILED_N=$((FAILED_N + 1))
-    FAILED_ITEMS+=("$module/$action: handler-failed")
+    FAILED_ITEMS+=("$module/$action: ${_reason:-handler-failed}")
   else
     st="changed"
     _e=0
@@ -399,7 +407,12 @@ for action_pos in "${!ACTIONS[@]}"; do
   else
     state_finish_action "$_a_idx" completed "$st" "${_d:-0}" "${_e:-0}" "${_reason:-$st}"
   fi
-  rm -f "$out"
+  # dotf-tui-manager: persist module fact (write failures must not fail the run)
+  if [ "$st" = "changed" ] || [ "$st" = "unchanged" ]; then
+    DOTF_STATE_MOD="$module" DOTF_STATE_ACT="$action" DOTF_STATE_RES="$st" DOTF_STATE_ROOT="$ROOT" \
+      python3 "$ROOT/scripts/dotf_tui/apply_state_hook.py" >/dev/null 2>&1 || true
+  fi
+  rm -f "$out" "$out.sani"
   CURRENT_OUT=""
 
   if [ "$rc" -ne 0 ]; then

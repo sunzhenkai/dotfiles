@@ -11,6 +11,8 @@ from typing import Any
 import modules
 import pytest
 
+from conftest import isolate_agents_sync_for_test
+
 
 COPY_MODULES = tuple(
     module
@@ -144,6 +146,30 @@ EXPECTED_COPY_MODULE_NAMES = {
 }
 
 
+def test_copy_conflict_surfaces_human_reason_in_result(repo_root: Path, tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    module = next(item for item in COPY_MODULES if item["name"] == "zsh")
+    target = _expand_home(module["config"]["target"], home)
+    target.parent.mkdir(parents=True)
+    foreign = tmp_path / "foreign-zsh"
+    foreign.mkdir()
+    (foreign / "keep.txt").write_text("keep", encoding="utf-8")
+    target.symlink_to(foreign, target_is_directory=True)
+
+    result = _run_config(repo_root, module, home, "conflict-msg-1")
+    text = result.stdout + result.stderr
+    assert result.returncode != 0, text
+    assert "RESULT\tfailed\t" in result.stdout, text
+    assert "safe copy deployment failed" not in text
+    assert "拒绝写入" in text
+    assert "目录符号链接" in text
+    assert str(target) in text
+    assert str(foreign) in text
+    assert target.is_symlink()
+    assert (foreign / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
 def test_generic_copy_inventory_is_complete() -> None:
     assert {module["name"] for module in COPY_MODULES} == EXPECTED_COPY_MODULE_NAMES
     tmux = next(module for module in COPY_MODULES if module["name"] == "tmux")
@@ -178,6 +204,8 @@ def test_specialized_config_is_manifest_owned_real_and_idempotent(
     home = tmp_path / "home"
     home.mkdir()
     name = module["name"]
+    if name == "agents":
+        isolate_agents_sync_for_test(home)
 
     first = _run_config(repo_root, module, home, f"specialized-{name}-1")
     assert first.returncode == 0, first.stdout + first.stderr

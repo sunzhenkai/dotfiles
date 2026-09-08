@@ -63,13 +63,23 @@ dotf_registry_config() {
     if [ -n "${PYTHONPATH:-}" ]; then
       pythonpath_value="${pythonpath_value}:${PYTHONPATH}"
     fi
+    errfile=$(mktemp)
     status=$(PYTHONPATH="$pythonpath_value" \
       python3 -m dotf_core.config_handler "$mod" \
       --repo-root "$DOTFILES_ROOT" --home "$HOME" \
-      "${state_args[@]}" --run-id "$DOTF_RUN_ID") || {
+      "${state_args[@]}" --run-id "$DOTF_RUN_ID" 2>"$errfile") || {
+      detail=$(tr '\n' ' ' <"$errfile" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      rm -f "$errfile"
+      if [ -n "$detail" ]; then
+        case "$detail" in
+        "config deploy failed: "*) detail="${detail#config deploy failed: }" ;;
+        esac
+        dotf_result_failed "$mod: $detail"
+      fi
       dotf_result_failed "$mod: safe $strategy deployment failed"
       return 1
     }
+    rm -f "$errfile"
     if [ "$status" = "unchanged" ]; then
       dotf_result_unchanged "$mod already deployed"
     else

@@ -113,6 +113,7 @@ class SkillsPlan:
     manifest_digest: str | None
     prior_manifest: ManagedManifest
     operations: tuple[RuntimeOperation, ...]
+    only_ids: frozenset[str] | None = None
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -304,6 +305,7 @@ def collect_runtime_files(
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
     include_unlisted: bool = False,
+    only_ids: frozenset[str] | None = None,
 ) -> tuple[RuntimeFile, ...]:
     policy = load_runtime_policy(root)
     source_root = source_root or root / "agents" / "skills"
@@ -339,6 +341,8 @@ def collect_runtime_files(
         if not skill_dir.is_dir() or skill_dir.is_symlink():
             continue
         skill_id = skill_dir.name
+        if only_ids is not None and skill_id not in only_ids:
+            continue
         marker = skill_dir / "SKILL.md"
         if not marker.is_file() or marker.is_symlink():
             continue
@@ -457,6 +461,7 @@ def compile_skills_plan(
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
     include_unlisted: bool = False,
+    only_ids: frozenset[str] | None = None,
 ) -> SkillsPlan:
     """Compile expected first-party runtime and ownership decisions without writes."""
     repo = root.expanduser().absolute()
@@ -471,6 +476,7 @@ def compile_skills_plan(
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
         include_unlisted=include_unlisted,
+        only_ids=only_ids,
     )
     snapshot = _read_manifest(base_home, state)
     prior_by_target = {
@@ -593,6 +599,7 @@ def compile_skills_plan(
         snapshot.digest,
         snapshot.manifest,
         tuple(sorted(operations, key=lambda item: (item.target, item.action))),
+        only_ids,
     )
 
 
@@ -855,6 +862,7 @@ def apply_skills_plan(
             source_root=Path(plan.source_root), owner_prefix=plan.owner_prefix,
             identity_prefix=plan.identity_prefix,
             include_unlisted=plan.include_unlisted,
+            only_ids=plan.only_ids,
         )
         if _expected_signature(current) != _expected_signature(plan):
             raise AgentRuntimeConflict("runtime source changed after planning")

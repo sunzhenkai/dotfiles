@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import isolate_agents_sync_for_test
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "agents"))
 from common import TOOLS  # noqa: E402
@@ -193,6 +195,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
 
 
 def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
+    isolate_agents_sync_for_test(tmp_home)
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     env["XDG_STATE_HOME"] = str(tmp_home / ".local" / "state")

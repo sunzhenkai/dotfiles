@@ -97,6 +97,10 @@ def test_mcp_source_change_updates_only_changed_owned_entry(tmp_path: Path, tmp_
     repo = tmp_path / "repo"
     (repo / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
+    shutil.copy2(
+        ROOT / "agents" / "skills-defaults.lock.yaml",
+        repo / "agents" / "skills-defaults.lock.yaml",
+    )
     servers_path = repo / "agents" / "env" / "mcp" / "servers.yaml"
     servers = yaml.safe_load(servers_path.read_text(encoding="utf-8"))
     servers["servers"]["web-reader"]["url"] = "https://example.com/changed/mcp"
@@ -205,6 +209,10 @@ def test_explicit_template_generator_is_overlay_independent_and_regenerates_clea
     isolated = tmp_path / "template-repo"
     (isolated / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", isolated / "agents" / "env")
+    shutil.copy2(
+        ROOT / "agents" / "skills-defaults.lock.yaml",
+        isolated / "agents" / "skills-defaults.lock.yaml",
+    )
     for tool in ("cursor", "kiro", "opencode", "kimi-code", "zcode"):
         shutil.copytree(ROOT / "agents" / "vendors" / tool, isolated / "agents" / "vendors" / tool)
     for command in (

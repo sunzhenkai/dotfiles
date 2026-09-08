@@ -193,6 +193,7 @@ def _sync_runtime(
     identity_prefix: str,
     label: str,
     dry_run: bool,
+    only_ids: frozenset[str] | None = None,
 ) -> int:
     print(f"==> sync {label} → {base}")
     plan = compile_skills_plan(
@@ -201,6 +202,7 @@ def _sync_runtime(
         target_root=base,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
+        only_ids=only_ids,
     )
 
     markers = {
@@ -240,6 +242,8 @@ def _sync_runtime(
 
 
 def sync_skills(root: Path, dry_run: bool = False) -> int:
+    from desired_set import resolve_skill_desired_set
+
     return _sync_runtime(
         root,
         skills_target(),
@@ -248,11 +252,14 @@ def sync_skills(root: Path, dry_run: bool = False) -> int:
         identity_prefix="agents/skills",
         label="skills",
         dry_run=dry_run,
+        only_ids=resolve_skill_desired_set(root),
     )
 
 
 def sync_kiro_skills(root: Path, dry_run: bool = False) -> int:
     """Kiro CLI does not consume ~/.agents, so keep a dedicated managed copy."""
+    from desired_set import resolve_skill_desired_set
+
     return _sync_runtime(
         root,
         kiro_skills_target(),
@@ -261,6 +268,7 @@ def sync_kiro_skills(root: Path, dry_run: bool = False) -> int:
         identity_prefix=KIRO_SKILL_IDENTITY_PREFIX,
         label="kiro skills",
         dry_run=dry_run,
+        only_ids=resolve_skill_desired_set(root),
     )
 
 

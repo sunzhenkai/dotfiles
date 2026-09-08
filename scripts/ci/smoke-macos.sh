@@ -11,8 +11,11 @@ if [ "${BASH_VERSINFO[0]}" -ne 3 ] || [ "${BASH_VERSINFO[1]}" -ne 2 ]; then
   exit 1
 fi
 
-PATH="/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
+PYTHON_BIN="$(command -v python3)"
+PYTHON_BIN_DIR="$(dirname "$PYTHON_BIN")"
+PATH="$PYTHON_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
 export PATH
+export PYTHON_BIN
 hash -r
 resolved_bash="$(command -v bash)"
 case "$resolved_bash" in

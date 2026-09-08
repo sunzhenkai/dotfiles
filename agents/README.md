@@ -12,6 +12,10 @@ dotf cursor -i                 # 仅安装 Cursor CLI
 dotf cursor -c                 # 仅应用 Cursor vendor 配置（不 sync skills/MCP）
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ MCP（全部工具）
 dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 的 MCP（skills 与 tool 无关，始终全量）
+dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync
+dotf agents skill remove <id>  # 停用并 prune owned 且未漂的目标（不改仓库）
+dotf agents mcp apply <id> --tool cursor
+dotf agents mcp remove <id> --all-tools
 dotf agents -d                 # L0 诊断
 dotf agents -d --deep          # L0 + agents L1 深度诊断
 dotf agents -d --deep --json   # 深度诊断 JSON（凭据脱敏）
@@ -79,6 +83,8 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 
 skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。**Kiro CLI 是当前唯一例外**：它不读取 `~/.agents/skills`，因此同一入口会额外托管一份 `${KIRO_HOME:-~/.kiro}/skills/<id>/`，并在 `SKILL.md` 末尾补上 Kiro slash 参数占位 `$ARGUMENTS`。`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。
 
+本机 Skill Desired Set = 一手 catalog ∪ `skills-defaults.yaml` 默认选中项 ∪ overlay `enabled_skills` − `disabled_skills`。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库 catalog / lock。
+
 一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过锁定目录安装到同一个 `~/.agents/skills`。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全局 `~/.agents/skills`（Kiro 例外镜像照旧）。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ```bash
@@ -124,3 +130,24 @@ git diff --exit-code -- agents/vendors/cursor/mcp.json agents/vendors/kiro/mcp.j
 ```
 
 生成器禁用本机 overlay，不解析 secret 值，只使用 committed safe sources；生成 diff 必须审查并提交。
+
+## TUI manager (`dotf tui`)
+
+`dotf tui` 是模块 / Skill / MCP 与状态漂移的**管理页面**，不是 plan-only 皮肤：
+
+- **顶部 tab**：`Tab` / `Shift+Tab`（或 `l` / `h`）切换 Modules / Skills / MCP / Status / Conflicts；`1`-`5` 直达；默认落在 Modules 清单
+- **单行一项**：每个模块 / Skill / MCP 占一行；不再被 install / config / deconfig 等动作稀释
+- **状态栏**：始终列出移动快捷键（`j`/`k` 上下、`C-d`/`C-u` 半屏、`gg`/`G` 首末）；光标所在行追加已声明动作的快捷键、动作名与简述（未声明的动作不出现）
+- **按键即时触发**：模块行按 `i` install / `c` config / `d` deconfig / `u` uninstall / `D` doctor；Skill / MCP 行按 `a` apply / `x` remove；弹出进度窗、留在 TUI 内、完成后按 Enter 继续、状态就地刷新
+- **批量**：`space` 勾选多行（`[x]` 高亮）后 `Enter` 在 TUI 内一次性跑；`Ctrl-x` 清空勾选（y/N，默认 N）
+- **过滤 / 跳转**：按 `/` 进入过滤；`j`/`k` 上下移动；`Ctrl-d`/`Ctrl-u` 半屏；`g g` 顶、`G` 底；`Esc` 清空过滤
+- **危险动作二次确认**：`u` / `d` / `x` 在按下后弹 y/N 确认，默认 `N`
+- **状态来源**：`XDG_STATE_HOME/dotf/modules-state.yaml`（模块 install/config 事实）+ managed manifest（漂移）+ `agents/env/overlay.*.yaml`（Skill / MCP Desired Set）。TUI 只读不写
+- **退出回显**：TUI 退出时在 stdout 打印本会话改动清单（或 "本会话无改动"）
+
+详细键位速查与状态优先级见 `openspec/changes/dotf-tui-manager/`。
+
+约束：
+- 仅在 TTY 下打开；非 TTY 立即失败并指向 CLI
+- 缺 Textual 时失败并指向 `mise exec -- pip install textual`
+- TUI 不直接写 HOME / overlay / state / manifest；所有改动通过 `bin/dotf` 子命令

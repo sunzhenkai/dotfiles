@@ -262,6 +262,110 @@ def test_disabled_skipped_in_select_all_and_profile() -> None:
     assert [a.module for a in plan_prof.actions] == ["a"]
 
 
+def test_uninstall_rejects_out_of_plan_dependents() -> None:
+    reg = _reg(
+        {"name": "base", "install": True, "uninstall": True, "doctor": True},
+        {"name": "leaf", "install": True, "uninstall": True, "doctor": True, "depends_on": ["base"]},
+    )
+    blocked = planner.build_plan(
+        os_id="linux",
+        modules_explicit=["base"],
+        actions=["uninstall"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert not blocked.ok
+    assert any("Dependent" in item and "leaf" in item for item in blocked.errors)
+
+    together = planner.build_plan(
+        os_id="linux",
+        modules_explicit=["base", "leaf"],
+        actions=["uninstall"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert together.ok, together.errors
+    assert [item.module for item in together.actions] == ["leaf", "base"]
+
+
+def test_deconfig_skips_dependent_check() -> None:
+    reg = _reg(
+        {"name": "base", "config": {"source": "a", "target": "~/.a"}},
+        {"name": "leaf", "config": {"source": "b", "target": "~/.b"}, "depends_on": ["base"]},
+    )
+    plan = planner.build_plan(
+        os_id="linux",
+        modules_explicit=["base"],
+        actions=["deconfig"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert plan.ok, plan.errors
+    assert [(item.module, item.action) for item in plan.actions] == [("base", "deconfig")]
+
+
+def test_retry_rebuilds_uninstall_and_skill_remove() -> None:
+    from dataclasses import asdict
+
+    import plan_protocol
+
+    reg = _reg({"name": "base", "install": True, "uninstall": True, "doctor": True})
+    os_id = planner.modules.detect_os()
+    original = planner.build_plan(
+        os_id=os_id,
+        modules_explicit=["base", "skill:grill-with-docs"],
+        actions=["uninstall", "skill.remove"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert original.ok, original.errors
+    probe = plan_protocol.make_document(
+        requested_os=os_id,
+        detected_os=os_id,
+        planned_os=os_id,
+        profile=None,
+        requested_actions=["uninstall", "skill.remove"],
+        registry=reg,
+        ordered_modules=original.ordered_modules,
+        actions=[asdict(item) for item in original.actions],
+    )
+    candidates = [
+        {
+            "module": item.module,
+            "action": item.action,
+            "dependency_hash": plan_protocol.dependency_digest(probe, item.module),
+        }
+        for item in original.actions
+    ]
+    retried = planner.build_retry_plan(
+        candidates,
+        os_id=os_id,
+        profile=None,
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert retried.ok, retried.errors
+    assert {(item.module, item.action) for item in retried.actions} == {
+        (item.module, item.action) for item in original.actions
+    }
+
+
+def test_artifact_actions_append_after_modules() -> None:
+    reg = _reg({"name": "nvim", "config": {"source": "a", "target": "~/.a"}})
+    plan = planner.build_plan(
+        os_id="linux",
+        modules_explicit=["nvim", "skill:grill-with-docs"],
+        actions=["deconfig", "skill.remove"],
+        registry=reg,
+        profiles_data=_profiles(),
+    )
+    assert plan.ok, plan.errors
+    assert [(item.module, item.action) for item in plan.actions] == [
+        ("nvim", "deconfig"),
+        ("skill:grill-with-docs", "skill.remove"),
+    ]
+
+
 def test_disabled_still_runs_when_explicit() -> None:
     reg = _reg(
         {"name": "disabled-b", "install": True, "doctor": True, "enabled": False},

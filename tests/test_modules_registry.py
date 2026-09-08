@@ -47,6 +47,35 @@ def test_capability_queries() -> None:
     assert agents and modules.has_install(agents) and modules.has_config(agents)
     assert agents and modules.has_doctor(agents)
     assert system and modules.has_install(system) and not modules.has_doctor(system)
+    assert nvim and modules.has_deconfig(nvim) and not modules.has_uninstall(nvim)
+    grepom = modules.find_module(mods, "grepom")
+    assert grepom and modules.has_uninstall(grepom)
+
+
+def test_base_modules_do_not_declare_uninstall() -> None:
+    mods = modules.load_registry()
+    for name in ("system", "homebrew", "sdk"):
+        mod = modules.find_module(mods, name)
+        assert mod is not None, name
+        assert not modules.has_uninstall(mod), name
+    for mod in mods:
+        name = str(mod.get("name") or "")
+        assert "docker" not in name
+
+
+def test_uninstall_requires_handler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    handlers = tmp_path / "handlers"
+    handlers.mkdir()
+    registry = [
+        {"name": "ghost", "install": True, "uninstall": True, "doctor": True},
+    ]
+    errors = modules.validate_registry(
+        registry,
+        profiles_data={"version": 1, "default": "t", "profiles": {"t": {"modules": [], "includes": []}}},
+        strict_handlers=True,
+        handlers_dir=handlers,
+    )
+    assert any("ghost" in item and "uninstall" in item for item in errors)
 
 
 def test_os_filter_config_modules() -> None:
@@ -57,12 +86,28 @@ def test_os_filter_config_modules() -> None:
     }
 
     assert "hypr" in linux_cfg
-    assert "fcitx5" in linux_cfg
+    # fcitx5 已归档：注册表保留 OS 能力，但不进默认列表。
+    assert "fcitx5" not in linux_cfg
     assert "iterm2" not in linux_cfg
 
     assert "iterm2" in darwin_cfg
     assert "hypr" not in darwin_cfg
     assert "fcitx5" not in darwin_cfg
+
+    linux_all_cfg = {
+        m["name"]
+        for m in modules.filter_modules(
+            mods, capability="config", os_id="linux", include_disabled=True
+        )
+    }
+    darwin_all_cfg = {
+        m["name"]
+        for m in modules.filter_modules(
+            mods, capability="config", os_id="darwin", include_disabled=True
+        )
+    }
+    assert "fcitx5" in linux_all_cfg
+    assert "fcitx5" not in darwin_all_cfg
 
     # 全平台模块两侧都应存在
     assert "nvim" in linux_cfg and "nvim" in darwin_cfg
@@ -71,12 +116,17 @@ def test_os_filter_config_modules() -> None:
 def test_disabled_modules_excluded_from_default_lists() -> None:
     mods = modules.load_registry()
     cpp = modules.find_module(mods, "cpp-dev")
+    archived_names = ("trae-cli", "fcitx5", "shell_gpt", "logseq")
     zcode = modules.find_module(mods, "zcode")
     kiro = modules.find_module(mods, "kiro")
     # 已移除的 vendor 不再注册
     for removed in ("claude", "qoder", "codebuddy-code", "minimax"):
         assert modules.find_module(mods, removed) is None
     assert cpp and not modules.is_enabled(cpp)
+    for name in archived_names:
+        module = modules.find_module(mods, name)
+        assert module is not None, name
+        assert not modules.is_enabled(module), name
     assert zcode and modules.is_enabled(zcode)
     assert kiro and modules.is_enabled(kiro)
     assert zcode.get("config")
@@ -129,6 +179,9 @@ def test_cli_has_and_exists(repo_root: Path) -> None:
     assert run("has", "nvim", "install").returncode == 1
     assert run("has", "sdk", "doctor").returncode == 0
     assert run("has", "system", "doctor").returncode == 1
+    assert run("has", "grepom", "uninstall").returncode == 0
+    assert run("has", "nvim", "uninstall").returncode == 1
+    assert run("has", "nvim", "deconfig").returncode == 0
 
 
 def test_doctor_capability_list_excludes_system(repo_root: Path) -> None:

@@ -75,6 +75,10 @@ agents/env/
 
 ```shell
 dotf agents -c
+dotf agents skill apply grill-with-docs
+dotf agents skill remove grill-with-docs
+dotf agents mcp apply web-reader --tool cursor
+dotf agents mcp remove web-reader --all-tools
 scripts/agents/sync.sh cursor --profile research
 scripts/agents/sync.sh all --dry-run
 scripts/agents/sync.sh all --env-only --profile browser
@@ -82,13 +86,15 @@ python3 scripts/agents/doctor.py
 python3 scripts/agents/doctor.py --profile browser --verbose
 ```
 
+Skill Desired Set = 一手 catalog ∪ 默认选中第三方 ∪ overlay `enabled_skills` − `disabled_skills`。MCP 继续用 `enabled_servers` / `disabled_servers` / `exclude.<tool>.servers`。apply / remove 只写本机 overlay，不改仓库编目或 lock。
+
 ## 本机覆盖
 
 ```shell
 PYTHONPATH=scripts python3 -m dotf_core.overlays init
 ```
 
-命令只写 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/00-local.yaml`。多个 `*.yaml` 按 UTF-8 文件名字节序加载，mapping 递归合并，后文件的 scalar/list 替换前文件；所有文件在合并前后均严格校验。可覆盖默认 profile、server 选择、browser 本机设置与 Codex `local_toml`。
+命令只写 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/00-local.yaml`。多个 `*.yaml` 按 UTF-8 文件名字节序加载，mapping 递归合并，后文件的 scalar/list 替换前文件；所有文件在合并前后均严格校验。可覆盖默认 profile、server 选择、Skill Desired Set（`enabled_skills` / `disabled_skills`）、browser 本机设置与 Codex `local_toml`。未写新键时保持旧默认全量 sync。
 
 旧 `agents/env/local.yaml`、`local-*.yaml`、`local/*.yaml` 与 `agents/vendors/codex/config.local.toml` 仅作为只读迁移输入，读取时告警。显式迁移：
 

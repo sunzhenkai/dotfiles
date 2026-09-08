@@ -21,6 +21,7 @@ from dotf_core.config_deploy import (
     UnsafeConfigHandlerError,
     apply_config_plan,
     compile_config_plan,
+    deconfig_owned,
 )
 from dotf_core.paths import PathBoundaryError
 from dotf_core.schemas import validate_managed_manifest
@@ -282,6 +283,139 @@ def test_producer_audit_skips_preserved_runtime_subtrees(tmp_path: Path) -> None
     assert plan.status == "changed"
     assert runtime.read_text(encoding="utf-8") == "updated-by-runtime"
 
+
+def _make_socket_inode(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.mknod(path, mode=stat.S_IFSOCK | 0o600)
+
+
+def test_merge_target_runtime_socket_is_skipped(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "template"
+    source.mkdir()
+    (source / "config.toml").write_text("managed = true\n", encoding="utf-8")
+    catalogs = source / "model-catalogs"
+    catalogs.mkdir()
+    (catalogs / "zhipu-catalog.json").write_text('{"models": [{"slug": "glm-5.3"}]}\n', encoding="utf-8")
+    target = home / ".codex"
+    sock_path = target / "app-server-control" / "app-server-control.sock"
+    module = _module(source, target, strategy="merge", target_mode="0700")
+    _make_socket_inode(sock_path)
+    (target / "state_5.sqlite").write_bytes(b"runtime-db")
+
+    def producer(context):
+        assert "model-catalogs/zhipu-catalog.json" in context.source_files
+        assert "state_5.sqlite" not in context.actual_files
+        return [
+            ProducedFile("config.toml", context.source_files["config.toml"]),
+            ProducedFile(
+                "model-catalogs/zhipu-catalog.json",
+                context.source_files["model-catalogs/zhipu-catalog.json"],
+                format="json",
+            ),
+        ]
+
+    plan = compile_config_plan(
+        module, repo_root=repo, home=home, state_home=state, producer=producer
+    )
+    assert plan.status == "changed"
+    relatives = {op.relative_path for op in plan.operations if op.operation == "write"}
+    assert relatives == {"config.toml", "model-catalogs/zhipu-catalog.json"}
+    result = apply_config_plan(
+        plan, repo_root=repo, home=home, state_home=state, run_id="sock-1"
+    )
+    assert result.status == "changed"
+    assert (target / "config.toml").read_text(encoding="utf-8") == "managed = true\n"
+    assert json.loads((target / "model-catalogs" / "zhipu-catalog.json").read_text(encoding="utf-8")) == {
+        "models": [{"slug": "glm-5.3"}]
+    }
+    assert stat.S_ISSOCK(sock_path.lstat().st_mode)
+    assert (target / "state_5.sqlite").read_bytes() == b"runtime-db"
+
+
+def test_merge_target_runtime_fifo_and_extra_symlink_are_skipped(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "template"
+    source.mkdir()
+    (source / "config.json").write_text("{}\n", encoding="utf-8")
+    target = home / ".config" / "tool"
+    target.mkdir(parents=True)
+    fifo = target / "runtime.pipe"
+    os.mkfifo(fifo)
+    outside = tmp_path / "outside-bin"
+    outside.write_text("#!/bin/sh\n", encoding="utf-8")
+    extra_link = target / "sandbox-wrapper"
+    extra_link.symlink_to(outside)
+    module = _module(source, target, strategy="merge", target_mode="0700")
+
+    def producer(context):
+        assert set(context.actual_files) == set()
+        return [ProducedFile("config.json", context.source_files["config.json"], format="json")]
+
+    plan = compile_config_plan(
+        module, repo_root=repo, home=home, state_home=state, producer=producer
+    )
+    apply_config_plan(plan, repo_root=repo, home=home, state_home=state, run_id="runtime-1")
+    assert (target / "config.json").read_text(encoding="utf-8") == "{}\n"
+    assert stat.S_ISFIFO(fifo.lstat().st_mode)
+    assert extra_link.is_symlink()
+    assert extra_link.readlink() == outside
+
+
+def test_repository_source_socket_still_fails_closed(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "template"
+    source.mkdir()
+    (source / "config.toml").write_text("managed = true\n", encoding="utf-8")
+    _make_socket_inode(source / "stale.sock")
+    module = _module(source, home / ".config" / "tool", strategy="merge", target_mode="0700")
+    with pytest.raises(ConfigDeployError, match="unsupported managed source entry"):
+        compile_config_plan(
+            module,
+            repo_root=repo,
+            home=home,
+            state_home=state,
+            producer=lambda context: [
+                ProducedFile("config.toml", context.source_files["config.toml"])
+            ],
+        )
+
+
+def test_merge_reads_example_stem_and_owned_leaves_only(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "template"
+    source.mkdir()
+    (source / "settings.json").write_text('{"managed": true}\n', encoding="utf-8")
+    (source / "auth.json.example").write_text('{"example": true}\n', encoding="utf-8")
+    target = home / ".pi" / "agent"
+    target.mkdir(parents=True)
+    (target / "auth.json").write_text('{"local": true}\n', encoding="utf-8")
+    (target / "noise.sqlite").write_bytes(b"db")
+    module = _module(source, target, strategy="merge", target_mode="0700")
+    seen: list[set[str]] = []
+
+    def producer(context):
+        seen.append(set(context.actual_files))
+        profile = context.actual_files.get(".dotf-profile", b"first\n")
+        return [
+            ProducedFile("settings.json", context.source_files["settings.json"], format="json"),
+            ProducedFile(".dotf-profile", profile),
+        ]
+
+    first = compile_config_plan(
+        module, repo_root=repo, home=home, state_home=state, producer=producer
+    )
+    apply_config_plan(first, repo_root=repo, home=home, state_home=state, run_id="pi-1")
+    second = compile_config_plan(
+        module, repo_root=repo, home=home, state_home=state, producer=producer
+    )
+    assert seen[0] == {"auth.json"}
+    assert seen[-1] == {"auth.json", "settings.json", ".dotf-profile"}
+    assert second.status == "unchanged"
+    assert (target / "noise.sqlite").read_bytes() == b"db"
+    assert (target / "auth.json").read_text(encoding="utf-8") == '{"local": true}\n'
+
+
 def test_unsafe_specialized_direct_write_is_detected_and_not_manifested(tmp_path: Path) -> None:
     repo, home, state = _roots(tmp_path)
     source = repo / "template.json"
@@ -327,6 +461,36 @@ def test_legacy_exact_directory_link_is_explicitly_migrated_without_repo_mutatio
     assert _tree_digest(source) == source_before
 
 
+def test_legacy_directory_link_via_checkout_alias_is_migrated(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config"
+    source.mkdir()
+    (source / "managed.txt").write_text("repository bytes", encoding="utf-8")
+    source_before = _tree_digest(source)
+    alias = home / ".config" / "dotfiles"
+    alias.parent.mkdir(parents=True)
+    alias.symlink_to(repo)
+    target = home / ".config" / "fixture"
+    target.symlink_to(alias / "config", target_is_directory=True)
+    module = _module(source, target)
+
+    assert os.readlink(target) != str(source)
+    assert Path(target).resolve() == source.resolve()
+
+    plan = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
+    migration = plan.operations[0]
+    assert migration.operation == "migrate-link"
+    assert (migration.item.state, migration.item.action) == ("update", "update")
+    result = apply_config_plan(plan, repo_root=repo, home=home, state_home=state, run_id="migrate-alias-1")
+
+    assert result.status == "changed"
+    assert target.is_dir() and not target.is_symlink()
+    assert (target / "managed.txt").read_text(encoding="utf-8") == "repository bytes"
+    assert source.is_dir() and (source / "managed.txt").read_text(encoding="utf-8") == "repository bytes"
+    assert _tree_digest(source) == source_before
+    assert alias.is_symlink() and alias.resolve() == repo.resolve()
+
+
 def test_legacy_foreign_link_and_unowned_real_root_default_to_conflict(tmp_path: Path) -> None:
     repo, home, state = _roots(tmp_path)
     source = repo / "config"
@@ -344,8 +508,12 @@ def test_legacy_foreign_link_and_unowned_real_root_default_to_conflict(tmp_path:
     link_plan = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
     assert link_plan.status == "conflict"
     assert link_plan.conflicts[0].conflict_reason == "foreign-directory-symlink"
-    with pytest.raises(ConfigConflictError):
+    with pytest.raises(ConfigConflictError, match="目录符号链接") as blocked:
         apply_config_plan(link_plan, repo_root=repo, home=home, state_home=state)
+    message = str(blocked.value)
+    assert str(target) in message
+    assert str(foreign) in message
+    assert "foreign-directory-symlink" not in message.split("：", 1)[0]
     assert target.is_symlink()
     assert victim.read_text(encoding="utf-8") == "keep"
 
@@ -354,8 +522,9 @@ def test_legacy_foreign_link_and_unowned_real_root_default_to_conflict(tmp_path:
     real_plan = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
     assert real_plan.status == "conflict"
     assert real_plan.conflicts[0].conflict_reason == "unowned-real-target"
-    with pytest.raises(ConfigConflictError):
+    with pytest.raises(ConfigConflictError, match="不受本模块管理") as unowned:
         apply_config_plan(real_plan, repo_root=repo, home=home, state_home=state)
+    assert str(target) in str(unowned.value)
     assert target.read_text(encoding="utf-8") == "foreign real leaf"
     assert (source / "managed.txt").read_text(encoding="utf-8") == "repo"
 
@@ -509,3 +678,79 @@ def test_merge_requires_explicit_field_reconciliation_for_modified_owned_target(
     )
     assert conflict.status == "conflict"
     assert conflict.conflicts[0].conflict_reason == "managed-target-modified"
+
+
+def test_deconfig_removes_unmodified_copy_targets(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config"
+    source.mkdir()
+    (source / "one.toml").write_text("value = 1\n", encoding="utf-8")
+    target = home / ".config" / "fixture"
+    module = _module(source, target)
+    apply_config_plan(
+        compile_config_plan(module, repo_root=repo, home=home, state_home=state),
+        repo_root=repo,
+        home=home,
+        state_home=state,
+        run_id="cfg-1",
+    )
+    one = target / "one.toml"
+    assert one.is_file()
+    first = deconfig_owned("fixture", repo_root=repo, home=home, state_home=state, run_id="de-1")
+    assert first.status == "changed"
+    assert first.pruned == 1
+    assert not one.exists()
+    assert _manifest(state)["items"] == []
+    second = deconfig_owned("fixture", repo_root=repo, home=home, state_home=state, run_id="de-2")
+    assert second.status == "unchanged"
+    assert second.pruned == 0
+
+
+def test_deconfig_keeps_conflict_and_unmanaged(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config"
+    source.mkdir()
+    (source / "managed.txt").write_text("expected\n", encoding="utf-8")
+    target = home / ".config" / "fixture"
+    module = _module(source, target)
+    apply_config_plan(
+        compile_config_plan(module, repo_root=repo, home=home, state_home=state),
+        repo_root=repo,
+        home=home,
+        state_home=state,
+        run_id="cfg-1",
+    )
+    drifted = target / "managed.txt"
+    drifted.write_text("local change\n", encoding="utf-8")
+    unmanaged = target / "manual.txt"
+    unmanaged.write_text("hands off\n", encoding="utf-8")
+    result = deconfig_owned("fixture", repo_root=repo, home=home, state_home=state, run_id="de-1")
+    assert result.status == "unchanged"
+    assert drifted.read_text(encoding="utf-8") == "local change\n"
+    assert unmanaged.read_text(encoding="utf-8") == "hands off\n"
+    owners = {item["owner"] for item in _manifest(state)["items"]}
+    assert owners == {"config:fixture"}
+
+
+def test_deconfig_removes_unmodified_merge_target(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "template.json"
+    source.write_text('{"managed": true}\n', encoding="utf-8")
+    target = home / ".config" / "tool" / "config.json"
+    module = _module(source, target, strategy="merge", target_mode="0644")
+
+    def merge(context):
+        return ProducedContent(context.source_files["."], format="json")
+
+    apply_config_plan(
+        compile_config_plan(module, repo_root=repo, home=home, state_home=state, producer=merge),
+        repo_root=repo,
+        home=home,
+        state_home=state,
+        run_id="merge-1",
+    )
+    assert target.is_file()
+    result = deconfig_owned("fixture", repo_root=repo, home=home, state_home=state, run_id="de-1")
+    assert result.status == "changed"
+    assert not target.exists()
+    assert _manifest(state)["items"] == []

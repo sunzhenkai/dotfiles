@@ -45,7 +45,6 @@ profiles:
       - wezterm
       - ghostty
       - hypr
-      - fcitx5
       - iterm2
 
   full:

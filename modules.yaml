@@ -5,6 +5,8 @@
 #   name       — 唯一模块名
 #   desc       — 人类可读描述
 #   install    — true 表示具备安装能力（由 scripts/install.sh 按名调度）
+#   uninstall  — true 表示具备撤软件能力（须有 scripts/modules/<name>/uninstall.sh）
+#                deconfig 由 config 隐含，不单独声明；system/homebrew/sdk 不声明 uninstall
 #   config     — 配置部署声明，必须显式包含:
 #                source/target、strategy(copy|merge|render|symlink)、
 #                writable/sensitive、target_mode（mode 为兼容别名）、
@@ -65,6 +67,7 @@ modules:
     group: tools
     depends_on: [golang]
     install: true
+    uninstall: true
     doctor: true
     bin: grepom
 
@@ -135,6 +138,7 @@ modules:
     group: agents
     install: true
     doctor: true
+    enabled: false   # archived
 
   - name: dsh
     desc: 安装 DeepSeek Harness CLI（dsh，npm @deepseek-ai/dsh）
@@ -571,6 +575,7 @@ modules:
       preserve: [cache, data, history, db, dictionaries]
       exclude: [conf/cached_layouts]
     os: [linux]
+    enabled: false   # archived
 
   # ---------- config-only: tools ----------
   - name: yazi
@@ -607,6 +612,7 @@ modules:
     desc: Shell-GPT 配置
     group: utils
     doctor: true
+    enabled: false   # archived
     config:
       source: config/tools/shell_gpt
       target: ~/.config/shell_gpt
@@ -621,6 +627,7 @@ modules:
     desc: Logseq 笔记配置（~/.logseq 为真实目录，禁止整树软链）
     group: utils
     doctor: true
+    enabled: false   # archived
     config:
       source: config/tools/logseq
       target: ~/.logseq

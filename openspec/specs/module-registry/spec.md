@@ -3,9 +3,8 @@
 ## Purpose
 维护单一模块注册表，作为 install/config/doctor 能力、路径与 OS 适用性的真相源，供 CLI 与调度只读查询。
 ## Requirements
-
 ### Requirement: 统一模块注册表
-系统 SHALL 维护单一模块注册表作为 install/config/doctor 能力与路径的真相源。每个模块条目 SHALL 包含唯一 `name`，并可选声明 `install` 能力、`config` 能力（含仓库源路径与安装目标路径）、`doctor` 能力，以及可选的 OS 适用性。工具型模块（非 `system`/`homebrew`/`fonts`，且具备 install 和/或 config）SHALL 声明 `doctor: true`。模块 MAY 声明可选 `bin` 字段供 L0 doctor 检查 PATH。
+系统 SHALL 维护单一模块注册表作为 install/config/doctor/uninstall 能力与路径的真相源。每个模块条目 SHALL 包含唯一 `name`，并可选声明 `install` 能力、`config` 能力（含仓库源路径与安装目标路径）、`doctor` 能力、`uninstall` 能力，以及可选的 OS 适用性。工具型模块（非 `system`/`homebrew`/`fonts`，且具备 install 和/或 config）SHALL 声明 `doctor: true`。模块 MAY 声明可选 `bin` 字段供 L0 doctor 检查 PATH。deconfig 由具备 config 的模块隐含提供，SHALL NOT 要求单独的注册表字段。
 
 #### Scenario: 双能力模块可查询
 - **WHEN** 查询模块 `agents`
@@ -30,8 +29,13 @@
 - **THEN** 注册表可不声明 doctor 能力
 - **THEN** 校验 SHALL NOT 因此失败
 
+#### Scenario: 有 config 即可 deconfig
+- **WHEN** 查询具备 config 的模块
+- **THEN** 调度 SHALL 视其可 deconfig
+- **THEN** SHALL NOT 要求额外的 `deconfig: true` 字段
+
 ### Requirement: 调度只读注册表
-`dotf` 及 install/config/doctor 调度逻辑 SHALL 以注册表判定模块是否存在、具备何种能力、配置源/目标路径；SHALL NOT 再维护与注册表并行的第二套模块清单作为真相源。
+`dotf` 及 install/config/doctor/uninstall/deconfig 调度逻辑 SHALL 以注册表判定模块是否存在、具备何种能力、配置源/目标路径；SHALL NOT 再维护与注册表并行的第二套模块清单作为真相源。
 
 #### Scenario: 未知模块
 - **WHEN** 用户对未注册名称请求 `-i`、`-c` 或 `-d`
@@ -44,6 +48,10 @@
 - **THEN** 系统以非零退出码失败并说明该模块无配置步骤
 - **WHEN** 用户对未声明 doctor 的模块请求 `-d`
 - **THEN** 系统以非零退出码失败并说明该模块无诊断步骤
+- **WHEN** 用户对未声明 uninstall 的模块请求 `--uninstall`
+- **THEN** 系统以非零退出码失败并说明该模块无卸载步骤
+- **WHEN** 用户对不具备 config 的模块请求 `--deconfig`
+- **THEN** 系统以非零退出码失败并说明该模块无配置可撤
 
 ### Requirement: OS 适用性过滤
 注册表可为模块声明适用操作系统集合；未声明时 SHALL 视为全平台适用。按 OS 过滤的操作（含 `dotf init` 与全量 `-a` / `-d -a`）SHALL 只包含当前（或指定）OS 适用的模块。
@@ -85,3 +93,19 @@
 - **WHEN** 模块声明 `strategy: copy` 且无需专用逻辑
 - **THEN** 调度 SHALL 使用公共 copy 实现安装配置
 - **THEN** SHALL NOT 创建指向仓库的目标软链
+
+### Requirement: uninstall 能力可查询
+注册表 MAY 为模块声明 `uninstall` 能力。声明时 SHALL 能通过与 install 相同的约定校验对应处理器。未声明 uninstall 的模块 SHALL 被查询为不具备该能力。`system`、`homebrew`、`sdk` 以及 Docker 相关模块在 v1 SHALL NOT 声明 uninstall。
+
+#### Scenario: 未声明则无 uninstall
+- **WHEN** 查询模块 `nvim`
+- **THEN** 注册表 SHALL NOT 声明 uninstall 能力
+
+#### Scenario: 已声明可查询
+- **WHEN** 某用户级单二进制模块声明 uninstall
+- **THEN** 查询该模块 SHALL 返回具备 uninstall
+- **THEN** 校验 SHALL 要求对应处理器存在
+
+#### Scenario: 底座模块 v1 不声明
+- **WHEN** 查询 `system`、`homebrew` 或 `sdk`
+- **THEN** 注册表 SHALL NOT 声明 uninstall

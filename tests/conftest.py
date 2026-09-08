@@ -58,6 +58,28 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launch_home: Path)
     return home
 
 
+def isolate_agents_sync_for_test(home: Path) -> None:
+    """Disable network-backed third-party defaults and secret-bearing MCP in tests."""
+    import yaml
+
+    overlay_dir = home / ".config" / "dotf" / "overlays"
+    overlay_dir.mkdir(parents=True)
+    lock = yaml.safe_load((ROOT / "agents" / "skills-defaults.lock.yaml").read_text(encoding="utf-8"))
+    servers = yaml.safe_load((ROOT / "agents" / "env" / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
+    overlay = {
+        "schema_version": 1,
+        "kind": "dotf-overlay",
+        "agents": {
+            "profile": "research",
+            "disabled_servers": sorted((servers.get("servers") or {}).keys()),
+            "disabled_skills": [item["id"] for item in lock.get("skills", [])],
+        },
+    }
+    (overlay_dir / "00-test.yaml").write_text(
+        yaml.safe_dump(overlay, sort_keys=False), encoding="utf-8"
+    )
+
+
 @pytest.fixture
 def tmp_state_dir(tmp_home: Path) -> Path:
     """dotf 执行报告等状态目录（XDG state）。"""
