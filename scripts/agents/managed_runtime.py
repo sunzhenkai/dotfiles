@@ -211,6 +211,10 @@ def _state_home(home: Path, state_home: Path | None) -> Path:
     return Path(configured).expanduser().absolute() if configured else home / ".local" / "state"
 
 
+def resolve_state_home(home: Path, state_home: Path | None = None) -> Path:
+    return _state_home(home.expanduser().absolute(), state_home)
+
+
 def manifest_path(home: Path | None = None, state_home: Path | None = None) -> Path:
     base_home = (home or Path.home()).expanduser().absolute()
     return _state_home(base_home, state_home) / "dotf" / AGENTS_MANIFEST_NAME
@@ -478,7 +482,37 @@ def compile_skills_plan(
         include_unlisted=include_unlisted,
         only_ids=only_ids,
     )
-    snapshot = _read_manifest(base_home, state)
+    return compile_owned_plan(
+        repo,
+        expected,
+        home=base_home,
+        state=state,
+        target_root=base_target,
+        source_root=resolved_source_root,
+        owner_prefix=owner_prefix,
+        identity_prefix=identity_prefix,
+        include_unlisted=include_unlisted,
+        only_ids=only_ids,
+        outside_root_message="stale manifest target is outside the skills root",
+    )
+
+
+def compile_owned_plan(
+    repo: Path,
+    expected: tuple[RuntimeFile, ...],
+    *,
+    home: Path,
+    state: Path,
+    target_root: Path,
+    source_root: Path,
+    owner_prefix: str,
+    identity_prefix: str,
+    include_unlisted: bool = False,
+    only_ids: frozenset[str] | None = None,
+    outside_root_message: str = "stale manifest target is outside the owned root",
+) -> SkillsPlan:
+    """Compile ownership decisions for an explicit set of HOME files."""
+    snapshot = _read_manifest(home, state)
     prior_by_target = {
         item.target: item
         for item in snapshot.manifest.items
@@ -489,14 +523,14 @@ def compile_skills_plan(
 
     if snapshot.status == "malformed":
         for item in expected:
-            actual = _read_actual(base_home, Path(item.target))
+            actual = _read_actual(home, Path(item.target))
             operations.append(_conflict(
                 item.target, item.source_identity, item.expected_hash, actual, None,
                 "agents manifest is malformed or incompatible", item, None,
             ))
     else:
         for item in expected:
-            actual = _read_actual(base_home, Path(item.target))
+            actual = _read_actual(home, Path(item.target))
             prior = prior_by_target.get(item.target)
             if prior is None:
                 if actual.state == "missing":
@@ -559,16 +593,16 @@ def compile_skills_plan(
                 continue
             target = Path(prior.target)
             try:
-                normalized = assert_path_confined(base_home, target)
-                normalized.relative_to(base_target)
+                normalized = assert_path_confined(home, target)
+                normalized.relative_to(target_root)
             except (OSError, PathBoundaryError, ValueError):
                 actual = _Actual("unsafe", None)
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
-                    "stale manifest target is outside the skills root", None, prior,
+                    outside_root_message, None, prior,
                 ))
                 continue
-            actual = _read_actual(base_home, normalized)
+            actual = _read_actual(home, normalized)
             if actual.state == "unsafe":
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
@@ -588,10 +622,10 @@ def compile_skills_plan(
     return SkillsPlan(
         MANIFEST_SCHEMA_VERSION,
         str(repo),
-        str(base_home),
+        str(home),
         str(state),
-        str(base_target),
-        str(resolved_source_root),
+        str(target_root),
+        str(source_root),
         owner_prefix,
         identity_prefix,
         include_unlisted,
@@ -844,6 +878,30 @@ def apply_skills_plan(
     A concurrent equivalent run is allowed to turn create/update into unchanged;
     source expectations must remain byte-identical to the caller's plan.
     """
+    def compile_current() -> SkillsPlan:
+        return compile_skills_plan(
+            Path(plan.repo_root),
+            render_skill,
+            home=Path(plan.home),
+            state_home=Path(plan.state_home),
+            target_root=Path(plan.target_root),
+            source_root=Path(plan.source_root),
+            owner_prefix=plan.owner_prefix,
+            identity_prefix=plan.identity_prefix,
+            include_unlisted=plan.include_unlisted,
+            only_ids=plan.only_ids,
+        )
+
+    return apply_owned_plan(plan, compile_current, run_id=run_id)
+
+
+def apply_owned_plan(
+    plan: SkillsPlan,
+    compile_current: Callable[[], SkillsPlan],
+    *,
+    run_id: str | None = None,
+) -> SkillsApplyResult:
+    """Apply an owned-file plan under the Agent manifest lock."""
     if not isinstance(plan, SkillsPlan) or plan.schema_version != MANIFEST_SCHEMA_VERSION:
         raise AgentRuntimeError("unsupported skills plan")
     home = Path(plan.home)
@@ -856,14 +914,7 @@ def apply_skills_plan(
     manifest_file = manifest_path(home, state_home)
 
     with AgentManifestLock(home, state_home):
-        current = compile_skills_plan(
-            Path(plan.repo_root), render_skill, home=home,
-            state_home=state_home, target_root=target_root,
-            source_root=Path(plan.source_root), owner_prefix=plan.owner_prefix,
-            identity_prefix=plan.identity_prefix,
-            include_unlisted=plan.include_unlisted,
-            only_ids=plan.only_ids,
-        )
+        current = compile_current()
         if _expected_signature(current) != _expected_signature(plan):
             raise AgentRuntimeConflict("runtime source changed after planning")
         if current.manifest_status == "malformed":
@@ -905,7 +956,7 @@ def apply_skills_plan(
                     operation.target,
                     operation.expected.content,
                     root=home,
-                    format="text" if operation.target.endswith((".md", ".py", ".sh")) else "binary",
+                    format="text" if operation.target.endswith((".md", ".mdc", ".py", ".sh")) else "binary",
                     mode=operation.expected.mode,
                     backup_root=backup_root if operation.action == "update" else None,
                     run_id=run if operation.action == "update" else None,

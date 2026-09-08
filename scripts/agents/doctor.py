@@ -28,6 +28,7 @@ if str(_SCRIPTS) not in sys.path:
 
 from adapters import adapter_for  # noqa: E402
 from common import Catalog, TOOLS  # noqa: E402
+from instructions import compile_instructions_plan  # noqa: E402
 from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
 from mcp_runtime import read_manifest as read_mcp_manifest  # noqa: E402
 from openspec_skills import openspec_command  # noqa: E402
@@ -435,6 +436,77 @@ def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
         f"openspec CLI 已安装，但全局缺少 {propose}",
         "运行 dotf agents -c 将 OpenSpec skills 装到 ~/.agents/skills",
     )
+
+
+def check_instructions_plan(
+    root: Path,
+    report: DoctorReport,
+    *,
+    home: Path,
+    state_home: Path | None = None,
+) -> None:
+    """Reuse the instruction planner; never approximate manifest/target drift."""
+    try:
+        plan = compile_instructions_plan(root, home=home, state_home=state_home)
+    except (AgentRuntimeError, OSError, ValueError) as exc:
+        report.add("instructions", "planner", STATUS_FAIL, f"instructions planner unavailable: {exc}")
+        return
+    counts = Counter({name: 0 for name in (
+        "managed", "missing", "changed", "stale", "unowned", "conflict", "permission", "malformed"
+    )})
+    statuses: list[str] = []
+    if plan.manifest_status == "malformed":
+        counts["malformed"] += 1
+        statuses.append(
+            _record_state(
+                report,
+                "instructions",
+                "manifest-malformed",
+                "malformed",
+                str(Path(plan.state_home) / "dotf" / "agents-manifest.json"),
+                "ownership manifest",
+            )
+        )
+    for index, operation in enumerate(plan.operations):
+        if operation.prior is not None:
+            counts["managed"] += 1
+        category: str | None = None
+        detail = operation.conflict or operation.state
+        if operation.state == "create" and operation.actual_state == "missing":
+            category = "missing"
+        elif operation.state == "update":
+            category = "changed"
+        elif operation.state == "prune":
+            category = "stale"
+        elif operation.state == "permission":
+            category = "permission"
+        elif operation.state == "conflict":
+            reason = (operation.conflict or "").lower()
+            if "without agents ownership" in reason:
+                category = "unowned"
+                counts["conflict"] += 1
+            elif "symlink" in reason or "unsafe" in reason or operation.actual_state == "unsafe":
+                category = "link-boundary"
+                counts["conflict"] += 1
+            elif "malformed" in reason:
+                category = None
+            else:
+                category = "conflict"
+        if category is not None:
+            count_name = "conflict" if category == "link-boundary" else category
+            counts[count_name] += 1
+            statuses.append(
+                _record_state(
+                    report,
+                    "instructions",
+                    f"runtime-{category}-{index}",
+                    category,
+                    operation.target,
+                    detail,
+                )
+            )
+    summary_status = max(statuses, key=lambda value: _STATUS_ORDER[value]) if statuses else STATUS_PASS
+    report.add("instructions", "sync-plan", summary_status, "instructions runtime plan " + _counts_message(counts))
 
 
 def check_mcp_plan(
@@ -1049,6 +1121,7 @@ def build_report(args: argparse.Namespace) -> DoctorReport:
     _safe_check(report, "mcp", "sync-plan-unavailable", lambda: check_mcp_plan(cat, report, profile, args.tool, args.deep, home=home))
     _safe_check(report, "skills", "sync-plan-unavailable", lambda: check_skills_plan(root, report, home=home))
     _safe_check(report, "skills", "openspec-unavailable", lambda: check_openspec_skills(report, home=home))
+    _safe_check(report, "instructions", "sync-plan-unavailable", lambda: check_instructions_plan(root, report, home=home))
     _safe_check(report, "browser", "browser-unavailable", lambda: check_browser(cat, report, profile, args.deep))
     _safe_check(report, "security", "registry-boundaries-unavailable", lambda: check_config_boundaries(root, report, home=home))
     _safe_check(report, "security", "declared-formats-unavailable", lambda: check_declared_formats(root, report, home=home))

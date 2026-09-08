@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）+ MCP/env（按 tool 过滤）。
+# 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）
+# + 全局 AGENTS.md + MCP/env（按 tool 过滤）。
 # 用法:
 #   sync.sh [<tool>|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
@@ -90,6 +91,13 @@ fi
 python3 "$SCRIPT_DIR/env_sync.py" "${validation_args[@]}"
 
 echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-default}  dry_run=$DRY_RUN"
+
+echo "--- instructions ---"
+instructions_args=(--root "$ROOT")
+if [ "$DRY_RUN" -eq 1 ]; then
+  instructions_args+=(--dry-run)
+fi
+python3 "$SCRIPT_DIR/instructions.py" "${instructions_args[@]}"
 
 if [ "$SKILLS" -eq 1 ]; then
   echo "--- skills ---"

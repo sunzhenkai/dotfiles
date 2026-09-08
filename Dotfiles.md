@@ -155,7 +155,7 @@ dotf agents -ic
 dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`（tool 无关），按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一个全局目录，再按工具写入 MCP/env 配置。
+`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`（tool 无关），按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一个全局目录，再按工具写入 MCP/env 配置。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md` 和 Cursor 用户级 rules。
 
 #### dsh（DeepSeek Harness）
 

@@ -286,7 +286,7 @@ def test_codex_uses_sensitive_merge_directory_and_preserves_runtime() -> None:
     assert config["strategy"] == "merge"
     assert config["writable"] is True and config["sensitive"] is True
     assert config["target_mode"] == "0700"
-    assert {"auth.json", "history.jsonl", "sessions", "log", "skills"} <= set(
+    assert {"auth.json", "history.jsonl", "sessions", "log", "skills", "AGENTS.md"} <= set(
         modules.module_preserve(codex)
     )
     assert {"README.md", "config.local.toml.example"} <= set(

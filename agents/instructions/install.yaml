@@ -1,0 +1,13 @@
+# 全局 AGENTS.md 的用户级安装目标。源文件是 AGENTS.md；Cursor 需要 .mdc frontmatter。
+version: 1
+source: AGENTS.md
+targets:
+  - id: agents
+    path: ~/.agents/AGENTS.md
+    format: markdown
+  - id: codex
+    path: ~/.codex/AGENTS.md
+    format: markdown
+  - id: cursor
+    path: ~/.cursor/rules/00-dotf-global.mdc
+    format: cursor-mdc

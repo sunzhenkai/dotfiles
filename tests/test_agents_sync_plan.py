@@ -452,6 +452,7 @@ def test_public_sync_wrapper_delegates_vendor_and_capability_validation_to_matri
         encoding="utf-8",
     )
     (repo / "agents" / "skills").mkdir()
+    shutil.copytree(ROOT / "agents" / "instructions", repo / "agents" / "instructions")
     shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
     shutil.copy2(ROOT / "agents" / "skills-defaults.yaml", repo / "agents" / "skills-defaults.yaml")
     shutil.copy2(ROOT / "agents" / "skills-defaults.lock.yaml", repo / "agents" / "skills-defaults.lock.yaml")

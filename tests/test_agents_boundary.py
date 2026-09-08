@@ -211,12 +211,16 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
     assert r.returncode == 0, r.stderr + r.stdout
     written = [line[4:] for line in r.stdout.splitlines() if line.startswith("  + ")]
     assert written, r.stdout
+    allowed = (
+        tmp_home / ".agents" / "skills",
+        tmp_home / ".agents" / "AGENTS.md",
+        tmp_home / ".local" / "bin",
+        tmp_home / ".kiro" / "skills",
+        tmp_home / ".codex" / "AGENTS.md",
+        tmp_home / ".cursor" / "rules",
+    )
     for dest in written:
-        assert dest.startswith(str(tmp_home / ".agents" / "skills")) or dest.startswith(
-            str(tmp_home / ".local" / "bin")
-        ) or dest.startswith(
-            str(tmp_home / ".kiro" / "skills")
-        ), dest
+        assert any(dest.startswith(str(prefix)) for prefix in allowed), dest
 
 
 def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
@@ -240,6 +244,8 @@ def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
         check=False,
     )
     assert r.returncode == 0, r.stderr + r.stdout
+    assert "--- instructions ---" in r.stdout
     assert f"==> sync kiro skills → {tmp_home / '.kiro' / 'skills'}" in r.stdout
     assert "--- openspec skills ---" in r.stdout
+    assert (tmp_home / ".agents" / "AGENTS.md").is_file()
     assert (tmp_home / ".kiro" / "skills" / "task-design" / "SKILL.md").is_file()

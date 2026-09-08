@@ -276,7 +276,7 @@ modules:
       writable: true
       sensitive: true
       target_mode: "0700"
-      preserve: [auth.json, history.jsonl, sessions, archived_sessions, log, shell_snapshots, skills, prompts, tmp, models_cache.json, version.json]
+      preserve: [auth.json, history.jsonl, sessions, archived_sessions, log, shell_snapshots, skills, prompts, tmp, models_cache.json, version.json, AGENTS.md]
       exclude: [README.md, config.local.toml.example]
 
   - name: kimi-code

@@ -121,7 +121,7 @@ skills、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ MCP
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ 全局 AGENTS.md + MCP
 dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs

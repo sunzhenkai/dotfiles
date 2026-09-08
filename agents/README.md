@@ -9,7 +9,7 @@
 ```shell
 dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 动作
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ MCP（全部工具）
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ 全局 AGENTS.md + MCP（全部工具）
 dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 的 MCP（skills 与 tool 无关，始终全量）
 dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync
 dotf agents skill remove <id>  # 停用并 prune owned 且未漂的目标（不改仓库）
@@ -31,6 +31,8 @@ agents/
   skills/<skill-id>/SKILL.md       # 一手 skill 源（frontmatter 渲染后分发）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
+  instructions/AGENTS.md           # 全局 agent 指令（用户级，跨项目）
+  instructions/install.yaml        # 安装目标（~/.agents、Codex、Cursor rules）
   skills-defaults.yaml             # 第三方默认 skill（锁定后装到 ~/.agents/skills）
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
   env/                             # MCP / profiles / browser / security 真相源
@@ -81,6 +83,8 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 ## 同步
 
 skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。**Kiro CLI 是当前唯一例外**：它不读取 `~/.agents/skills`，因此同一入口会额外托管一份 `${KIRO_HOME:-~/.kiro}/skills/<id>/`，并在 `SKILL.md` 末尾补上 Kiro slash 参数占位 `$ARGUMENTS`。`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。
+
+同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`，以及 Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`。源在 `agents/instructions/`。**不要手改**这些安装产物。
 
 本机 Skill Desired Set = 一手 catalog ∪ `skills-defaults.yaml` 默认选中项 ∪ overlay `enabled_skills` − `disabled_skills`。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库 catalog / lock。
 
