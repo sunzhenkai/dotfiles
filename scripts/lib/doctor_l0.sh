@@ -39,6 +39,17 @@ dotf_doctor_l0() {
         failed=1
       fi
     fi
+  else
+    local mcp_status=""
+    if mcp_status="$(python3 "$DOTFILES_ROOT/scripts/agents/managed_mcp_status.py" "$mod")"; then
+      [ -n "$mcp_status" ] && echo "$mcp_status"
+    else
+      local mcp_rc=$?
+      if [ "$mcp_rc" -ne 2 ]; then
+        [ -n "$mcp_status" ] && echo "$mcp_status"
+        failed=1
+      fi
+    fi
   fi
 
   if modules_has "$mod" install; then

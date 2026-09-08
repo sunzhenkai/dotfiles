@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import stat
 import subprocess
@@ -18,6 +19,13 @@ sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(SCRIPTS / "agents"))
 
 from common import Catalog  # noqa: E402
+from dotf_core.config_deploy import (  # noqa: E402
+    _load_registry_module,
+    apply_config_plan,
+    compile_config_plan,
+    deploy_config,
+)
+from dotf_core.config_producers import producer_for  # noqa: E402
 from mcp_runtime import MCP_JOURNAL_DIR, MCP_MANIFEST_NAME  # noqa: E402
 from sync_plan import SyncPlanError, apply_sync_plan, compile_sync_plan  # noqa: E402
 
@@ -40,6 +48,42 @@ def _apply(cat: Catalog, home: Path, profile: str, tools: list[str], **kwargs):
     state = home / ".state"
     plan = compile_sync_plan(cat, profile, tools, home=home, state_home=state)
     return plan, apply_sync_plan(plan, cat, approved=True, home=home, state_home=state, **kwargs)
+
+
+def _deploy_opencode(home: Path, state: Path, profile: str = "company") -> None:
+    module = _load_registry_module(ROOT, "opencode")
+    producer = producer_for("opencode", repo_root=ROOT, home=home)
+    prior = os.environ.get("DOTF_OPENCODE_PROFILE")
+    os.environ["DOTF_OPENCODE_PROFILE"] = profile
+    try:
+        deploy_config(
+            module,
+            repo_root=ROOT,
+            home=home,
+            state_home=state,
+            producer=producer,
+            run_id="test-opencode-config",
+        )
+    finally:
+        if prior is None:
+            os.environ.pop("DOTF_OPENCODE_PROFILE", None)
+        else:
+            os.environ["DOTF_OPENCODE_PROFILE"] = prior
+
+
+def _catalog_with_changed_reader(tmp_path: Path) -> Catalog:
+    repo = tmp_path / "catalog-repo"
+    (repo / "agents").mkdir(parents=True)
+    shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
+    shutil.copy2(
+        ROOT / "agents" / "skills-defaults.lock.yaml",
+        repo / "agents" / "skills-defaults.lock.yaml",
+    )
+    servers_path = repo / "agents" / "env" / "mcp" / "servers.yaml"
+    servers = yaml.safe_load(servers_path.read_text(encoding="utf-8"))
+    servers["servers"]["web-reader"]["url"] = "https://example.com/changed/mcp"
+    servers_path.write_text(yaml.safe_dump(servers, sort_keys=False), encoding="utf-8")
+    return Catalog(repo, include_overlays=False)
 
 
 def test_mcp_manifest_owns_each_server_and_preserves_reports_unowned(tmp_home: Path) -> None:
@@ -66,6 +110,168 @@ def test_mcp_manifest_owns_each_server_and_preserves_reports_unowned(tmp_home: P
     ]
     apply_sync_plan(plan, cat, approved=True, home=tmp_home, state_home=tmp_home / ".state")
     assert _block(target, "mcpServers")["private-local"] == {"command": "mine"}
+
+
+def test_mcp_adopts_equivalent_entries_without_replacing_target(tmp_home: Path) -> None:
+    cat = Catalog(ROOT)
+    state = tmp_home / ".state"
+    _apply(cat, tmp_home, "research", ["cursor"])
+    manifest = state / "dotf" / MCP_MANIFEST_NAME
+    manifest.unlink()
+    target = tmp_home / ".cursor" / "mcp.json"
+    value = json.loads(target.read_text(encoding="utf-8"))
+    value["mcpServers"]["private-local"] = {"command": "mine"}
+    target.write_text(json.dumps(value), encoding="utf-8")
+    before = (target.read_bytes(), target.stat().st_ino, target.stat().st_mtime_ns)
+
+    plan = compile_sync_plan(cat, "research", ["cursor"], home=tmp_home, state_home=state)
+    item = plan.items[0]
+    assert (item.state, item.action) == ("update", "adopt")
+    owned = [entry for entry in item.entries if entry.ownership == "owned"]
+    assert owned and all((entry.state, entry.action) == ("update", "adopt") for entry in owned)
+    local = next(entry for entry in item.entries if entry.server_id == "private-local")
+    assert (local.ownership, local.state, local.action) == ("unowned", "unchanged", "none")
+
+    results, _secrets = apply_sync_plan(
+        plan, cat, approved=True, home=tmp_home, state_home=state
+    )
+    assert results[0].status == "changed"
+    assert (target.read_bytes(), target.stat().st_ino, target.stat().st_mtime_ns) == before
+    adopted = json.loads(manifest.read_text(encoding="utf-8"))
+    assert {entry["server_id"] for entry in adopted["items"]} == {
+        "web-reader", "web-search-prime", "zai-vision", "zread"
+    }
+
+    repeated = compile_sync_plan(cat, "research", ["cursor"], home=tmp_home, state_home=state)
+    assert (repeated.items[0].state, repeated.items[0].action) == ("unchanged", "none")
+    assert next(
+        entry for entry in repeated.items[0].entries if entry.server_id == "private-local"
+    ).ownership == "unowned"
+
+
+def test_mcp_unowned_expected_entry_conflicts_when_not_equivalent(tmp_home: Path) -> None:
+    cat = Catalog(ROOT)
+    state = tmp_home / ".state"
+    _apply(cat, tmp_home, "research", ["cursor"])
+    (state / "dotf" / MCP_MANIFEST_NAME).unlink()
+    target = tmp_home / ".cursor" / "mcp.json"
+    value = json.loads(target.read_text(encoding="utf-8"))
+    value["mcpServers"]["web-reader"]["url"] = "https://example.invalid/local-edit"
+    target.write_text(json.dumps(value), encoding="utf-8")
+    before = target.read_bytes()
+
+    plan = compile_sync_plan(cat, "research", ["cursor"], home=tmp_home, state_home=state)
+    entry = next(item for item in plan.items[0].entries if item.server_id == "web-reader")
+    assert (entry.state, entry.action) == ("conflict", "block")
+    with pytest.raises(SyncPlanError, match="without ownership"):
+        apply_sync_plan(plan, cat, approved=True, home=tmp_home, state_home=state)
+    assert target.read_bytes() == before
+    assert not (state / "dotf" / MCP_MANIFEST_NAME).exists()
+
+
+def test_sync_releases_legacy_registry_ownership_for_pure_mcp_target(tmp_home: Path) -> None:
+    state = tmp_home / ".state"
+    module = {
+        "name": "cursor",
+        "config": {
+            "source": "agents/vendors/cursor/mcp.json",
+            "target": "~/.cursor/mcp.json",
+            "strategy": "render",
+            "writable": True,
+            "sensitive": True,
+            "target_mode": "0600",
+            "preserve": [],
+            "exclude": [],
+        },
+    }
+    producer = producer_for("cursor", repo_root=ROOT, home=tmp_home)
+    deploy_config(
+        module,
+        repo_root=ROOT,
+        home=tmp_home,
+        state_home=state,
+        producer=producer,
+        run_id="legacy-cursor",
+    )
+    target = tmp_home / ".cursor" / "mcp.json"
+    before = (target.read_bytes(), target.stat().st_ino, target.stat().st_mtime_ns)
+
+    _apply(Catalog(ROOT, include_overlays=False), tmp_home, "research", ["cursor"])
+    config_manifest = json.loads(
+        (state / "dotf" / "config-manifest.json").read_text(encoding="utf-8")
+    )
+    assert not [
+        item for item in config_manifest["items"] if item["target"] == str(target)
+    ]
+    assert (target.read_bytes(), target.stat().st_ino, target.stat().st_mtime_ns) == before
+
+
+def test_opencode_sync_coordinates_config_manifest_and_preserves_local_agent(
+    tmp_path: Path, tmp_home: Path,
+) -> None:
+    state = tmp_home / ".state"
+    _deploy_opencode(tmp_home, state)
+    target = tmp_home / ".config" / "opencode" / "opencode.json"
+    value = json.loads(target.read_text(encoding="utf-8"))
+    value["agent"]["local-only"] = {"prompt": "keep me"}
+    target.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    module = _load_registry_module(ROOT, "opencode")
+    producer = producer_for("opencode", repo_root=ROOT, home=tmp_home)
+    repair = compile_config_plan(
+        module, repo_root=ROOT, home=tmp_home, state_home=state, producer=producer
+    )
+    apply_config_plan(repair, repo_root=ROOT, home=tmp_home, state_home=state, run_id="local-agent")
+
+    cat = Catalog(ROOT, include_overlays=False)
+    _apply(cat, tmp_home, "research", ["opencode"])
+    changed = _catalog_with_changed_reader(tmp_path)
+    _apply(changed, tmp_home, "research", ["opencode"])
+
+    plan = compile_config_plan(
+        module, repo_root=ROOT, home=tmp_home, state_home=state, producer=producer
+    )
+    assert plan.status == "unchanged"
+    installed = json.loads(target.read_text(encoding="utf-8"))
+    assert installed["agent"]["local-only"] == {"prompt": "keep me"}
+    assert installed["model"] == "company/vanchin/deepseek-v4-pro-0813"
+    assert installed["mcp"]["web-reader"]["url"] == "https://example.com/changed/mcp"
+
+    installed["model"] = "minimax/MiniMax-M3"
+    target.write_text(json.dumps(installed, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    drift = compile_config_plan(
+        module, repo_root=ROOT, home=tmp_home, state_home=state, producer=producer
+    )
+    assert drift.status == "changed"
+    write = next(op for op in drift.operations if op.item.target == str(target))
+    assert (write.item.state, write.item.action) == ("update", "update")
+
+
+def test_opencode_coordinated_manifest_failure_rolls_back_every_output(
+    tmp_path: Path, tmp_home: Path,
+) -> None:
+    state = tmp_home / ".state"
+    _deploy_opencode(tmp_home, state)
+    _apply(Catalog(ROOT, include_overlays=False), tmp_home, "research", ["opencode"])
+    changed = _catalog_with_changed_reader(tmp_path)
+    target = tmp_home / ".config" / "opencode" / "opencode.json"
+    agent_manifest = state / "dotf" / MCP_MANIFEST_NAME
+    config_manifest = state / "dotf" / "config-manifest.json"
+    before = {
+        target: target.read_bytes(),
+        agent_manifest: agent_manifest.read_bytes(),
+        config_manifest: config_manifest.read_bytes(),
+    }
+    plan = compile_sync_plan(changed, "research", ["opencode"], home=tmp_home, state_home=state)
+
+    def fail(phase: str, index: int, _label: str) -> None:
+        if phase == "commit" and index == 2:
+            raise RuntimeError("config-manifest-commit-fault")
+
+    with pytest.raises(RuntimeError, match="config-manifest-commit-fault"):
+        apply_sync_plan(
+            plan, changed, approved=True, home=tmp_home, state_home=state, fault=fail
+        )
+    assert {path: path.read_bytes() for path in before} == before
 
 
 def test_mcp_prunes_only_unchanged_stale_and_conflicts_on_local_edit(tmp_home: Path) -> None:

@@ -173,6 +173,61 @@ def test_unowned_modified_and_stale_modified_targets_are_conflicts(tmp_path: Pat
     assert actual.read_text(encoding="utf-8") == "user edit"
 
 
+def test_unowned_equivalent_real_target_is_adopted_without_replacement(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config.txt"
+    source.write_text("expected\n", encoding="utf-8")
+    target = home / ".config" / "config.txt"
+    target.parent.mkdir(parents=True)
+    target.write_text("expected\n", encoding="utf-8")
+    target.chmod(0o666)
+    module = _module(source, target, target_mode="0644")
+    before = (target.stat().st_ino, target.stat().st_mtime_ns)
+
+    plan = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
+    operation = plan.operations[0]
+    assert plan.status == "changed"
+    assert (operation.item.state, operation.item.action) == ("update", "update")
+    assert operation.metadata_only
+
+    result = apply_config_plan(
+        plan, repo_root=repo, home=home, state_home=state, run_id="adopt-1"
+    )
+    assert result.status == "changed"
+    assert target.read_text(encoding="utf-8") == "expected\n"
+    assert (target.stat().st_ino, target.stat().st_mtime_ns) == before
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+    manifest = validate_managed_manifest(_manifest(state))
+    assert len(manifest.items) == 1
+    assert manifest.items[0].target == str(target)
+    assert manifest.items[0].expected_hash == manifest.items[0].installed_hash
+
+    repeated = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
+    assert repeated.status == "unchanged"
+    assert repeated.operations[0].item.action == "none"
+
+
+def test_unowned_equivalent_symlink_is_not_adopted(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config.txt"
+    source.write_text("expected\n", encoding="utf-8")
+    target = home / ".config" / "config.txt"
+    target.parent.mkdir(parents=True)
+    outside = tmp_path / "outside.txt"
+    outside.write_text("expected\n", encoding="utf-8")
+    target.symlink_to(outside)
+
+    plan = compile_config_plan(
+        _module(source, target), repo_root=repo, home=home, state_home=state
+    )
+    assert plan.status == "conflict"
+    assert plan.conflicts[0].conflict_reason == "foreign-file-symlink"
+    with pytest.raises(ConfigConflictError):
+        apply_config_plan(plan, repo_root=repo, home=home, state_home=state)
+    assert target.is_symlink()
+    assert outside.read_text(encoding="utf-8") == "expected\n"
+
+
 def test_malformed_or_symlinked_manifest_fails_closed_without_target_write(tmp_path: Path) -> None:
     repo, home, state = _roots(tmp_path)
     source = repo / "config.txt"

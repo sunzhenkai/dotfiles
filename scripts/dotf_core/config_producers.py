@@ -127,14 +127,14 @@ def _opencode_factory(repo_root: Path):
                     if resolved in merge_module.PROFILES:
                         profile = resolved
 
-        actual_doc = _json_object(
-            context.actual_files.get("opencode.json"), label="OpenCode target"
-        )
+        actual_raw = context.actual_files.get("opencode.json")
+        actual_doc = _json_object(actual_raw, label="OpenCode target")
         outputs.append(
             ProducedFile(
                 "opencode.json",
                 merge_module.merge(actual_doc or None, source_doc, profile),
                 format="json",
+                reconcile_owned=actual_raw is not None,
             )
         )
         if profile:

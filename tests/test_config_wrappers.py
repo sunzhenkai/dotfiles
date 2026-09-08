@@ -181,7 +181,7 @@ def test_generic_copy_inventory_is_complete() -> None:
 
 
 EXPECTED_SPECIALIZED_MODULE_NAMES = {
-    "ocr", "agents", "cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "logseq",
+    "ocr", "agents", "opencode", "codex", "kimi-code", "pi", "logseq",
 }
 
 

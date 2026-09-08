@@ -399,7 +399,13 @@ def build_plan(
                 continue
             if not module_has_action(mod, action):
                 if strict_caps:
-                    errors.append(f"模块 {name} 无 {action} 能力")
+                    if action == "config" and name in modules.load_agents_mcp_targets():
+                        errors.append(
+                            f"模块 {name} 的 MCP 由 agents sync 管理；"
+                            f"请使用 dotf agents -c --tool {name}"
+                        )
+                    else:
+                        errors.append(f"模块 {name} 无 {action} 能力")
                 continue
             idx += 1
             plan_actions.append(

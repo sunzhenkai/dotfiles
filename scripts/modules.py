@@ -23,6 +23,9 @@ yaml = ensure_yaml()
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = Path(os.environ.get("DOTF_REGISTRY_PATH", str(ROOT / "modules.yaml")))
 PROFILES_PATH = Path(os.environ.get("DOTF_PROFILES_PATH", str(ROOT / "profiles.yaml")))
+AGENTS_VENDORS_PATH = Path(
+    os.environ.get("DOTF_AGENTS_VENDORS_PATH", str(ROOT / "agents" / "env" / "vendors.yaml"))
+)
 HANDLERS_DIR = Path(
     os.environ.get("DOTF_HANDLERS_DIR", str(ROOT / "scripts" / "modules"))
 )
@@ -66,6 +69,7 @@ CONFIG_KEYS = frozenset(
 CONFIG_REQUIRED_KEYS = frozenset(
     {"source", "target", "strategy", "writable", "sensitive", "preserve", "exclude"}
 )
+COORDINATED_MCP_MODULES = frozenset({"opencode"})
 _MODE_RE = re.compile(r"^(?:0o)?[0-7]{3,4}$", re.IGNORECASE)
 
 
@@ -202,6 +206,24 @@ def load_profiles(path: Path | None = None) -> dict[str, Any]:
         "default": data.get("default"),
         "profiles": profiles,
     }
+
+
+def load_agents_mcp_targets(path: Path | None = None) -> dict[str, str]:
+    """Return tool -> HOME-relative target from the Agent vendor matrix."""
+    vendor_path = path or AGENTS_VENDORS_PATH
+    with vendor_path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    vendors = data.get("vendors") or {}
+    if not isinstance(vendors, dict):
+        return {}
+    targets: dict[str, str] = {}
+    for name, raw in vendors.items():
+        if not isinstance(name, str) or not isinstance(raw, dict) or raw.get("mcp") is not True:
+            continue
+        target = raw.get("target")
+        if isinstance(target, str) and target.startswith("~/"):
+            targets[name] = posixpath.normpath(target)
+    return targets
 
 
 def detect_os() -> str:
@@ -610,6 +632,20 @@ def validate_registry(
 
     for cycle in _find_cycles(dep_graph):
         errors.append("模块依赖环: " + " -> ".join(cycle))
+
+    # A pure MCP target has exactly one whole-file writer. OpenCode is the
+    # explicit mixed-file exception and coordinates updates with config_deploy.
+    sync_targets = load_agents_mcp_targets()
+    for name, mod in by_name.items():
+        cfg = mod.get("config")
+        if not isinstance(cfg, dict) or name in COORDINATED_MCP_MODULES:
+            continue
+        target = cfg.get("target")
+        sync_target = sync_targets.get(name)
+        if isinstance(target, str) and sync_target and posixpath.normpath(target) == sync_target:
+            errors.append(
+                f"{name}: config 目标 {target} 与 agents sync MCP 目标重叠"
+            )
 
     # profiles
     profiles = profiles_data.get("profiles") or {}

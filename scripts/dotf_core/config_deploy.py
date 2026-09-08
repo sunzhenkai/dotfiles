@@ -16,7 +16,7 @@ import json
 import os
 import stat
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
@@ -532,13 +532,13 @@ def _ensure_state_directory(home: Path, state_home: Path) -> Path:
     return directory
 
 
-class _ManifestLock:
+class ConfigManifestLock:
     def __init__(self, home: Path, state_home: Path) -> None:
         self.home = home
         self.state_home = state_home
         self.fd: int | None = None
 
-    def __enter__(self) -> "_ManifestLock":
+    def __enter__(self) -> "ConfigManifestLock":
         _directory, _manifest, lock_path = _manifest_paths(self.home, self.state_home)
         _ensure_state_directory(self.home, self.state_home)
         boundary = _boundary_for(self.home, lock_path)
@@ -557,6 +557,79 @@ class _ManifestLock:
             fcntl.flock(self.fd, fcntl.LOCK_UN)
             os.close(self.fd)
             self.fd = None
+
+
+def coordinated_manifest_payload(
+    *,
+    updates: Mapping[str, tuple[str, bytes, bytes]],
+    releases: Mapping[str, str],
+    home: os.PathLike[str] | str,
+    state_home: os.PathLike[str] | str,
+    run_id: str,
+) -> tuple[Path, bytes] | None:
+    """Refresh or release config ownership for an external transaction.
+
+    The caller must hold ``ConfigManifestLock`` and commit the returned
+    manifest payload atomically with the target bytes.
+    """
+    home_path = Path(home).absolute()
+    state_path = Path(state_home).absolute()
+    manifest, _digest = _read_manifest(home_path, state_path)
+    by_target = {item.target: item for item in manifest.items}
+    changed = False
+    for raw_target, owner in releases.items():
+        target = str(Path(raw_target).absolute())
+        prior = by_target.get(target)
+        if prior is None:
+            continue
+        if prior.owner != owner:
+            raise ConfigConflictError(f"coordinated target has foreign ownership: {target}")
+        del by_target[target]
+        changed = True
+    for raw_target, (owner, current_content, installed_content) in updates.items():
+        target = str(Path(raw_target).absolute())
+        prior = by_target.get(target)
+        if prior is None:
+            continue
+        if prior.owner != owner:
+            raise ConfigConflictError(f"coordinated target has foreign ownership: {target}")
+        if _sha256(current_content) != prior.installed_hash:
+            raise ConfigConflictError(f"coordinated target was modified locally: {target}")
+        installed_hash = _sha256(installed_content)
+        updated = replace(
+            prior,
+            expected_hash=installed_hash,
+            installed_hash=installed_hash,
+            run_id=run_id,
+        )
+        if updated != prior:
+            by_target[target] = updated
+            changed = True
+    if not changed:
+        return None
+    items = tuple(sorted(by_target.values(), key=lambda item: item.target))
+    next_value = ManagedManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        kind="managed-manifest",
+        generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        items=items,
+    )
+    return _manifest_paths(home_path, state_path)[1], _serialize_manifest(next_value)
+
+
+def config_manifest_has_owners(
+    *,
+    target_owners: Mapping[str, str],
+    home: os.PathLike[str] | str,
+    state_home: os.PathLike[str] | str,
+) -> bool:
+    """Read-only preflight used to avoid locking unrelated sync targets."""
+    manifest, _digest = _read_manifest(Path(home).absolute(), Path(state_home).absolute())
+    expected = {str(Path(target).absolute()): owner for target, owner in target_owners.items()}
+    return any(expected.get(item.target) == item.owner for item in manifest.items)
+
+
+_ManifestLock = ConfigManifestLock
 
 
 def _format_for(path: str, declared: Format = None) -> Format:
@@ -1157,7 +1230,12 @@ def compile_config_plan(
             actual_hash = _sha256(actual_content)
             accepted_actual_hash = actual_hash
             if prior is None:
-                state, action, reason = "conflict", "block", "unowned-real-target"
+                if actual_hash == expected_hash:
+                    # Adopt byte-identical real files without replacing their
+                    # inode. Apply records ownership and narrows mode if needed.
+                    state, action, metadata_only = "update", "update", True
+                else:
+                    state, action, reason = "conflict", "block", "unowned-real-target"
             elif prior.owner != declaration.owner:
                 state, action, reason = "conflict", "block", "foreign-managed-owner"
             elif actual_hash == expected_hash:
@@ -1392,9 +1470,15 @@ def _assert_operation_fresh(
             if kind != "missing":
                 raise ConfigConflictError(f"target appeared after planning: {target}")
             return
-        if kind != "file" or content is None or prior is None or prior.owner != item.owner:
+        if kind != "file" or content is None:
             raise ConfigConflictError(f"managed target changed type or ownership: {target}")
         actual_hash = _sha256(content)
+        if prior is None:
+            if not operation.metadata_only or actual_hash != item.expected_hash:
+                raise ConfigConflictError(f"managed target changed type or ownership: {target}")
+            return
+        if prior.owner != item.owner:
+            raise ConfigConflictError(f"managed target changed type or ownership: {target}")
         if item.action == "none":
             if (
                 actual_hash != item.expected_hash
@@ -1514,6 +1598,16 @@ def apply_config_plan(
                         _secure_directory(home_path, root_target, plan.target_root_mode)
                 if item.action == "none":
                     unchanged += 1
+                elif operation.metadata_only:
+                    fd = open_nofollow(home_path, target)
+                    try:
+                        current_mode = stat.S_IMODE(os.fstat(fd).st_mode)
+                        if current_mode != operation.mode:
+                            os.fchmod(fd, operation.mode)
+                            os.fsync(fd)
+                    finally:
+                        os.close(fd)
+                    changed += 1
                 else:
                     result = atomic_write(
                         target,

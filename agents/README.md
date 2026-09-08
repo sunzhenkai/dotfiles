@@ -4,12 +4,11 @@
 
 ## 统一入口（推荐）
 
-**边界**：`agents` 负责聚合安装计划与共享 skills/MCP 同步；单工具模块只处理本工具 CLI/vendor 配置，**不会**隐式全量 sync。
+**边界**：`agents` 负责聚合安装计划与共享 skills/MCP 同步；Cursor、Kiro、ZCode 的 MCP 只由 agents sync 管理，单工具模块只安装 CLI。
 
 ```shell
 dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 动作
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf cursor -c                 # 仅应用 Cursor vendor 配置（不 sync skills/MCP）
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ MCP（全部工具）
 dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 的 MCP（skills 与 tool 无关，始终全量）
 dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync
