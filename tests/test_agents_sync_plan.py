@@ -32,6 +32,10 @@ def _copy_catalog(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     (repo / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
+    shutil.copy2(
+        ROOT / "agents" / "skills-defaults.lock.yaml",
+        repo / "agents" / "skills-defaults.lock.yaml",
+    )
     return repo
 
 

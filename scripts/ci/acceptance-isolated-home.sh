@@ -9,7 +9,7 @@ if ! command -v "$BASH_BIN" >/dev/null 2>&1; then
   echo "error: bash executable not found: $BASH_BIN" >&2
   exit 1
 fi
-PYTHON_BIN="$(command -v python3)"
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
 GIT_BIN="$(command -v git)"
 REAL_HOME="${HOME:-}"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dotf-acceptance.XXXXXX")"

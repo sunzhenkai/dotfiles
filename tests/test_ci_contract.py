@@ -47,7 +47,7 @@ def test_linux_workflow_runs_make_ci_with_immutable_action_pins() -> None:
     assert "runs-on: ubuntu-24.04" in workflow
     assert "run: make ci" in workflow
     assert "shellcheck=0.9.0-1" in workflow
-    assert "PyYAML==6.0.3 pytest==9.1.1" in workflow
+    assert "PyYAML==6.0.3 pytest==9.1.1 textual==8.2.8 rich==15.0.0" in workflow
     action_uses = re.findall(r"uses:\s*[^@\s]+@([^\s]+)", workflow)
     assert action_uses and all(re.fullmatch(r"[0-9a-f]{40}", pin) for pin in action_uses)
 
@@ -61,6 +61,10 @@ def test_macos_workflow_requires_system_bash32_and_migration_smoke() -> None:
     assert "run: /bin/bash scripts/ci/smoke-macos.sh" in workflow
     assert "BASH_VERSINFO[0]" in smoke and "BASH_VERSINFO[1]" in smoke
     assert "-ne 3" in smoke and "-ne 2" in smoke
+    assert 'PYTHON_BIN="$(command -v python3)"' in smoke
+    assert 'PATH="$PYTHON_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"' in smoke
+    assert "export PYTHON_BIN" in smoke
+    assert 'PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"' in acceptance
     combined = (workflow + smoke).lower()
     assert "brew install" not in combined and "brew --prefix" not in combined
 
