@@ -175,6 +175,11 @@ map_timeout 2.0
    - 同一行 **`map` 后不要接 `#` 注释**（部分版本解析会把注释带入参数）。  
    - 升级 Kitty 或查阅 [Issue #6000](https://github.com/kovidgoyal/kitty/issues/6000) 一类兼容性说明。
 
+5. **SSH 里 Yazi 图片变成字符画 / 远程报 unknown terminal type**  
+   - 不要把 `term` 设成 `xterm-256color` 来「兼容远程」；Yazi 需要 `$TERM=xterm-kitty` 才能匹配 Kgp。  
+   - 远程装发行版 `kitty-terminfo`（或 `kitten ssh`），见 [USAGE.md §6](USAGE.md) 与 [ADR-0010](../../../docs/adr/0010-keep-kitty-default-term.md)。  
+   - `Ctrl+Shift+F5` 不会改变已开窗口的 `TERM`，须新开窗口。
+
 ---
 
 ## 12. OpenSpec 规格对照（`migrate-wezterm-to-kitty`）

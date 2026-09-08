@@ -6,9 +6,10 @@
 
 | 文档 | 说明 |
 |------|------|
-| [USAGE.md](USAGE.md) | **使用说明**：安装、日常操作、改配置与文档索引 |
+| [USAGE.md](USAGE.md) | **使用说明**：安装、日常操作、SSH 图像预览、改配置与文档索引 |
 | [keybindings.md](keybindings.md) | 快捷键：迁移后的 `Ctrl+a` 风格前缀、子模式与 Kitty 默认键补充 |
 | [configuration-zh.md](configuration-zh.md) | 配置项按功能整理的中文摘要（完整选项以官方为准） |
+| [ADR-0010](../../../docs/adr/0010-keep-kitty-default-term.md) | 保持默认 `TERM=xterm-kitty`，远程装 terminfo 而不是本机降级 |
 | [kitty.conf 官方手册](https://sw.kovidgoyal.net/kitty/conf/) | 上游完整说明 |
 
 ## 应用方式

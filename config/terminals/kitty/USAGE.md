@@ -56,6 +56,7 @@
 2. 在 Kitty 窗口里 **`Ctrl+Shift+F5`** 重载（macOS 亦常见 **⌃⌘,**）。
 3. 若某项要求重启 Kitty，以 [官方说明](https://sw.kovidgoyal.net/kitty/conf/) 为准。
 4. 可用 **`Ctrl+Shift+F6`** 查看当前**实际生效**的配置，避免「改了文件但未加载」的困惑。
+5. **`term` / `$TERM` 只对之后新建的窗口生效**。`Ctrl+Shift+F5` 会重载配置，但已开窗口的 `TERM` 不会变。
 
 ---
 
@@ -65,7 +66,34 @@
 
 ---
 
-## 6. 文档与仓库指引
+## 6. SSH 与远程图像预览
+
+本仓库不覆盖 `term`（默认 `xterm-kitty`）。Yazi 靠 `$TERM` 匹配 Kitty 图形协议（`ya env` 里 `Drivers.matches: Kgp`）；若改成 `xterm-256color`，远程会话会落到 Chafa 字符画。见 [ADR-0010](../../../docs/adr/0010-keep-kitty-default-term.md)。
+
+远程机若报 `Error opening terminal: xterm-kitty`，装 terminfo 即可，不必改远端 shell 或 yazi 配置（`TERM` 由 SSH 客户端带过去）：
+
+```bash
+# Arch
+sudo pacman -S --needed kitty-terminfo
+```
+
+只装 terminfo 数据，不装 Kitty 本体。其它发行版装对应的 kitty terminfo 包。应急可临时 `TERM=xterm-256color ssh <host>`。
+
+可选零维护：`kitten ssh <host>`（Kitty 官方 ssh kitten，首次连接把 terminfo 写到远端家目录，免 sudo）。
+
+验证（须在 **`$TERM=xterm-kitty` 的新 Kitty 窗口**里）：
+
+```bash
+ssh <host> 'echo $TERM'                        # xterm-kitty，且无 unknown terminal type
+ssh <host> 'infocmp xterm-kitty | head -1'     # 以 xterm-kitty| 开头
+ssh <host> 'ya env | grep -A1 Adapter'         # Drivers.matches: Kgp
+```
+
+Yazi 26.x 的图像后端是自动探测的，不要在 `yazi.toml` 里写 `image_backend` 等已删除的键。
+
+---
+
+## 7. 文档与仓库指引
 
 | 需求 | 打开 |
 |------|------|
@@ -76,6 +104,6 @@
 
 ---
 
-## 7. 仍用 WezTerm 对照时
+## 8. 仍用 WezTerm 对照时
 
 仓库中的 **`wezterm/`** 未删除；可与 `kitty/` 并行参照，逐步把肌肉记忆迁到 Kitty。
