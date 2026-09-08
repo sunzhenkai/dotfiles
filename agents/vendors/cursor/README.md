@@ -1,6 +1,6 @@
 # Cursor MCP
 
-`agents/vendors/cursor/mcp.json` 是 **agents/env 生成物**。请改 `agents/env/mcp/` 后运行：
+Cursor MCP 只由 agents sync 写入 `~/.cursor/mcp.json`；`dotf cursor` 模块只负责安装 CLI。`agents/vendors/cursor/mcp.json` 是不参与部署的安全生成参考，用于 drift/占位符检查。请改 `agents/env/mcp/` 后运行：
 
 ```shell
 dotf agents -c

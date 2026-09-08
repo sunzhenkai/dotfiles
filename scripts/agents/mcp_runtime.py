@@ -184,10 +184,16 @@ def entry_plans(
         owned = prior.get(server_id)
         if owned is None:
             if server_id in actual:
-                decisions.append(McpEntryPlan(
-                    server_id, "owned", wanted_hash, current_hash, None,
-                    "conflict", "block", "expected MCP id exists without ownership",
-                ))
+                if entries_equivalent(value, actual[server_id]):
+                    decisions.append(McpEntryPlan(
+                        server_id, "owned", wanted_hash, current_hash, None,
+                        "update", "adopt", None,
+                    ))
+                else:
+                    decisions.append(McpEntryPlan(
+                        server_id, "owned", wanted_hash, current_hash, None,
+                        "conflict", "block", "expected MCP id exists without ownership",
+                    ))
             else:
                 decisions.append(McpEntryPlan(server_id, "owned", wanted_hash, None, None, "create", "create", None))
             continue

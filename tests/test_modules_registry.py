@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from copy import deepcopy
 from pathlib import Path
 
 import modules
@@ -19,6 +20,39 @@ def test_validate_registry_passes(repo_root: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "校验通过" in result.stdout
+
+
+def test_registry_rejects_pure_mcp_target_overlap() -> None:
+    registry = deepcopy(modules.load_registry())
+    cursor = modules.find_module(registry, "cursor")
+    assert cursor is not None
+    cursor["config"] = {
+        "source": "agents/vendors/cursor/mcp.json",
+        "target": "~/.cursor/mcp.json",
+        "strategy": "render",
+        "writable": True,
+        "sensitive": True,
+        "target_mode": "0600",
+        "preserve": [],
+        "exclude": [],
+    }
+    errors = modules.validate_registry(registry, strict_handlers=False)
+    assert any(
+        "cursor" in error and "~/.cursor/mcp.json" in error and "重叠" in error
+        for error in errors
+    )
+
+
+def test_registry_allows_coordinated_mixed_and_distinct_mcp_targets() -> None:
+    registry = modules.load_registry()
+    assert not [
+        error for error in modules.validate_registry(registry, strict_handlers=False)
+        if "agents sync MCP 目标重叠" in error
+    ]
+    opencode = modules.find_module(registry, "opencode")
+    kimi = modules.find_module(registry, "kimi-code")
+    assert opencode and opencode["config"]["target"] == "~/.config/opencode"
+    assert kimi and kimi["config"]["target"] == "~/.kimi-code/config.toml"
 
 
 def test_tool_modules_declare_doctor() -> None:
@@ -129,8 +163,8 @@ def test_disabled_modules_excluded_from_default_lists() -> None:
         assert not modules.is_enabled(module), name
     assert zcode and modules.is_enabled(zcode)
     assert kiro and modules.is_enabled(kiro)
-    assert zcode.get("config")
-    assert kiro.get("config")
+    assert not zcode.get("config")
+    assert not kiro.get("config")
     assert cpp.get("bin") == "cmake"
     assert zcode.get("bin") == "zcode"
     assert kiro.get("bin") == "kiro-cli"
@@ -142,8 +176,8 @@ def test_disabled_modules_excluded_from_default_lists() -> None:
 
     config_names = {m["name"] for m in modules.filter_modules(mods, capability="config")}
     assert "cpp-dev" not in config_names
-    assert "zcode" in config_names
-    assert "kiro" in config_names
+    assert "zcode" not in config_names
+    assert "kiro" not in config_names
 
     with_disabled = {
         m["name"]

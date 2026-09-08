@@ -56,11 +56,11 @@ def render_openspec_kiro_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
 
 
 def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
-    """Run `openspec init --tools agents` in an isolated project and copy skills."""
+    """Generate generic OpenSpec skills through the Cursor adapter."""
     project = destination / "project"
     project.mkdir(parents=True)
     completed = subprocess.run(
-        [str(openspec), "init", "--tools", "agents", "--no-animation", str(project)],
+        [str(openspec), "init", "--tools", "cursor", str(project)],
         capture_output=True,
         text=True,
         check=False,
@@ -68,9 +68,9 @@ def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "openspec init failed").strip()
         raise OpenSpecSkillsError(detail)
-    generated = project / ".agents" / "skills"
+    generated = project / ".cursor" / "skills"
     if not generated.is_dir():
-        raise OpenSpecSkillsError("openspec init --tools agents did not create .agents/skills")
+        raise OpenSpecSkillsError("openspec init --tools cursor did not create .cursor/skills")
     skills = destination / "skills"
     skills.mkdir(parents=True)
     copied = 0
@@ -85,7 +85,7 @@ def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
         shutil.copytree(child, skills / child.name, symlinks=False)
         copied += 1
     if copied == 0:
-        raise OpenSpecSkillsError("openspec init --tools agents produced no openspec-* skills")
+        raise OpenSpecSkillsError("openspec init --tools cursor produced no openspec-* skills")
     return skills
 
 

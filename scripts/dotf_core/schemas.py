@@ -10,7 +10,7 @@ MANIFEST_SCHEMA_VERSION = 1
 MCP_TRANSACTION_JOURNAL_SCHEMA_VERSION = 1
 
 PLAN_STATES = frozenset({"unchanged", "create", "update", "prune", "permission", "conflict", "blocked", "failed"})
-PLAN_ACTIONS = frozenset({"none", "create", "update", "prune", "chmod", "skip", "block"})
+PLAN_ACTIONS = frozenset({"none", "create", "update", "prune", "chmod", "adopt", "skip", "block"})
 STRATEGIES = frozenset({"copy", "merge", "render", "symlink", "install", "config", "doctor"})
 RISKS = frozenset({"low", "medium", "high", "sensitive"})
 RUN_STATES = frozenset({"pending", "running", "completed", "failed", "interrupted", "failed-rollback"})

@@ -30,11 +30,7 @@ dotf agents -i
 
 ## 配置
 
-```shell
-dotf kiro -c
-```
-
-确保 `~/.kiro/{skills,prompts,settings}` 就绪。Kiro 不读取共享 `~/.agents/skills`；`dotf agents -c` 会额外托管一份 Kiro skills，并为 slash skill 追加 `$ARGUMENTS`：
+Kiro 不读取共享 `~/.agents/skills`；`dotf agents -c` 会托管 Kiro skills 与 MCP，并为 slash skill 追加 `$ARGUMENTS`。`dotf kiro` 模块只负责安装 CLI：
 
 ```shell
 dotf agents -c --tool kiro
@@ -64,7 +60,7 @@ scripts/agents/sync.sh kiro
 
 Kiro skills 由 managed manifest 独立跟踪（owner 前缀 `agents:kiro-skill:`）。未托管或本机修改的同名文件会保持原样并报告 conflict，不会静默覆盖。
 
-`agents/vendors/kiro/mcp.json` 是 **agents/env 生成物**。请改 `agents/env/mcp/` 后运行：
+`agents/vendors/kiro/mcp.json` 是不参与部署的安全生成参考，用于 drift/占位符检查。请改 `agents/env/mcp/` 后运行：
 
 ```shell
 dotf agents -c

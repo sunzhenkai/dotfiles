@@ -113,6 +113,31 @@ def test_cursor_install_plan_is_solo() -> None:
     assert ("install", "agents") not in planned
 
 
+def test_pure_mcp_tool_config_directs_to_agents_sync() -> None:
+    for tool in ("cursor", "kiro", "zcode"):
+        result = subprocess.run(
+            [
+                "python3",
+                str(ROOT / "scripts" / "planner.py"),
+                "plan",
+                "--actions",
+                "config",
+                "--modules",
+                tool,
+                "--os",
+                "ubuntu",
+                "--format",
+                "machine",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+            check=False,
+        )
+        assert result.returncode != 0
+        assert f"dotf agents -c --tool {tool}" in result.stderr
+
+
 def test_single_tool_config_source_has_no_sync_call() -> None:
     text = (ROOT / "scripts" / "config.sh").read_text(encoding="utf-8")
     # install_cursor 等函数体内不应再调用 sync

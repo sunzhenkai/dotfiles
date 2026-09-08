@@ -8,6 +8,7 @@ import json
 import os
 import stat
 import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
@@ -25,6 +26,12 @@ from dotf_core.schemas import (  # noqa: E402
     SyncPlan,
     SyncPlanItem,
 )
+
+_PURE_MCP_CONFIG_OWNERS = {
+    "cursor": "config:cursor",
+    "kiro": "config:kiro",
+    "zcode": "config:zcode",
+}
 
 
 class SyncPlanError(RuntimeError):
@@ -266,6 +273,14 @@ def plan_json(plan: SyncPlan) -> str:
     return json.dumps(plan.to_dict(), ensure_ascii=False, sort_keys=True, indent=2)
 
 
+def _canonical_payload(tool: str, payload: bytes) -> bytes:
+    """Match the registry JSON serializer for coordinated mixed targets."""
+    if tool != "opencode":
+        return payload
+    value = json.loads(payload.decode("utf-8"))
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
 # Ownership-aware compiler/apply retains task-4 pinned-inode permission remediation.
 def _compile_owned_sync_plan(
     catalog: Catalog,
@@ -303,7 +318,9 @@ def _compile_owned_sync_plan(
                 actual=actual_entries,
                 snapshot=snapshot,
             )
-            expected = reconcile_payload(adapter, actual, rendered.servers, decisions)
+            expected = _canonical_payload(
+                tool, reconcile_payload(adapter, actual, rendered.servers, decisions)
+            )
             entry_conflicts = [entry for entry in decisions if entry.state == "conflict"]
             if entry_conflicts:
                 state, action = "conflict", "skip"
@@ -312,6 +329,8 @@ def _compile_owned_sync_plan(
                 state, action = "create", "create"
             elif any(entry.action in {"create", "update", "prune"} for entry in decisions):
                 state, action = "update", "update"
+            elif any(entry.action == "adopt" for entry in decisions):
+                state, action = "update", "adopt"
             elif adapter.equivalent(expected, actual):
                 if capability.sensitive and _sensitive_permissions_broad(user_home, actual.target):
                     state, action = "permission", "chmod"
@@ -395,6 +414,11 @@ def apply_sync_plan(
         serialize_manifest,
     )
     from dotf_core.backup import generate_run_id
+    from dotf_core.config_deploy import (
+        ConfigManifestLock,
+        config_manifest_has_owners,
+        coordinated_manifest_payload,
+    )
 
     plan.validate()
     if not approved:
@@ -420,7 +444,23 @@ def apply_sync_plan(
     secret_values: list[str] = []
     resolver = _secret_resolver(secret_values)
     results: list[ApplyResult] = []
-    with AgentManifestLock(user_home, state_root):
+    planned_releases = {
+        item.target: _PURE_MCP_CONFIG_OWNERS[item.adapter]
+        for item in plan.items
+        if item.adapter in _PURE_MCP_CONFIG_OWNERS
+    }
+    coordinates_config = any(item.adapter == "opencode" for item in plan.items) or (
+        bool(planned_releases)
+        and config_manifest_has_owners(
+            target_owners=planned_releases,
+            home=user_home,
+            state_home=state_root,
+        )
+    )
+    config_lock = (
+        ConfigManifestLock(user_home, state_root) if coordinates_config else nullcontext()
+    )
+    with config_lock, AgentManifestLock(user_home, state_root):
         current = _compile_owned_sync_plan(
             catalog, plan.profile, plan.tools, home=user_home, state_home=state_root,
         )
@@ -429,11 +469,24 @@ def apply_sync_plan(
         snapshot = read_manifest(user_home, state_root)
         if snapshot.status == "malformed" or snapshot.digest != plan.ownership_hash:
             raise SyncPlanError("MCP ownership manifest changed after approval")
+        releases = {
+            item.target: _PURE_MCP_CONFIG_OWNERS[item.adapter]
+            for item in current.items
+            if item.adapter in _PURE_MCP_CONFIG_OWNERS
+        }
+        release_only = coordinated_manifest_payload(
+            updates={},
+            releases=releases,
+            home=user_home,
+            state_home=state_root,
+            run_id=run_id,
+        ) if releases else None
 
         # Keep task-4 retained-inode behavior for a pure permission remediation.
         mutating = [item for item in current.items if item.action in {"create", "update"}]
+        adopting = [item for item in current.items if item.action == "adopt"]
         chmods = [item for item in current.items if item.action == "chmod"]
-        if chmods and not mutating:
+        if chmods and not mutating and not adopting and release_only is None:
             for item in current.items:
                 if item.action == "chmod":
                     adapter = adapter_for(catalog.vendor_matrix, item.adapter)
@@ -447,6 +500,7 @@ def apply_sync_plan(
         expected_by_tool: dict[str, Mapping[str, object]] = {}
         installed_by_tool: dict[str, Mapping[str, object]] = {}
         targets: dict[str, str] = {}
+        config_updates: dict[str, tuple[str, bytes, bytes]] = {}
         for item in current.items:
             adapter = adapter_for(catalog.vendor_matrix, item.adapter)
             selected = catalog.selected_servers(item.adapter, current.profile)
@@ -455,9 +509,10 @@ def apply_sync_plan(
             targets[item.adapter] = item.target
             actual = adapter.read_actual(user_home)
             _assert_fresh(item, actual)
-            if item.action == "none":
+            if item.action in {"none", "adopt"}:
                 installed_by_tool[item.adapter] = adapter.entries(actual)
-                results.append(ApplyResult(item.resource_id, item.target, "unchanged", None))
+                status = "changed" if item.action == "adopt" else "unchanged"
+                results.append(ApplyResult(item.resource_id, item.target, status, None))
                 continue
             capability = catalog.vendor_matrix.capability(item.adapter)
             rendered = adapter.render(
@@ -466,6 +521,8 @@ def apply_sync_plan(
             )
             payload = reconcile_payload(adapter, actual, rendered.servers, item.entries)
             placeholder_payload = reconcile_payload(adapter, actual, placeholder.servers, item.entries)
+            payload = _canonical_payload(item.adapter, payload)
+            placeholder_payload = _canonical_payload(item.adapter, placeholder_payload)
             if hashlib.sha256(placeholder_payload).hexdigest() != item.expected_hash:
                 raise SyncPlanError(f"declared content changed after approval: {item.resource_id}")
             _secure_target_parents(user_home, Path(item.target), all_ancestors=item.sensitive)
@@ -479,9 +536,30 @@ def apply_sync_plan(
                 mode=item.target_mode,
                 sensitive=item.sensitive,
             ))
+            if item.adapter == "opencode" and actual.raw is not None:
+                config_updates[item.target] = ("config:opencode", actual.raw, payload)
             results.append(ApplyResult(item.resource_id, item.target, "changed", None))
 
-        if not outputs:
+        coordinated = coordinated_manifest_payload(
+            updates=config_updates,
+            releases=releases,
+            home=user_home,
+            state_home=state_root,
+            run_id=run_id,
+        ) if coordinates_config else None
+        if coordinated is not None:
+            config_manifest_target, config_manifest_bytes = coordinated
+            outputs.append(TransactionOutput(
+                label="config:manifest:coordinated",
+                target=config_manifest_target,
+                root=Path("/") if not _inside(config_manifest_target, user_home) else user_home,
+                payload=config_manifest_bytes,
+                format="json",
+                mode=0o600,
+                sensitive=True,
+            ))
+
+        if not outputs and not adopting:
             return tuple(results), tuple(secret_values)
         manifest = next_manifest(
             snapshot.manifest,
