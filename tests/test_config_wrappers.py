@@ -11,6 +11,8 @@ from typing import Any
 import modules
 import pytest
 
+from conftest import isolate_agents_sync_for_test
+
 
 COPY_MODULES = tuple(
     module
@@ -202,6 +204,8 @@ def test_specialized_config_is_manifest_owned_real_and_idempotent(
     home = tmp_path / "home"
     home.mkdir()
     name = module["name"]
+    if name == "agents":
+        isolate_agents_sync_for_test(home)
 
     first = _run_config(repo_root, module, home, f"specialized-{name}-1")
     assert first.returncode == 0, first.stdout + first.stderr

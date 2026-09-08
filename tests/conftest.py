@@ -58,18 +58,20 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launch_home: Path)
     return home
 
 
-def disable_third_party_defaults_for_test(home: Path) -> None:
-    """Install an explicit offline overlay for tests that run real agents sync."""
+def isolate_agents_sync_for_test(home: Path) -> None:
+    """Disable network-backed third-party defaults and secret-bearing MCP in tests."""
     import yaml
 
     overlay_dir = home / ".config" / "dotf" / "overlays"
     overlay_dir.mkdir(parents=True)
     lock = yaml.safe_load((ROOT / "agents" / "skills-defaults.lock.yaml").read_text(encoding="utf-8"))
+    servers = yaml.safe_load((ROOT / "agents" / "env" / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
     overlay = {
         "schema_version": 1,
         "kind": "dotf-overlay",
         "agents": {
             "profile": "research",
+            "disabled_servers": sorted((servers.get("servers") or {}).keys()),
             "disabled_skills": [item["id"] for item in lock.get("skills", [])],
         },
     }
