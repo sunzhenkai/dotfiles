@@ -35,6 +35,28 @@ mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 # Remove relevant inherited values so acceptance cannot persist a real credential.
 unset ZHIPU_API_KEY Z_AI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
+printf '%s\n' "==> offline locked default skills"
+PYTHONPATH="$ROOT/scripts/agents:$ROOT/scripts" "$PYTHON_BIN" - "$ROOT" <<'PY'
+import sys
+from pathlib import Path
+
+from agents.defaults import selected_default_ids
+from dotf_core.overlays import upsert_local_overlay
+
+
+root = Path(sys.argv[1]).resolve()
+locked_ids = sorted(selected_default_ids(root))
+
+
+def mutate(agents: dict) -> None:
+    agents["profile"] = "research"
+    agents["disabled_skills"] = locked_ids
+
+
+upsert_local_overlay(root, mutate, home=Path.home())
+print(f"disabled_skills={len(locked_ids)}")
+PY
+
 snapshot_paths() {
   "$PYTHON_BIN" - "$@" <<'PY'
 import hashlib

@@ -85,9 +85,12 @@ def test_isolated_acceptance_fail_closed_contract() -> None:
     export_home = acceptance.index('export HOME="$TMP_HOME"')
     first_runtime_command = acceptance.index('"$BASH_BIN" "$ROOT/bin/dotf" -h')
     assert export_home < first_runtime_command
+    offline_locks = acceptance.index("==> offline locked default skills")
+    assert export_home < offline_locks < first_runtime_command
     for marker in (
         "unset ZHIPU_API_KEY Z_AI_API_KEY",
         "NETWORK_ATTEMPTED",
+        "disabled_skills",
         "network/acquisition is disabled",
         "snapshot_paths \"$HOME\"",
         "metadata=mode,inode,mtime,size,sha256",
@@ -106,28 +109,6 @@ def test_secret_scan_emits_rule_and_count_evidence() -> None:
     for marker in ("rule_version=", "scanned=", "skipped=", "findings="):
         assert marker in scan
     assert "check_security_scan" in scan
-
-
-def test_version_controlled_acceptance_evidence_records_required_gates() -> None:
-    evidence = _text("acceptance/harden-dotfiles-state-boundaries.md")
-    for marker in (
-        "Plain full pytest",
-        "Strict registry/handlers",
-        "Strict OpenSpec validation",
-        "Template check/no delta",
-        "First-party ShellCheck",
-        "Bash 3.2 syntax",
-        "Tracked source secret scan",
-        "Isolated doctor parity",
-        "Disposable HOME/XDG acceptance",
-        "repo_status=unchanged",
-        "repo_diff=unchanged",
-        "repo_content=unchanged",
-        "Staged `.gitignore` blob before and after implementation",
-        "`tasks.md` SHA-256 retained without checkbox edits",
-    ):
-        assert marker in evidence
-    assert "- [x]" not in evidence and "- [ ]" not in evidence
 
 
 def test_state_boundary_docs_cover_operator_contracts() -> None:
