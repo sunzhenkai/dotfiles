@@ -187,7 +187,7 @@ EXPECTED_SPECIALIZED_MODULE_NAMES = {
 
 def test_specialized_strategy_inventory_uses_safe_registry_dispatch(repo_root: Path) -> None:
     assert {module["name"] for module in SPECIALIZED_MODULES} == EXPECTED_SPECIALIZED_MODULE_NAMES
-    production = (repo_root / "scripts" / "dotf_core" / "config_handler.py").read_text(encoding="utf-8")
+    production = (repo_root / "src" / "dotf_core" / "config_handler.py").read_text(encoding="utf-8")
     assert "deploy_config(" in production
     codex = repo_root / "scripts" / "modules" / "codex" / "config.sh"
     text = codex.read_text(encoding="utf-8")

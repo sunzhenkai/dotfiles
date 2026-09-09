@@ -295,7 +295,7 @@ def test_codex_uses_sensitive_merge_directory_and_preserves_runtime() -> None:
 
 
 def test_cli_and_shell_accessors_expose_metadata(repo_root: Path) -> None:
-    py = repo_root / "scripts" / "modules.py"
+    py = repo_root / "src" / "modules.py"
     get_result = subprocess.run(
         ["python3", str(py), "get", "logseq"],
         cwd=repo_root,

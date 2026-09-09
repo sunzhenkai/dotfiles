@@ -185,7 +185,7 @@ def test_usage_profiles_cli(repo_root: Path) -> None:
     import subprocess
 
     out = subprocess.run(
-        ["python3", str(repo_root / "scripts" / "modules.py"), "profiles", "usage"],
+        ["python3", str(repo_root / "src" / "modules.py"), "profiles", "usage"],
         capture_output=True,
         text=True,
         check=True,

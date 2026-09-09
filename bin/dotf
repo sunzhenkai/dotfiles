@@ -150,7 +150,7 @@ plan_and_run() {
   trap "rm -f '$plan_file'" RETURN
 
   # Preserve planner failure exactly; an unsuccessful planner never reaches runner.
-  python3 "$SCRIPT_DIR/scripts/planner.py" "${plan_args[@]}" >"$plan_file"
+  python3 "$SCRIPT_DIR/src/planner.py" "${plan_args[@]}" >"$plan_file"
   local planner_rc=$?
   if [ "$planner_rc" -ne 0 ]; then
     return "$planner_rc"
@@ -292,7 +292,7 @@ cmd_init() {
   fi
 
   if [ -z "$usage_profile" ]; then
-    usage_profile="$(python3 "$SCRIPT_DIR/scripts/modules.py" profiles default 2>/dev/null || echo full)"
+    usage_profile="$(python3 "$SCRIPT_DIR/src/modules.py" profiles default 2>/dev/null || echo full)"
     [ -z "$usage_profile" ] && usage_profile=full
   fi
 
@@ -341,7 +341,7 @@ cmd_status() {
     shift
   done
   if [ -z "$usage_profile" ]; then
-    usage_profile="$(python3 "$SCRIPT_DIR/scripts/modules.py" profiles default 2>/dev/null || echo full)"
+    usage_profile="$(python3 "$SCRIPT_DIR/src/modules.py" profiles default 2>/dev/null || echo full)"
   fi
 
   export DOTF_STATUS_MODE=1
@@ -383,7 +383,7 @@ cmd_tui() {
     echo "错误: dotf tui 需要 TTY。请改用 CLI，例如: dotf nvim --deconfig 或 dotf agents skill apply <id>" >&2
     exit 2
   fi
-  PYTHONPATH="$SCRIPT_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -m dotf_tui
+  PYTHONPATH="$SCRIPT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m dotf_tui
 }
 
 cmd_agents_artifact() {
@@ -498,7 +498,7 @@ cmd_retry() {
     exit 1
   fi
 
-  if ! python3 "$SCRIPT_DIR/scripts/retry_plan.py" "$report_json" "$plan_file"; then
+  if ! python3 "$SCRIPT_DIR/src/retry_plan.py" "$report_json" "$plan_file"; then
     exit 1
   fi
 

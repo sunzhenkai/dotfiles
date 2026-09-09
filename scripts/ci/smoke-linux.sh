@@ -16,7 +16,7 @@ export XDG_CACHE_HOME="$TMP_HOME/.cache"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 
 echo "==> modules.py validate"
-python3 scripts/modules.py validate
+python3 src/modules.py validate
 
 echo "==> bootstrap --check-only"
 bash scripts/bootstrap.sh --check-only >/dev/null

@@ -269,7 +269,7 @@ def _record_state(
     }[category]
     hint = ""
     if category in {"missing", "changed", "stale", "permission"}:
-        hint = "运行 scripts/agents/sync.sh all --dry-run，确认后再同步"
+        hint = "运行 scripts/modules/agents/sync.sh all --dry-run，确认后再同步"
     elif category == "unowned":
         hint = "保留未托管内容；如需接管请先显式审查并备份"
     elif category == "conflict":
@@ -1072,9 +1072,9 @@ def check_browser(cat: Catalog, report: DoctorReport, profile: str, deep: bool) 
 
 
 def check_agents(root: Path, report: DoctorReport) -> None:
-    script = root / "scripts" / "agents" / "sync.sh"
+    script = root / "scripts" / "modules" / "agents" / "sync.sh"
     status = STATUS_PASS if script.is_file() else STATUS_WARN
-    report.add("agents", "sync-script", status, "agents sync 脚本存在" if status == STATUS_PASS else "找不到 scripts/agents/sync.sh")
+    report.add("agents", "sync-script", status, "agents sync 脚本存在" if status == STATUS_PASS else "找不到 scripts/modules/agents/sync.sh")
 
 
 def _safe_check(report: DoctorReport, group: str, check_id: str, callback: Callable[[], None]) -> None:

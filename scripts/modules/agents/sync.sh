@@ -5,11 +5,12 @@
 #   sync.sh [<tool>|all]
 #           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
 # 工具名称与能力由 agents/env/vendors.yaml 校验。
-# 诊断请用: dotf agents -d  或  python3 scripts/agents/doctor.py
+# 诊断请用: dotf agents -d  或  python3 src/agents/doctor.py
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+_SRC_AGENTS="$(cd "$SCRIPT_DIR/../../.." && pwd)/src/agents"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "error: python3 是 agents sync 所必需的" >&2
@@ -88,7 +89,7 @@ fi
 if [ "$ENV" -eq 1 ] && [ "$SKILLS" -eq 0 ] && [ "$TOOL" != "all" ]; then
   validation_args+=(--require-mcp)
 fi
-python3 "$SCRIPT_DIR/env_sync.py" "${validation_args[@]}"
+python3 "$_SRC_AGENTS/env_sync.py" "${validation_args[@]}"
 
 echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-default}  dry_run=$DRY_RUN"
 
@@ -97,7 +98,7 @@ instructions_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then
   instructions_args+=(--dry-run)
 fi
-python3 "$SCRIPT_DIR/instructions.py" "${instructions_args[@]}"
+python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
 
 if [ "$SKILLS" -eq 1 ]; then
   echo "--- skills ---"
@@ -107,11 +108,11 @@ if [ "$SKILLS" -eq 1 ]; then
   if [ "$DRY_RUN" -eq 1 ]; then
     skills_args+=(--dry-run)
   fi
-  python3 "$SCRIPT_DIR/sync.py" "${skills_args[@]}"
+  python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
   echo "--- default skills ---"
-  python3 "$SCRIPT_DIR/defaults.py" "${skills_args[@]}"
+  python3 "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
   echo "--- openspec skills ---"
-  python3 "$SCRIPT_DIR/openspec_skills.py" "${skills_args[@]}"
+  python3 "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
 fi
 
 if [ "$ENV" -eq 1 ]; then
@@ -123,7 +124,7 @@ if [ "$ENV" -eq 1 ]; then
   if [ "$DRY_RUN" -eq 1 ]; then
     env_args+=(--dry-run)
   fi
-  python3 "$SCRIPT_DIR/env_sync.py" "${env_args[@]}"
+  python3 "$_SRC_AGENTS/env_sync.py" "${env_args[@]}"
 fi
 
 # --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）

@@ -14,8 +14,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from dotf_core.overlays import (  # noqa: E402
     OVERLAY_KIND,
@@ -168,7 +168,7 @@ def test_plan_and_doctor_show_declared_runtime_version(tmp_home: Path) -> None:
     sync = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            str(ROOT / "src" / "agents" / "env_sync.py"),
             "cursor",
             "--profile",
             "research",
@@ -190,7 +190,7 @@ def test_plan_and_doctor_show_declared_runtime_version(tmp_home: Path) -> None:
     doctor = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "doctor.py"),
+            str(ROOT / "src" / "agents" / "doctor.py"),
             "--profile",
             "research",
             "--tool",
@@ -216,7 +216,7 @@ def test_plan_shows_overlay_enabled_runtime_version(tmp_home: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            str(ROOT / "src" / "agents" / "env_sync.py"),
             "cursor",
             "--profile",
             "research",
@@ -318,7 +318,7 @@ def test_default_doctor_skips_browser_capability(tmp_home: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "doctor.py"),
+            str(ROOT / "src" / "agents" / "doctor.py"),
             "--json",
             "--root",
             str(ROOT),
@@ -357,7 +357,7 @@ def test_runtime_sync_never_writes_repository_templates(tmp_home: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            str(ROOT / "src" / "agents" / "env_sync.py"),
             "cursor",
             "--profile",
             "research",
@@ -377,7 +377,7 @@ def test_runtime_sync_never_writes_repository_templates(tmp_home: Path) -> None:
     rejected = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            str(ROOT / "src" / "agents" / "env_sync.py"),
             "cursor",
             "--dry-run",
             "--also-repo-templates",

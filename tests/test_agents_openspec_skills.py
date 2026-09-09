@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import sys
 
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 
 def _load(name: str):
@@ -161,8 +161,8 @@ def test_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_home: Path) -> 
 
 
 def test_sync_sh_invokes_openspec_skills() -> None:
-    script = (ROOT / "scripts" / "agents" / "sync.sh").read_text(encoding="utf-8")
-    assert 'python3 "$SCRIPT_DIR/openspec_skills.py"' in script
+    script = (ROOT / "scripts" / "modules" / "agents" / "sync.sh").read_text(encoding="utf-8")
+    assert 'python3 "$_SRC_AGENTS/openspec_skills.py"' in script
     assert "--- openspec skills ---" in script
 
 

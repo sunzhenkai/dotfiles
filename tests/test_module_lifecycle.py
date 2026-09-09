@@ -95,7 +95,7 @@ def test_undeclared_handler_reported_by_validate(tmp_path: Path, monkeypatch: py
     """未声明处理器：注册表校验报告不一致。"""
     import sys
 
-    sys.path.insert(0, str(ROOT / "scripts"))
+    sys.path.insert(0, str(ROOT / "src"))
     import modules as m
 
     reg = tmp_path / "modules.yaml"
@@ -123,7 +123,7 @@ def test_undeclared_handler_reported_by_validate(tmp_path: Path, monkeypatch: py
 def test_declared_missing_handler_reported_by_validate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import sys
 
-    sys.path.insert(0, str(ROOT / "scripts"))
+    sys.path.insert(0, str(ROOT / "src"))
     import modules as m
 
     reg = tmp_path / "modules.yaml"

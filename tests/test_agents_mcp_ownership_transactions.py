@@ -14,7 +14,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = ROOT / "scripts"
+SCRIPTS = ROOT / "src"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(SCRIPTS / "agents"))
 
@@ -400,7 +400,7 @@ def test_explicit_template_generator_is_overlay_independent_and_regenerates_clea
     env = dict(__import__("os").environ)
     env.update({"HOME": str(tmp_home), "XDG_CONFIG_HOME": str(tmp_home / ".config")})
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "agents" / "generate_templates.py"), "--check", "--root", str(ROOT)],
+        [sys.executable, str(ROOT / "src" / "agents" / "generate_templates.py"), "--check", "--root", str(ROOT)],
         cwd=ROOT,
         env=env,
         text=True,
@@ -409,7 +409,7 @@ def test_explicit_template_generator_is_overlay_independent_and_regenerates_clea
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "/private/browser/profile" not in "".join(path.read_text(encoding="utf-8") for path in (ROOT / "agents" / "vendors").rglob("*.json"))
-    runtime = (ROOT / "scripts" / "agents" / "env_sync.py").read_text(encoding="utf-8")
+    runtime = (ROOT / "src" / "agents" / "env_sync.py").read_text(encoding="utf-8")
     assert "repo-templates" not in runtime
 
     isolated = tmp_path / "template-repo"
@@ -430,7 +430,7 @@ def test_explicit_template_generator_is_overlay_independent_and_regenerates_clea
     ):
         subprocess.run(command, cwd=isolated, check=True, capture_output=True)
     generated = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "agents" / "generate_templates.py"), "--root", str(isolated)],
+        [sys.executable, str(ROOT / "src" / "agents" / "generate_templates.py"), "--root", str(isolated)],
         cwd=ROOT,
         env=env,
         text=True,

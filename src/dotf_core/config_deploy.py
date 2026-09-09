@@ -1789,7 +1789,7 @@ def deconfig_owned(
 def _load_registry_module(repo_root: Path, name: str) -> Mapping[str, Any]:
     import sys
 
-    scripts = str(repo_root / "scripts")
+    scripts = str(repo_root / "src")
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
     import modules

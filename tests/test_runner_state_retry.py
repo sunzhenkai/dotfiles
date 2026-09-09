@@ -18,7 +18,7 @@ from plan_test_helpers import plan_env, write_test_plan
 
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "src"))
 import execution_state  # noqa: E402
 
 

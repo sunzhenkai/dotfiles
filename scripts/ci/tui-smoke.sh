@@ -43,7 +43,7 @@ export DOTF_REGISTRY_PATH="$TMP_HOME/modules.yaml"
 export DOTF_PROFILES_PATH="$TMP_HOME/profiles.yaml"
 echo '{"version":1,"default":"smoke","profiles":{"smoke":{"modules":[],"includes":[]}}}' > "$TMP_HOME/profiles.yaml"
 
-PYTHONPATH="$ROOT/scripts:$ROOT/tests" python3 - "$TMP_HOME/plan.json" "$HANDLERS" <<'PY'
+PYTHONPATH="$ROOT/src:$ROOT/tests" python3 - "$TMP_HOME/plan.json" "$HANDLERS" <<'PY'
 import sys
 from pathlib import Path
 from plan_test_helpers import write_test_plan
@@ -66,7 +66,7 @@ test -f "$STATE" || { echo "state file missing: $STATE" >&2; exit 1; }
 echo "--- state file ---"
 cat "$STATE"
 
-PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 - "$XDG_STATE_HOME" <<'PY'
+PYTHONPATH="$ROOT/src:$USER_SITE" python3 - "$XDG_STATE_HOME" <<'PY'
 import sys
 from pathlib import Path
 from dotf_core import modules_state as ms
@@ -78,7 +78,7 @@ print("state post-install: installed OK (doctor is no-op)")
 PY
 
 echo "==> modules_state round-trip"
-PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 - <<'PY'
+PYTHONPATH="$ROOT/src:$USER_SITE" python3 - <<'PY'
 import os, sys, tempfile
 from pathlib import Path
 from dotf_core import modules_state as ms
@@ -96,15 +96,15 @@ with tempfile.TemporaryDirectory() as td:
     print("round-trip OK")
 PY
 
-if PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 -c "import textual" 2>/dev/null; then
+if PYTHONPATH="$ROOT/src:$USER_SITE" python3 -c "import textual" 2>/dev/null; then
     echo "==> TUI app import"
-    PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 -c "
+    PYTHONPATH="$ROOT/src:$USER_SITE" python3 -c "
 from dotf_tui.app import DotfTuiApp, ModulesPane, SkillsPane, McpPane, StatusPane, ConflictsPane, ConfirmModal, ProgressModal
 print('app+views import OK')
 "
 
     echo "==> non-TTY __main__ fail-fast"
-    PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 - <<'PY'
+    PYTHONPATH="$ROOT/src:$USER_SITE" python3 - <<'PY'
 import sys
 from dotf_tui import __main__ as cli
 sys.stdin = open('/dev/null')
@@ -115,7 +115,7 @@ print("non-TTY fail-fast: rc=2 OK")
 PY
 
     echo "==> TUI Pilot smoke"
-    PYTHONPATH="$ROOT/scripts:$USER_SITE" python3 - <<'PY'
+    PYTHONPATH="$ROOT/src:$USER_SITE" python3 - <<'PY'
 import asyncio
 from pathlib import Path
 from textual.widgets import Input

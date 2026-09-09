@@ -128,11 +128,11 @@ dotf agents skill remove grill-with-docs
 dotf agents mcp remove web-reader --tool cursor
 dotf agents mcp apply web-reader --all-tools
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
-scripts/agents/sync.sh all --dry-run
+scripts/modules/agents/sync.sh all --dry-run
 ```
 
 - 源码：`agents/{skills,skills-defaults.yaml,vendors,env}`（一手 skills + 第三方默认清单 + 工具专属 vendors + MCP/env 真相源）
-- 脚本：单一包 `scripts/agents/`（`sync.sh` / `doctor.py` / `env_sync.py`）
+- 脚本：Python 包 `src/agents/`（`doctor.py` / `env_sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
 
 详见 `agents/README.md`、`agents/env/README.md`。
@@ -157,7 +157,7 @@ PYTHONPATH=scripts python3 -m dotf_core.overlays migrate  # 迁移旧仓库 loca
 默认 Agent profile 是低风险 `research`，不会启用 browser；`browser` / `full` 必须显式选择。普通 `dotf agents -c` 只写 HOME 与 XDG state，不反写仓库模板。维护者修改 `agents/env/` 后需显式生成并审查模板：
 
 ```shell
-python3 scripts/agents/generate_templates.py
+python3 src/agents/generate_templates.py
 # CI 使用同一命令后执行 git diff --exit-code
 ```
 

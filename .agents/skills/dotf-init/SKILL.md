@@ -33,7 +33,7 @@ OS 检测、模块清单、profile 展开都由 `dotf` 自己读这两个文件�
 
 ```bash
 dotf init --list                    # OS profile + 使用场景 profile
-python3 scripts/modules.py list     # 全模块（含 group/depends_on）
+python3 src/modules.py list     # 全模块（含 group/depends_on）
 ```
 
 ## 多用户共用性判定（核心，所有 phase 前必做）

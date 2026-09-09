@@ -36,7 +36,7 @@ mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 unset ZHIPU_API_KEY Z_AI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
 printf '%s\n' "==> offline locked default skills"
-PYTHONPATH="$ROOT/scripts/agents:$ROOT/scripts" "$PYTHON_BIN" - "$ROOT" <<'PY'
+PYTHONPATH="$ROOT/src/agents:$ROOT/src" "$PYTHON_BIN" - "$ROOT" <<'PY'
 import sys
 from pathlib import Path
 
@@ -226,7 +226,7 @@ done
 export PATH="$STUB_BIN:$PATH"
 
 agents_first="$TMP_ROOT/agents-first.log"
-"$BASH_BIN" "$ROOT/scripts/agents/sync.sh" cursor --profile research >"$agents_first"
+"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" cursor --profile research >"$agents_first"
 if ! grep -Eq 'done skills: changed=[1-9][0-9]* ' "$agents_first"; then
   echo "error: first Agent skills sync did not report changed" >&2
   exit 1
@@ -244,7 +244,7 @@ agents_before="$TMP_ROOT/agents-before.snapshot"
 snapshot_paths "$HOME" >"$agents_before"
 agents_backups_before="$(backup_count)"
 agents_second="$TMP_ROOT/agents-second.log"
-"$BASH_BIN" "$ROOT/scripts/agents/sync.sh" cursor --profile research >"$agents_second"
+"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" cursor --profile research >"$agents_second"
 if ! grep -Eq 'done skills: changed=0 pruned=0 unchanged=[1-9][0-9]*' "$agents_second"; then
   echo "error: second Agent skills sync was not fully unchanged" >&2
   exit 1

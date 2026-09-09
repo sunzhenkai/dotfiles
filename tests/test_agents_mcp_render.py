@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from common import (  # noqa: E402
     Catalog,
@@ -197,7 +197,7 @@ def test_no_secret_cli_dry_run_succeeds(
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "agents" / "env_sync.py"),
+            str(ROOT / "src" / "agents" / "env_sync.py"),
             tool,
             "--dry-run",
             "--root",

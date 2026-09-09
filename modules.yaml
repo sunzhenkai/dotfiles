@@ -1,5 +1,5 @@
 # 统一模块注册表 — install/config/doctor 能力与路径的真相源
-# 由 scripts/modules.py / scripts/modules.sh 读取；勿再维护并行硬编码清单。
+# 由 src/modules.py / scripts/modules.sh 读取；勿再维护并行硬编码清单。
 #
 # 字段:
 #   name       — 唯一模块名

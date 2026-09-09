@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = ROOT / "scripts"
+SCRIPTS = ROOT / "src"
 sys.path.insert(0, str(SCRIPTS / "agents"))
 
 from common import Catalog  # noqa: E402

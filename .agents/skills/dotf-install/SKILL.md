@@ -29,8 +29,8 @@ description: "在已初始化的系统上按需安装/配置单个或多个模�
 `modules.yaml` 是真相源；下表是 group 与多用户安全性的**速查**，非权威清单。权威查询：
 
 ```bash
-python3 scripts/modules.py list                 # 全模块 + group + depends_on
-python3 scripts/modules.py list --filter-os     # 当前 OS 适用
+python3 src/modules.py list                 # 全模块 + group + depends_on
+python3 src/modules.py list --filter-os     # 当前 OS 适用
 dotf <mod> -i --dry-run                         # 单模块计划预览
 ```
 
@@ -78,7 +78,7 @@ system homebrew hypr fcitx5 fonts（装到系统目录时） zsh（触发 chsh �
 
 1. 读台账 / 探测共用性。
 2. 环境状态：`dotf status`（只读 L0）。
-3. 可装模块：`python3 scripts/modules.py list --filter-os`（按 group 展示）。
+3. 可装模块：`python3 src/modules.py list --filter-os`（按 group 展示）。
 4. 输出：当前已装/缺失、按 group 的可装模块、shared 下的安全标记。
 5. 不改任何状态。
 

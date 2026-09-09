@@ -70,7 +70,7 @@ install_pi_config() { install_config pi; }
 # Agent sync is intentionally separate from config deployment until its own
 # plan/manifest transaction work is complete.
 sync_agents() {
-  "$DOTFILES_ROOT/scripts/agents/sync.sh" "$@"
+  "$DOTFILES_ROOT/scripts/modules/agents/sync.sh" "$@"
 }
 
 install_all() {

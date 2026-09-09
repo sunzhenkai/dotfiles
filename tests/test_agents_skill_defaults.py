@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import sys
 
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 def _load(name: str):
     return importlib.import_module(name)
 

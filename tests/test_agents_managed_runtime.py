@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from managed_runtime import AGENTS_MANIFEST_NAME  # noqa: E402
 
@@ -46,7 +46,7 @@ def _run(repo: Path, home: Path, *, dry_run: bool = False) -> subprocess.Complet
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
-    cmd = [sys.executable, str(ROOT / "scripts" / "agents" / "sync.py"), "--root", str(repo)]
+    cmd = [sys.executable, str(ROOT / "src" / "agents" / "sync.py"), "--root", str(repo)]
     if dry_run:
         cmd.append("--dry-run")
     return subprocess.run(cmd, text=True, capture_output=True, env=env, cwd=ROOT, check=False)
@@ -217,7 +217,7 @@ def test_concurrent_syncs_serialize_without_manifest_loss(tmp_path: Path) -> Non
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
-    cmd = [sys.executable, str(ROOT / "scripts" / "agents" / "sync.py"), "--root", str(repo)]
+    cmd = [sys.executable, str(ROOT / "src" / "agents" / "sync.py"), "--root", str(repo)]
     one = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd=ROOT)
     two = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd=ROOT)
     out1, err1 = one.communicate(timeout=30)

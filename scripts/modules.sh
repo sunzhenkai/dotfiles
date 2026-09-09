@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 模块注册表 bash 封装 — 委托 scripts/modules.py
+# 模块注册表 bash 封装 — 委托 src/modules.py
 # 用法: source "$DOTFILES_ROOT/scripts/modules.sh"
 
 # 在 source 时锚定仓根（勿在函数内用 BASH_SOURCE，否则指向调用方）
 _MODULES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-_MODULES_PY="$_MODULES_ROOT/scripts/modules.py"
+_MODULES_PY="$_MODULES_ROOT/src/modules.py"
 
 _modules_py() {
   python3 "$_MODULES_PY" "$@"

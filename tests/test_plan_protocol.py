@@ -15,7 +15,7 @@ from plan_test_helpers import plan_env, write_test_plan
 
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
-PLANNER = ROOT / "scripts" / "planner.py"
+PLANNER = ROOT / "src" / "planner.py"
 
 
 def _reseal(document: dict) -> None:

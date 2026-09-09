@@ -16,8 +16,8 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 import doctor  # noqa: E402
 from common import Catalog  # noqa: E402
@@ -396,7 +396,7 @@ def test_planner_failure_does_not_stop_unrelated_checks(
 
 
 def test_legacy_doctor_module_is_import_only_and_gitignore_untouched() -> None:
-    source = (ROOT / "scripts" / "agents" / "doctor_impl.py").read_text(encoding="utf-8")
+    source = (ROOT / "src" / "agents" / "doctor_impl.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     assert not [node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
     assert "from doctor import" in source

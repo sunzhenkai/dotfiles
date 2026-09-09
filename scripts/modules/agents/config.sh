@@ -21,7 +21,7 @@ if grep -q $'^RESULT\tchanged\t' "$registry_log"; then
 fi
 
 sync_log="$(mktemp)"
-if ! bash "$DOTFILES_ROOT/scripts/agents/sync.sh" "$@" >"$sync_log" 2>&1; then
+if ! bash "$DOTFILES_ROOT/scripts/modules/agents/sync.sh" "$@" >"$sync_log" 2>&1; then
   cat "$sync_log"
   dotf_result_failed "agents sync failed"
   exit 1

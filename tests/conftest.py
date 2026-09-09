@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = ROOT / "scripts"
+SCRIPTS = ROOT / "src"
 DOTF = ROOT / "bin" / "dotf"
 
 # 会话开始时锁定真实 HOME，供断言对照

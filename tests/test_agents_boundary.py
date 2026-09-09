@@ -11,7 +11,7 @@ from pathlib import Path
 from conftest import isolate_agents_sync_for_test
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 from common import TOOLS  # noqa: E402
 
 
@@ -19,7 +19,7 @@ def test_agents_install_plan_expands_tools() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "scripts" / "planner.py"),
+            str(ROOT / "src" / "planner.py"),
             "plan",
             "--actions",
             "install",
@@ -52,7 +52,7 @@ def test_removed_vendors_not_in_tools_or_bundle() -> None:
         assert removed not in TOOLS
     assert "zcode" in TOOLS
     assert "kiro" in TOOLS
-    bundle = (ROOT / "scripts" / "planner.py").read_text(encoding="utf-8")
+    bundle = (ROOT / "src" / "planner.py").read_text(encoding="utf-8")
     assert (
         'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")'
         in bundle
@@ -63,7 +63,7 @@ def test_agents_config_plan_does_not_pull_tool_configs() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "scripts" / "planner.py"),
+            str(ROOT / "src" / "planner.py"),
             "plan",
             "--actions",
             "config",
@@ -90,7 +90,7 @@ def test_cursor_install_plan_is_solo() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "scripts" / "planner.py"),
+            str(ROOT / "src" / "planner.py"),
             "plan",
             "--actions",
             "install",
@@ -118,7 +118,7 @@ def test_pure_mcp_tool_config_directs_to_agents_sync() -> None:
         result = subprocess.run(
             [
                 "python3",
-                str(ROOT / "scripts" / "planner.py"),
+                str(ROOT / "src" / "planner.py"),
                 "plan",
                 "--actions",
                 "config",
@@ -157,7 +157,7 @@ def test_sync_tool_filter_dry_run_idempotent(tmp_home: Path) -> None:
     env["HOME"] = str(tmp_home)
     cmd = [
         "bash",
-        str(ROOT / "scripts" / "agents" / "sync.sh"),
+        str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
         "cursor",
         "--skills-only",
         "--dry-run",
@@ -177,7 +177,7 @@ def test_sync_removed_tools_rejected(tmp_home: Path) -> None:
         r = subprocess.run(
             [
                 "bash",
-                str(ROOT / "scripts" / "agents" / "sync.sh"),
+                str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
                 tool,
                 "--skills-only",
                 "--dry-run",
@@ -198,7 +198,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
     r = subprocess.run(
         [
             "bash",
-            str(ROOT / "scripts" / "agents" / "sync.sh"),
+            str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
             "cursor",
             "--skills-only",
             "--dry-run",

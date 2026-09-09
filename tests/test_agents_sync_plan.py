@@ -16,8 +16,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from adapters import adapter_for  # noqa: E402
 from catalog import CatalogError, load_catalog_documents, load_vendor_matrix, render_vendor_docs  # noqa: E402
@@ -316,7 +316,7 @@ def test_zcode_no_secret_machine_dry_run_has_no_writes(tmp_home: Path) -> None:
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "agents" / "env_sync.py"), "zcode", "--dry-run", "--json", "--root", str(ROOT)],
+        [sys.executable, str(ROOT / "src" / "agents" / "env_sync.py"), "zcode", "--dry-run", "--json", "--root", str(ROOT)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -339,7 +339,7 @@ def test_apply_cli_never_logs_literal_secret(tmp_home: Path) -> None:
         "PYTHONDONTWRITEBYTECODE": "1",
     })
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "agents" / "env_sync.py"), "zcode", "--root", str(ROOT)],
+        [sys.executable, str(ROOT / "src" / "agents" / "env_sync.py"), "zcode", "--root", str(ROOT)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -466,7 +466,7 @@ def test_public_sync_wrapper_delegates_vendor_and_capability_validation_to_matri
         "XDG_STATE_HOME": str(home / ".state"),
         "PYTHONDONTWRITEBYTECODE": "1",
     })
-    wrapper = ROOT / "scripts" / "agents" / "sync.sh"
+    wrapper = ROOT / "scripts" / "modules" / "agents" / "sync.sh"
     accepted = subprocess.run(
         ["bash", str(wrapper), vendor_id, "--skills-only", "--dry-run", "--root", str(repo)],
         capture_output=True,

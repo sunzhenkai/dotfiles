@@ -11,7 +11,7 @@ TASKFLOW = AGENTS / "skills" / "taskflow"
 
 
 def _load_sync_module():
-    path = ROOT / "scripts" / "agents" / "sync.py"
+    path = ROOT / "src" / "agents" / "sync.py"
     spec = importlib.util.spec_from_file_location("agents_sync", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

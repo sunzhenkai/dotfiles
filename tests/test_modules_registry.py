@@ -12,7 +12,7 @@ import pytest
 
 def test_validate_registry_passes(repo_root: Path) -> None:
     result = subprocess.run(
-        ["python3", str(repo_root / "scripts" / "modules.py"), "validate"],
+        ["python3", str(repo_root / "src" / "modules.py"), "validate"],
         cwd=str(repo_root),
         capture_output=True,
         text=True,
@@ -196,7 +196,7 @@ def test_matches_os_family() -> None:
 
 
 def test_cli_has_and_exists(repo_root: Path) -> None:
-    py = repo_root / "scripts" / "modules.py"
+    py = repo_root / "src" / "modules.py"
 
     def run(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -220,7 +220,7 @@ def test_cli_has_and_exists(repo_root: Path) -> None:
 
 def test_doctor_capability_list_excludes_system(repo_root: Path) -> None:
     result = subprocess.run(
-        ["python3", str(repo_root / "scripts" / "modules.py"), "list", "--capability", "doctor"],
+        ["python3", str(repo_root / "src" / "modules.py"), "list", "--capability", "doctor"],
         cwd=str(repo_root),
         capture_output=True,
         text=True,

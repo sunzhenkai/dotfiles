@@ -12,7 +12,7 @@ dotf_doctor_l0() {
   echo "doctor ($mod) — L0"
 
   if [ "$mod" = "agents" ]; then
-    if ! python3 "$DOTFILES_ROOT/scripts/agents/managed_status.py"; then
+    if ! python3 "$DOTFILES_ROOT/src/agents/managed_status.py"; then
       failed=1
     fi
   elif modules_has "$mod" config; then
@@ -41,7 +41,7 @@ dotf_doctor_l0() {
     fi
   else
     local mcp_status=""
-    if mcp_status="$(python3 "$DOTFILES_ROOT/scripts/agents/managed_mcp_status.py" "$mod")"; then
+    if mcp_status="$(python3 "$DOTFILES_ROOT/src/agents/managed_mcp_status.py" "$mod")"; then
       [ -n "$mcp_status" ] && echo "$mcp_status"
     else
       local mcp_rc=$?

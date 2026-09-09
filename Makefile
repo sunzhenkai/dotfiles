@@ -10,7 +10,7 @@ TEMPLATE_OUTPUTS := \
 	agents/vendors/zcode/mcp.json
 
 registry validate:
-	python3 scripts/modules.py validate --strict-handlers
+	python3 src/modules.py validate --strict-handlers
 
 test:
 	python3 -m pytest -q
@@ -25,7 +25,7 @@ shellcheck:
 	bash scripts/ci/shellcheck-first-party.sh
 
 templates:
-	python3 scripts/agents/generate_templates.py
+	python3 src/agents/generate_templates.py
 	git diff --exit-code -- $(TEMPLATE_OUTPUTS)
 
 secret-scan:

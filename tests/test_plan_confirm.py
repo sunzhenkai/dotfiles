@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
 COMMON = ROOT / "scripts" / "lib" / "common.sh"
 SYSTEM = ROOT / "scripts" / "modules" / "system" / "lib.sh"
-TOOLS = ROOT / "scripts" / "tools"
+MODULE_LIBS = ROOT / "scripts" / "modules"
 
 
 def _pty_run(
@@ -196,11 +196,10 @@ def test_system_keeps_side_effect_confirms_only() -> None:
 
 def test_regular_modules_have_no_install_confirm() -> None:
     """白名单外模块不应再有「是否安装/配置」confirm。"""
-    side_effect_files = {"system.sh", "common.sh"}
     pattern = re.compile(r'confirm\s+"是否')
     offenders: list[str] = []
-    for path in TOOLS.glob("*.sh"):
-        if path.name in side_effect_files:
+    for path in MODULE_LIBS.glob("*/lib.sh"):
+        if path.parent.name == "system":
             continue
         text = path.read_text(encoding="utf-8")
         if pattern.search(text):

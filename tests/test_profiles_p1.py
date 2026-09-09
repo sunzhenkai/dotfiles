@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def test_profiles_validate() -> None:
     r = subprocess.run(
-        ["python3", str(ROOT / "scripts" / "modules.py"), "validate"],
+        ["python3", str(ROOT / "src" / "modules.py"), "validate"],
         capture_output=True,
         text=True,
         cwd=str(ROOT),
@@ -27,7 +27,7 @@ def test_minimal_profile_plan() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "scripts" / "planner.py"),
+            str(ROOT / "src" / "planner.py"),
             "plan",
             "--actions",
             "install,config",
@@ -57,7 +57,7 @@ def test_full_profile_larger_than_minimal() -> None:
         r = subprocess.run(
             [
                 "python3",
-                str(ROOT / "scripts" / "planner.py"),
+                str(ROOT / "src" / "planner.py"),
                 "plan",
                 "--actions",
                 "install,config",
@@ -83,7 +83,7 @@ def test_desktop_filters_darwin_only_on_linux() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "scripts" / "planner.py"),
+            str(ROOT / "src" / "planner.py"),
             "plan",
             "--actions",
             "config",

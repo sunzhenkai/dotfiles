@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from instructions import CURSOR_MDC_HEADER, OWNER_PREFIX  # noqa: E402
 from managed_runtime import AGENTS_MANIFEST_NAME  # noqa: E402
@@ -20,7 +20,7 @@ def _run(home: Path, *, dry_run: bool = False, root: Path = ROOT) -> subprocess.
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
-    cmd = [sys.executable, str(ROOT / "scripts" / "agents" / "instructions.py"), "--root", str(root)]
+    cmd = [sys.executable, str(ROOT / "src" / "agents" / "instructions.py"), "--root", str(root)]
     if dry_run:
         cmd.append("--dry-run")
     return subprocess.run(cmd, text=True, capture_output=True, env=env, cwd=ROOT, check=False)
@@ -36,8 +36,8 @@ def test_source_is_global_and_omits_skill_catalog() -> None:
 
 
 def test_sync_sh_invokes_instructions() -> None:
-    script = (ROOT / "scripts" / "agents" / "sync.sh").read_text(encoding="utf-8")
-    assert 'python3 "$SCRIPT_DIR/instructions.py"' in script
+    script = (ROOT / "scripts" / "modules" / "agents" / "sync.sh").read_text(encoding="utf-8")
+    assert 'python3 "$_SRC_AGENTS/instructions.py"' in script
     assert "--- instructions ---" in script
 
 
@@ -102,7 +102,7 @@ def test_local_edit_conflicts_without_overwrite(tmp_path: Path) -> None:
 
 
 def test_doctor_reports_missing_targets(tmp_path: Path) -> None:
-    sys.path.insert(0, str(ROOT / "scripts"))
+    sys.path.insert(0, str(ROOT / "src"))
     import doctor  # noqa: WPS433
 
     home = tmp_path / "home"

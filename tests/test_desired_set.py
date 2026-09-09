@@ -9,8 +9,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from desired_set import DesiredSetError, resolve_skill_desired_set  # noqa: E402
 from defaults import first_party_skill_ids, selected_default_ids  # noqa: E402

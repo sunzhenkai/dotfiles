@@ -119,7 +119,7 @@ driver 的 `proposal.md` SHALL 含涉及面表，角色取值为 `必须`、`建
 
 ### Requirement: 命令面只增一个且零脚本
 
-taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stock `openspec-*` skill。skill 目录 MUST NOT 包含 `scripts/`，且 MUST NOT 要求 `scripts/agents/sync.py` 新增 shim。
+taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stock `openspec-*` skill。skill 目录 MUST NOT 包含 `scripts/`，且 MUST NOT 要求 `src/agents/sync.py` 新增 shim。
 
 #### Scenario: 阶段命令复用 stock
 
@@ -131,5 +131,5 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 
 - **WHEN** 检视 `agents/skills/taskflow/`
 - **THEN** 其中没有可执行脚本目录
-- **THEN** `scripts/agents/sync.py` 的 `SHIMS` 未新增条目
+- **THEN** `src/agents/sync.py` 的 `SHIMS` 未新增条目
 

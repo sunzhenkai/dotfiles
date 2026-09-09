@@ -84,7 +84,7 @@
 - **THEN** 该 skip 单独 SHALL NOT 导致非零退出
 
 ### Requirement: agents 走专用 doctor 入口
-模块 `agents` 的 doctor SHALL 调用现有 agents 深度诊断实现（如 `scripts/agents/doctor.py`），而非仅 L0。诊断专用选项（如 `--json`、`--deep`、`--profile`）SHALL 在 `dotf agents -d`（及含 d 的组合）时可透传。
+模块 `agents` 的 doctor SHALL 调用现有 agents 深度诊断实现（如 `src/agents/doctor.py`），而非仅 L0。诊断专用选项（如 `--json`、`--deep`、`--profile`）SHALL 在 `dotf agents -d`（及含 d 的组合）时可透传。
 
 #### Scenario: agents -d 调用深度诊断
 - **WHEN** 运行 `dotf agents -d`

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from conftest import ROOT, run_dotf
 
-SCRIPTS = ROOT / "scripts"
+SCRIPTS = ROOT / "src"
 sys.path.insert(0, str(SCRIPTS))
 
 from dotf_tui.catalog import Selectable, list_agent_selectables, list_module_selectables  # noqa: E402

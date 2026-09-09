@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "agents"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from sync import kiro_skills_target  # noqa: E402
 from sync import validate_output  # noqa: E402
@@ -21,7 +21,7 @@ def _run_sync(tmp_home: Path, *, kiro_home: str | None = None) -> subprocess.Com
     if kiro_home is not None:
         env["KIRO_HOME"] = kiro_home
     return subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "agents" / "sync.py"), "--root", str(ROOT)],
+        [sys.executable, str(ROOT / "src" / "agents" / "sync.py"), "--root", str(ROOT)],
         capture_output=True,
         text=True,
         cwd=str(ROOT),

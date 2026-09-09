@@ -145,7 +145,7 @@ runner_run_action() {
       # shellcheck source=/dev/null
       source "$DOTFILES_ROOT/scripts/lib/result.sh"
       status="$(
-        PYTHONPATH="${DOTFILES_ROOT}/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+        PYTHONPATH="${DOTFILES_ROOT}/src${PYTHONPATH:+:$PYTHONPATH}" \
           python3 -m dotf_core.config_deploy deconfig \
           --module "$module" \
           --repo-root "$DOTFILES_ROOT" \
@@ -169,8 +169,8 @@ runner_run_action() {
       export DOTF_ACTION="$action"
       # shellcheck source=/dev/null
       source "$DOTFILES_ROOT/scripts/lib/result.sh"
-      PYTHONPATH="${DOTFILES_ROOT}/scripts:${DOTFILES_ROOT}/scripts/agents${PYTHONPATH:+:$PYTHONPATH}" \
-        python3 "$DOTFILES_ROOT/scripts/agents/desired_ops.py" "$action" "$module"
+      PYTHONPATH="${DOTFILES_ROOT}/src:${DOTFILES_ROOT}/src/agents${PYTHONPATH:+:$PYTHONPATH}" \
+        python3 "$DOTFILES_ROOT/src/agents/desired_ops.py" "$action" "$module"
     ) >"$capture" 2>&1 || rc=$?
   elif [ "$action" = "config" ]; then
     # Registry-declared config has one safe generic entry point. Specialized

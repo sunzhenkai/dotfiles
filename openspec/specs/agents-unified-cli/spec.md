@@ -54,21 +54,21 @@ The system SHALL allow users to restrict sync scope without abandoning the unifi
 - **THEN** 系统 SHALL 按统一 agents 配置模块契约同步支持工具
 
 ### Requirement: Scripts expose a single agents CLI surface
-The system SHALL provide scripts under `scripts/agents/` as the single CLI surface for sync and doctor orchestration, implemented as one self-contained Python package with no reverse dependency on any other agent script directory. Sync entrypoints SHALL NOT accept a `--doctor` flag; diagnosis SHALL be invoked via the module doctor action (`dotf agents -d`) or by calling the doctor script directly.
+The system SHALL provide scripts under `src/agents/` as the single CLI surface for sync and doctor orchestration, implemented as one self-contained Python package with no reverse dependency on any other agent script directory. Sync entrypoints SHALL NOT accept a `--doctor` flag; diagnosis SHALL be invoked via the module doctor action (`dotf agents -d`) or by calling the doctor script directly.
 
 #### Scenario: User invokes scripts directly
-- **WHEN** the user runs `scripts/agents/sync.sh` without going through `dotf`
+- **WHEN** the user runs `scripts/modules/agents/sync.sh` without going through `dotf`
 - **THEN** the command SHALL support the same core scopes as `dotf agents -c`
 - **THEN** documentation SHALL present this path as equivalent to the config module
 
 #### Scenario: Sync rejects doctor flag
-- **WHEN** the user runs `scripts/agents/sync.sh --doctor` or `dotf agents -c --doctor`
+- **WHEN** the user runs `scripts/modules/agents/sync.sh --doctor` or `dotf agents -c --doctor`
 - **THEN** the command SHALL fail with a non-zero exit
 - **THEN** the error SHALL direct the user to `dotf agents -d` or `dotf agents -cd`
 
 #### Scenario: No parallel agent script directory
 - **WHEN** the sync/doctor logic is loaded
-- **THEN** all core implementation modules SHALL reside under `scripts/agents/`
+- **THEN** all core implementation modules SHALL reside under `src/agents/`
 - **THEN** the code SHALL NOT import agent logic from a separate `scripts/agent-env/` directory
 
 ### Requirement: Agents dual capability via subject-first CLI

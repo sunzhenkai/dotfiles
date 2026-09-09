@@ -6,7 +6,7 @@
 : "${DOTF_TARGET_ROOT:=${HOME}}"
 
 _DOTF_CONFIG_SAFE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-_DOTF_CORE_PYTHONPATH=$(cd "${_DOTF_CONFIG_SAFE_DIR}/.." && pwd)
+_DOTF_CORE_PYTHONPATH=$(cd "${_DOTF_CONFIG_SAFE_DIR}/../.." && pwd)/src
 
 _dotf_core() {
   if [ -n "${PYTHONPATH:-}" ]; then
