@@ -33,6 +33,10 @@ PROFILES: dict[str, dict[str, Any]] = {
         "model": "company/vanchin/deepseek-v4-pro-0813",
         "env": ("COMPANY_API_KEY", "COMPANY_BASE_URL"),
     },
+    "deepseek": {
+        "model": "deepseek/deepseek-v4-pro",
+        "env": ("DEEPSEEK_API_KEY",),
+    },
     "kimi": {
         "model": "kimi/kimi-for-coding",
         "env": ("KIMI_API_KEY",),

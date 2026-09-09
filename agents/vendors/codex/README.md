@@ -14,6 +14,7 @@ dotf codex -f zhipu             # bigmodel 是 zhipu 的别名
 dotf codex -f scnet
 dotf codex -f nativex
 dotf codex -f company
+dotf codex -f deepseek
 dotf codex -f minimax            # 切回默认
 
 codex                            # 使用 ~/.codex/config.toml 中的当前 provider
@@ -27,6 +28,7 @@ codex                            # 使用 ~/.codex/config.toml 中的当前 prov
 | `kimi` | `https://api.kimi.com/coding/v1` | `KIMI_API_KEY` | `kimi-for-coding` | `kimi-catalog.json` |
 | `zhipu`（别名 `bigmodel`） | `https://open.bigmodel.cn/api/v1` | `ZHIPU_API_KEY` | `glm-5.3` | `zhipu-catalog.json` |
 | `scnet` | `https://api.scnet.cn/api/llm/v1` | `SCNET_API_KEY` | `DeepSeek-V4-Flash-0731` | `scnet-catalog.json` |
+| `deepseek` | `https://api.deepseek.com/` | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` | `deepseek-catalog.json` |
 
 全部 provider 均 `wire_api = "responses"`、`requires_openai_auth = false`。启动时跳过 ChatGPT 登录。
 
@@ -50,10 +52,10 @@ Codex 默认走 OpenAI 登录流程（ChatGPT / API Key）。本配置全部是*
 ## 配置说明
 
 - `config.toml` - Codex **基础**配置（base），安装时与选中的 `*.config.toml` overlay、以及 XDG overlay `codex.local_toml` 合并生成 `~/.codex/config.toml`（真实文件，非软链）。**不含 `projects`**（信任列表已本地化，见下节）
-  - 默认 `model_provider = "minimax"` / `model = "MiniMax-M3"`；`-f` 会覆盖这几项
-  - `[model_providers.*]` 一次声明全部 provider，切换只改顶层 model / catalog
+  - 默认 `model_provider = "minimax"` / `model = "MiniMax-M3"`；`-f` 会覆盖这些顶层键（DeepSeek 还会设置 API key 登录模式）
+  - `[model_providers.*]` 一次声明全部 provider，切换只改顶层 model / catalog 等键
   - `approval_policy` / `sandbox_mode` - 审批与沙箱策略
-- `minimax.config.toml` / `nativex.config.toml` / `company.config.toml` / `kimi.config.toml` / `zhipu.config.toml` / `scnet.config.toml` - 各 provider 的仓库内 overlay 输入；选择 profile 时只合并进受管配置文件 `~/.codex/config.toml`，不会作为 `~/.codex/<name>.config.toml` 单独安装
+  - `minimax.config.toml` / `nativex.config.toml` / `company.config.toml` / `kimi.config.toml` / `zhipu.config.toml` / `scnet.config.toml` / `deepseek.config.toml` - 各 provider 的仓库内 overlay 输入；选择 profile 时只合并进受管配置文件 `~/.codex/config.toml`，不会作为 `~/.codex/<name>.config.toml` 单独安装
 - `model-catalogs/*.json` - 各 provider 的模型能力目录；`config_deploy` 将每个被 base/profile 引用的 catalog 安装为 `~/.codex/model-catalogs/*.json` 真实文件并记录 manifest ownership（不使用软链）
 
 > **踩坑**：国内 MiniMax key 打到海外站 `api.minimax.io` 会 `401 invalid api key`（Codex 正常、Pi/SDK 挂时常是这个）。  
@@ -126,6 +128,7 @@ dotf codex -c
    senv env set KIMI_API_KEY "<kimi coding key>" -g ai    # Kimi For Coding
    senv env set ZHIPU_API_KEY "<智谱 coding plan key>" -g ai
    senv env set SCNET_API_KEY "<scnet key>" -g ai         # 官方名也可能是 SCNET_TOKEN_PLAN_API_KEY
+   senv env set DEEPSEEK_API_KEY "<deepseek key>" -g ai   # DeepSeek 官方 API
    senv env set COMPANY_API_KEY "<company new-api token>" -g feg
    senv env set COMPANY_BASE_URL "<openai-compatible-base>/v1" -g feg
    ```
@@ -189,6 +192,10 @@ dotf codex -f company
 ### SCNet
 
 OpenAI（含 Responses）：`https://api.scnet.cn/api/llm/v1`。Anthropic 端点 Codex 不用。默认 `DeepSeek-V4-Flash-0731`（平台标了 Responses）。catalog 收录平台列出的 Kimi / DeepSeek / 千问 / 智谱 / MiniMax；未标 Responses 的模型仍可在 `/model` 里看到，但 Codex 可能失败。SCNet 按市场价扣 Credits，选模时注意成本。
+
+### DeepSeek 官方 API
+
+官方端点原生支持 OpenAI Responses：`https://api.deepseek.com/`。默认 `deepseek-v4-flash`；`/model` 可切 `deepseek-v4-pro` 与实验性的 `deepseek-v4-flash-vision-exp`（后者支持 image input）。catalog 的官方元数据要求 Codex CLI >= 0.144.0；密钥继续用 `DEEPSEEK_API_KEY` 环境变量，不写入配置。
 
 ## 注意事项
 

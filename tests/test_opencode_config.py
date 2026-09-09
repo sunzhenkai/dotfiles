@@ -224,7 +224,7 @@ def test_cli_opencode_f_lists_profiles() -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     out = r.stdout
     assert "可用 OpenCode provider" in out
-    for name in ("minimax", "nativex", "company", "kimi", "zhipu", "scnet"):
+    for name in ("minimax", "nativex", "company", "deepseek", "kimi", "zhipu", "scnet"):
         assert name in out
     assert "company/vanchin/deepseek-v4-pro-0813" in out
     assert "用法: dotf opencode -f <provider>" in out

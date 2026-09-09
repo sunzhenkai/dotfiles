@@ -1,0 +1,9 @@
+# DeepSeek 官方 API（`dotf codex -f deepseek` 合并到 ~/.codex/config.toml）
+# 本文件仅为仓库内 merge 输入，不单独安装到 HOME。
+# 官方稳定别名：deepseek-v4-flash / deepseek-v4-pro / deepseek-v4-flash-vision-exp
+model = "deepseek-v4-flash"
+model_provider = "deepseek"
+model_context_window = 1048576
+preferred_auth_method = "apikey"
+forced_login_method = "api"
+model_catalog_json = "~/.codex/model-catalogs/deepseek-catalog.json"

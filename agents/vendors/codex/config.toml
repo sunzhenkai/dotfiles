@@ -8,6 +8,7 @@
 #   kimi     — Kimi For Coding         KIMI_API_KEY
 #   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
 #   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
+#   deepseek — DeepSeek 官方 API       DEEPSEEK_API_KEY
 #
 # 切换默认 provider：dotf codex -f <name>（选择仓库 profile 并 merge）
 # profile TOML 只作为仓库内 merge 输入，不作为 Codex CLI 辅助配置安装。
@@ -111,6 +112,18 @@ requires_openai_auth = false
 name = "SCNet"
 base_url = "https://api.scnet.cn/api/llm/v1"
 env_key = "SCNET_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+
+# ============================================================
+# 自定义模型提供商 - DeepSeek 官方 API
+# ============================================================
+# 官方原生支持 OpenAI Responses：https://api.deepseek.com/
+# 认证通过 env_key 从 DEEPSEEK_API_KEY 环境变量读取，密钥不入库。
+[model_providers.deepseek]
+name = "DeepSeek"
+base_url = "https://api.deepseek.com/"
+env_key = "DEEPSEEK_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
 

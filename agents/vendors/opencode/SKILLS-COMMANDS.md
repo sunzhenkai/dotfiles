@@ -10,14 +10,16 @@
 dotf opencode -c                 # 安装手写配置 + 托管 providers
 dotf opencode -f                 # 列出可用 provider
 dotf opencode -f company         # 切换默认 model（隐含 -c；全家仍保留）
+dotf opencode -f deepseek        # 切换 DeepSeek 官方渠道
 opencode -m company/vanchin/deepseek-v4-pro-0813   # 仅本次会话
+opencode -m deepseek/deepseek-v4-pro               # 仅本次会话
 dotf agents -c --tool opencode   # 同步 skills + MCP
 scripts/agents/sync.sh opencode
 ```
 
-`dotf opencode -f` **不是**排他 overlay：六家 provider 始终写在 `opencode.json` 里，`/models` 可随时切。`-f` 只改默认 `model` 指针，记在 `~/.config/opencode/.dotf-profile`。
+`dotf opencode -f` **不是**排他 overlay：七家 provider 始终写在 `opencode.json` 里，`/models` 可随时切。`-f` 只改默认 `model` 指针，记在 `~/.config/opencode/.dotf-profile`。
 
-company 走 Chat Completions（`@ai-sdk/openai-compatible`），地址/密钥运行时读 `{env:COMPANY_BASE_URL}` / `{env:COMPANY_API_KEY}`，不入库。MiniMax / NativeX / 智谱 / SCNet 按 Responses（`@ai-sdk/openai`）；Kimi 官方是 Chat。
+company 走 Chat Completions（`@ai-sdk/openai-compatible`），地址/密钥运行时读 `{env:COMPANY_BASE_URL}` / `{env:COMPANY_API_KEY}`，不入库。MiniMax / NativeX / 智谱 / SCNet 按 Responses（`@ai-sdk/openai`）；DeepSeek 官方也支持 Responses，但 OpenCode 内置定义走 OpenAI-compatible Chat；Kimi 官方是 Chat。
 
 **MCP**：`~/.config/opencode/opencode.json` 的 `mcp` 字段由统一 `agents` sync 合并；安装托管 providers 时不会覆盖 `mcp`。
 可选 `--also-repo-templates` 同步更新本目录仓库模板。请改 `agents/env/mcp/` 后重新 sync。

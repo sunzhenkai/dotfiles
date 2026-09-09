@@ -30,6 +30,7 @@ CATALOG_NAMES = {
     "minimax-catalog.json",
     "nativex-catalog.json",
     "scnet-catalog.json",
+    "deepseek-catalog.json",
     "zhipu-catalog.json",
 }
 
@@ -58,7 +59,7 @@ install_codex
 
 def test_list_profiles_includes_new_providers() -> None:
     names = list_profiles(VENDOR)
-    for name in ("minimax", "nativex", "company", "kimi", "zhipu", "scnet"):
+    for name in ("minimax", "nativex", "company", "kimi", "zhipu", "scnet", "deepseek"):
         assert name in names
 
 
@@ -330,7 +331,7 @@ def test_cli_codex_f_lists_installed_current_or_deterministic_default(tmp_home: 
     assert fallback.returncode == 0, fallback.stdout + fallback.stderr
     out = fallback.stdout
     assert "可用 Codex profile" in out
-    for name in ("minimax", "nativex", "company", "kimi", "zhipu", "scnet"):
+    for name in ("minimax", "nativex", "company", "kimi", "zhipu", "scnet", "deepseek"):
         assert name in out
     assert "kimi-for-coding" in out
     assert "vanchin/deepseek-v4-pro-0813" in out
