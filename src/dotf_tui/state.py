@@ -268,11 +268,22 @@ def load_mcp(root: Path) -> list[McpRow]:
         agents = loaded.agents
         enabled_set = set(agents.get("enabled_servers") or [])
         disabled_set = set(agents.get("disabled_servers") or [])
+        # exclude.<tool>.servers 是 mcp.remove --tool <tool> 的产物：
+        # server 仍全局 enabled，但对单个 tool 已排除。该 tool 的行
+        # 必须显示 disabled，否则 remove 成功后 status 仍是 enabled。
+        excluded_by_tool: dict[str, set[str]] = {
+            tool: set((entry or {}).get("servers") or [])
+            for tool, entry in (agents.get("exclude") or {}).items()
+            if isinstance(entry, dict)
+        }
     rows: list[McpRow] = []
     for tool in sorted(catalog.tools):
         for server in sorted(catalog.servers):
-            if server in enabled_set:
-                enabled: bool | None = True
+            enabled: bool | None
+            if server in excluded_by_tool.get(tool, set()):
+                enabled = False
+            elif server in enabled_set:
+                enabled = True
             elif server in disabled_set:
                 enabled = False
             else:

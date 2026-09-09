@@ -28,10 +28,13 @@ def test_repository_defaults_match_strict_lock_without_first_party_overlap() -> 
     ids = [item.id for item in lock.skills]
     assert lock.kind == "third-party-skills-lock"
     assert lock.schema_version == 1
-    assert catalog["skills"] == ids
+    assert set(catalog["skills"]) <= set(ids)
     assert "ui-template-apply" in ids
     assert "ui-template-author" in ids
     assert "setup-matt-pocock-skills" in ids
+    # taste-skill 保留审计锁，但不再作为 dotf agents -c 的默认安装项。
+    assert "taste-skill" in ids
+    assert "taste-skill" not in catalog["skills"]
     assert "ask-matt" not in ids
     assert set(ids).isdisjoint(defaults.first_party_skill_ids(ROOT))
     assert all(item.audit.status == "approved" for item in lock.skills)

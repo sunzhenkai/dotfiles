@@ -11,6 +11,8 @@ dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ 全局 AGENTS.md + MCP（全部工具）
 dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 的 MCP（skills 与 tool 无关，始终全量）
+dotf skills -i <skill-name>    # 用 npx skills 按需安装；短名先经 skills-map.yaml 映射；默认交互式，-g 全局 / --project 项目 / -y 跳过询问
+dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
 dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync
 dotf agents skill remove <id>  # 停用并 prune owned 且未漂的目标（不改仓库）
 dotf agents mcp apply <id> --tool cursor
@@ -113,7 +115,7 @@ scripts/config.sh agents
 
 仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`dotf-ui-design`（UI Engineering 薄路由：frontend-design 走全局 defaults，其余 4 条能力 skill 为内部引用）、`task-design`（复杂任务可选设计环节）、`task-grill`（taskflow 链路上 explore 与 propose 之间的可选收敛）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 由 `dotf agents -c` 默认装到全局 `~/.agents/skills`（`openspec init --tools agents`），不必写入本目录或各项目 `.cursor/skills`；`taskflow` 在已安装时委托它们。
 
-第三方默认（`agents/skills-defaults.yaml` + `agents/skills-defaults.lock.yaml`）：`mattpocock/skills` 的 `setup-matt-pocock-skills`、`grill-with-docs`、`to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`diagnosing-bugs`、`codebase-design`、`domain-modeling`、`research`、`wayfinder`，`sunzhenkai/ui-templates-skill` 的 `ui-template-author` 与 `ui-template-apply`，以及 `Leonxlnx/taste-skill` 的 `taste-skill`。由锁定目录安装到 `~/.agents/skills`，并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。
+第三方默认（`agents/skills-defaults.yaml` + `agents/skills-defaults.lock.yaml`）：`mattpocock/skills` 的 `setup-matt-pocock-skills`、`grill-with-docs`、`to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`diagnosing-bugs`、`codebase-design`、`domain-modeling`、`research`、`wayfinder`，以及 `sunzhenkai/ui-templates-skill` 的 `ui-template-author` 与 `ui-template-apply`。由锁定目录安装到 `~/.agents/skills`，并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。`Leonxlnx/taste-skill` 的 `taste-skill` 已从默认移除，但仍在审计锁中：可通过本机 overlay 显式启用，或用 `dotf skills -i taste-skill` 按需安装（短名映射见 `agents/skills-map.yaml`）。
 
 ## Managed ownership 与冲突
 

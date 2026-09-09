@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from conftest import ROOT, run_dotf
 
 SCRIPTS = ROOT / "src"
@@ -109,3 +111,33 @@ def test_help_lists_reverse_actions_and_tui(tmp_home: Path) -> None:
     assert "--deconfig" in out
     assert "dotf tui" in out
     assert "skill apply" in out
+
+
+def test_load_mcp_reports_per_tool_exclude_as_disabled(
+    tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mcp.remove --tool <tool> 写 exclude 后，该 tool 行必须显示 disabled。"""
+    import yaml
+
+    from dotf_tui import state
+
+    overlay_dir = tmp_home / ".config" / "dotf" / "overlays"
+    overlay_dir.mkdir(parents=True)
+    (overlay_dir / "00-local.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "kind": "dotf-overlay",
+                "agents": {
+                    "enabled_servers": ["web-reader"],
+                    "exclude": {"cursor": {"servers": ["web-reader"]}},
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DOTFILES_ROOT", str(ROOT))
+    rows = {(row.tool, row.server): row for row in state.load_mcp(ROOT)}
+    assert rows[("cursor", "web-reader")].status_text == "disabled"
+    assert rows[("kimi-code", "web-reader")].status_text == "enabled"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import stat
 
 from conftest import run_dotf
 
@@ -77,6 +78,127 @@ def test_command_stub_on_path(tmp_home: Path, make_command_stub) -> None:
     assert path is not None
     out = subprocess.run(["fake-tool"], capture_output=True, text=True, check=True)
     assert "ok" in out.stdout
+
+
+def test_skills_install_defaults_to_interactive_npx(
+    tmp_home: Path, stub_bin_dir: Path
+) -> None:
+    npx = stub_bin_dir / "npx"
+    npx.write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n",
+        encoding="utf-8",
+    )
+    npx.chmod(npx.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    result = run_dotf("skills", "-i", "frontend-design")
+
+    assert result.returncode == 0
+    assert result.stdout.splitlines()[1:] == [
+        "--yes",
+        "skills",
+        "add",
+        "frontend-design",
+    ]
+
+
+def test_skills_install_dry_run_can_select_project(
+    tmp_home: Path, make_command_stub
+) -> None:
+    make_command_stub("npx", stdout="should not execute\n")
+
+    result = run_dotf(
+        "skills",
+        "-i",
+        "frontend-design",
+        "-s",
+        "demo",
+        "--project",
+        "--agent",
+        "cursor",
+        "--dry-run",
+    )
+
+    assert result.returncode == 0
+    assert "should not execute" not in result.stdout
+    assert "==> npx skills add frontend-design -s demo --agent cursor" in result.stdout
+
+
+def test_skills_install_global_and_yes_pass_through(stub_bin_dir: Path) -> None:
+    npx = stub_bin_dir / "npx"
+    npx.write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n",
+        encoding="utf-8",
+    )
+    npx.chmod(npx.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    result = run_dotf("skills", "-i", "frontend-design", "-g", "-y")
+
+    assert result.returncode == 0
+    assert result.stdout.splitlines()[1:] == [
+        "--yes",
+        "skills",
+        "add",
+        "frontend-design",
+        "-g",
+        "-y",
+    ]
+
+
+def test_skills_install_rejects_project_global_conflict(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-i", "frontend-design", "-g", "--project")
+
+    assert result.returncode != 0
+    assert "只能二选一" in result.stdout
+
+
+def test_skills_install_resolves_mapped_name(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add https://github.com/Leonxlnx/taste-skill"
+        " -s design-taste-frontend" in result.stdout
+    )
+
+
+def test_skills_install_resolves_multiple_mapped_skills(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-i", "ui-template", "--dry-run")
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add sunzhenkai/ui-templates-skill"
+        " -s ui-template-author -s ui-template-apply"
+        " -s ui-template-design" in result.stdout
+    )
+
+
+def test_skills_uninstall_resolves_mapped_name(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-r", "taste-skill", "--dry-run")
+
+    assert result.returncode == 0
+    assert "==> npx skills remove design-taste-frontend" in result.stdout
+
+
+def test_skills_uninstall_resolves_multiple_mapped_skills(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-r", "ui-template", "--dry-run")
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills remove ui-template-author"
+        " ui-template-apply ui-template-design" in result.stdout
+    )
+
+
+def test_skills_uninstall_passthrough_and_interactive(tmp_home: Path) -> None:
+    result = run_dotf("skills", "--uninstall", "frontend-design", "--dry-run")
+
+    assert result.returncode == 0
+    assert "==> npx skills remove frontend-design" in result.stdout
+
+    result = run_dotf("skills", "-r", "--dry-run")
+
+    assert result.returncode == 0
+    assert "==> npx skills remove\n" in result.stdout
 
 
 def test_tmp_state_dir_ready(tmp_state_dir: Path, tmp_home: Path) -> None:

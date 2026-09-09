@@ -32,6 +32,7 @@ dotf -a --dry-run
 dotf sdk -i --dry-run    # 预览计划
 dotf nvim zsh -c --yes   # 非交互配置
 dotf agents -ic
+dotf skills -i frontend-design
 ```
 
 ## Profiles
@@ -125,8 +126,11 @@ dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro�
 dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs
+dotf skills -i frontend-design
 dotf agents mcp remove web-reader --tool cursor
 dotf agents mcp apply web-reader --all-tools
+dotf skills -i frontend-design             # npx skills 按需安装（交互式；-g -y 跳过询问）
+dotf skills -r design-taste-frontend       # npx skills 移除已安装 skill
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/modules/agents/sync.sh all --dry-run
 ```

@@ -637,8 +637,10 @@ class SkillsPane(_SubPane):
             verb,
             row.skill_id,
         )
-        if verb == "apply":
-            argv.append("--yes")
+        # TUI 内已完成确认（remove 走 ConfirmModal；apply 直接执行）。
+        # 子进程必须以非交互模式运行，否则 run_plan.sh 会读 /dev/tty
+        # 等待确认，在 Textual 接管终端时永远读不到输入而卡死。
+        argv.append("--yes")
         action = SelectedAction(label=f"{verb} {row.skill_id}", argv=tuple(argv))
         if verb == "remove":
             self._confirm_then_run(action, f"确认 remove skill {row.skill_id}？输入 y 确认。")
@@ -687,8 +689,9 @@ class McpPane(_SubPane):
             "--tool",
             row.tool,
         )
-        if verb == "apply":
-            argv.append("--yes")
+        # 与 SkillsPane 相同：remove/apply 都已在 TUI 内处理确认，
+        # 传 --yes 避免 run_plan.sh 从 /dev/tty 读确认导致卡死。
+        argv.append("--yes")
         action = SelectedAction(label=f"{verb} {row.tool}/{row.server}", argv=tuple(argv))
         if verb == "remove":
             self._confirm_then_run(action, f"确认 remove MCP {row.tool}/{row.server}？输入 y 确认。")

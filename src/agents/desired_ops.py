@@ -139,12 +139,19 @@ def run_desired_op(action: str, selector: str, *, root: Path | None = None) -> i
                 ),
             )
             targets = "all" if tool == "*" else tool
+            sync_detail = ""
             try:
                 env_rc = env_sync_main([targets, "--root", str(repo)])
             except SystemExit as exc:
-                env_rc = int(exc.code) if isinstance(exc.code, int) else 1
+                # common.die() 用字符串 code 退出；捕获后解释器不再打印消息，
+                # 必须在这里保留原因，否则 RESULT 只剩笼统的 sync failed。
+                if isinstance(exc.code, int):
+                    env_rc = exc.code
+                else:
+                    env_rc = 1
+                    sync_detail = str(exc.code).removeprefix("error: ")
             if env_rc != 0:
-                _emit("failed", "mcp sync failed after overlay write", 1)
+                _emit("failed", sync_detail or "mcp sync failed after overlay write", 1)
                 return 1
             _emit("changed", f"mcp {artifact_id} {'applied' if enable else 'removed'}")
             return 0

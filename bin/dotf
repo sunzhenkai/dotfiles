@@ -484,6 +484,122 @@ cmd_agents_artifact() {
   plan_and_run "$action" --modules "$selector"
 }
 
+cmd_skills() {
+  local verb="${1:-}"
+  local mode="add"
+  case "$verb" in
+  -i | --install) ;;
+  -r | --remove | --uninstall)
+    mode="remove"
+    ;;
+  -h | --help)
+    echo "用法: dotf skills -i <package> [选项...]"
+    echo "      dotf skills -r|--uninstall [skill-name] [选项...]"
+    echo "  -i 通过 npx skills 安装；<package> 一般直接写 skill 名称"
+    echo "  -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除"
+    echo "  已知短名会先经 agents/skills-map.yaml 映射到来源仓库/安装名"
+    echo "  也可写 owner/repo 或 URL 来指定来源仓库"
+    echo "  默认交互式：npx skills 会询问安装位置与目标 agents"
+    echo "  -g 全局；--project 当前项目；-y 跳过询问；-a 指定 agents"
+    echo "示例:"
+    echo "  dotf skills -i frontend-design"
+    echo "  dotf skills -i frontend-design --project"
+    echo "  dotf skills -r design-taste-frontend"
+    exit 0
+    ;;
+  "")
+    echo "错误: 需要 -i/--install 或 -r/--remove 动作"
+    echo "用法: dotf skills -i <package> [选项...]"
+    exit 1
+    ;;
+  *)
+    echo "错误: skills 仅支持 -i/--install 与 -r/--remove/--uninstall"
+    echo "用法: dotf skills -i <package> [选项...]"
+    exit 1
+    ;;
+  esac
+  shift
+
+  local package=""
+  local want_global=0
+  local want_project=0
+  local -a extra_args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --project)
+      want_project=1
+      ;;
+    -g | --global)
+      want_global=1
+      extra_args+=("-g")
+      ;;
+    --dry-run)
+      DOTF_DRY_RUN=1
+      ;;
+    -a | --agent | -s | --skill | --subagent | --metadata)
+      if [ -z "${2:-}" ]; then
+        echo "错误: $1 需要参数"
+        exit 1
+      fi
+      extra_args+=("$1" "$2")
+      shift
+      ;;
+    -*)
+      extra_args+=("$1")
+      ;;
+    *)
+      if [ -n "$package" ]; then
+        echo "错误: 多余参数 '$1'；一次只安装一个 package"
+        exit 1
+      fi
+      package="$1"
+      ;;
+    esac
+    shift
+  done
+
+  if [ -z "$package" ] && [ "$mode" = "add" ]; then
+    echo "错误: 需要 skills package"
+    echo "用法: dotf skills -i <package> [选项...]"
+    exit 1
+  fi
+  if [ "$want_global" -eq 1 ] && [ "$want_project" -eq 1 ]; then
+    echo "错误: -g/--global 与 --project 只能二选一"
+    exit 1
+  fi
+
+  local -a package_args=()
+  if [ -n "$package" ]; then
+    local -a resolver_args=("$package")
+    if [ "$mode" = "remove" ]; then
+      resolver_args=("--remove" "$package")
+    fi
+    local resolve_out
+    if ! resolve_out="$(python3 "$SCRIPT_DIR/src/agents/skills_map.py" "${resolver_args[@]}")"; then
+      exit 1
+    fi
+    local map_line
+    while IFS= read -r map_line; do
+      if [ -n "$map_line" ]; then
+        package_args+=("$map_line")
+      fi
+    done <<< "$resolve_out"
+  fi
+
+  local -a skills_args=("$mode" "${package_args[@]}")
+  for x in "${extra_args[@]+"${extra_args[@]}"}"; do
+    skills_args+=("$x")
+  done
+
+  echo "==> npx skills ${skills_args[*]}"
+  [ "$DOTF_DRY_RUN" -eq 1 ] && return 0
+  if ! command -v npx >/dev/null 2>&1; then
+    echo "错误: 未找到 npx；请先安装 Node.js/npm"
+    exit 1
+  fi
+  npx --yes skills "${skills_args[@]}"
+}
+
 cmd_retry() {
   # shellcheck source=/dev/null
   source "$SCRIPT_DIR/scripts/lib/report.sh"
@@ -768,6 +884,7 @@ show_help() {
   echo "  tui                         两区 TUI（需 TTY；无参数 dotf 仍是帮助）"
   echo "  pull                        拉取 dotfiles 最新更新（保护性 pull）"
   echo "  cd                          跳转到 dotfiles 目录（需 zsh wrapper）"
+  echo "  skills                      通过 npx skills 按需安装第三方 skill"
   echo ""
   echo "动作:"
   echo "  -i, --install               安装"
@@ -803,6 +920,7 @@ show_help() {
   echo "  dotf agents skill remove <id>   # 写本机 overlay 并 prune"
   echo "  dotf agents mcp apply <id> --tool cursor"
   echo "  dotf agents mcp remove <id> --all-tools"
+  echo "  dotf skills -i frontend-design"
   echo ""
   echo "示例:"
   echo "  dotf init                   # OS profile 完整初始化"
@@ -892,6 +1010,15 @@ main() {
         reject_legacy_syntax
       fi
       modules+=("agents")
+      ;;
+    skills)
+      if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
+        echo "错误: skills 为独立命令"
+        exit 1
+      fi
+      shift
+      cmd_skills "$@"
+      exit $?
       ;;
     status)
       if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then

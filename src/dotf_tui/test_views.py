@@ -120,6 +120,72 @@ def test_format_action_status_skill_and_mcp():
     assert "x remove" in mcp
 
 
+def test_skill_and_mcp_actions_always_pass_yes(home, monkeypatch):
+    """Skill/MCP 的 apply 与 remove 子进程都必须带 --yes 非交互执行。
+
+    remove 的确认已由 TUI ConfirmModal 完成；若子进程缺 --yes，
+    run_plan.sh 会读 /dev/tty 等待确认，在 Textual 接管终端时
+    永远读不到输入，动作卡死在“运行中”。
+    """
+    from dotf_tui.app import SelectedAction
+    from dotf_tui import state as tui_state
+
+    captured: list[tuple[str, SelectedAction]] = []
+
+    def fake_run(pane, actions):
+        for action in actions:
+            captured.append((type(pane).__name__, action))
+
+    def fake_confirm(pane, action, _prompt):
+        captured.append((type(pane).__name__, action))
+
+    monkeypatch.setattr(SkillsPane, "_run_with_progress", fake_run)
+    monkeypatch.setattr(SkillsPane, "_confirm_then_run", fake_confirm)
+    monkeypatch.setattr(McpPane, "_run_with_progress", fake_run)
+    monkeypatch.setattr(McpPane, "_confirm_then_run", fake_confirm)
+    monkeypatch.setattr(
+        tui_state,
+        "load_skills",
+        lambda _root: [SkillRow("demo-skill", "desired", True)],
+    )
+    monkeypatch.setattr(
+        tui_state,
+        "load_mcp",
+        lambda _root: [McpRow("cursor", "demo-server", True)],
+    )
+
+    async def main():
+        app = DotfTuiApp(ROOT)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("2")
+            await pilot.pause()
+            assert isinstance(app.active_pane, SkillsPane)
+            await pilot.press("a")
+            await pilot.pause()
+            await pilot.press("x")
+            await pilot.pause()
+
+            await pilot.press("3")
+            await pilot.pause()
+            assert isinstance(app.active_pane, McpPane)
+            await pilot.press("a")
+            await pilot.pause()
+            await pilot.press("x")
+            await pilot.pause()
+
+    _run(main())
+
+    assert [(pane, action.label) for pane, action in captured] == [
+        ("SkillsPane", "apply demo-skill"),
+        ("SkillsPane", "remove demo-skill"),
+        ("McpPane", "apply cursor/demo-server"),
+        ("McpPane", "remove cursor/demo-server"),
+    ]
+    for _pane, action in captured:
+        assert action.argv[-1] == "--yes"
+
+
 def test_format_action_status_readonly():
     text = format_action_status(None, readonly=True)
     assert "j/k 上下" in text
