@@ -227,7 +227,7 @@ def load_agents_mcp_targets(path: Path | None = None) -> dict[str, str]:
 
 
 def detect_os() -> str:
-    """与 scripts/tools/system.sh detect_os 语义对齐的轻量检测。"""
+    """与 scripts/modules/system/lib.sh detect_os 语义对齐的轻量检测。"""
     os_release = Path("/etc/os-release")
     if os_release.is_file():
         kv: dict[str, str] = {}

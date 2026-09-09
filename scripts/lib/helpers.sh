@@ -1,7 +1,7 @@
 #!/bin/bash
 # Go 二进制工具通用安装函数
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 通用 Go 项目编译安装
 # 参数: $1=工具名称, $2=git仓库地址, $3=安装目录(可选,默认~/.local/bin)

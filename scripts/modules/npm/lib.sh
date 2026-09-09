@@ -1,7 +1,7 @@
 #!/bin/bash
 # npm 全局包安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # npm 国内镜像源列表
 NPM_REGISTRIES=(

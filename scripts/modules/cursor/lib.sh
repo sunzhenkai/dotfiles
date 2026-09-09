@@ -1,7 +1,7 @@
 #!/bin/bash
 # Cursor Agent CLI 安装（cursor-agent / agent）
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 判断 cursor-agent 是否真实可执行（不被悬空 symlink 欺骗）
 _cursor_agent_resolvable() {

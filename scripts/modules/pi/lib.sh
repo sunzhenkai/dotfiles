@@ -3,7 +3,7 @@
 # 官方文档: https://pi.dev/docs/latest/
 # 包: @earendil-works/pi-coding-agent
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 默认扩展包（目标管理 + 子代理委派）
 PI_DEFAULT_PACKAGES=(

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Homebrew 安装和配置
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # brew 可能的路径（支持 macOS 和 Linux）
 BREW_PATHS=(

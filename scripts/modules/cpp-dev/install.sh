@@ -4,8 +4,8 @@
 # brew install 本身幂等，已装的会跳过。
 source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
 dotf_handler_init
-source "$DOTFILES_ROOT/scripts/tools/common.sh"
-source "$DOTFILES_ROOT/scripts/tools/cpp-dev.sh"
+source "$DOTFILES_ROOT/scripts/lib/common.sh"
+source "$DOTFILES_ROOT/scripts/modules/cpp-dev/lib.sh"
 if install_cpp_dev; then
   dotf_result_changed "installed cpp-dev toolchain"
 else

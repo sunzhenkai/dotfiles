@@ -3,7 +3,7 @@
 # 文档: https://kiro.dev/docs/cli/installation/
 # 主目录: ~/.kiro（可用 KIRO_HOME 重定向）
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 _ensure_kiro_path() {
   if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then

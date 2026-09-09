@@ -3,7 +3,7 @@
 # 为 git diff/show/log/blame 提供语法高亮的分页器
 # 项目: https://github.com/dandavison/delta
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_delta() {
   # 确保 brew 可用（由 homebrew.sh 提供，此处兜底）

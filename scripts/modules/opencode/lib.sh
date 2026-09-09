@@ -1,7 +1,7 @@
 #!/bin/bash
 # OpenCode CLI 安装（Homebrew: anomalyco/tap/opencode）
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_opencode() {
   command -v setup_brew_path &>/dev/null && setup_brew_path

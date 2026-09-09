@@ -2,7 +2,7 @@
 # Herdr 安装：使用官方稳定版安装脚本。
 # 文档: https://herdr.dev/docs/install/
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 _ensure_herdr_path() {
   if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then

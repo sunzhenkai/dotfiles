@@ -1,7 +1,7 @@
 #!/bin/bash
 # vcpkg C++ 包管理器安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 setup_vcpkg() {
   echo "---- Setting up vcpkg ----"

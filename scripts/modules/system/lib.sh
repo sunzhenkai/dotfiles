@@ -1,7 +1,7 @@
 #!/bin/bash
 # 探测系统信息，并安装必要软件，搭建开发环境
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 检测操作系统
 detect_os() {

@@ -1,7 +1,7 @@
 #!/bin/bash
 # 阿里云 CLI 安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_aliyun_cli() {
   echo "---- Installing Aliyun CLI ----"

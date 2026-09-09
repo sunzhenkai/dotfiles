@@ -1,7 +1,7 @@
 #!/bin/bash
 # AWS CLI v2 安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_aws_cli() {
   echo "---- Installing AWS CLI v2 ----"

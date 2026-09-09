@@ -1,7 +1,7 @@
 #!/bin/bash
 # SDK 管理（通过 mise）
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 初始化 SDK（通过 mise 管理多版本）
 setup_sdk() {

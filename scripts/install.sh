@@ -10,7 +10,7 @@ export SCRIPT_DIR
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/scripts/modules.sh"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/scripts/lib/runner.sh"
 

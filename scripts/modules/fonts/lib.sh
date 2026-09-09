@@ -2,7 +2,7 @@
 # Font installation script with system adaptation
 # Maple Mono NF CN https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 FONT_URL="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
 FONT_ZIP="MapleMono-NF-CN.zip"

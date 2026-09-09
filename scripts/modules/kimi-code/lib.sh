@@ -2,7 +2,7 @@
 # Kimi Code CLI 安装
 # 官方文档: https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 确保 kimi 常见安装目录在 PATH（官方默认 ~/.kimi-code/bin）
 _ensure_kimi_path() {

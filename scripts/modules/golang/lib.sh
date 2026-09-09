@@ -1,7 +1,7 @@
 #!/bin/bash
 # Golang 环境配置
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 setup_golang() {
   echo "---- Setting up Golang environment ----"

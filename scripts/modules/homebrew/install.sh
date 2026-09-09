@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
 dotf_handler_init
-source "$DOTFILES_ROOT/scripts/tools/common.sh"
-source "$DOTFILES_ROOT/scripts/tools/homebrew.sh"
+source "$DOTFILES_ROOT/scripts/lib/common.sh"
+source "$DOTFILES_ROOT/scripts/modules/homebrew/lib.sh"
 setup_brew_path
 if command -v brew >/dev/null 2>&1; then
   init_homebrew || true

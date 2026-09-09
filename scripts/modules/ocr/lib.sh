@@ -3,7 +3,7 @@
 # 包: @alibaba-group/open-code-review（bin: ocr）
 # 文档: https://github.com/alibaba/open-code-review
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # npm 全局 bin（mise / ~/.local）临时加入 PATH
 _ensure_ocr_path() {

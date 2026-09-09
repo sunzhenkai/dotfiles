@@ -1,7 +1,7 @@
 #!/bin/bash
 # Google Cloud CLI (gcloud) 安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_gcp_cli() {
   echo "---- Installing Google Cloud CLI ----"

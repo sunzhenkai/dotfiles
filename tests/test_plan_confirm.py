@@ -15,8 +15,8 @@ from plan_test_helpers import plan_env, write_test_plan
 
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
-COMMON = ROOT / "scripts" / "tools" / "common.sh"
-SYSTEM = ROOT / "scripts" / "tools" / "system.sh"
+COMMON = ROOT / "scripts" / "lib" / "common.sh"
+SYSTEM = ROOT / "scripts" / "modules" / "system" / "lib.sh"
 TOOLS = ROOT / "scripts" / "tools"
 
 

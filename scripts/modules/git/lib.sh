@@ -1,7 +1,7 @@
 #!/bin/bash
 # Git 配置
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 初始化 git 配置
 setup_git() {

@@ -4,7 +4,7 @@
 source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
 dotf_handler_init
 # shellcheck source=/dev/null
-source "$DOTFILES_ROOT/scripts/tools/common.sh"
+source "$DOTFILES_ROOT/scripts/lib/common.sh"
 
 if has_clipboard_tool; then
   dotf_result_unchanged "tmux clipboard dependency already available"

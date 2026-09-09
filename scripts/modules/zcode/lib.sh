@@ -4,7 +4,7 @@
 # CLI 包: zcode-app-cli（bin: zcode）
 # 文档: https://zcode.z.ai/en/docs/install
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # npm 全局 bin（mise / ~/.local）临时加入 PATH
 _ensure_zcode_path() {

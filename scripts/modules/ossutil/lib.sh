@@ -1,7 +1,7 @@
 #!/bin/bash
 # ossutil 2.0 阿里云 OSS 命令行工具安装
 
-source "$SCRIPT_DIR/scripts/tools/common.sh"
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 install_ossutil() {
   echo "---- Installing ossutil 2.0 ----"
