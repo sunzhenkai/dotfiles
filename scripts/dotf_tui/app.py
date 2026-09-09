@@ -704,6 +704,7 @@ class StatusPane(_SubPane):
 
     def _populate(self) -> None:
         rows = state.load_modules(self.app.dotfiles_root)
+        instructions = state.load_instructions(self.app.dotfiles_root)
         table = self.query_one("#table", DataTable)
         table.clear(columns=True)
         table.add_columns("summary")
@@ -712,6 +713,8 @@ class StatusPane(_SubPane):
                 f"{row.name:20s} install={str(row.installed):5s} "
                 f"config={str(row.configured):5s} drift={row.drift}"
             )
+        for row in instructions:
+            table.add_row(f"instructions:{row.target_id:12s} drift={row.drift}")
         self._key_to_row = {}
         self.app.refresh_action_status()
 
@@ -722,11 +725,17 @@ class ConflictsPane(_SubPane):
     def _populate(self) -> None:
         rows = state.load_modules(self.app.dotfiles_root)
         failed = state.load_journal_failures()
+        instructions_drift = [
+            r for r in state.load_instructions(self.app.dotfiles_root) if r.drift != "unchanged"
+        ]
         drifted = [r.name for r in rows if r.drift in {"changed", "missing", "conflict", "permission"}]
         body_lines: list[str] = []
         if drifted:
             body_lines.append("manifest drift:")
             body_lines.extend(f"  - {name}" for name in drifted)
+        if instructions_drift:
+            body_lines.append("instructions drift:")
+            body_lines.extend(f"  - {r.target_id} ({r.drift})" for r in instructions_drift)
         if failed:
             body_lines.append("journal failed modules:")
             body_lines.extend(f"  - {name}" for name in failed)

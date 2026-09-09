@@ -103,6 +103,16 @@ class McpRow:
         return "A/X"
 
 
+@dataclass(frozen=True, slots=True)
+class InstructionsRow:
+    target_id: str
+    drift: Literal["unchanged", "changed", "missing", "stale", "conflict", "permission", "unknown"]
+
+    @property
+    def drift_text(self) -> str:
+        return self.drift if self.drift != "unchanged" else ""
+
+
 def _manifest_drift(manifest_status: str) -> str:
     if manifest_status in {"unchanged", "changed", "missing", "conflict", "permission"}:
         return manifest_status
@@ -188,6 +198,43 @@ def load_modules(root: Path, *, state_home: Path | None = None) -> list[ModuleRo
                 configured_unknown=configured_unknown,
             )
         )
+    return rows
+
+
+def load_instructions(root: Path) -> list[InstructionsRow]:
+    """Build one row per managed global-AGENTS.md target via the instruction planner.
+
+    Reuse the instruction planner (same source of truth as doctor); never
+    approximate manifest/target drift from raw manifest fields.
+    """
+    try:
+        from instructions import compile_instructions_plan
+
+        plan = compile_instructions_plan(root)
+    except Exception:
+        return [InstructionsRow(target_id="planner", drift="unknown")]
+    rows: list[InstructionsRow] = []
+    for op in plan.operations:
+        if op.expected is not None:
+            owner = op.expected.owner
+        elif op.prior is not None:
+            owner = op.prior.owner
+        else:
+            owner = ""
+        target_id = owner.removeprefix("agents:instructions:") or op.target
+        if op.state == "conflict":
+            drift: str = "conflict"
+        elif op.state == "permission":
+            drift = "permission"
+        elif op.state == "prune":
+            drift = "stale"
+        elif op.state == "update":
+            drift = "changed"
+        elif op.state == "create" and op.actual_state == "missing":
+            drift = "missing"
+        else:
+            drift = "unchanged"
+        rows.append(InstructionsRow(target_id=target_id, drift=drift))  # type: ignore[arg-type]
     return rows
 
 

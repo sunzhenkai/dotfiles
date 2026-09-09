@@ -23,7 +23,12 @@ from dotf_tui.app import (  # noqa: E402
     format_row_cells,
     selection_mark,
 )
-from dotf_tui.state import McpRow, ModuleRow, SkillRow  # noqa: E402
+from dotf_tui.state import (  # noqa: E402
+    McpRow,
+    ModuleRow,
+    SkillRow,
+    load_instructions,
+)
 
 
 @pytest.fixture
@@ -375,6 +380,57 @@ def test_status_and_conflicts_render(home):
             await pilot.press("5")
             await pilot.pause()
             assert app.query_one("#tabs", TabbedContent).active == "conflicts"
+
+    _run(main())
+
+
+def test_load_instructions_reports_missing_targets(home):
+    rows = load_instructions(ROOT)
+    assert {r.target_id: r.drift for r in rows} == {
+        "agents": "missing",
+        "codex": "missing",
+        "cursor": "missing",
+    }
+
+
+def test_load_instructions_planner_failure_is_unknown(home, monkeypatch):
+    import instructions
+
+    def boom(root, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(instructions, "compile_instructions_plan", boom)
+    rows = load_instructions(ROOT)
+    assert [(r.target_id, r.drift) for r in rows] == [("planner", "unknown")]
+
+
+def test_status_and_conflicts_show_instructions_drift(home):
+    async def main():
+        from textual.widgets import DataTable, TabbedContent
+
+        app = DotfTuiApp(ROOT)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("4")
+            await pilot.pause()
+            assert app.query_one("#tabs", TabbedContent).active == "status"
+            status_rows = [
+                app.active_pane.query_one("#table", DataTable).get_row_at(i)[0]
+                for i in range(app.active_pane.query_one("#table", DataTable).row_count)
+            ]
+            assert any(
+                line.startswith("instructions:agents") and "drift=missing" in line
+                for line in status_rows
+            )
+            await pilot.press("5")
+            await pilot.pause()
+            assert app.query_one("#tabs", TabbedContent).active == "conflicts"
+            conflict_rows = [
+                app.active_pane.query_one("#table", DataTable).get_row_at(i)[0]
+                for i in range(app.active_pane.query_one("#table", DataTable).row_count)
+            ]
+            assert "instructions drift:" in conflict_rows
+            assert any(line.startswith("  - agents (missing)") for line in conflict_rows)
 
     _run(main())
 

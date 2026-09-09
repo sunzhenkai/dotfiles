@@ -84,7 +84,7 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 
 skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/`、`scripts/` sidecar，原样字节分发）。各 agent 工具从该目录读取共享 skill；本系统不再向各工具私有目录写镜像。**Kiro CLI 是当前唯一例外**：它不读取 `~/.agents/skills`，因此同一入口会额外托管一份 `${KIRO_HOME:-~/.kiro}/skills/<id>/`，并在 `SKILL.md` 末尾补上 Kiro slash 参数占位 `$ARGUMENTS`。`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。
 
-同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`，以及 Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`。源在 `agents/instructions/`。**不要手改**这些安装产物。
+同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`，以及 Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
 
 本机 Skill Desired Set = 一手 catalog ∪ `skills-defaults.yaml` 默认选中项 ∪ overlay `enabled_skills` − `disabled_skills`。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库 catalog / lock。
 
@@ -146,6 +146,7 @@ git diff --exit-code -- agents/vendors/cursor/mcp.json agents/vendors/kiro/mcp.j
 - **过滤 / 跳转**：按 `/` 进入过滤；`j`/`k` 上下移动；`Ctrl-d`/`Ctrl-u` 半屏；`g g` 顶、`G` 底；`Esc` 清空过滤
 - **危险动作二次确认**：`u` / `d` / `x` 在按下后弹 y/N 确认，默认 `N`
 - **状态来源**：`XDG_STATE_HOME/dotf/modules-state.yaml`（模块 install/config 事实）+ managed manifest（漂移）+ `agents/env/overlay.*.yaml`（Skill / MCP Desired Set）。TUI 只读不写
+- **全局 AGENTS.md 漂移**：Status / Conflicts 面板复用 instruction planner 聚合 `agents:instructions:` 漂移，与 doctor 的 `instructions` 段同源
 - **退出回显**：TUI 退出时在 stdout 打印本会话改动清单（或 "本会话无改动"）
 
 详细键位速查与状态优先级见 `openspec/changes/dotf-tui-manager/`。
