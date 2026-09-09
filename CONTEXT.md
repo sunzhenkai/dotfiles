@@ -8,7 +8,7 @@
 
 **Module**:
 `modules.yaml` 里的一条注册项，是工具与配置在 TUI 主清单中的一行。
-_Avoid_: 工具, 包, package, 软件（作为清单行）
+_Avoid_: 工具, 包, package, 软件（作为清单行）, 配置项目, 项目（指单个 Module 时）
 
 **Skill**:
 一条可分发技能；本机上管理的就是这份制品本身。apply / remove 以机器为粒度，所有读取共享 skills 目录的工具一起生效。
@@ -67,8 +67,18 @@ _Avoid_: catalog（那是仓库编目）, 清单（含糊）
 _Avoid_: 级联卸载, 反向依赖（当已能说 Dependent 时）
 
 **Uninstall Handler**:
-模块自己声明的撤软件实现。v1 只要求管线存在；先覆盖用户级、边界清楚的单二进制模块。`system` / `homebrew` / `sdk` / Docker 暂无此动作。
+uninstall 动作的 Handler。v1 只要求管线存在；先覆盖用户级、边界清楚的单二进制模块。`system` / `homebrew` / `sdk` / Docker 暂无此动作。
 _Avoid_: 通用卸包, 猜测卸法
+
+### Anatomy
+
+**Handler**:
+一个 Module 的约定式操作脚本，位于 `scripts/modules/<name>/`（install.sh / config.sh / doctor.sh / uninstall.sh），由 Executor 按名发现与调用；泛化原 Uninstall Handler。
+_Avoid_: 操作文件, 模块脚本, tools/<name>.sh 散件（已并入 Handler 目录）
+
+**Executor**:
+约定式调度层：读 modules.yaml，按名发现并调用 Handler 与 config 部署，自身不含模块专属逻辑。
+_Avoid_: 操作文件执行器, 安装器, 调度器（与 planner 混称）
 
 ### Surfaces
 
