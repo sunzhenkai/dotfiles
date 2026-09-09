@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "agents"))
 
 from sync import kiro_skills_target  # noqa: E402
+from sync import validate_output  # noqa: E402
 
 
 def _run_sync(tmp_home: Path, *, kiro_home: str | None = None) -> subprocess.CompletedProcess:
@@ -68,6 +69,12 @@ def test_sync_renders_slash_placeholders(tmp_path: Path) -> None:
     content = skill.read_text()
     assert "{{slash:" not in content
     assert "/openspec-propose" in content
+
+
+def test_validate_output_allows_literal_object_braces() -> None:
+    # 第三方/前端 skill 正文可能包含 JavaScript 对象示例（如 `value={{...}}`），
+    # 不是 sync 的 slash 模板占位符。
+    validate_output(Path("SKILL.md"), "const value = {{ once: true, amount: 0.3 }};")
 
 
 def test_sync_also_targets_kiro_cli_skills(tmp_path: Path) -> None:

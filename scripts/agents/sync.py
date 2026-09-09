@@ -179,8 +179,8 @@ def render_kiro_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
 
 
 def validate_output(path: Path, content: str) -> None:
-    if "{{" in content:
-        leftovers = re.findall(r"\{\{[^}]+\}\}", content)
+    if SLASH_RE.search(content):
+        leftovers = re.findall(r"\{\{slash:[a-z0-9-]+\}\}", content)
         die(f"{path}: residual placeholders: {leftovers}")
 
 
