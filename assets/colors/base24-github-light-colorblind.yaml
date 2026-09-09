@@ -86,7 +86,7 @@ notes:
   system_change: >-
     重要：本主题 system 是 base24 (不是 base16)，提供 24 个 token
     (base00-base17)，比 base16 多 8 个扩展槽 (base10-base17)。
-    这是 design/colors/ 下第一份 base24，命名与结构都按 base24
+    这是 assets/colors/ 下第一份 base24，命名与结构都按 base24
     规范：base08-base0F 是主强调色 (8 个)，base10-base17 是扩展
     强调色 (8 个，常用于强调色的浅/深变体、面板背景、链接色等)。
     文件名按 base24 规范带 "base24-" 前缀，与 base16-*.yaml 区分。

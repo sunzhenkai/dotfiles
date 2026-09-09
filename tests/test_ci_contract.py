@@ -121,7 +121,7 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     env = _text("agents/env/README.md")
     module_guide = _text(".agents/skills/dotf-install/SKILL.md")
     init_guide = _text(".agents/skills/dotf-init/SKILL.md")
-    user_guide = _text("Dotfiles.md")
+    user_guide = _text("docs/Dotfiles.md")
     kitty_readme = _text("config/terminals/kitty/README.md")
     kitty_usage = _text("config/terminals/kitty/USAGE.md")
     zellij_readme = _text("config/multiplexers/zellij/README.md")
