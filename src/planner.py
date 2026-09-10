@@ -19,7 +19,7 @@ import plan_protocol  # noqa: E402
 ACTION_ORDER = plan_protocol.ACTION_ORDER
 
 # agents -i 展开为独立单工具 install 动作（不污染 agents -c）
-AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")
+AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code")
 
 
 @dataclass

@@ -318,6 +318,13 @@ modules:
     doctor: true
     bin: zcode
 
+  - name: claude-code
+    desc: Claude Code CLI（官方原生安装器，用户级 ~/.local/bin）
+    group: agents
+    install: true
+    doctor: true
+    bin: claude
+
   # ---------- config-only: shell ----------
   - name: zsh
     desc: Zsh shell 配置

@@ -42,7 +42,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 | tools | ossutil, aws, aliyun, gcp | 用户级二进制 | ✅ |
 | tools | vcpkg, d2 | 用户级 | ✅ |
 | 办公 | dws, lark-cli | 用户级（npm/npx） | ✅（需 sdk/Node） |
-| agents | agents, cursor, kiro, opencode, codex, kimi-code, pi, zcode, trae-cli, dsh | 用户级 CLI + 配置 | ✅ |
+| agents | agents, cursor, kiro, opencode, codex, kimi-code, pi, zcode, claude-code, trae-cli, dsh | 用户级 CLI + 配置 | ✅ |
 | shell | git, zsh, starship | git 用户级配置；**zsh 可能 chsh**；starship 用户级 | ⚠️ zsh 见下 |
 | editors | nvim, helix, zed | 用户级配置 + 可能装编辑器 | ✅（装编辑器时确认） |
 | terminals | kitty, alacritty, wezterm, ghostty, iterm2 | 用户级配置；装终端可能系统级 | ✅（装终端时确认） |
@@ -59,7 +59,7 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 ```
 sdk golang delta grepom senv mdserve ocr npm ossutil aws aliyun gcp vcpkg d2
 dws lark-cli
-agents cursor kiro opencode codex kimi-code pi zcode trae-cli dsh
+agents cursor kiro opencode codex kimi-code pi zcode claude-code trae-cli dsh
 nvim helix tmux zellij yazi k9s shell_gpt
 git starship（仅配置，不 chsh）
 ```

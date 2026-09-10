@@ -39,7 +39,7 @@ def test_agents_install_plan_expands_tools() -> None:
     document = json.loads(r.stdout)
     assert document["header"] == "DOTF_EXECUTION_PLAN"
     planned = {(action["action"], action["module"]) for action in document["actions"]}
-    for tool in ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode"):
+    for tool in ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code"):
         assert ("install", tool) in planned
     # 已移除的 vendor 不进安装计划
     assert ("install", "claude") not in planned
@@ -54,7 +54,7 @@ def test_removed_vendors_not_in_tools_or_bundle() -> None:
     assert "kiro" in TOOLS
     bundle = (ROOT / "src" / "planner.py").read_text(encoding="utf-8")
     assert (
-        'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode")'
+        'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code")'
         in bundle
     )
 
