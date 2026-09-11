@@ -1,0 +1,73 @@
+# 全量 Skill 编目（唯一真相源）。
+#
+# - 按 group 组织：组声明来源属性，成员只写安装 id。group 名兼作 CLI 展开单位，
+#   例如 `dotf skills -i mattpocock` 展开为整组。
+# - 编目里的条目 = 默认全量安装（`dotf agents -c`）。不想装就注释掉该条目：
+#   注释掉即不在编目内，于是既不自动装，也不能经 overlay / agents apply 引用，
+#   `dotf skills -i` 只会把它当普通名字透传给 npx。
+# - type 是语义字段：first-party 来源是仓库内 agents/skills/<id>/；
+#   third-party 来源由 lock（skills.lock.yaml）固定，且必须被 lock 覆盖。
+#   type 不得由 group 推断，也不得由 package 形态推断。
+# - 第三方条目 revision/hash/license/audit 只在 lock；这里写 source/package 供识别与 npx 安装。
+version: 3
+lock: skills.lock.yaml
+
+groups:
+  dotfiles:
+    type: first-party
+    skills:
+      - commit-push
+      - dotf-code-explore
+      - dotf-code-review
+      - dotf-ui-design
+      - en-chat
+      - lark-cli
+      - pretty-view-html
+      - pretty-view-ppt
+      - project-init
+      - project-spec-mirror
+      - repo-manager
+      - role-based-reviewer
+      - service-manager
+      - skill-evolver
+      - skill-upgrader
+      - skills-store
+      - task-design
+      - task-grill
+      - taskflow
+
+  mattpocock:
+    type: third-party
+    source: github
+    package: https://github.com/mattpocock/skills
+    skills:
+      - code-review
+      - codebase-design
+      - diagnosing-bugs
+      - domain-modeling
+      - grill-with-docs
+      - implement
+      - research
+      - setup-matt-pocock-skills
+      - tdd
+      - to-spec
+      - to-tickets
+      - wayfinder
+
+  ui-templates:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/ui-templates-skill
+    skills:
+      - ui-template-author
+      - ui-template-apply
+      - ui-template-design
+
+  # taste-skill 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
+  # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。
+  # taste:
+  #   type: third-party
+  #   source: github
+  #   package: https://github.com/Leonxlnx/taste-skill
+  #   skills:
+  #     - taste-skill

@@ -21,46 +21,71 @@ def _load(name: str):
     return importlib.import_module(name)
 
 
-def test_repository_defaults_match_strict_lock_without_first_party_overlap() -> None:
+def test_repository_catalog_matches_strict_lock() -> None:
     defaults = _load("defaults")
+    catalog_mod = _load("skills_catalog")
     lock = defaults.load_catalog(ROOT)
-    catalog = yaml.safe_load((ROOT / "agents" / "skills-defaults.yaml").read_text())
+    catalog = catalog_mod.load_skills_catalog(ROOT)
     ids = [item.id for item in lock.skills]
+    third_party = set(catalog.third_party_ids())
+    first_party = set(catalog.first_party_ids())
     assert lock.kind == "third-party-skills-lock"
     assert lock.schema_version == 1
-    assert set(catalog["skills"]) <= set(ids)
+    # every catalogued third-party id is lock-covered...
+    assert third_party <= set(ids)
+    # ...and no first-party id leaks into the lock (no source confusion).
+    assert first_party.isdisjoint(ids)
     assert "ui-template-apply" in ids
     assert "ui-template-author" in ids
+    assert "ui-template-design" in ids
     assert "setup-matt-pocock-skills" in ids
-    # taste-skill 保留审计锁，但不再作为 dotf agents -c 的默认安装项。
+    # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
-    assert "taste-skill" not in catalog["skills"]
+    assert "taste-skill" not in set(catalog.ids())
     assert "ask-matt" not in ids
-    assert set(ids).isdisjoint(defaults.first_party_skill_ids(ROOT))
     assert all(item.audit.status == "approved" for item in lock.skills)
+
+
+def _write_min_repo(repo: Path, lock_body: str, *, ids: list[str]) -> None:
+    """Write a v3 catalog (one third-party group) + lock."""
+    (repo / "agents").mkdir(parents=True, exist_ok=True)
+    lines = [
+        "version: 3",
+        "lock: skills.lock.yaml",
+        "groups:",
+        "  test:",
+        "    type: third-party",
+        "    source: github",
+        "    package: https://github.com/example/demo",
+    ]
+    if ids:
+        lines.append("    skills:")
+        lines += [f"      - {skill_id}" for skill_id in ids]
+    else:
+        lines.append("    skills: []")
+    (repo / "agents" / "skills.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (repo / "agents" / "skills.lock.yaml").write_text(lock_body, encoding="utf-8")
 
 
 def test_unlocked_or_floating_catalog_fails_closed(tmp_path: Path) -> None:
     defaults = _load("defaults")
     repo = tmp_path / "repo"
     (repo / "agents" / "skills").mkdir(parents=True)
-    shutil.copy2(ROOT / "agents" / "skills-defaults.lock.yaml", repo / "agents")
-    (repo / "agents" / "skills-defaults.yaml").write_text(
-        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [unlocked]\n", encoding="utf-8"
-    )
-    with pytest.raises(defaults.ThirdPartyLockError, match="strict lock"):
+
+    # third-party id not covered by the lock -> fail closed
+    _write_min_repo(repo, "schema_version: 1\nkind: third-party-skills-lock\nskills: []\n", ids=["unlocked"])
+    with pytest.raises(defaults.ThirdPartyLockError, match="covered by the strict lock"):
         defaults.load_catalog(repo)
 
-    (repo / "agents" / "skills-defaults.yaml").write_text(
-        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
-    )
-    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+    # floating revision + non-approved audit -> fail closed in the lock loader
+    _write_min_repo(
+        repo,
         "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
         "  - id: demo\n    source: https://github.com/example/demo\n"
         "    revision: main\n    subdirectory: skill\n    content_hash: '" + "a" * 64 + "'\n"
         "    license: {spdx: MIT, file: LICENSE, hash: '" + "b" * 64 + "'}\n"
         "    audit: {status: pending, date: '2026-09-04', tool: review, evidence: https://example.com/audit}\n",
-        encoding="utf-8",
+        ids=["demo"],
     )
     with pytest.raises(defaults.ThirdPartyLockError, match="revision|audit"):
         defaults.load_catalog(repo)
@@ -130,16 +155,14 @@ def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownershi
     revision = "1" * 40
     content_hash = third_party.tree_hash(skill)
     license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
-    (repo / "agents" / "skills-defaults.yaml").write_text(
-        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
-    )
-    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+    _write_min_repo(
+        repo,
         "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
         "  - id: demo\n    source: https://github.com/example/demo\n"
         f"    revision: '{revision}'\n    subdirectory: skill\n    content_hash: {content_hash}\n"
         f"    license: {{spdx: MIT, file: LICENSE, hash: {license_hash}}}\n"
         "    audit: {status: approved, date: '2026-09-04', tool: test-review-v1, evidence: https://example.com/audit/demo}\n",
-        encoding="utf-8",
+        ids=["demo"],
     )
 
     def acquire(lock, destination):
@@ -193,16 +216,14 @@ def test_third_party_install_copies_unlisted_runtime_files(
     revision = "1" * 40
     content_hash = third_party.tree_hash(skill)
     license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
-    (repo / "agents" / "skills-defaults.yaml").write_text(
-        "version: 2\nlock: skills-defaults.lock.yaml\nskills: [demo]\n", encoding="utf-8"
-    )
-    (repo / "agents" / "skills-defaults.lock.yaml").write_text(
+    _write_min_repo(
+        repo,
         "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
         "  - id: demo\n    source: https://github.com/example/demo\n"
         f"    revision: '{revision}'\n    subdirectory: skill\n    content_hash: {content_hash}\n"
         f"    license: {{spdx: MIT, file: LICENSE, hash: {license_hash}}}\n"
         "    audit: {status: approved, date: '2026-09-04', tool: test-review-v1, evidence: https://example.com/audit/demo}\n",
-        encoding="utf-8",
+        ids=["demo"],
     )
 
     def acquire(lock, destination):

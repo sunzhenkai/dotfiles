@@ -58,21 +58,51 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launch_home: Path)
     return home
 
 
+def write_skills_catalog(repo: Path, *, default: bool = True) -> None:
+    """Write a v3 agenda catalog covering every first-party skill dir in *repo*.
+
+    Test mini-repos only ship first-party skills; this keeps them consistent
+    with the unified catalog's coverage invariant.
+    """
+    skills_root = repo / "agents" / "skills"
+    ids = sorted(
+        path.name
+        for path in skills_root.iterdir()
+        if path.is_dir() and (path / "SKILL.md").is_file()
+    ) if skills_root.is_dir() else []
+    lines = ["version: 3", "lock: skills.lock.yaml", "groups:"]
+    lines += ["  dotfiles:", "    type: first-party"]
+    if ids:
+        lines.append("    skills:")
+        lines += [f"      - {skill_id}" for skill_id in ids]
+    else:
+        lines.append("    skills: []")
+    (repo / "agents" / "skills.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def isolate_agents_sync_for_test(home: Path) -> None:
     """Disable network-backed third-party defaults and secret-bearing MCP in tests."""
     import yaml
 
     overlay_dir = home / ".config" / "dotf" / "overlays"
     overlay_dir.mkdir(parents=True)
-    lock = yaml.safe_load((ROOT / "agents" / "skills-defaults.lock.yaml").read_text(encoding="utf-8"))
+    catalog = yaml.safe_load((ROOT / "agents" / "skills.yaml").read_text(encoding="utf-8"))
     servers = yaml.safe_load((ROOT / "agents" / "env" / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
+    # Only third-party skills are network-backed; first-party skills come from
+    # the repo and stay enabled so tests can exercise the sync path.
+    catalog_ids = [
+        skill_id
+        for group in (catalog.get("groups") or {}).values()
+        if isinstance(group, dict) and group.get("type") == "third-party"
+        for skill_id in (group.get("skills") or [])
+    ]
     overlay = {
         "schema_version": 1,
         "kind": "dotf-overlay",
         "agents": {
             "profile": "research",
             "disabled_servers": sorted((servers.get("servers") or {}).keys()),
-            "disabled_skills": [item["id"] for item in lock.get("skills", [])],
+            "disabled_skills": catalog_ids,
         },
     }
     (overlay_dir / "00-test.yaml").write_text(

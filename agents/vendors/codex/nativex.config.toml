@@ -1,9 +1,0 @@
-# NativeX profile（`dotf codex -f nativex` 合并到 ~/.codex/config.toml）
-#
-# 需要走公司 newapi 网关时覆盖 model / context / catalog。
-# 默认 gpt-5.6-luna；catalog 不含 gpt-5.3-codex。
-# 本文件仅为仓库内 merge 输入，不单独安装到 HOME。
-model = "gpt-5.6-luna"
-model_provider = "nativex"
-model_context_window = 400000
-model_catalog_json = "~/.codex/model-catalogs/nativex-catalog.json"

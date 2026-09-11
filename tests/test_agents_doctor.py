@@ -46,6 +46,12 @@ def test_skills_plan_reports_all_states_managed_counts_and_safe_conflict_hint(
         SimpleNamespace(prior=prior, state="conflict", action="block", actual_state="unsafe", conflict="target path contains a symlink or unsafe type", target="/home/link"),
     )
     plan = SimpleNamespace(manifest_status="ok", state_home=str(tmp_path), operations=operations)
+    (tmp_path / "agents").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\n"
+        "groups:\n  dotfiles:\n    type: first-party\n    skills: []\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(doctor, "compile_skills_plan", lambda *args, **kwargs: plan)
     report = _report()
 

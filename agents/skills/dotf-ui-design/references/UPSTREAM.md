@@ -11,7 +11,7 @@ vendor 日期：2026-08-28。第三方快照不要直接修改；升级时按本
 | tailwind-design-system | wshobson/agents | plugins/frontend-mobile-development/skills/tailwind-design-system | 38e19c20d2b154510b0e624a2e3e186b19b5c527 |
 | webapp-testing | anthropics/skills | skills/webapp-testing | 3b3fad96af16a10759d930941b4520ba0c40edae |
 
-未 vendor：`frontend-design`（`anthropics/skills`，走 `agents/skills-defaults.yaml`）。
+未 vendor：`frontend-design`（`anthropics/skills`，走 `agents/skills.yaml`）。
 
 快照去掉 png / evals / agent 适配文件；保留 SKILL.md、其引用的 rules/references、以及 `webapp-testing` 的 scripts/examples/LICENSE。各目录带上游 LICENSE。
 

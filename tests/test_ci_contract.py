@@ -162,14 +162,15 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     assert "安装到 `~/.codex/<name>.config.toml`" not in codex_readme
     assert "symlink 到本仓库" not in codex_readme
     for marker in (
-        "dotf codex -f <name>",
-        "仓库内 merge 输入",
+        "dotf codex -c",
+        "不要用 `dotf` 去切 LLM provider",
         "~/.codex/model-catalogs/*.json",
         "manifest",
         "真实文件",
         "不创建或读取 `.dotf-profile`",
     ):
         assert marker in codex_readme
+    assert "dotf codex -f" not in codex_readme
 
     for marker in (
         "修改 `config/` 后必须重新运行 `dotf <module> -c`",

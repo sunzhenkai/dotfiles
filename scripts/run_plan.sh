@@ -328,29 +328,6 @@ for action_pos in "${!ACTIONS[@]}"; do
     if [ ${#CONFIG_EXTRA[@]} -gt 0 ]; then
       case "$module" in
       agents) extra=("${CONFIG_EXTRA[@]}") ;;
-      codex)
-        skip_val=0
-        for x in "${CONFIG_EXTRA[@]}"; do
-          if [ "$skip_val" -eq 1 ]; then extra+=("$x"); skip_val=0; continue; fi
-          case "$x" in --codex-profile | -f) extra+=("$x"); skip_val=1 ;; esac
-        done
-        ;;
-      opencode)
-        skip_val=0
-        for x in "${CONFIG_EXTRA[@]}"; do
-          if [ "$skip_val" -eq 1 ]; then
-            extra+=("$x")
-            skip_val=0
-            continue
-          fi
-          case "$x" in
-          --opencode-profile | -f)
-            extra+=("$x")
-            skip_val=1
-            ;;
-          esac
-        done
-        ;;
       esac
     fi
     ;;

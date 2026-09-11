@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 
 import pytest
+
+from conftest import write_skills_catalog
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,6 +50,7 @@ def _repo_with_runtime(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     (repo / "agents" / "skills").mkdir(parents=True)
     shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    write_skills_catalog(repo)
     return repo
 
 

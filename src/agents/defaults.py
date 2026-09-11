@@ -15,12 +15,17 @@ if str(_SCRIPTS) not in sys.path:
 
 from ensure_pyyaml import ensure_yaml
 from managed_runtime import AgentRuntimeConflict, apply_skills_plan, compile_skills_plan
+from skills_catalog import (
+    SkillsCatalogError,
+    load_skills_catalog,
+    validate_first_party_coverage,
+)
 from sync import kiro_skills_target, render_kiro_skill_bytes, render_skill_bytes, skills_target
 from third_party import ThirdPartyLock, ThirdPartyLockError, acquire_all, load_lock
 
 _yaml = ensure_yaml()
-CATALOG_REL = Path("agents") / "skills-defaults.yaml"
-LOCK_REL = Path("agents") / "skills-defaults.lock.yaml"
+CATALOG_REL = Path("agents") / "skills.yaml"
+LOCK_REL = Path("agents") / "skills.lock.yaml"
 THIRD_PARTY_OWNER = "agents:third-party:"
 KIRO_THIRD_PARTY_OWNER = "agents:kiro-third-party:"
 
@@ -34,45 +39,52 @@ def skills_target() -> Path:
 
 
 def first_party_skill_ids(root: Path) -> List[str]:
-    skills_root = root / "agents" / "skills"
-    if not skills_root.is_dir():
-        return []
-    return sorted(path.name for path in skills_root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file())
+    """First-party ids per the catalog (the single source of truth)."""
+    return load_skills_catalog(root).first_party_ids()
 
 
-def selected_default_ids(root: Path) -> List[str]:
-    catalog_path = root / CATALOG_REL
-    catalog = _yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-    if not isinstance(catalog, dict) or not isinstance(catalog.get("skills"), list):
-        raise ThirdPartyLockError("third-party defaults catalog skills are invalid")
-    return list(catalog["skills"])
+def catalog_skill_ids(root: Path) -> List[str]:
+    """Every catalogued id; the automatic full install installs all of them.
+
+    Opting out is done by commenting an entry out of the catalog, so there is
+    no per-entry default switch."""
+    return load_skills_catalog(root).ids()
+
+
+def load_skills_lock(root: Path) -> ThirdPartyLock:
+    """Load the strict third-party lock referenced by the catalog."""
+    return load_lock(root / LOCK_REL)
 
 
 def load_catalog(root: Path) -> ThirdPartyLock:
-    catalog_path = root / CATALOG_REL
-    lock_path = root / LOCK_REL
+    """Validate the unified catalog against the strict lock and return the lock.
+
+    Invariants:
+    - first-party directories and catalogued first-party ids must agree;
+    - every third-party catalogue id must be covered by the strict lock;
+    - no first-party id may appear in the lock (no source confusion).
+    """
     try:
-        catalog = _yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, _yaml.YAMLError) as exc:
-        raise ThirdPartyLockError(f"cannot read third-party defaults catalog: {catalog_path}") from exc
-    if not isinstance(catalog, dict) or set(catalog) != {"version", "lock", "skills"}:
-        raise ThirdPartyLockError("third-party defaults catalog has missing or unknown keys")
-    if catalog["version"] != 2 or catalog["lock"] != LOCK_REL.name or not isinstance(catalog["skills"], list):
-        raise ThirdPartyLockError("third-party defaults catalog version/lock/skills is invalid")
-    ids = catalog["skills"]
-    if any(not isinstance(item, str) or not item for item in ids) or len(ids) != len(set(ids)):
-        raise ThirdPartyLockError("third-party defaults catalog skill ids are invalid or duplicate")
-    lock = load_lock(lock_path)
-    locked_ids = [item.id for item in lock.skills]
-    missing = sorted(set(ids) - set(locked_ids))
+        catalog = load_skills_catalog(root)
+    except SkillsCatalogError as exc:
+        raise ThirdPartyLockError(str(exc)) from exc
+    validate_first_party_coverage(root, catalog)
+    lock = load_lock(root / LOCK_REL)
+    locked_ids = {item.id for item in lock.skills}
+    third_party = set(catalog.third_party_ids())
+    first_party = set(catalog.first_party_ids())
+
+    missing = sorted(third_party - locked_ids)
     if missing:
         raise ThirdPartyLockError(
-            "third-party defaults must be covered by the strict lock "
+            "third-party catalogue entries must be covered by the strict lock "
             f"(unlocked={missing})"
         )
-    overlap = sorted(set(ids).intersection(first_party_skill_ids(root)))
-    if overlap:
-        raise ThirdPartyLockError("third-party defaults overlap first-party skills: " + ", ".join(overlap))
+    confusion = sorted(first_party & locked_ids)
+    if confusion:
+        raise ThirdPartyLockError(
+            "first-party skills must not appear in the strict lock: " + ", ".join(confusion)
+        )
     return lock
 
 
@@ -153,7 +165,7 @@ def install_defaults(
                     source_root=source_root,
                     owner_prefix=owner_prefix,
                     identity_prefix=(
-                        f"agents/skills-defaults.lock.yaml@{lock.digest}{identity_suffix}"
+                        f"agents/skills.lock.yaml@{lock.digest}{identity_suffix}"
                     ),
                     include_unlisted=True,
                     only_ids=frozenset(item.id for item in selected),

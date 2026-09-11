@@ -231,7 +231,17 @@ def install_openspec_skills(
         print("warning: openspec CLI 未安装，跳过全局 OpenSpec skills（dotf npm -i）", file=sys.stderr)
         return 0
 
-    overlap = [item for item in first_party_skill_ids(root) if item.startswith("openspec-")]
+    # Defense in depth: reject any first-party skill named like an OpenSpec CLI
+    # skill, whether catalogued or present only as a raw agents/skills/<id>/ dir.
+    declared = set(first_party_skill_ids(root))
+    skills_root = root / "agents" / "skills"
+    if skills_root.is_dir():
+        declared |= {
+            path.name
+            for path in skills_root.iterdir()
+            if path.is_dir() and (path / "SKILL.md").is_file()
+        }
+    overlap = sorted(item for item in declared if item.startswith("openspec-"))
     if overlap:
         print(
             "error: first-party skills overlap OpenSpec CLI skills: " + ", ".join(overlap),

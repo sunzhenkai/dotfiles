@@ -245,7 +245,7 @@ def test_registry_has_no_dotfiles_agents_source_link_target() -> None:
 
 
 def test_agents_status_uses_managed_manifest_hash(tmp_home: Path) -> None:
-    target = tmp_home / ".config" / "dotf" / "managed" / "agents-skills-defaults.yaml"
+    target = tmp_home / ".config" / "dotf" / "managed" / "agents-skills.yaml"
     target.parent.mkdir(parents=True)
     target.write_text("skills: []\n", encoding="utf-8")
     target.chmod(0o600)
@@ -263,7 +263,7 @@ def test_agents_status_uses_managed_manifest_hash(tmp_home: Path) -> None:
                     {
                         "owner": "config:agents",
                         "target": str(target),
-                        "source_identity": "agents/skills-defaults.yaml",
+                        "source_identity": "agents/skills.yaml",
                         "expected_hash": digest,
                         "installed_hash": digest,
                         "strategy": "render",

@@ -1,8 +1,8 @@
 """Pure expected-content producers for registry merge/render declarations.
 
-These callbacks may inspect only immutable source/actual bytes (plus explicit,
-repository-confined Codex profile inputs). They never write HOME, repository,
-or manifest state; config_deploy retains all ownership and apply authority.
+These callbacks may inspect only immutable source/actual bytes (plus Codex XDG
+local overlay). They never write HOME, repository, or manifest state;
+config_deploy retains all ownership and apply authority.
 """
 
 from __future__ import annotations
@@ -108,37 +108,16 @@ def _opencode_factory(repo_root: Path):
         if source_doc is None:
             raise ConfigDeployError("OpenCode source is missing opencode.json")
 
-        requested = os.environ.get("DOTF_OPENCODE_PROFILE", "").strip()
-        profile: str | None = None
-        if requested:
-            resolved = merge_module.resolve_profile_name(requested)
-            if resolved not in merge_module.PROFILES:
-                raise ConfigDeployError(f"unknown OpenCode profile: {requested}")
-            profile = resolved
-        else:
-            persisted_raw = context.actual_files.get(".dotf-profile")
-            if persisted_raw is not None:
-                try:
-                    persisted = persisted_raw.decode("utf-8").strip()
-                except UnicodeDecodeError:
-                    persisted = ""
-                if persisted:
-                    resolved = merge_module.resolve_profile_name(persisted)
-                    if resolved in merge_module.PROFILES:
-                        profile = resolved
-
         actual_raw = context.actual_files.get("opencode.json")
         actual_doc = _json_object(actual_raw, label="OpenCode target")
         outputs.append(
             ProducedFile(
                 "opencode.json",
-                merge_module.merge(actual_doc or None, source_doc, profile),
+                merge_module.merge(actual_doc or None, source_doc),
                 format="json",
                 reconcile_owned=actual_raw is not None,
             )
         )
-        if profile:
-            outputs.append(ProducedFile(".dotf-profile", profile + "\n"))
         return outputs
 
     return produce
@@ -243,28 +222,10 @@ def _codex_factory(repo_root: Path, home: Path):
             raise ConfigDeployError("Codex source is missing config.toml")
         base, base_document = _toml_document(base_raw, label="Codex base")
 
-        profiles: dict[str, str] = {}
         catalog_paths = {_catalog_relative(base_document, label="Codex base")}
         for relative, raw in sorted(context.source_files.items()):
-            if not relative.endswith(".config.toml"):
-                continue
-            name = relative[: -len(".config.toml")]
-            profile_text, profile_document = _toml_document(
-                raw, label=f"Codex profile {name}"
-            )
-            profiles[name] = profile_text
-            catalog_paths.add(
-                _catalog_relative(profile_document, label=f"Codex profile {name}")
-            )
-
-        requested = os.environ.get("DOTF_CODEX_PROFILE", "").strip()
-        profile_text: str | None = None
-        if requested:
-            resolved = merge_module.resolve_profile_name(requested)
-            try:
-                profile_text = profiles[resolved]
-            except KeyError as exc:
-                raise ConfigDeployError(f"unknown Codex profile: {requested}") from exc
+            if relative.startswith("model-catalogs/") and relative.endswith(".json"):
+                catalog_paths.add(relative)
 
         try:
             local = load_overlays(
@@ -283,7 +244,7 @@ def _codex_factory(repo_root: Path, home: Path):
         outputs = [
             ProducedFile(
                 "config.toml",
-                merge_module.merge(base, profile_text, local, actual=actual_text),
+                merge_module.merge(base, local, actual=actual_text),
                 format="toml",
                 reconcile_owned=actual_raw is not None,
             )

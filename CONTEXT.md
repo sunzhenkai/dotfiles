@@ -14,9 +14,25 @@ _Avoid_: 工具, 包, package, 软件（作为清单行）, 配置项目, 项目
 一条可分发技能；本机上管理的就是这份制品本身。apply / remove 以机器为粒度，所有读取共享 skills 目录的工具一起生效。
 _Avoid_: 插件, prompt, command（command 是另一种制品）
 
+**Skill Catalog**:
+`agents/skills.yaml`，全部 Skill 的唯一编目，**按 group 组织**。组声明 `type`（一手/第三方）与第三方 `source`/`package`，成员只写 id。**没有 default 字段**：编目内即自动全量安装，不想装就注释掉条目。desired_set / lock 校验 / overlay / CLI 都读它。
+_Avoid_: skills-defaults（旧名）, 打平列表, skill 清单（含糊）
+
+**First-Party Skill**:
+来源是仓库内 `agents/skills/<id>/` 的 Skill。编目里 `type: first-party`；不带 hash/revision，目录即真相，但目录必须被编目覆盖。
+_Avoid_: 自家 skill, 内置 skill, vendor 副本
+
+**Third-Party Skill**:
+来源由 lock 固定的 Skill，编目里 `type: third-party`，并声明 `source: registry | github` 与 `package`；revision / hash / license / audit 只在 lock，编目只引用。
+_Avoid_: 外部 skill, 上游 skill（作为制品名）
+
 **Locked Skill**:
-第三方 Skill：lock 已批准其不可变 revision。TUI/CLI 可以 apply 它，即使它不在默认选中列表里。
+第三方 Skill 中 lock 已批准其不可变 revision 的那条。被注释出编目的 Locked Skill 不自动装，也不能经 overlay 引用；要重新启用需取消注释。
 _Avoid_: 未锁定 skill, 浮动上游
+
+**Skill Group**:
+编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id、最后透传 npx。
+_Avoid_: type（两者正交）, 包, 命名空间（含糊）
 
 **MCP Server**:
 编目里声明的一条 MCP 服务，是 Agent 区可选行的来源。
@@ -59,7 +75,7 @@ _Avoid_: drift（当已能判定是 Conflict 时）, 损坏
 ### Scope
 
 **Desired Set**:
-这台机器同步之后应该存在的 Skill 与 MCP Entry。默认 = 一手 catalog ∪ 默认选中的第三方 ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方。
+这台机器同步之后应该存在的 Skill 与 MCP Entry。默认 = 编目内全部 id ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方。
 _Avoid_: catalog（那是仓库编目）, 清单（含糊）
 
 **Dependent**:

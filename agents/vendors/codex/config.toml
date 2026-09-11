@@ -3,17 +3,12 @@
 #
 # 自定义 provider（均 requires_openai_auth = false，启动跳过 ChatGPT 登录）：
 #   minimax  — MiniMax 国内站（默认）  MINIMAX_API_KEY
-#   nativex  — 公司 newapi 网关        NATIVEX_API_KEY
-#   company  — 内网 new-api 网关       COMPANY_API_KEY / COMPANY_BASE_URL（senv）
 #   kimi     — Kimi For Coding         KIMI_API_KEY
 #   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
 #   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
 #   deepseek — DeepSeek 官方 API       DEEPSEEK_API_KEY
 #
-# 切换默认 provider：dotf codex -f <name>（选择仓库 profile 并 merge）
-# profile TOML 只作为仓库内 merge 输入，不作为 Codex CLI 辅助配置安装。
-# 模型切换：TUI /model 或 codex exec -m <slug>（catalog 为数据源）
-#
+# 切换模型：TUI /model 或 codex exec -m <slug>（catalog 为数据源）。
 # 注意: codex 0.130+ 仅支持 wire_api = "responses"。
 
 # ============================================================
@@ -24,7 +19,6 @@ model_provider = "minimax"
 model_context_window = 1000000
 # 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
 # 安装后由 config_deploy 管理为 ~/.codex/model-catalogs/minimax-catalog.json 真实文件。
-# `dotf codex -f nativex` 时由仓库 profile merge 为 nativex-catalog.json。
 model_catalog_json = "~/.codex/model-catalogs/minimax-catalog.json"
 
 # 审批策略: untrusted | on-request | never
@@ -48,33 +42,6 @@ model_reasoning_effort = "high"
 name = "MiniMax"
 base_url = "https://api.minimaxi.com/v1"
 env_key = "MINIMAX_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - NativeX（备用，`dotf codex -f nativex` 激活）
-# ============================================================
-# ailink.nativex.com 是 newapi 网关，/v1/responses 端点已验证可用。
-# 认证通过 env_key 从 NATIVEX_API_KEY 环境变量读取（senv ai 组）。
-# 注意：验证网关模型必须用 codex 真跑（codex exec -m <model>），裸 curl 简单请求
-# 不会触发网关的 Responses→chat 协议转换，会误判"不可用"（2026-08-20 踩坑）。
-[model_providers.nativex]
-name = "NativeX"
-base_url = "https://ailink.nativex.com/v1"
-env_key = "NATIVEX_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - Company（内网 new-api，地址不入库）
-# ============================================================
-# Codex 走 Responses：COMPANY_BASE_URL 须含 /v1。
-# 安装时由 merge 从环境 / senv 展开 ${COMPANY_BASE_URL}，写入本机 ~/.codex/config.toml。
-# 密钥运行时读 COMPANY_API_KEY。两者都放 senv，不要写进仓库。
-[model_providers.company]
-name = "Company"
-base_url = "${COMPANY_BASE_URL}"
-env_key = "COMPANY_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
 
@@ -126,9 +93,6 @@ base_url = "https://api.deepseek.com/"
 env_key = "DEEPSEEK_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false
-
-# profile 层来自仓库内 <name>.config.toml merge 输入；`dotf codex -f <name>`
-# 将其顶层键合并进唯一的 ~/.codex/config.toml，不安装 profile 辅助文件。
 
 # ============================================================
 # 子进程环境变量策略

@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from desired_set import DesiredSetError, resolve_skill_desired_set  # noqa: E402
-from defaults import first_party_skill_ids, selected_default_ids  # noqa: E402
+from defaults import catalog_skill_ids, first_party_skill_ids  # noqa: E402
 from dotf_core.overlays import (  # noqa: E402
     OVERLAY_KIND,
     OVERLAY_SCHEMA_VERSION,
@@ -24,12 +24,13 @@ from dotf_core.overlays import (  # noqa: E402
 )
 
 
-def test_default_desired_set_is_first_party_plus_defaults() -> None:
+def test_default_desired_set_is_the_whole_catalog() -> None:
     desired = resolve_skill_desired_set(ROOT, overlay_agents={})
     first = set(first_party_skill_ids(ROOT))
-    defaults = set(selected_default_ids(ROOT))
+    catalogued = set(catalog_skill_ids(ROOT))
     assert first <= desired
-    assert defaults <= desired
+    # no per-entry default: every catalogued id is in the desired set.
+    assert catalogued == desired
     assert all(not item.startswith("openspec-") for item in desired)
 
 
@@ -40,13 +41,13 @@ def test_overlay_disable_removes_skill() -> None:
     assert "grill-with-docs" not in desired
 
 
-def test_overlay_can_enable_locked_skill(tmp_path: Path) -> None:
-    locked = set(selected_default_ids(ROOT))
+def test_overlay_can_narrow_to_one_locked_skill(tmp_path: Path) -> None:
+    catalogued = set(catalog_skill_ids(ROOT))
     extra = "wayfinder"
-    assert extra in locked
+    assert extra in catalogued
     desired = resolve_skill_desired_set(
         ROOT,
-        overlay_agents={"enabled_skills": [extra], "disabled_skills": list(locked - {extra})},
+        overlay_agents={"enabled_skills": [extra], "disabled_skills": list(catalogued - {extra})},
     )
     assert extra in desired
     assert "grill-with-docs" not in desired

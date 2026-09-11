@@ -223,8 +223,8 @@ modules:
     install: true
     doctor: true
     config:
-      source: agents/skills-defaults.yaml
-      target: ~/.config/dotf/managed/agents-skills-defaults.yaml
+      source: agents/skills.yaml
+      target: ~/.config/dotf/managed/agents-skills.yaml
       strategy: render
       writable: true
       sensitive: true
@@ -264,7 +264,7 @@ modules:
       exclude: []
 
   - name: codex
-    desc: Codex CLI + 多 provider 配置（MiniMax / NativeX / Kimi / 智谱 / SCNet）
+    desc: Codex CLI + 默认 MiniMax 配置（仓库声明 MiniMax / Kimi / 智谱 / SCNet / DeepSeek）
     group: agents
     install: true
     doctor: true

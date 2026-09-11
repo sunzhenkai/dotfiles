@@ -15,6 +15,8 @@ sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from managed_runtime import AGENTS_MANIFEST_NAME  # noqa: E402
 
+from conftest import write_skills_catalog  # noqa: E402
+
 
 def _repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
@@ -39,6 +41,7 @@ def _repo(tmp_path: Path) -> Path:
     (skill / "scripts" / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
     for name in ("patches", "evals", "experience", "evolutions", "authoring"):
         (skill / name / "private.txt").write_text(name, encoding="utf-8")
+    write_skills_catalog(repo)
     return repo
 
 

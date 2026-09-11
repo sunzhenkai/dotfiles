@@ -1,4 +1,4 @@
-"""OpenCode provider 合并、默认 model 切换与 CLI -f 透传。"""
+"""OpenCode provider 合并、默认 MiniMax 安装，以及不再提供 -f 切换。"""
 
 from __future__ import annotations
 
@@ -22,11 +22,9 @@ def _load_merge():
 
 
 _merge = _load_merge()
-ALIASES = _merge.ALIASES
 MANAGED_PROVIDER_IDS = _merge.MANAGED_PROVIDER_IDS
-PROFILES = _merge.PROFILES
+DEFAULT_MODEL = _merge.DEFAULT_MODEL
 merge = _merge.merge
-resolve_profile_name = _merge.resolve_profile_name
 
 VENDOR = ROOT / "agents" / "vendors" / "opencode"
 VENDOR_JSON = VENDOR / "opencode.json"
@@ -36,24 +34,35 @@ def _vendor() -> dict:
     return json.loads(VENDOR_JSON.read_text(encoding="utf-8"))
 
 
-def test_profiles_match_vendor_providers() -> None:
+def _install(tmp_home: Path) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_home)
+    env["DOTFILES_ROOT"] = str(ROOT)
+    env.pop("DOTF_OPENCODE_PROFILE", None)
+    script = r"""
+set -euo pipefail
+source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
+source "$DOTFILES_ROOT/scripts/modules.sh"
+source "$DOTFILES_ROOT/scripts/config.sh"
+install_opencode
+"""
+    return subprocess.run(
+        ["bash", "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(ROOT),
+        check=False,
+    )
+
+
+def test_vendor_providers_match_managed_ids() -> None:
     vendor = _vendor()
     providers = vendor["provider"]
     assert set(providers) == set(MANAGED_PROVIDER_IDS)
-    assert vendor["model"] == PROFILES["minimax"]["model"]
-    for name, info in PROFILES.items():
-        model = info["model"]
-        assert model.startswith(f"{name}/")
-        slug = model.split("/", 1)[1]
-        assert slug in providers[name]["models"]
-
-
-def test_company_uses_chat_adapter_and_env_url() -> None:
-    company = _vendor()["provider"]["company"]
-    assert company["npm"] == "@ai-sdk/openai-compatible"
-    assert company["options"]["baseURL"] == "{env:COMPANY_BASE_URL}"
-    assert company["options"]["apiKey"] == "{env:COMPANY_API_KEY}"
-    assert "vanchin/deepseek-v4-pro-0813" in company["models"]
+    assert vendor["model"] == DEFAULT_MODEL
+    pid, slug = DEFAULT_MODEL.split("/", 1)
+    assert slug in providers[pid]["models"]
 
 
 def test_vendor_files_have_no_company_secrets() -> None:
@@ -63,26 +72,11 @@ def test_vendor_files_have_no_company_secrets() -> None:
     assert not ip_re.search(text)
     assert not key_re.search(text)
     assert "39.106" not in text
-
-
-def test_bigmodel_alias_resolves_to_zhipu() -> None:
-    assert resolve_profile_name("bigmodel") == "zhipu"
-    assert ALIASES["zai"] == "zhipu"
-    rc = subprocess.run(
-        [
-            "python3",
-            str(ROOT / "scripts" / "modules" / "opencode" / "merge_config.py"),
-            "--resolve",
-            "bigmodel",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert rc.returncode == 0, rc.stderr
-    assert rc.stdout.splitlines()[0] == "zhipu"
-    assert rc.stdout.splitlines()[1] == "zhipu/glm-5.3"
+    assert "NATIVEX_API_KEY" not in text
+    assert "COMPANY_API_KEY" not in text
+    assert "nativex.com" not in text
+    assert "nativex" not in text
+    assert '"company"' not in text
 
 
 def test_merge_preserves_mcp_and_local_provider() -> None:
@@ -93,138 +87,69 @@ def test_merge_preserves_mcp_and_local_provider() -> None:
         "provider": {"ollama": {"name": "Local Ollama"}},
         "agent": {"build": {"prompt": "local"}},
     }
-    out = merge(existing, vendor, None)
+    out = merge(existing, vendor)
     assert out["model"] == "kimi/k3"
     assert out["mcp"] == existing["mcp"]
     assert out["agent"] == existing["agent"]
     assert out["provider"]["ollama"] == {"name": "Local Ollama"}
     assert "minimax" in out["provider"]
-    assert "company" in out["provider"]
+    assert "kimi" in out["provider"]
+    assert "company" not in out["provider"]
+    assert "nativex" not in out["provider"]
 
 
-def test_merge_profile_sets_default_model() -> None:
+def test_merge_uses_vendor_default_when_missing_model() -> None:
     vendor = _vendor()
-    out = merge({"mcp": {"x": 1}}, vendor, "company")
-    assert out["model"] == "company/vanchin/deepseek-v4-pro-0813"
+    out = merge({"mcp": {"x": 1}}, vendor)
+    assert out["model"] == DEFAULT_MODEL
     assert out["mcp"] == {"x": 1}
 
 
-def test_unknown_profile_resolve_fails() -> None:
-    rc = subprocess.run(
-        [
-            "python3",
-            str(ROOT / "scripts" / "modules" / "opencode" / "merge_config.py"),
-            "--resolve",
-            "not-a-provider",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert rc.returncode == 2
-    assert "未知" in rc.stderr
-    assert "kimi" in rc.stderr
-
-
-def test_install_opencode_applies_profile(tmp_home: Path) -> None:
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_home)
-    env["DOTFILES_ROOT"] = str(ROOT)
-    env["DOTF_OPENCODE_PROFILE"] = "company"
-    env["COMPANY_API_KEY"] = "sk-test-not-a-secret"
-    env["COMPANY_BASE_URL"] = "http://127.0.0.1:9/v1"
-    script = r"""
-set -euo pipefail
-source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
-source "$DOTFILES_ROOT/scripts/modules.sh"
-source "$DOTFILES_ROOT/scripts/config.sh"
-install_opencode
-"""
-    r = subprocess.run(
-        ["bash", "-c", script],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
+def test_install_opencode_uses_vendor_default(tmp_home: Path) -> None:
+    r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
-    cfg = json.loads((tmp_home / ".config" / "opencode" / "opencode.json").read_text(encoding="utf-8"))
-    assert cfg["model"] == "company/vanchin/deepseek-v4-pro-0813"
-    assert cfg["provider"]["company"]["options"]["baseURL"] == "{env:COMPANY_BASE_URL}"
-    assert "http://127.0.0.1:9/v1" not in json.dumps(cfg)
-    assert (tmp_home / ".config" / "opencode" / ".dotf-profile").read_text(
-        encoding="utf-8"
-    ).strip() == "company"
-
-
-def test_install_opencode_keeps_profile_on_reinstall(tmp_home: Path) -> None:
     target = tmp_home / ".config" / "opencode"
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_home)
-    env["DOTFILES_ROOT"] = str(ROOT)
-    env["DOTF_OPENCODE_PROFILE"] = "company"
-    script = r"""
-set -euo pipefail
-source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
-source "$DOTFILES_ROOT/scripts/modules.sh"
-source "$DOTFILES_ROOT/scripts/config.sh"
-install_opencode
-"""
-    r = subprocess.run(
-        ["bash", "-c", script],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert r.returncode == 0, r.stdout + r.stderr
     cfg = json.loads((target / "opencode.json").read_text(encoding="utf-8"))
-    assert cfg["model"] == "company/vanchin/deepseek-v4-pro-0813"
+    assert cfg["model"] == DEFAULT_MODEL
+    assert "COMPANY_BASE_URL" not in json.dumps(cfg)
+    assert not (target / ".dotf-profile").exists()
 
-    # Reinstall without the env flag: the persisted profile keeps the model
-    # pointer stable instead of falling back to the vendor default.
-    env.pop("DOTF_OPENCODE_PROFILE")
-    r = subprocess.run(
-        ["bash", "-c", script],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
+
+def test_install_opencode_keeps_existing_model_on_reinstall(tmp_home: Path) -> None:
+    target = tmp_home / ".config" / "opencode"
+    r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
-    cfg = json.loads((target / "opencode.json").read_text(encoding="utf-8"))
-    assert cfg["model"] == "company/vanchin/deepseek-v4-pro-0813"
-    assert (target / ".dotf-profile").read_text(encoding="utf-8").strip() == "company"
+    cfg_path = target / "opencode.json"
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    cfg["model"] = "kimi/kimi-for-coding"
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-
-def test_cli_opencode_f_dry_run() -> None:
-    r = subprocess.run(
-        ["bash", str(ROOT / "bin" / "dotf"), "opencode", "-f", "kimi", "--dry-run"],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        check=False,
-    )
+    r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "config" in r.stdout and "opencode" in r.stdout
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    assert cfg["model"] == "kimi/kimi-for-coding"
+    assert not (target / ".dotf-profile").exists()
 
 
-def test_cli_opencode_f_lists_profiles() -> None:
-    r = subprocess.run(
-        ["bash", str(ROOT / "bin" / "dotf"), "opencode", "-f"],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert r.returncode == 0, r.stdout + r.stderr
-    out = r.stdout
-    assert "可用 OpenCode provider" in out
-    for name in ("minimax", "nativex", "company", "deepseek", "kimi", "zhipu", "scnet"):
-        assert name in out
-    assert "company/vanchin/deepseek-v4-pro-0813" in out
-    assert "用法: dotf opencode -f <provider>" in out
+def test_cli_rejects_llm_provider_switch_flags() -> None:
+    for args in (
+        ["opencode", "-f", "kimi", "--dry-run"],
+        ["opencode", "-f"],
+        ["opencode", "--opencode-profile", "kimi", "--dry-run"],
+        ["opencode", "-c", "--profile", "kimi", "--dry-run"],
+    ):
+        result = subprocess.run(
+            ["bash", str(ROOT / "bin" / "dotf"), *args],
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+            check=False,
+        )
+        combined = result.stdout + result.stderr
+        if "--profile" in args:
+            assert "LLM provider" not in combined
+            assert result.returncode == 0, combined
+            assert "config" in result.stdout and "opencode" in result.stdout
+            continue
+        assert result.returncode != 0, args
+        assert "未知选项" in combined

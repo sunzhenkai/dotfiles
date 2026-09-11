@@ -15,8 +15,17 @@ def test_help_lists_doctor_actions(tmp_home: Path, launch_home: Path) -> None:
     assert "--doctor" in out
     assert "-icd" in out
     assert "不含 doctor" in out
+    assert "LLM provider" not in out
+    assert "dotf codex -f" not in out
     assert Path.home().resolve() == tmp_home.resolve()
     assert tmp_home.resolve() != launch_home
+
+
+def test_agents_research_profile_is_not_llm_provider(tmp_home: Path) -> None:
+    result = run_dotf("agents", "-c", "--profile", "research", "--dry-run")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "agents" in result.stdout
+    assert "LLM provider" not in (result.stdout + result.stderr)
 
 
 def test_legacy_action_first_rejected(tmp_home: Path) -> None:
@@ -151,36 +160,60 @@ def test_skills_install_rejects_project_global_conflict(tmp_home: Path) -> None:
     assert "只能二选一" in result.stdout
 
 
-def test_skills_install_resolves_mapped_name(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
+def test_skills_install_resolves_third_party_skill_id(tmp_home: Path) -> None:
+    # catalogued third-party id resolves to its package with a -s selector.
+    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills add https://github.com/Leonxlnx/taste-skill"
-        " -s design-taste-frontend" in result.stdout
+        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
+        " -s ui-template-apply" in result.stdout
     )
 
 
-def test_skills_install_resolves_multiple_mapped_skills(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-i", "ui-template", "--dry-run")
+def test_skills_install_commented_out_skill_passes_through(tmp_home: Path) -> None:
+    # taste-skill is commented out of the catalog -> treated as a plain name.
+    result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
+
+    assert result.returncode == 0
+    assert "==> npx skills add taste-skill" in result.stdout
+
+
+def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:
+    # unknown names (not a group or catalogued id) pass through to npx search.
+    result = run_dotf("skills", "-i", "frontend-design", "--dry-run")
+
+    assert result.returncode == 0
+    assert "==> npx skills add frontend-design" in result.stdout
+
+
+def test_skills_install_rejects_first_party_skill_id(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-i", "commit-push", "--dry-run")
+
+    assert result.returncode != 0
+    assert "first-party" in result.stderr
+
+
+def test_skills_install_resolves_group(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-i", "ui-templates", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills add sunzhenkai/ui-templates-skill"
+        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
         " -s ui-template-author -s ui-template-apply"
         " -s ui-template-design" in result.stdout
     )
 
 
-def test_skills_uninstall_resolves_mapped_name(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-r", "taste-skill", "--dry-run")
+def test_skills_uninstall_resolves_third_party_skill_id(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-r", "ui-template-apply", "--dry-run")
 
     assert result.returncode == 0
-    assert "==> npx skills remove design-taste-frontend" in result.stdout
+    assert "==> npx skills remove ui-template-apply" in result.stdout
 
 
 def test_skills_uninstall_resolves_multiple_mapped_skills(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-r", "ui-template", "--dry-run")
+    result = run_dotf("skills", "-r", "ui-templates", "--dry-run")
 
     assert result.returncode == 0
     assert (

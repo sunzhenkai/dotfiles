@@ -11,7 +11,7 @@ dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills）+ 全局 AGENTS.md + MCP（全部工具）
 dotf agents -c --tool cursor   # 显式过滤：只同步 Cursor 的 MCP（skills 与 tool 无关，始终全量）
-dotf skills -i <skill-name>    # 用 npx skills 按需安装；短名先经 skills-map.yaml 映射；默认交互式，-g 全局 / --project 项目 / -y 跳过询问
+dotf skills -i <name>          # npx skills 按需安装；先匹配 skills.yaml 的 group，再匹配 skill id，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
 dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
 dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync
 dotf agents skill remove <id>  # 停用并 prune owned 且未漂的目标（不改仓库）
@@ -35,7 +35,8 @@ agents/
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
   instructions/AGENTS.md           # 全局 agent 指令（用户级，跨项目）
   instructions/install.yaml        # 安装目标（~/.agents、Codex、Cursor rules）
-  skills-defaults.yaml             # 第三方默认 skill（锁定后装到 ~/.agents/skills）
+  skills.yaml                      # 全量 Skill 编目（按 group；一手 + 第三方；唯一真相源）
+  skills.lock.yaml                 # 第三方 skill 的严格审计锁（revision/hash/license/audit）
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
   env/                             # MCP / profiles / browser / security 真相源
   README.md
@@ -88,9 +89,9 @@ skills 默认同步到共享目标：`~/.agents/skills/<id>/`（含 `references/
 
 同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`，以及 Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
 
-本机 Skill Desired Set = 一手 catalog ∪ `skills-defaults.yaml` 默认选中项 ∪ overlay `enabled_skills` − `disabled_skills`。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库 catalog / lock。
+本机 Skill Desired Set = `agents/skills.yaml` 编目内全部 id ∪ overlay `enabled_skills` − `disabled_skills`。**没有 default 字段**：编目内即默认全量安装；不想装就把该条目注释掉（注释即不在编目内，不自动装、也不能经 overlay / `agents skill apply` 引用）。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库编目 / lock。
 
-一手 skill 来自 `agents/skills/`。第三方默认 skill 见 `agents/skills-defaults.yaml`，由同一入口通过锁定目录安装到同一个 `~/.agents/skills`。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全局 `~/.agents/skills`（Kiro 例外镜像照旧）。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
+一手 skill 来自 `agents/skills/`，并在 `agents/skills.yaml` 的 `dotfiles` 组编目（`type: first-party`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到同一个 `~/.agents/skills`。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全局 `~/.agents/skills`（Kiro 例外镜像照旧）。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ```bash
 # 同步 skills（tool 无关，一次性）+ 全部工具的 MCP/env
@@ -109,13 +110,13 @@ scripts/config.sh agents
 共享 sync：`dotf agents -c [--tool <name>]`（`--tool` 只过滤 MCP/env）。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 `dsh`（DeepSeek Harness CLI，bin: `dsh`）：MCP client 配置在 profile 内，不参与 agents/env 聚合（env_sync 为 skip stub）。安装走 `dotf dsh -i`。
 
-**不要手改** `~/.agents/skills/` 或 `${KIRO_HOME:-~/.kiro}/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 后重新 sync，默认第三方 skill 请改 `agents/skills-defaults.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。
+**不要手改** `~/.agents/skills/` 或 `${KIRO_HOME:-~/.kiro}/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 并在 `agents/skills.yaml` 编目后重新 sync，第三方 skill 请改 `agents/skills.yaml` + `agents/skills.lock.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。
 
 ## 示例条目
 
 仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`dotf-ui-design`（UI Engineering 薄路由：frontend-design 走全局 defaults，其余 4 条能力 skill 为内部引用）、`task-design`（复杂任务可选设计环节）、`task-grill`（taskflow 链路上 explore 与 propose 之间的可选收敛）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 由 `dotf agents -c` 默认装到全局 `~/.agents/skills`（`openspec init --tools agents`），不必写入本目录或各项目 `.cursor/skills`；`taskflow` 在已安装时委托它们。
 
-第三方默认（`agents/skills-defaults.yaml` + `agents/skills-defaults.lock.yaml`）：`mattpocock/skills` 的 `setup-matt-pocock-skills`、`grill-with-docs`、`to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`diagnosing-bugs`、`codebase-design`、`domain-modeling`、`research`、`wayfinder`，以及 `sunzhenkai/ui-templates-skill` 的 `ui-template-author` 与 `ui-template-apply`。由锁定目录安装到 `~/.agents/skills`，并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。`Leonxlnx/taste-skill` 的 `taste-skill` 已从默认移除，但仍在审计锁中：可通过本机 overlay 显式启用，或用 `dotf skills -i taste-skill` 按需安装（短名映射见 `agents/skills-map.yaml`）。
+第三方编目（`agents/skills.yaml` + `agents/skills.lock.yaml`）：`mattpocock/skills` 的 `setup-matt-pocock-skills`、`grill-with-docs`、`to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`diagnosing-bugs`、`codebase-design`、`domain-modeling`、`research`、`wayfinder`，以及 `sunzhenkai/ui-templates-skill` 的 `ui-template-author`、`ui-template-apply`、`ui-template-design`。由锁定目录安装到 `~/.agents/skills`，并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。`taste-skill` 的 group 已在编目中注释，故不自动装也不能经 overlay/apply 引用（其审计锁保留）；`dotf skills -i taste-skill` 会按字面透传给 npx 搜索安装。
 
 ## Managed ownership 与冲突
 

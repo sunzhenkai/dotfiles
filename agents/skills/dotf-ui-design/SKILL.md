@@ -20,7 +20,7 @@ UI Engineering
 └── ui-inspect                现有页空间细节 / 可选优雅重构 （自有 phase）
 ```
 
-`frontend-design` 由 `agents/skills-defaults.yaml` 装到 `~/.agents/skills/`。其余 4 条在本 skill 的 `references/` 下，随分发到位，**不是**独立 skill，不要再 `npx skills add` 到全局。`ui-inspect` 清单在 `references/ui-inspect.md`，不要当成独立 skill 安装。
+`frontend-design` 由 `agents/skills.yaml` 装到 `~/.agents/skills/`。其余 4 条在本 skill 的 `references/` 下，随分发到位，**不是**独立 skill，不要再 `npx skills add` 到全局。`ui-inspect` 清单在 `references/ui-inspect.md`，不要当成独立 skill 安装。
 
 ## 三道门禁
 
@@ -75,7 +75,7 @@ UI Engineering
 ## 边界
 
 - 不修改 `references/` 下的第三方快照；`ui-inspect.md` 是本 skill 自有清单，可随本协议更新。发现问题记到 `.dotf-ui-design.md`，升级改 [UPSTREAM.md](references/UPSTREAM.md) 后重新 vendor。
-- 这 4 条内部引用不要装进 `~/.agents/skills/<name>/`，也不要写进 `skills-defaults.yaml`。
+- 这 4 条内部引用不要装进 `~/.agents/skills/<name>/`，也不要写进 `agents/skills.yaml`。
 - 不拦截 `pretty-view-html` / `pretty-view-ppt`；它们有自己的设计路径。
 - 不把 CDP 操控（`browser-use`）当成视觉验收。
 - `frontend-design` 与共享目录不一致时，以 `~/.agents/skills/frontend-design/SKILL.md` 为准，并提示跑 `dotf agents -c`。

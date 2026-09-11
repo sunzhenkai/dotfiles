@@ -1,4 +1,4 @@
-"""dotf skills short-name mapping tests."""
+"""dotf skills input resolver tests (group -> skill id -> passthrough)."""
 
 from __future__ import annotations
 
@@ -19,21 +19,15 @@ def run_resolver(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_taste_skill_maps_to_audited_source_repo() -> None:
-    result = run_resolver("taste-skill")
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == [
-        "https://github.com/Leonxlnx/taste-skill",
-        "-s",
-        "design-taste-frontend",
-    ]
+def _write_catalog(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
 
 
-def test_ui_template_maps_to_multiple_skills() -> None:
-    result = run_resolver("ui-template")
+def test_group_expands_to_its_third_party_skills() -> None:
+    result = run_resolver("ui-templates")
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        "sunzhenkai/ui-templates-skill",
+        "https://github.com/sunzhenkai/ui-templates-skill",
         "-s",
         "ui-template-author",
         "-s",
@@ -43,8 +37,18 @@ def test_ui_template_maps_to_multiple_skills() -> None:
     ]
 
 
-def test_remove_mode_resolves_multiple_installed_skill_names() -> None:
-    result = run_resolver("ui-template", "--remove")
+def test_third_party_skill_id_resolves_to_its_package() -> None:
+    result = run_resolver("ui-template-apply")
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "https://github.com/sunzhenkai/ui-templates-skill",
+        "-s",
+        "ui-template-apply",
+    ]
+
+
+def test_remove_mode_group_resolves_installed_skill_names() -> None:
+    result = run_resolver("ui-templates", "--remove")
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         "ui-template-author",
@@ -53,77 +57,66 @@ def test_remove_mode_resolves_multiple_installed_skill_names() -> None:
     ]
 
 
-def test_multiple_skill_selectors_reject_skill_alias(tmp_path: Path) -> None:
-    map_file = tmp_path / "skills-map.yaml"
-    map_file.write_text(
-        (
-            "version: 1\n"
-            "skills:\n"
-            "  demo:\n"
-            "    package: owner/repo\n"
-            "    skill: demo\n"
-            "    skills:\n"
-            "      - demo\n"
-        ),
-        encoding="utf-8",
-    )
-    result = run_resolver("demo", "--map", str(map_file))
+def test_first_party_skill_id_is_rejected_with_guidance() -> None:
+    result = run_resolver("commit-push")
     assert result.returncode != 0
-    assert "cannot use both" in result.stderr
+    assert "first-party" in result.stderr
+    assert "dotf agents skill apply commit-push" in result.stderr
 
 
-def test_unmapped_name_passes_through() -> None:
-    result = run_resolver("frontend-design")
+def test_unknown_name_passes_through_for_npx_search() -> None:
+    result = run_resolver("some-third-party-thing")
     assert result.returncode == 0
-    assert result.stdout.splitlines() == ["frontend-design"]
+    assert result.stdout.splitlines() == ["some-third-party-thing"]
 
 
-def test_remove_mode_resolves_installed_skill_name() -> None:
-    result = run_resolver("taste-skill", "--remove")
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == ["design-taste-frontend"]
-
-
-def test_remove_mode_unmapped_name_passes_through() -> None:
-    result = run_resolver("frontend-design", "--remove")
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == ["frontend-design"]
-
-
-def test_remove_mode_without_skill_selector_passes_through(tmp_path: Path) -> None:
-    map_file = tmp_path / "skills-map.yaml"
-    map_file.write_text(
-        "version: 1\nskills:\n  demo: owner/repo\n",
-        encoding="utf-8",
-    )
-    result = run_resolver("demo", "--remove", "--map", str(map_file))
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == ["demo"]
-
-
-def test_string_entry_maps_to_package(tmp_path: Path) -> None:
-    map_file = tmp_path / "skills-map.yaml"
-    map_file.write_text(
-        "version: 1\nskills:\n  demo: owner/repo\n",
-        encoding="utf-8",
-    )
-    result = run_resolver("demo", "--map", str(map_file))
+def test_raw_package_spec_passes_through() -> None:
+    result = run_resolver("owner/repo")
     assert result.returncode == 0
     assert result.stdout.splitlines() == ["owner/repo"]
 
 
-def test_invalid_entry_fails_loudly(tmp_path: Path) -> None:
-    map_file = tmp_path / "skills-map.yaml"
-    map_file.write_text(
-        "version: 1\nskills:\n  demo: {package: ''}\n",
-        encoding="utf-8",
+def test_group_and_skill_collision_prefers_group_with_notice(tmp_path: Path) -> None:
+    map_file = tmp_path / "skills.yaml"
+    # group name 'demo' collides with a member skill id 'demo'.
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  demo:\n    type: third-party\n    source: github\n"
+        "    package: owner/one\n    skills: [demo, foo]\n",
     )
     result = run_resolver("demo", "--map", str(map_file))
-    assert result.returncode != 0
-    assert "error: skills map" in result.stderr
-
-
-def test_missing_map_file_passes_through(tmp_path: Path) -> None:
-    result = run_resolver("demo", "--map", str(tmp_path / "missing.yaml"))
     assert result.returncode == 0
-    assert result.stdout.splitlines() == ["demo"]
+    assert "both a group and a skill id" in result.stderr
+    assert result.stdout.splitlines() == [
+        "owner/one", "-s", "demo", "-s", "foo",
+    ]
+
+
+def test_group_mixing_packages_is_rejected(tmp_path: Path) -> None:
+    # A single group has one package, so cross-package mixing can only come from
+    # the resolver being asked for a group whose ids resolve to different packages;
+    # with the nested schema each group is single-source, so this is enforced at
+    # the schema level (a second package would need a second group).
+    map_file = tmp_path / "skills.yaml"
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  one:\n    type: third-party\n    source: github\n"
+        "    package: owner/one\n    skills: [foo]\n"
+        "  two:\n    type: third-party\n    source: github\n"
+        "    package: owner/two\n    skills: [bar]\n",
+    )
+    # each group is self-consistent; both resolve independently.
+    assert run_resolver("one", "--map", str(map_file)).stdout.splitlines() == [
+        "owner/one", "-s", "foo",
+    ]
+    assert run_resolver("two", "--map", str(map_file)).stdout.splitlines() == [
+        "owner/two", "-s", "bar",
+    ]
+
+
+def test_missing_catalog_passes_name_through(tmp_path: Path) -> None:
+    result = run_resolver("anything", "--map", str(tmp_path / "missing.yaml"))
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["anything"]

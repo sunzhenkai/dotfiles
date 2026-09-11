@@ -33,8 +33,8 @@ def _copy_catalog(tmp_path: Path) -> Path:
     (repo / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
     shutil.copy2(
-        ROOT / "agents" / "skills-defaults.lock.yaml",
-        repo / "agents" / "skills-defaults.lock.yaml",
+        ROOT / "agents" / "skills.lock.yaml",
+        repo / "agents" / "skills.lock.yaml",
     )
     return repo
 
@@ -454,8 +454,12 @@ def test_public_sync_wrapper_delegates_vendor_and_capability_validation_to_matri
     (repo / "agents" / "skills").mkdir()
     shutil.copytree(ROOT / "agents" / "instructions", repo / "agents" / "instructions")
     shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
-    shutil.copy2(ROOT / "agents" / "skills-defaults.yaml", repo / "agents" / "skills-defaults.yaml")
-    shutil.copy2(ROOT / "agents" / "skills-defaults.lock.yaml", repo / "agents" / "skills-defaults.lock.yaml")
+    # minimal empty catalog: this test exercises vendor validation, not skills.
+    (repo / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\n"
+        "groups:\n  dotfiles:\n    type: first-party\n    skills: []\n",
+        encoding="utf-8",
+    )
 
     home = tmp_path / "home"
     home.mkdir()

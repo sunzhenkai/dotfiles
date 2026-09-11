@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import stat
 import subprocess
@@ -50,25 +49,17 @@ def _apply(cat: Catalog, home: Path, profile: str, tools: list[str], **kwargs):
     return plan, apply_sync_plan(plan, cat, approved=True, home=home, state_home=state, **kwargs)
 
 
-def _deploy_opencode(home: Path, state: Path, profile: str = "company") -> None:
+def _deploy_opencode(home: Path, state: Path) -> None:
     module = _load_registry_module(ROOT, "opencode")
     producer = producer_for("opencode", repo_root=ROOT, home=home)
-    prior = os.environ.get("DOTF_OPENCODE_PROFILE")
-    os.environ["DOTF_OPENCODE_PROFILE"] = profile
-    try:
-        deploy_config(
-            module,
-            repo_root=ROOT,
-            home=home,
-            state_home=state,
-            producer=producer,
-            run_id="test-opencode-config",
-        )
-    finally:
-        if prior is None:
-            os.environ.pop("DOTF_OPENCODE_PROFILE", None)
-        else:
-            os.environ["DOTF_OPENCODE_PROFILE"] = prior
+    deploy_config(
+        module,
+        repo_root=ROOT,
+        home=home,
+        state_home=state,
+        producer=producer,
+        run_id="test-opencode-config",
+    )
 
 
 def _catalog_with_changed_reader(tmp_path: Path) -> Catalog:
@@ -76,8 +67,8 @@ def _catalog_with_changed_reader(tmp_path: Path) -> Catalog:
     (repo / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
     shutil.copy2(
-        ROOT / "agents" / "skills-defaults.lock.yaml",
-        repo / "agents" / "skills-defaults.lock.yaml",
+        ROOT / "agents" / "skills.lock.yaml",
+        repo / "agents" / "skills.lock.yaml",
     )
     servers_path = repo / "agents" / "env" / "mcp" / "servers.yaml"
     servers = yaml.safe_load(servers_path.read_text(encoding="utf-8"))
@@ -233,10 +224,23 @@ def test_opencode_sync_coordinates_config_manifest_and_preserves_local_agent(
     assert plan.status == "unchanged"
     installed = json.loads(target.read_text(encoding="utf-8"))
     assert installed["agent"]["local-only"] == {"prompt": "keep me"}
-    assert installed["model"] == "company/vanchin/deepseek-v4-pro-0813"
+    assert installed["model"] == "minimax/MiniMax-M3"
     assert installed["mcp"]["web-reader"]["url"] == "https://example.com/changed/mcp"
 
-    installed["model"] = "minimax/MiniMax-M3"
+    target.write_text(
+        target.read_text(encoding="utf-8").replace(
+            "minimax/MiniMax-M3", "kimi/kimi-for-coding"
+        ),
+        encoding="utf-8",
+    )
+    kept = compile_config_plan(
+        module, repo_root=ROOT, home=tmp_home, state_home=state, producer=producer
+    )
+    apply_config_plan(kept, repo_root=ROOT, home=tmp_home, state_home=state, run_id="keep-model")
+    installed = json.loads(target.read_text(encoding="utf-8"))
+    assert installed["model"] == "kimi/kimi-for-coding"
+
+    installed["provider"]["minimax"]["name"] = "tampered"
     target.write_text(json.dumps(installed, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     drift = compile_config_plan(
         module, repo_root=ROOT, home=tmp_home, state_home=state, producer=producer
@@ -304,8 +308,8 @@ def test_mcp_source_change_updates_only_changed_owned_entry(tmp_path: Path, tmp_
     (repo / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", repo / "agents" / "env")
     shutil.copy2(
-        ROOT / "agents" / "skills-defaults.lock.yaml",
-        repo / "agents" / "skills-defaults.lock.yaml",
+        ROOT / "agents" / "skills.lock.yaml",
+        repo / "agents" / "skills.lock.yaml",
     )
     servers_path = repo / "agents" / "env" / "mcp" / "servers.yaml"
     servers = yaml.safe_load(servers_path.read_text(encoding="utf-8"))
@@ -416,8 +420,8 @@ def test_explicit_template_generator_is_overlay_independent_and_regenerates_clea
     (isolated / "agents").mkdir(parents=True)
     shutil.copytree(ROOT / "agents" / "env", isolated / "agents" / "env")
     shutil.copy2(
-        ROOT / "agents" / "skills-defaults.lock.yaml",
-        isolated / "agents" / "skills-defaults.lock.yaml",
+        ROOT / "agents" / "skills.lock.yaml",
+        isolated / "agents" / "skills.lock.yaml",
     )
     for tool in ("cursor", "kiro", "opencode", "kimi-code", "zcode"):
         shutil.copytree(ROOT / "agents" / "vendors" / tool, isolated / "agents" / "vendors" / tool)

@@ -327,24 +327,21 @@ def catalog_from_repo(repo_root: Path) -> OverlayCatalog:
 
 
 def _skill_catalog_ids(repo_root: Path) -> frozenset[str]:
+    """Approved skill ids come from the unified catalog (its single source of
+    truth); the strict lock only gates install, not the overlay's vocabulary."""
+    catalog_path = repo_root / "agents" / "skills.yaml"
+    if not catalog_path.is_file() or catalog_path.is_symlink():
+        return frozenset()
+    raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8")) or {}
     ids: set[str] = set()
-    skills_root = repo_root / "agents" / "skills"
-    if skills_root.is_dir():
-        for path in skills_root.iterdir():
-            if (
-                path.is_dir()
-                and not path.is_symlink()
-                and (path / "SKILL.md").is_file()
-                and not path.name.startswith("openspec-")
-            ):
-                ids.add(path.name)
-    lock_path = repo_root / "agents" / "skills-defaults.lock.yaml"
-    if lock_path.is_file() and not lock_path.is_symlink():
-        raw = yaml.safe_load(lock_path.read_text(encoding="utf-8")) or {}
-        for item in raw.get("skills") or []:
-            if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]:
-                if not str(item["id"]).startswith("openspec-"):
-                    ids.add(str(item["id"]))
+    groups = raw.get("groups")
+    if isinstance(groups, dict):
+        for group in groups.values():
+            if not isinstance(group, dict):
+                continue
+            for skill_id in group.get("skills") or []:
+                if isinstance(skill_id, str) and skill_id and not skill_id.startswith("openspec-"):
+                    ids.add(skill_id)
     return frozenset(ids)
 
 
