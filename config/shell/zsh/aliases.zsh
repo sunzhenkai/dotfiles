@@ -95,6 +95,10 @@ alias cx='codex --dangerously-bypass-approvals-and-sandbox'
 # kiro-cli
 alias kiroc='kiro-cli chat --trust-all-tools'
 
+# claude
+alias cca='claude --permission-mode auto'
+alias ccp='claude --permission-mode bypassPermissions'
+
 # others
 alias rmf='rm -f'
 
