@@ -21,6 +21,13 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "slow: 端到端慢测（pty 交互、临时 git 仓库），与快测分离运行",
+    )
+
+
 @pytest.fixture(scope="session")
 def repo_root() -> Path:
     return ROOT

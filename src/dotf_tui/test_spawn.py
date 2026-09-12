@@ -27,7 +27,12 @@ def test_dotf_cmd_runs_bash_entry_not_python():
     assert "用法" in result.stdout
 
 
-def test_python_dotf_is_the_syntax_error_the_tui_used_to_hit():
+def test_python_dotf_is_still_not_valid_python():
+    """bin/dotf 必须保持非 Python 可执行（TUI 曾误用 python spawn 的回归护栏）。
+
+    下沉后 bin/dotf 仍是 bash shim：用 python 解释它必须失败，
+    防止 TUI 侧再把 argv[0] 换成 Python 解释器而静默变行为。
+    """
     result = subprocess.run(
         [sys.executable, str(ROOT / "bin" / "dotf"), "-h"],
         capture_output=True,
@@ -35,7 +40,6 @@ def test_python_dotf_is_the_syntax_error_the_tui_used_to_hit():
     )
     assert result.returncode != 0
     assert "SyntaxError" in result.stderr
-    assert "closing parenthesis" in result.stderr
 
 
 def test_argv_change_label_extracts_action_and_module():
