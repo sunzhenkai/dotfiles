@@ -58,7 +58,7 @@ def test_tui_and_cli_deconfig_plans_match(tmp_home: Path) -> None:
     items = [Selectable("nvim / deconfig", "deconfig", "nvim", "modules")]
     argv = planner_argv(items)
     tui_plan = subprocess.run(
-        ["python3", str(SCRIPTS / "planner.py"), *argv],
+        ["python3", str(SCRIPTS / "dotf_core" / "planner.py"), *argv],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -67,7 +67,7 @@ def test_tui_and_cli_deconfig_plans_match(tmp_home: Path) -> None:
     cli_plan = subprocess.run(
         [
             "python3",
-            str(SCRIPTS / "planner.py"),
+            str(SCRIPTS / "dotf_core" / "planner.py"),
             "plan",
             "--actions",
             "deconfig",

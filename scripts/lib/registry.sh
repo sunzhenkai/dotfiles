@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# 模块注册表 bash 封装 — 委托 src/modules.py
-# 用法: source "$DOTFILES_ROOT/scripts/modules.sh"
+# 模块注册表 bash 封装 — 委托 dotf_core.registry
+# 用法: source "$DOTFILES_ROOT/scripts/lib/registry.sh"
 
 # 在 source 时锚定仓根（勿在函数内用 BASH_SOURCE，否则指向调用方）
-_MODULES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-_MODULES_PY="$_MODULES_ROOT/src/modules.py"
+_MODULES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 _modules_py() {
-  python3 "$_MODULES_PY" "$@"
+  PYTHONPATH="$_MODULES_ROOT/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m dotf_core.registry "$@"
 }
 
 # 列出模块名（一行一个）

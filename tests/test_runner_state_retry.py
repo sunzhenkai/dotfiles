@@ -19,7 +19,7 @@ from plan_test_helpers import plan_env, write_test_plan
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
 sys.path.insert(0, str(ROOT / "src"))
-import execution_state  # noqa: E402
+from dotf_core import execution_state  # noqa: E402
 
 
 def _handler(root: Path, module: str, action: str, body: str) -> Path:
@@ -266,7 +266,7 @@ def test_retry_rejects_recursive_dependency_drift_before_handler(tmp_home: Path,
 
 
 def test_retry_rejects_os_mismatch_in_complete_report_before_handler(tmp_home: Path, tmp_path: Path) -> None:
-    import modules
+    from dotf_core import registry as modules
 
     handlers = tmp_path / "handlers"
     _handler(handlers, "known", "install", 'dotf_result_failed "first" 3\n')

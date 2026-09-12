@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import modules
+from dotf_core import registry as modules
 import pytest
 
 
@@ -28,7 +28,7 @@ def _config(source: Path, **updates: Any) -> dict[str, Any]:
 
 def _errors(config: dict[str, Any]) -> list[str]:
     return modules.validate_registry(
-        [{"name": "fixture", "doctor": True, "config": config}],
+        [{"name": "fixture", "kind": "config", "doctor": True, "config": config}],
         profiles_data={"profiles": {}},
         strict_handlers=False,
     )
@@ -295,7 +295,7 @@ def test_codex_uses_sensitive_merge_directory_and_preserves_runtime() -> None:
 
 
 def test_cli_and_shell_accessors_expose_metadata(repo_root: Path) -> None:
-    py = repo_root / "src" / "modules.py"
+    py = repo_root / "src" / "dotf_core" / "registry.py"
     get_result = subprocess.run(
         ["python3", str(py), "get", "logseq"],
         cwd=repo_root,
@@ -315,7 +315,7 @@ def test_cli_and_shell_accessors_expose_metadata(repo_root: Path) -> None:
         [
             "bash",
             "-c",
-            "source scripts/modules.sh; "
+            "source scripts/lib/registry.sh; "
             "modules_strategy logseq; modules_writable logseq; "
             "modules_sensitive logseq; modules_target_mode logseq; "
             "modules_mode logseq; modules_preserve logseq; modules_exclude logseq",

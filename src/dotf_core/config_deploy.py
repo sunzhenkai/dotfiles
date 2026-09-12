@@ -1792,7 +1792,7 @@ def _load_registry_module(repo_root: Path, name: str) -> Mapping[str, Any]:
     scripts = str(repo_root / "src")
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
-    import modules
+    from dotf_core import registry as modules  # type: ignore[import-not-found]
 
     registry = modules.load_registry(repo_root / "modules.yaml")
     errors = modules.validate_registry(

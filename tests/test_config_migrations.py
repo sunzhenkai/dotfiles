@@ -13,7 +13,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-import modules
+from dotf_core import registry as modules
 import pytest
 import yaml
 

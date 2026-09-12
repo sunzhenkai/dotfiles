@@ -675,7 +675,7 @@ def test_single_file_producer_rejects_target_symlink_without_callback(
 def test_logseq_producer_preserves_private_json_fields_after_managed_install(
     repo_root: Path, tmp_path: Path
 ) -> None:
-    import modules
+    from dotf_core import registry as modules
     from dotf_core.config_producers import producer_for
 
     repo, home, state = repo_root, tmp_path / "home", tmp_path / "state"

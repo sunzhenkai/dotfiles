@@ -11,8 +11,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "modules" / "codex"))
-from merge_config import expand_env, merge  # noqa: E402
+from dotf_core.config_producers import codex_expand_env as expand_env  # noqa: E402
+from dotf_core.config_producers import codex_merge as merge  # noqa: E402
 
 VENDOR = ROOT / "agents" / "vendors" / "codex"
 CATALOG_NAMES = {
@@ -32,8 +32,8 @@ def _install(tmp_home: Path) -> subprocess.CompletedProcess[str]:
     script = r"""
 set -euo pipefail
 source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
-source "$DOTFILES_ROOT/scripts/modules.sh"
-source "$DOTFILES_ROOT/scripts/config.sh"
+source "$DOTFILES_ROOT/scripts/lib/registry.sh"
+source "$DOTFILES_ROOT/scripts/lib/dispatch_config.sh"
 install_codex
 """
     return subprocess.run(

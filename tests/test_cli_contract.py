@@ -48,7 +48,7 @@ def test_verbose_chain_on_plan_failure(tmp_home: Path) -> None:
     result = run_dotf("no-such-module-xyz", "-i", "--verbose")
     assert result.returncode == 1
     assert "调用链:" in result.stderr
-    assert "planner.py" in result.stderr
+    assert "dotf_core.planner" in result.stderr
 
 
 def test_non_verbose_no_chain(tmp_home: Path) -> None:

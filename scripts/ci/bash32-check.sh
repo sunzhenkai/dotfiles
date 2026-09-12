@@ -17,8 +17,10 @@ echo "==> bash version ($BASH_BIN)"
 # 语法检查主入口与关键 shell 封装（避免 bash 4+ 特性）
 echo "==> bash -n syntax"
 "$BASH_BIN" -n bin/dotf
-"$BASH_BIN" -n scripts/modules.sh
-"$BASH_BIN" -n scripts/doctor.sh
+"$BASH_BIN" -n scripts/lib/registry.sh
+"$BASH_BIN" -n scripts/lib/dispatch_install.sh
+"$BASH_BIN" -n scripts/lib/dispatch_config.sh
+"$BASH_BIN" -n scripts/lib/dispatch_doctor.sh
 "$BASH_BIN" -n scripts/bootstrap.sh
 "$BASH_BIN" -n scripts/run_plan.sh
 "$BASH_BIN" -n scripts/lib/result.sh

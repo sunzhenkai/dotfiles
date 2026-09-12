@@ -153,7 +153,7 @@ def load_modules(root: Path, *, state_home: Path | None = None) -> list[ModuleRo
 
     ``state_home`` defaults to ``XDG_STATE_HOME`` (or ``~/.local/state``).
     """
-    import modules as mods
+    from dotf_core import registry as mods
 
     registry = mods.load_registry()
     os_id = mods.detect_os()
@@ -264,6 +264,7 @@ def load_mcp(root: Path) -> list[McpRow]:
         loaded = None
     enabled_set: set[str] = set()
     disabled_set: set[str] = set()
+    excluded_by_tool: dict[str, set[str]] = {}
     if loaded is not None:
         agents = loaded.agents
         enabled_set = set(agents.get("enabled_servers") or [])
@@ -271,7 +272,7 @@ def load_mcp(root: Path) -> list[McpRow]:
         # exclude.<tool>.servers 是 mcp.remove --tool <tool> 的产物：
         # server 仍全局 enabled，但对单个 tool 已排除。该 tool 的行
         # 必须显示 disabled，否则 remove 成功后 status 仍是 enabled。
-        excluded_by_tool: dict[str, set[str]] = {
+        excluded_by_tool = {
             tool: set((entry or {}).get("servers") or [])
             for tool, entry in (agents.get("exclude") or {}).items()
             if isinstance(entry, dict)

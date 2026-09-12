@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import modules
+from dotf_core import registry as modules
 import yaml
 
 
@@ -185,7 +185,7 @@ def test_usage_profiles_cli(repo_root: Path) -> None:
     import subprocess
 
     out = subprocess.run(
-        ["python3", str(repo_root / "src" / "modules.py"), "profiles", "usage"],
+        ["python3", str(repo_root / "src" / "dotf_core" / "registry.py"), "profiles", "usage"],
         capture_output=True,
         text=True,
         check=True,

@@ -135,7 +135,7 @@ dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/modules/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/{skills,skills-defaults.yaml,vendors,env}`（一手 skills + 第三方默认清单 + 工具专属 vendors + MCP/env 真相源）
+- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（一手 skills + skill 编目与第三方 lock + 工具专属 vendors + MCP/env 真相源）
 - 脚本：Python 包 `src/agents/`（`doctor.py` / `env_sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
 

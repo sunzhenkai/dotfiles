@@ -127,7 +127,7 @@ dotf codex -c
 
    或者直接运行：
    ```bash
-   bash scripts/config.sh codex
+   bash scripts/lib/dispatch_config.sh codex
    ```
 
 ## 使用

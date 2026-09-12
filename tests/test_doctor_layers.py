@@ -14,7 +14,7 @@ def test_l0_only_deep_skips_missing_l1(tmp_home: Path) -> None:
     env["HOME"] = str(tmp_home)
     # starship 无 L1 doctor.sh
     r = subprocess.run(
-        ["bash", str(ROOT / "scripts" / "doctor.sh"), "starship", "--deep"],
+        ["bash", str(ROOT / "scripts" / "lib" / "dispatch_doctor.sh"), "starship", "--deep"],
         capture_output=True,
         text=True,
         env=env,
@@ -31,7 +31,7 @@ def test_doctor_map_fail_to_failed(tmp_home: Path, tmp_path: Path) -> None:
     env["HOME"] = str(tmp_home)
     # nvim 未配置 → L0 fail → failed
     r = subprocess.run(
-        ["bash", str(ROOT / "scripts" / "doctor.sh"), "nvim"],
+        ["bash", str(ROOT / "scripts" / "lib" / "dispatch_doctor.sh"), "nvim"],
         capture_output=True,
         text=True,
         env=env,
@@ -58,7 +58,7 @@ def test_doctor_pass_maps_unchanged(tmp_home: Path) -> None:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     r = subprocess.run(
-        ["bash", str(ROOT / "scripts" / "doctor.sh"), "zed"],
+        ["bash", str(ROOT / "scripts" / "lib" / "dispatch_doctor.sh"), "zed"],
         capture_output=True,
         text=True,
         env=env,
@@ -73,7 +73,7 @@ def test_agents_l1_only_with_deep(tmp_home: Path) -> None:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     shallow = subprocess.run(
-        ["bash", str(ROOT / "scripts" / "doctor.sh"), "agents"],
+        ["bash", str(ROOT / "scripts" / "lib" / "dispatch_doctor.sh"), "agents"],
         capture_output=True,
         text=True,
         env=env,
@@ -84,7 +84,7 @@ def test_agents_l1_only_with_deep(tmp_home: Path) -> None:
     assert "doctor (agents) — L1" not in shallow.stdout
 
     deep = subprocess.run(
-        ["bash", str(ROOT / "scripts" / "doctor.sh"), "agents", "--deep", "--json"],
+        ["bash", str(ROOT / "scripts" / "lib" / "dispatch_doctor.sh"), "agents", "--deep", "--json"],
         capture_output=True,
         text=True,
         env=env,

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-import modules
-import plan_protocol
+from dotf_core import plan_protocol
+from dotf_core import registry as modules
 
 
 def write_test_plan(
@@ -42,6 +42,7 @@ def write_test_plan(
         item: dict = {"name": name, "doctor": True}
         if "install" in caps.get(name, set()):
             item["install"] = True
+        item["kind"] = "binary" if item.get("install") else "config"
         if "uninstall" in caps.get(name, set()):
             item["uninstall"] = True
         if "deconfig" in caps.get(name, set()):

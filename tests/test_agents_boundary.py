@@ -19,7 +19,7 @@ def test_agents_install_plan_expands_tools() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "src" / "planner.py"),
+            str(ROOT / "src" / "dotf_core" / "planner.py"),
             "plan",
             "--actions",
             "install",
@@ -52,7 +52,7 @@ def test_removed_vendors_not_in_tools_or_bundle() -> None:
         assert removed not in TOOLS
     assert "zcode" in TOOLS
     assert "kiro" in TOOLS
-    bundle = (ROOT / "src" / "planner.py").read_text(encoding="utf-8")
+    bundle = (ROOT / "src" / "dotf_core" / "planner.py").read_text(encoding="utf-8")
     assert (
         'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code")'
         in bundle
@@ -63,7 +63,7 @@ def test_agents_config_plan_does_not_pull_tool_configs() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "src" / "planner.py"),
+            str(ROOT / "src" / "dotf_core" / "planner.py"),
             "plan",
             "--actions",
             "config",
@@ -90,7 +90,7 @@ def test_cursor_install_plan_is_solo() -> None:
     r = subprocess.run(
         [
             "python3",
-            str(ROOT / "src" / "planner.py"),
+            str(ROOT / "src" / "dotf_core" / "planner.py"),
             "plan",
             "--actions",
             "install",
@@ -118,7 +118,7 @@ def test_pure_mcp_tool_config_directs_to_agents_sync() -> None:
         result = subprocess.run(
             [
                 "python3",
-                str(ROOT / "src" / "planner.py"),
+                str(ROOT / "src" / "dotf_core" / "planner.py"),
                 "plan",
                 "--actions",
                 "config",
@@ -139,7 +139,7 @@ def test_pure_mcp_tool_config_directs_to_agents_sync() -> None:
 
 
 def test_single_tool_config_source_has_no_sync_call() -> None:
-    text = (ROOT / "scripts" / "config.sh").read_text(encoding="utf-8")
+    text = (ROOT / "scripts" / "lib" / "dispatch_config.sh").read_text(encoding="utf-8")
     # install_cursor 等函数体内不应再调用 sync
     assert "sync_agents cursor" not in text
     assert "sync_agents kiro" not in text

@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import modules  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dotf_core import registry as modules  # noqa: E402
 
 PLAN_HEADER = "DOTF_EXECUTION_PLAN"
 PLAN_VERSION = 1

@@ -6,7 +6,7 @@ dotf_handler_init() {
   : "${DOTFILES_ROOT:?DOTFILES_ROOT required}"
   export SCRIPT_DIR="$DOTFILES_ROOT"
   # shellcheck source=/dev/null
-  source "$DOTFILES_ROOT/scripts/modules.sh"
+  source "$DOTFILES_ROOT/scripts/lib/registry.sh"
   # shellcheck source=/dev/null
   source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
   if ! type dotf_result_changed >/dev/null 2>&1; then

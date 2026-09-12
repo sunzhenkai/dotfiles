@@ -12,7 +12,7 @@ if str(_SCRIPTS) not in sys.path:
 if str(_SCRIPTS / "agents") not in sys.path:
     sys.path.insert(0, str(_SCRIPTS / "agents"))
 
-import modules  # noqa: E402
+from dotf_core import registry as modules  # noqa: E402
 from desired_set import approved_skill_ids, resolve_skill_desired_set  # noqa: E402
 from dotf_core.overlays import catalog_from_repo  # noqa: E402
 

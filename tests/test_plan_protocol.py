@@ -15,7 +15,7 @@ from plan_test_helpers import plan_env, write_test_plan
 
 ROOT = Path(__file__).resolve().parent.parent
 RUN_PLAN = ROOT / "scripts" / "run_plan.sh"
-PLANNER = ROOT / "src" / "planner.py"
+PLANNER = ROOT / "src" / "dotf_core" / "planner.py"
 
 
 def _reseal(document: dict) -> None:
@@ -260,7 +260,7 @@ def test_lifecycle_order_rejected_when_reordered(tmp_home: Path, tmp_path: Path)
 
 
 def test_cross_os_only_dry_run_and_planned_os_propagates_immutably(tmp_home: Path, tmp_path: Path) -> None:
-    import modules
+    from dotf_core import registry as modules
 
     detected = modules.detect_os()
     other = "darwin" if detected != "darwin" else "ubuntu"

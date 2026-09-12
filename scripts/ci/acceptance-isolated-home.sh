@@ -40,12 +40,12 @@ PYTHONPATH="$ROOT/src/agents:$ROOT/src" "$PYTHON_BIN" - "$ROOT" <<'PY'
 import sys
 from pathlib import Path
 
-from agents.defaults import selected_default_ids
+from agents.defaults import catalog_skill_ids
 from dotf_core.overlays import upsert_local_overlay
 
 
 root = Path(sys.argv[1]).resolve()
-locked_ids = sorted(selected_default_ids(root))
+locked_ids = sorted(catalog_skill_ids(root))
 
 
 def mutate(agents: dict) -> None:

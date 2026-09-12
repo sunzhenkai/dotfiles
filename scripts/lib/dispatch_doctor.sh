@@ -4,11 +4,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOTFILES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DOTFILES_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export DOTFILES_ROOT
 
 # shellcheck source=/dev/null
-source "$DOTFILES_ROOT/scripts/modules.sh"
+source "$DOTFILES_ROOT/scripts/lib/registry.sh"
 # shellcheck source=/dev/null
 source "$DOTFILES_ROOT/scripts/lib/doctor_run.sh"
 

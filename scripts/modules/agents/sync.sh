@@ -9,8 +9,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-_SRC_AGENTS="$(cd "$SCRIPT_DIR/../../.." && pwd)/src/agents"
+# 单一 ROOT 锚点：管线内用 run_plan.sh 导出的 DOTFILES_ROOT，直调时回退自算
+ROOT="${DOTFILES_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
+_SRC_AGENTS="$ROOT/src/agents"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "error: python3 是 agents sync 所必需的" >&2

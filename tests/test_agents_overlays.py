@@ -295,8 +295,8 @@ def test_codex_config_reads_external_overlay_only(tmp_home: Path) -> None:
     script = r'''
 set -euo pipefail
 source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
-source "$DOTFILES_ROOT/scripts/modules.sh"
-source "$DOTFILES_ROOT/scripts/config.sh"
+source "$DOTFILES_ROOT/scripts/lib/registry.sh"
+source "$DOTFILES_ROOT/scripts/lib/dispatch_config.sh"
 install_codex
 '''
     result = subprocess.run(

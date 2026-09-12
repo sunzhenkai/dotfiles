@@ -104,7 +104,7 @@ scripts/agents/sync.sh cursor
 scripts/agents/sync.sh --skills-only
 
 # 也可用配置入口
-scripts/config.sh agents
+scripts/lib/dispatch_config.sh agents
 ```
 
 共享 sync：`dotf agents -c [--tool <name>]`（`--tool` 只过滤 MCP/env）。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。

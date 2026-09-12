@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """统一模块注册表与 profile 读取 API。
 
-供 bin/dotf、scripts/install.sh、scripts/config.sh、scripts/doctor.sh 调用。
+供 bin/dotf 与 scripts/lib/ 下的 Bash 框架层（registry.sh、dispatch_*）调用。
 输出以纯文本/行分隔为主，便于 bash 消费。
 """
 
@@ -16,11 +16,13 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from ensure_pyyaml import ensure_yaml
+# 文件直跑（python3 src/dotf_core/registry.py）时 src/ 不在 sys.path，ensure_pyyaml 必须先行
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ensure_pyyaml import ensure_yaml  # noqa: E402
 
 yaml = ensure_yaml()
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = Path(os.environ.get("DOTF_REGISTRY_PATH", str(ROOT / "modules.yaml")))
 PROFILES_PATH = Path(os.environ.get("DOTF_PROFILES_PATH", str(ROOT / "profiles.yaml")))
 AGENTS_VENDORS_PATH = Path(
@@ -30,6 +32,8 @@ HANDLERS_DIR = Path(
     os.environ.get("DOTF_HANDLERS_DIR", str(ROOT / "scripts" / "modules"))
 )
 
+# 模块物种：artifact 为保留值（未来制品型模块），当前校验拒绝
+MODULE_KINDS = frozenset({"binary", "config"})
 # 非工具型：不强制 doctor: true
 NON_TOOL_MODULES = frozenset({"system", "homebrew", "fonts"})
 
@@ -611,6 +615,17 @@ def validate_registry(
             if not isinstance(dep, list) or not all(isinstance(x, str) for x in dep):
                 errors.append(f"{name}: depends_on 必须为字符串列表")
 
+        kind = mod.get("kind")
+        if kind is None:
+            errors.append(f"{name}: 缺失 kind（binary|config）")
+        elif kind not in MODULE_KINDS:
+            hint = "（保留值，当前不得使用）" if kind == "artifact" else ""
+            errors.append(f"{name}: kind 必须为 binary|config，得到 {kind!r}{hint}")
+        elif kind == "binary" and not has_install(mod):
+            errors.append(f"{name}: kind: binary 必须声明 install 能力")
+        elif kind == "config" and has_install(mod):
+            errors.append(f"{name}: kind: config 不得声明 install 能力")
+
         cfg = mod.get("config")
         if cfg is not None:
             if not isinstance(cfg, dict):
@@ -687,6 +702,22 @@ def validate_registry(
     # 处理器声明一致性（迁移模式默认关闭严格失败）
     if hdir.is_dir() or strict_handlers:
         for name, mod in by_name.items():
+            kind = mod.get("kind")
+            mod_dir = hdir / name
+            if kind == "binary":
+                if not (mod_dir / "install.sh").is_file():
+                    errors.append(
+                        f"{name}: kind: binary 缺少处理器 scripts/modules/{name}/install.sh"
+                    )
+                for entry in sorted(mod_dir.glob("*")):
+                    if entry.is_file() and entry.suffix != ".sh":
+                        errors.append(
+                            f"{name}: Handler 目录只允许 .sh 文件，发现 {entry.name}"
+                        )
+            elif kind == "config" and (mod_dir / "install.sh").is_file():
+                errors.append(
+                    f"{name}: kind: config 不得存在 install.sh（装软件是 binary 专属）"
+                )
             for action in HANDLER_ACTIONS:
                 declared = (
                     (action == "install" and has_install(mod))
@@ -884,6 +915,18 @@ def cmd_names(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     errors = validate_registry(strict_handlers=args.strict_handlers)
+    # 仓库布局护栏：src/ 根级只允许包目录与 ensure_pyyaml.py 豁免
+    src_dir = ROOT / "src"
+    if src_dir.is_dir():
+        for entry in sorted(src_dir.iterdir()):
+            if (
+                entry.is_file()
+                and entry.suffix == ".py"
+                and entry.name != "ensure_pyyaml.py"
+            ):
+                errors.append(
+                    f"src/ 根级出现散模块 {entry.name}（仅允许 ensure_pyyaml.py 豁免）"
+                )
     if errors:
         print("错误: 注册表/profile 校验失败:", file=sys.stderr)
         for err in errors:

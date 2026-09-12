@@ -34,6 +34,10 @@ _Avoid_: 未锁定 skill, 浮动上游
 编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id、最后透传 npx。
 _Avoid_: type（两者正交）, 包, 命名空间（含糊）
 
+**Kind**:
+`modules.yaml` 里模块的物种声明：`binary` 负责把软件装到本机（必须声明 install 且有 install handler），`config` 只部署配置（不得声明 install、不得有 install handler；专用 `config.sh` 仍是合法配置触点）。`artifact` 为保留值（未来制品型模块），当前校验拒绝。registry validate 强制 kind ↔ install ↔ Handler 对齐。
+_Avoid_: 物种（口语）, 用 install 字段隐式表达, 第二引擎（指 agents 引擎时）
+
 **MCP Server**:
 编目里声明的一条 MCP 服务，是 Agent 区可选行的来源。
 _Avoid_: MCP, 工具（指 server 本身时）

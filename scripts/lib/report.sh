@@ -25,5 +25,5 @@ dotf_report_load() {
   local root path
   root="$(_dotf_report_root)"
   path="$(dotf_report_path)"
-  python3 "$root/src/execution_state.py" load-latest --path "$path"
+  PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m dotf_core.execution_state load-latest --path "$path"
 }

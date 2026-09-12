@@ -8,6 +8,8 @@ export DOTFILES_ROOT="$ROOT"
 [ -n "${DOTF_HANDLERS_DIR:-}" ] && export DOTF_HANDLERS_DIR
 [ -n "${DOTF_REGISTRY_PATH:-}" ] && export DOTF_REGISTRY_PATH
 [ -n "${DOTF_PROFILES_PATH:-}" ] && export DOTF_PROFILES_PATH
+# 包内模块（dotf_core.*）以 -m 调用，需保证 src/ 在 PYTHONPATH
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/runner.sh"
 # shellcheck source=/dev/null
@@ -78,7 +80,7 @@ interrupt_run_plan() {
   local signal_code="$1"
   trap - INT TERM
   if [ -n "$RUN_ID" ] && [ "$RUN_FINALIZED" -eq 0 ]; then
-    python3 "$ROOT/src/execution_state.py" interrupt --run-id "$RUN_ID" >/dev/null 2>&1 || true
+    python3 -m dotf_core.execution_state interrupt --run-id "$RUN_ID" >/dev/null 2>&1 || true
     RUN_FINALIZED=1
   fi
   cleanup_run_plan
@@ -99,7 +101,7 @@ fi
 validate_args=(validate --plan "$PLAN_FILE" --emit-tsv)
 [ "$DRY_RUN" -eq 1 ] && validate_args+=(--dry-run)
 set +e
-python3 "$ROOT/src/plan_protocol.py" "${validate_args[@]}" >"$NORMALIZED"
+python3 -m dotf_core.plan_protocol "${validate_args[@]}" >"$NORMALIZED"
 validate_rc=$?
 set -e
 if [ "$validate_rc" -ne 0 ]; then
@@ -214,7 +216,7 @@ fi
 
 # This is the first state-changing execution step and occurs before any handler.
 if [ "${DOTF_STATUS_MODE:-0}" != "1" ]; then
-  state_info="$(python3 "$ROOT/src/execution_state.py" create --plan "$PLAN_FILE")" || exit $?
+  state_info="$(python3 -m dotf_core.execution_state create --plan "$PLAN_FILE")" || exit $?
   RUN_ID="${state_info%%$'\t'*}"
   RUN_JOURNAL="${state_info#*$'\t'}"
   if [ -z "$RUN_ID" ] || [ "$RUN_JOURNAL" = "$state_info" ]; then
@@ -257,7 +259,7 @@ print(json.dumps({
 }, ensure_ascii=False))
 PY
 )"
-  printf '%s\n' "$payload" | python3 "$ROOT/src/execution_state.py" action-finish \
+  printf '%s\n' "$payload" | python3 -m dotf_core.execution_state action-finish \
     --run-id "$RUN_ID" --index "$index" --status "$state"
 }
 
@@ -319,7 +321,7 @@ for action_pos in "${!ACTIONS[@]}"; do
   fi
 
   if [ -n "$RUN_ID" ]; then
-    python3 "$ROOT/src/execution_state.py" action-start --run-id "$RUN_ID" --index "$_a_idx"
+    python3 -m dotf_core.execution_state action-start --run-id "$RUN_ID" --index "$_a_idx"
   fi
   echo "→ $action $module ($reason)"
   extra=()
@@ -352,7 +354,7 @@ for action_pos in "${!ACTIONS[@]}"; do
   fi
   rc=$?
   set -e
-  python3 "$ROOT/src/execution_state.py" sanitize-file "$out" >"$out.sani"
+  python3 -m dotf_core.execution_state sanitize-file "$out" >"$out.sani"
   cat "$out.sani"
 
   rline=$(grep -E $'^RESULT\t' "$out.sani" 2>/dev/null | tail -n 1 || true)
@@ -433,7 +435,7 @@ fi
 if [ -n "$RUN_ID" ]; then
   final_status="completed"
   [ "$FAILED" -ne 0 ] && final_status="failed"
-  final_info="$(python3 "$ROOT/src/execution_state.py" finalize --run-id "$RUN_ID" --status "$final_status")" || exit $?
+  final_info="$(python3 -m dotf_core.execution_state finalize --run-id "$RUN_ID" --status "$final_status")" || exit $?
   RUN_FINALIZED=1
   saved="${final_info#*$'\t'}"
   [ -n "${saved:-}" ] && echo "报告已保存: $saved"
@@ -441,7 +443,7 @@ fi
 
 if [ "$JSON_OUT" -eq 1 ]; then
   if [ -n "$RUN_ID" ]; then
-    python3 "$ROOT/src/execution_state.py" emit-json --run-id "$RUN_ID" >&4
+    python3 -m dotf_core.execution_state emit-json --run-id "$RUN_ID" >&4
   else
     python3 - "$ROOT" "$OS_ID" "$PROFILE" "$CHANGED" "$UNCHANGED" "$SKIPPED" "$FAILED_N" "$BLOCKED" "$NOT_RUN" "${RESULT_LINES[@]}" <<'PY' >&4
 import json, sys

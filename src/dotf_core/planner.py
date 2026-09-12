@@ -10,10 +10,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
-# 与 modules.py 同目录
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import modules  # noqa: E402
-import plan_protocol  # noqa: E402
+# src/ 入 sys.path：文件直跑与包内导入（python3 -m dotf_core.planner）两种方式都可用
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dotf_core import registry as modules  # noqa: E402
+from dotf_core import plan_protocol  # noqa: E402
 
 
 ACTION_ORDER = plan_protocol.ACTION_ORDER

@@ -7,9 +7,10 @@ config_deploy retains all ownership and apply authority.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
+import re
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -82,19 +83,43 @@ def _ocr(context: ProducerContext) -> list[ProducedFile]:
     return [ProducedFile("config.json", _deep_overlay(actual, source), format="json")]
 
 
-def _load_opencode_merge(repo_root: Path):
-    path = repo_root / "scripts" / "modules" / "opencode" / "merge_config.py"
-    spec = importlib.util.spec_from_file_location("dotf_opencode_merge_config", path)
-    if spec is None or spec.loader is None:
-        raise ConfigDeployError("cannot load OpenCode merge producer")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# ---- OpenCode provider 合并（原 scripts/modules/opencode/merge_config.py） ----
+
+OPENCODE_DEFAULT_MODEL = "minimax/MiniMax-M3"
+OPENCODE_MANAGED_PROVIDER_IDS = frozenset({"minimax", "kimi", "zhipu", "scnet", "deepseek"})
+
+
+def opencode_merge(
+    existing: dict[str, Any] | None,
+    vendor: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge vendor-managed providers; keep an existing default model."""
+    if existing:
+        out = dict(existing)
+    else:
+        out = {key: value for key, value in vendor.items() if key not in ("provider", "model")}
+
+    vendor_providers = vendor.get("provider")
+    if not isinstance(vendor_providers, dict):
+        vendor_providers = {}
+    current_providers = out.get("provider")
+    if not isinstance(current_providers, dict):
+        current_providers = {}
+    merged_providers = dict(current_providers)
+    for pid, pcfg in vendor_providers.items():
+        merged_providers[pid] = pcfg
+    out["provider"] = merged_providers
+
+    if "$schema" not in out and "$schema" in vendor:
+        out["$schema"] = vendor["$schema"]
+
+    if "model" not in out:
+        out["model"] = vendor.get("model") or OPENCODE_DEFAULT_MODEL
+
+    return out
 
 
 def _opencode_factory(repo_root: Path):
-    merge_module = _load_opencode_merge(repo_root)
-
     def produce(context: ProducerContext) -> list[ProducedFile]:
         outputs: list[ProducedFile] = []
         source_doc: dict[str, Any] | None = None
@@ -113,7 +138,7 @@ def _opencode_factory(repo_root: Path):
         outputs.append(
             ProducedFile(
                 "opencode.json",
-                merge_module.merge(actual_doc or None, source_doc),
+                opencode_merge(actual_doc or None, source_doc),
                 format="json",
                 reconcile_owned=actual_raw is not None,
             )
@@ -176,19 +201,98 @@ def _zcode(context: ProducerContext) -> list[ProducedFile]:
     return [ProducedFile("cli/config.json", context.source_files["mcp.json"], format="json")]
 
 
-def _load_codex_merge(repo_root: Path):
-    path = repo_root / "scripts" / "modules" / "codex" / "merge_config.py"
-    spec = importlib.util.spec_from_file_location("dotf_codex_merge_config", path)
-    if spec is None or spec.loader is None:
-        raise ConfigDeployError("cannot load Codex merge producer")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# ---- Codex base + XDG overlay 合并（原 scripts/modules/codex/merge_config.py） ----
+
+_CODEX_PLACEHOLDER_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_CODEX_LOCAL_MARKER = (
+    "\n# ============================================================\n"
+    "# ↓↓↓ 以下来自 XDG dotf overlay（机器特定，不纳入 git） ↓↓↓\n"
+)
+_CODEX_PROJECT_HEADER_RE = re.compile(r"^\[projects(?:\.[^\]]*)?\]\s*$")
+
+
+def codex_expand_env(text: str, environ: dict[str, str] | None = None) -> str:
+    """Replace ${VAR} from the environment; leave unknown placeholders intact."""
+    env = os.environ if environ is None else environ
+
+    def repl(match: re.Match[str]) -> str:
+        key = match.group(1)
+        value = env.get(key)
+        return value if value else match.group(0)
+
+    return _CODEX_PLACEHOLDER_RE.sub(repl, text)
+
+
+def _codex_project_keys(text: str) -> set[str]:
+    try:
+        document = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return set()
+    projects = document.get("projects")
+    if not isinstance(projects, dict):
+        return set()
+    return {str(key) for key in projects}
+
+
+def _codex_extract_project_tables(text: str) -> list[str]:
+    """Return raw ``[projects...]`` tables, omitting trailing comment footnotes."""
+    lines = text.splitlines(keepends=True)
+    blocks: list[str] = []
+    index = 0
+    while index < len(lines):
+        if not _CODEX_PROJECT_HEADER_RE.match(lines[index].rstrip("\n")):
+            index += 1
+            continue
+        start = index
+        index += 1
+        while index < len(lines) and not lines[index].lstrip().startswith("["):
+            index += 1
+        block_lines = lines[start:index]
+        while block_lines and block_lines[-1].lstrip().startswith("#"):
+            block_lines.pop()
+        while block_lines and not block_lines[-1].strip():
+            block_lines.pop()
+        if block_lines:
+            blocks.append("".join(block_lines).rstrip() + "\n")
+    return blocks
+
+
+def _codex_harvest_runtime_projects(managed: str, actual: str | None) -> str:
+    """Keep Codex-written ``[projects]`` that are not already in managed output."""
+    if not actual or not actual.strip():
+        return managed
+    existing = _codex_project_keys(managed)
+    extras: list[str] = []
+    for block in _codex_extract_project_tables(actual):
+        keys = _codex_project_keys(block)
+        if not keys or keys <= existing:
+            continue
+        extras.append(block if block.endswith("\n") else f"{block}\n")
+        existing |= keys
+    if not extras:
+        return managed
+    text = managed if managed.endswith("\n") else f"{managed}\n"
+    if not text.endswith("\n\n"):
+        text += "\n"
+    return text + "".join(extras)
+
+
+def codex_merge(
+    base: str,
+    local: str | None = None,
+    actual: str | None = None,
+) -> str:
+    text = base
+    if local and local.strip():
+        if not text.endswith("\n"):
+            text += "\n"
+        text += _CODEX_LOCAL_MARKER + local
+        if not text.endswith("\n"):
+            text += "\n"
+    return codex_expand_env(_codex_harvest_runtime_projects(text, actual))
 
 
 def _codex_factory(repo_root: Path, home: Path):
-    merge_module = _load_codex_merge(repo_root)
-
     def _toml_document(raw: bytes, *, label: str) -> tuple[str, dict[str, Any]]:
         try:
             text = raw.decode("utf-8")
@@ -244,7 +348,7 @@ def _codex_factory(repo_root: Path, home: Path):
         outputs = [
             ProducedFile(
                 "config.toml",
-                merge_module.merge(base, local, actual=actual_text),
+                codex_merge(base, local, actual=actual_text),
                 format="toml",
                 reconcile_owned=actual_raw is not None,
             )

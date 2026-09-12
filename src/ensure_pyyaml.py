@@ -1,4 +1,9 @@
-"""确保 PyYAML 可 import；缺失时用 pip 自动安装（跨平台，不依赖发行版包名）。"""
+"""确保 PyYAML 可 import；缺失时用 pip 自动安装（跨平台，不依赖发行版包名）。
+
+【布局豁免】本文件是 src/ 根级唯一允许的散模块：它必须在 PyYAML 缺失时、
+任何包 __init__（可能间接触发 yaml 导入）之前可导入，因此不可收进包内。
+registry validate 会检查 src/ 根级除本文件外不得有其他散文件。
+"""
 
 from __future__ import annotations
 

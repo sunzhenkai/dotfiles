@@ -8,7 +8,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/scripts/modules.sh"
+source "$SCRIPT_DIR/scripts/lib/registry.sh"
 
 # Compatibility helpers always use the system Bash; hosted macOS validates 3.2.
 get_bash() {
@@ -102,7 +102,7 @@ plan_and_run() {
   trap "rm -f '$plan_file'" RETURN
 
   # Preserve planner failure exactly; an unsuccessful planner never reaches runner.
-  python3 "$SCRIPT_DIR/src/planner.py" "${plan_args[@]}" >"$plan_file"
+  python3 "$SCRIPT_DIR/src/dotf_core/planner.py" "${plan_args[@]}" >"$plan_file"
   local planner_rc=$?
   if [ "$planner_rc" -ne 0 ]; then
     return "$planner_rc"
@@ -128,15 +128,15 @@ plan_and_run() {
 run_config() {
   local bash_bin
   bash_bin="$(get_bash)"
-  "$bash_bin" "$SCRIPT_DIR/scripts/config.sh" "$@"
+  "$bash_bin" "$SCRIPT_DIR/scripts/lib/dispatch_config.sh" "$@"
 }
 
 run_install() {
-  bash "$SCRIPT_DIR/scripts/install.sh" "$@"
+  bash "$SCRIPT_DIR/scripts/lib/dispatch_install.sh" "$@"
 }
 
 run_doctor() {
-  bash "$SCRIPT_DIR/scripts/doctor.sh" "$@"
+  bash "$SCRIPT_DIR/scripts/lib/dispatch_doctor.sh" "$@"
 }
 
 # ============================================================
@@ -244,7 +244,7 @@ cmd_init() {
   fi
 
   if [ -z "$usage_profile" ]; then
-    usage_profile="$(python3 "$SCRIPT_DIR/src/modules.py" profiles default 2>/dev/null || echo full)"
+    usage_profile="$(python3 "$SCRIPT_DIR/src/dotf_core/registry.py" profiles default 2>/dev/null || echo full)"
     [ -z "$usage_profile" ] && usage_profile=full
   fi
 
@@ -293,7 +293,7 @@ cmd_status() {
     shift
   done
   if [ -z "$usage_profile" ]; then
-    usage_profile="$(python3 "$SCRIPT_DIR/src/modules.py" profiles default 2>/dev/null || echo full)"
+    usage_profile="$(python3 "$SCRIPT_DIR/src/dotf_core/registry.py" profiles default 2>/dev/null || echo full)"
   fi
 
   export DOTF_STATUS_MODE=1
@@ -582,7 +582,7 @@ cmd_retry() {
     exit 1
   fi
 
-  if ! python3 "$SCRIPT_DIR/src/retry_plan.py" "$report_json" "$plan_file"; then
+  if ! python3 "$SCRIPT_DIR/src/dotf_core/retry_plan.py" "$report_json" "$plan_file"; then
     exit 1
   fi
 

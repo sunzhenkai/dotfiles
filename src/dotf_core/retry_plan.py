@@ -10,9 +10,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import execution_state  # noqa: E402
-import plan_protocol  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dotf_core import execution_state  # noqa: E402
+from dotf_core import plan_protocol  # noqa: E402
 from dotf_core.sanitize import sanitize_for_terminal  # noqa: E402
 
 

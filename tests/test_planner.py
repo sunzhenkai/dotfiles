@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import planner
+from dotf_core import planner
 import yaml
 
 
@@ -307,7 +307,7 @@ def test_deconfig_skips_dependent_check() -> None:
 def test_retry_rebuilds_uninstall_and_skill_remove() -> None:
     from dataclasses import asdict
 
-    import plan_protocol
+    from dotf_core import plan_protocol
 
     reg = _reg({"name": "base", "install": True, "uninstall": True, "doctor": True})
     os_id = planner.modules.detect_os()

@@ -3,11 +3,11 @@
 # All copy/merge/render writes are owned by dotf_core.config_handler.
 set -e
 
-DOTFILES_ROOT="${DOTFILES_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+DOTFILES_ROOT="${DOTFILES_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export DOTFILES_ROOT
 
 # shellcheck source=/dev/null
-source "$DOTFILES_ROOT/scripts/modules.sh"
+source "$DOTFILES_ROOT/scripts/lib/registry.sh"
 
 get_config_def() {
   local name="$1" source target

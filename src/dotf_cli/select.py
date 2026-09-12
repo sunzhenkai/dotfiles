@@ -22,7 +22,7 @@ def _modules_for_capability(capability: str) -> list[str]:
     args += ["--filter-os", "--registry-order"]
     proc = modules_py(*args, capture=True)
     if proc.returncode != 0:
-        raise DotfError("env", "无法读取模块列表", chain=["modules.py " + " ".join(args)])
+        raise DotfError("env", "无法读取模块列表", chain=["dotf_core.registry " + " ".join(args)])
     return [line for line in proc.stdout.splitlines() if line.strip()]
 
 

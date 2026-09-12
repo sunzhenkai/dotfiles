@@ -17,7 +17,7 @@ for path in (_SCRIPTS, _AGENTS):
 from desired_set import DesiredSetError, approved_skill_ids  # noqa: E402
 from dotf_core.overlays import OverlayError, catalog_from_repo, upsert_local_overlay  # noqa: E402
 from env_sync import main as env_sync_main  # noqa: E402
-from plan_protocol import ProtocolError, parse_artifact_selector  # noqa: E402
+from dotf_core.plan_protocol import ProtocolError, parse_artifact_selector  # noqa: E402
 from sync import sync_kiro_skills, sync_skills  # noqa: E402
 
 

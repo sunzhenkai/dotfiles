@@ -5,15 +5,15 @@
 `config.sh` SHALL NOT 使用 `declare -A`（关联数组）或其他 Bash 4+ 特性。配置映射 SHALL 使用 case 语句函数实现，确保在 Bash 3.2（macOS 自带）下可正常运行。
 
 #### Scenario: 用 /bin/bash (3.2) 直接运行 config.sh
-- **WHEN** 执行 `/bin/bash scripts/config.sh --all`
+- **WHEN** 执行 `/bin/bash scripts/lib/dispatch_config.sh --all`
 - **THEN** 脚本正常运行，不报 `declare -A` 或语法错误
 
 #### Scenario: 用 /bin/bash 列出配置
-- **WHEN** 执行 `/bin/bash scripts/config.sh`（无参数）
+- **WHEN** 执行 `/bin/bash scripts/lib/dispatch_config.sh`（无参数）
 - **THEN** 正确显示所有可用配置列表
 
 #### Scenario: 用 /bin/bash 配置单个模块
-- **WHEN** 执行 `/bin/bash scripts/config.sh nvim`
+- **WHEN** 执行 `/bin/bash scripts/lib/dispatch_config.sh nvim`
 - **THEN** 正确执行 nvim 配置的 symlink 创建
 
 ### Requirement: 配置映射使用 case 函数对
@@ -41,11 +41,11 @@
 `iterm2` SHALL 在配置映射中注册，映射关系为 `config/terminals/iterm2:~/.config/iterm2`。
 
 #### Scenario: 配置 iterm2
-- **WHEN** 执行 `scripts/config.sh iterm2`
+- **WHEN** 执行 `scripts/lib/dispatch_config.sh iterm2`
 - **THEN** 创建 `~/.config/iterm2` 到 dotfiles 的 `iterm2/` 的 symlink
 
 #### Scenario: --list 包含 iterm2
-- **WHEN** 执行 `scripts/config.sh --list`
+- **WHEN** 执行 `scripts/lib/dispatch_config.sh --list`
 - **THEN** 输出列表中包含 `iterm2`
 
 ### Requirement: config.sh 支持 --list-desc
@@ -53,7 +53,7 @@
 `config.sh` SHALL 支持 `--list-desc` 选项，以 tab 分隔输出配置名和描述。
 
 #### Scenario: 列出配置及描述
-- **WHEN** 执行 `scripts/config.sh --list-desc`
+- **WHEN** 执行 `scripts/lib/dispatch_config.sh --list-desc`
 - **THEN** 每行输出格式为 `<name>\t<description>`，与 install.sh 的 `--list-desc` 格式一致
 
 ### Requirement: install-claude.sh 独立运行完整

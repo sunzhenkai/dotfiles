@@ -22,6 +22,7 @@ from .runner import (
     detect_os,
     modules_py,
     plan_and_run,
+    python_env,
     skills_map_py,
 )
 
@@ -123,7 +124,8 @@ def cmd_retry(ctx: Ctx) -> int:
         plan_file = f.name
     try:
         proc = subprocess.run(
-            ["python3", str(SRC_DIR / "retry_plan.py"), report_file, plan_file]
+            ["python3", "-m", "dotf_core.retry_plan", report_file, plan_file],
+            env=python_env(),
         )
         if proc.returncode != 0:
             raise DotfError("plan", "无法从报告中重建失败计划")

@@ -50,7 +50,7 @@ from dotf_core.paths import (  # noqa: E402
 from dotf_core.sanitize import sanitize_for_terminal  # noqa: E402
 
 try:  # registry is a shared source of config deployment metadata
-    import modules as registry_modules  # type: ignore[import-not-found]
+    from dotf_core import registry as registry_modules  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - only an incomplete checkout
     registry_modules = None
 

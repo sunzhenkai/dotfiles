@@ -132,7 +132,7 @@
 - **THEN** 脚本正常运行，不报语法错误
 
 ### Requirement: Homebrew bash 自动检测
-当调用 `scripts/config.sh` 时，脚本 SHALL 自动检测 `/opt/homebrew/bin/bash`，若存在则使用它执行；否则 fallback 到 `/bin/bash`。
+当调用 `scripts/lib/dispatch_config.sh` 时，脚本 SHALL 自动检测 `/opt/homebrew/bin/bash`，若存在则使用它执行；否则 fallback 到 `/bin/bash`。
 
 #### Scenario: Homebrew bash 存在
 - **WHEN** `/opt/homebrew/bin/bash` 存在且可执行

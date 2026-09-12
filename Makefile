@@ -10,7 +10,7 @@ TEMPLATE_OUTPUTS := \
 	agents/vendors/zcode/mcp.json
 
 registry validate:
-	python3 src/modules.py validate --strict-handlers
+	python3 src/dotf_core/registry.py validate --strict-handlers
 
 test:
 	python3 -m pytest -q

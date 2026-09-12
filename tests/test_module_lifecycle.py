@@ -96,7 +96,7 @@ def test_undeclared_handler_reported_by_validate(tmp_path: Path, monkeypatch: py
     import sys
 
     sys.path.insert(0, str(ROOT / "src"))
-    import modules as m
+    from dotf_core import registry as m
 
     reg = tmp_path / "modules.yaml"
     reg.write_text(
@@ -124,7 +124,7 @@ def test_declared_missing_handler_reported_by_validate(tmp_path: Path, monkeypat
     import sys
 
     sys.path.insert(0, str(ROOT / "src"))
-    import modules as m
+    from dotf_core import registry as m
 
     reg = tmp_path / "modules.yaml"
     reg.write_text(

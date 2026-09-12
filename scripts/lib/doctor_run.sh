@@ -39,7 +39,7 @@ dotf_doctor_run() {
   {
     set +e
     # shellcheck source=/dev/null
-    source "$DOTFILES_ROOT/scripts/modules.sh"
+    source "$DOTFILES_ROOT/scripts/lib/registry.sh"
     # shellcheck source=/dev/null
     source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
     # shellcheck source=/dev/null

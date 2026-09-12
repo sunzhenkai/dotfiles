@@ -2,7 +2,7 @@
 # 公共 L0 doctor：binary / config target / symlink
 # 输出行: pass|warn|fail|skip <scope>: <message>
 # 返回: 0=无 fail，1=有 fail
-# 依赖: modules.sh；可选 config_safe.sh 的 expand
+# 依赖: lib/registry.sh；可选 config_safe.sh 的 expand
 
 dotf_doctor_l0() {
   local mod="$1"

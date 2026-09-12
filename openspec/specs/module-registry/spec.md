@@ -109,3 +109,33 @@
 #### Scenario: 底座模块 v1 不声明
 - **WHEN** 查询 `system`、`homebrew` 或 `sdk`
 - **THEN** 注册表 SHALL NOT 声明 uninstall
+
+### Requirement: 模块物种声明与 Handler 对齐
+注册表中每个模块条目 SHALL 声明 `kind` 字段,取值限于 `binary` 与 `config`(`artifact` 为保留值,当前 SHALL NOT 使用)。`kind: binary` 表示模块负责把软件安装到本机:SHALL 声明 install 能力,且 `scripts/modules/<name>/` Handler 目录与其 `install.sh` SHALL 存在。`kind: config` 表示模块只部署配置:SHALL NOT 声明 install 能力,且 SHALL NOT 存在 `install.sh`(装软件是 binary 专属;专用 `config.sh` 处理器仍属合法配置触点)。Handler 目录内容 SHALL 仅包含 `.sh` 文件;需要 Python 的合并/渲染逻辑 SHALL 由通用内核提供,SHALL NOT 存放在 Handler 目录内。注册表校验 SHALL 在执行计划生成前拒绝缺失 `kind` 或违反上述对齐的条目。
+
+#### Scenario: 二进制型模块声明与目录对齐
+- **WHEN** 校验 `kind: binary` 的模块(如 `sdk`)
+- **THEN** 注册表 SHALL 声明 install 能力
+- **THEN** `scripts/modules/sdk/install.sh` SHALL 存在
+- **THEN** 校验 SHALL 通过
+
+#### Scenario: 配置型模块无 install 处理器
+- **WHEN** 校验 `kind: config` 的模块(如 `nvim`)
+- **THEN** 注册表 SHALL NOT 声明 install 能力
+- **THEN** `scripts/modules/nvim/install.sh` SHALL NOT 存在
+- **THEN** 校验 SHALL 通过
+
+#### Scenario: Handler 目录纯 Bash
+- **WHEN** 校验任一 `kind: binary` 模块的 Handler 目录
+- **THEN** 目录内每个文件 SHALL 为 `.sh` 文件
+- **THEN** 出现其他扩展名文件时校验 SHALL 以非零退出码失败并指出该文件
+
+#### Scenario: 物种与目录不一致即拒绝
+- **WHEN** 模块声明 `kind: binary` 但 Handler 目录或 `install.sh` 缺失
+- **THEN** 校验 SHALL 以非零退出码失败并指出该模块
+- **WHEN** 模块声明 `kind: config` 但存在 `install.sh`
+- **THEN** 校验 SHALL 以非零退出码失败并指出该模块
+
+#### Scenario: 缺失 kind 字段即拒绝
+- **WHEN** 模块条目未声明 `kind`
+- **THEN** 校验 SHALL 以非零退出码失败并指出该模块

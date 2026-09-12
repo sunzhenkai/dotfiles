@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import modules
+from dotf_core import registry as modules
 import pytest
 
 from conftest import isolate_agents_sync_for_test

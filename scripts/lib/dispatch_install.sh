@@ -1,14 +1,14 @@
 #!/bin/bash
-# 安装入口：委托约定式处理器（scripts/modules/<name>/install.sh）
-# 保留 CLI 以便直接调用；编排主路径为 bin/dotf → run_plan → runner。
+# 安装调度库：委托约定式处理器（scripts/modules/<name>/install.sh）
+# 编排主路径为 bin/dotf → run_plan → runner；本文件是 lib 内部实现，可被直接调用。
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DOTFILES_ROOT="$SCRIPT_DIR"
 export DOTFILES_ROOT
 export SCRIPT_DIR
 
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/scripts/modules.sh"
+source "$SCRIPT_DIR/scripts/lib/registry.sh"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 # shellcheck source=/dev/null

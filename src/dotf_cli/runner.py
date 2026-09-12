@@ -41,8 +41,21 @@ def _python(*args: str, **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(["python3", *map(str, args)], **kwargs)
 
 
+def python_env() -> dict[str, str]:
+    """以 -m 调用包内模块时保证 src/ 在子进程 PYTHONPATH 上。"""
+    env = dict(os.environ)
+    parts = [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
+    if str(SRC_DIR) not in parts:
+        parts.insert(0, str(SRC_DIR))
+    env["PYTHONPATH"] = os.pathsep.join(parts)
+    return env
+
+
 def modules_py(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
-    return _python(SRC_DIR / "modules.py", *args, capture_output=capture, text=True)
+    return _python(
+        "-m", "dotf_core.registry", *args,
+        capture_output=capture, text=True, env=python_env(),
+    )
 
 
 def skills_map_py(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
@@ -80,7 +93,8 @@ def plan_and_run(
     sys.stdout.flush()  # 子进程直写 fd，先冲刷 Python 缓冲保证输出顺序
     plan_args = [
         "python3",
-        str(SRC_DIR / "planner.py"),
+        "-m",
+        "dotf_core.planner",
         "plan",
         "--actions",
         actions_csv,
@@ -99,13 +113,13 @@ def plan_and_run(
     plan_file = tempfile.NamedTemporaryFile(mode="w", suffix=".plan", delete=False)
     try:
         with plan_file:
-            proc = subprocess.run(plan_args, stdout=plan_file)
+            proc = subprocess.run(plan_args, stdout=plan_file, env=python_env())
         if proc.returncode != 0:
             # 契约：planner 失败退出码逐字透传（见其测试），不归类为 3。
             raise DotfError(
                 "plan",
                 "计划生成失败（详见上方 planner 输出）",
-                chain=["planner.py plan " + " ".join(plan_args[2:])],
+                chain=["dotf_core.planner plan " + " ".join(plan_args[4:])],
                 rc=proc.returncode,
             )
 

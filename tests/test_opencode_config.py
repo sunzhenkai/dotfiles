@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -12,19 +11,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _load_merge():
-    path = ROOT / "scripts" / "modules" / "opencode" / "merge_config.py"
-    spec = importlib.util.spec_from_file_location("opencode_merge_config", path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_merge = _load_merge()
-MANAGED_PROVIDER_IDS = _merge.MANAGED_PROVIDER_IDS
-DEFAULT_MODEL = _merge.DEFAULT_MODEL
-merge = _merge.merge
+from dotf_core.config_producers import (  # noqa: E402
+    OPENCODE_DEFAULT_MODEL as DEFAULT_MODEL,
+    OPENCODE_MANAGED_PROVIDER_IDS as MANAGED_PROVIDER_IDS,
+    opencode_merge as merge,
+)
 
 VENDOR = ROOT / "agents" / "vendors" / "opencode"
 VENDOR_JSON = VENDOR / "opencode.json"
@@ -42,8 +33,8 @@ def _install(tmp_home: Path) -> subprocess.CompletedProcess[str]:
     script = r"""
 set -euo pipefail
 source "$DOTFILES_ROOT/scripts/lib/config_safe.sh"
-source "$DOTFILES_ROOT/scripts/modules.sh"
-source "$DOTFILES_ROOT/scripts/config.sh"
+source "$DOTFILES_ROOT/scripts/lib/registry.sh"
+source "$DOTFILES_ROOT/scripts/lib/dispatch_config.sh"
 install_opencode
 """
     return subprocess.run(

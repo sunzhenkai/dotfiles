@@ -15,7 +15,7 @@ def test_run_plan_requires_yes_without_tty(tmp_home: Path, tmp_path: Path) -> No
     generated = subprocess.run(
         [
             "python3",
-            str(ROOT / "src" / "planner.py"),
+            str(ROOT / "src" / "dotf_core" / "planner.py"),
             "plan",
             "--actions",
             "install",
