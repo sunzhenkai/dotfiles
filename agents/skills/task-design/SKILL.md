@@ -8,10 +8,10 @@ description: 复杂任务的可选全面设计环节（在 openspec-explore 之�
 
 面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文，不要逐词硬翻。
 
-`taskflow` 链路上的**可选**设计环节，位于 explore（发散）与 propose（提案）之间。生命周期与归档晋升以 `taskflow` 为准；本 skill 只规定**怎么写设计**。需要先收敛未决决策时，可先走 `task-grill`。
+`taskflow` 链路上的**可选**设计环节，位于 explore（发散）与 propose（提案）之间。生命周期与归档晋升以 `taskflow` 为准；本 skill 只规定**怎么写设计**。
 
 ```
-taskflow-new → openspec-explore? → task-grill? → task-design? → openspec-propose → openspec-apply-change → openspec-archive-change
+taskflow-new → openspec-explore? → task-design? → openspec-propose → openspec-apply-change → openspec-archive-change
 ```
 
 ## 何时使用
@@ -27,7 +27,6 @@ taskflow-new → openspec-explore? → task-grill? → task-design? → openspec
 |------|------|
 | 尚无 driver | `taskflow-new` |
 | 问题本身还没想清 | stock skill `openspec-explore`（绑定 `{task}-driver`） |
-| 只需结构化访谈收敛决策，还不写设计文档 | skill `task-grill` |
 | 范围局部、路径唯一、无架构决策 | 直接 stock skill `openspec-propose`（绑定 `{task}-driver`） |
 | 要写 OpenSpec `proposal.md` / `tasks.md` | stock skill `openspec-propose` |
 | 已经在写代码 | stock skill `openspec-apply-change` |
@@ -130,7 +129,6 @@ taskflow-new → openspec-explore? → task-grill? → task-design? → openspec
 ## 相关
 
 - `taskflow` — 任务生命周期 / driver 绑定
-- `task-grill` — 可选前置；先收敛决策再写设计
 - `openspec-explore` — 前置；想不清问题时用
 - `openspec-propose` — 下游；把设计收成 OpenSpec change
 - `references/design-template.md` — 设计文档骨架

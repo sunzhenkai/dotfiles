@@ -18,7 +18,6 @@ description: 用一个 driver change 编排一批子 change 的任务生命周�
 |------|------|------|
 | 立项 | 本文件「脚手架」小节（command `taskflow-new`） | 任务描述 |
 | 澄清 | stock skill `openspec-explore` | `{task}-driver` |
-| 收敛（可选） | skill `task-grill` | `{task}-driver` |
 | 提案 | stock skill `openspec-propose` | `{task}-driver` |
 | 实施 | stock skill `openspec-apply-change` | `{task}-driver` |
 | 归档 | stock skill `openspec-archive-change` | `{task}-driver`（只归档 driver 自身） |

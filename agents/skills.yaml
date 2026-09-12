@@ -33,7 +33,6 @@ groups:
       - skill-upgrader
       - skills-store
       - task-design
-      - task-grill
       - taskflow
 
   mattpocock:
@@ -41,18 +40,18 @@ groups:
     source: github
     package: https://github.com/mattpocock/skills
     skills:
-      - code-review
+      # - code-review
       - codebase-design
       - diagnosing-bugs
       - domain-modeling
       - grill-with-docs
-      - implement
-      - research
+      # - implement
+      # - research
       - setup-matt-pocock-skills
-      - tdd
-      - to-spec
-      - to-tickets
-      - wayfinder
+      # - tdd
+      # - to-spec
+      # - to-tickets
+      # - wayfinder
 
   ui-templates:
     type: third-party

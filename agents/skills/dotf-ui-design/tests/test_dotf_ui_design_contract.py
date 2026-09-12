@@ -61,7 +61,7 @@ class DotfUiDesignContractTest(unittest.TestCase):
 
     def test_router_keeps_frontend_design_global(self) -> None:
         for text in (
-            "skills-defaults.yaml",
+            "skills.yaml",
             "dotf agents -c",
             "一次只加载一个能力 skill",
             "内部引用",
