@@ -155,24 +155,17 @@ dotf agents -ic
 dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`，按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一个全局目录。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md` 和 Cursor 用户级 rules。
+`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`，按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md` 和 Cursor 用户级 rules。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`。
 
-#### dsh（DeepSeek Harness）
+> 本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-*`）；Codex、OpenCode、Pi 等工具的 provider 与密钥由本机自管。
 
-DeepSeek Harness CLI（`dsh`）：启动 web / headless 等 agent profile。只装 CLI：
-
-```bash
-dotf dsh -i
-# 或: npm install -g @deepseek-ai/dsh
-```
-
-共享 skills 由 `dotf agents -c` 同步到 `~/.agents/skills`（tool 无关）：
+共享 skills 由 `dotf agents -c` 同步到全部 skill layout（tool 无关）：
 
 ```bash
 dotf agents -c
+# 已手改过的受管文件想恢复受管版本（先备份到 state/dotf/backups/）
+dotf agents -c --on-conflict=backup
 ```
-
-`dsh plugin` 管理 profile 插件需 `pnpm`。
 
 ### 7. utils — 杂项
 
@@ -181,7 +174,7 @@ dotf yazi k9s -i   # 按需
 dotf fonts -i                # 可能写系统字体目录，shared 下确认
 ```
 
-已归档模块（当前包括 `trae-cli`、`fcitx5`、`shell_gpt`、`logseq`）保留在
+已归档模块（当前包括 `trae-cli`、`fcitx5`、`logseq`）保留在
 `modules.yaml` 中但设为 `enabled: false`，不进入 full/profile/`--all`。需要恢复时
 显式执行，例如 `dotf logseq -c`。
 

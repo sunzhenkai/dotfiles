@@ -166,6 +166,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         tmp_home / ".agents" / "AGENTS.md",
         tmp_home / ".local" / "bin",
         tmp_home / ".kiro" / "skills",
+        tmp_home / ".claude" / "skills",
         tmp_home / ".codex" / "AGENTS.md",
         tmp_home / ".cursor" / "rules",
     )

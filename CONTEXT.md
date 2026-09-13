@@ -15,7 +15,7 @@ _Avoid_: 工具, 包, package, 软件（作为清单行）, 配置项目, 项目
 _Avoid_: 插件, prompt, command（command 是另一种制品）
 
 **Skill Catalog**:
-`agents/skills.yaml`，全部 Skill 的唯一编目，**按 group 组织**。组声明 `type`（一手/第三方）与第三方 `source`/`package`，成员只写 id。**没有 default 字段**：编目内即自动全量安装，不想装就注释掉条目。desired_set / lock 校验 / overlay / CLI 都读它。
+`agents/skills.yaml`，全部 Skill 的唯一编目，**按 group 组织**。组声明 `type`（一手/第三方）与第三方 `source`/`package`，成员只写 id（或 `- id` + `optional: true` 映射）。**没有 default 字段**：编目内即自动全量安装，`optional: true` 条目是唯一例外（默认不装、可经 overlay 按需启用）；不想保留就注释掉条目。desired_set / lock 校验 / overlay / CLI 都读它。
 _Avoid_: skills-defaults（旧名）, 打平列表, skill 清单（含糊）
 
 **First-Party Skill**:
@@ -33,6 +33,10 @@ _Avoid_: 未锁定 skill, 浮动上游
 **Skill Group**:
 编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id、最后透传 npx。
 _Avoid_: type（两者正交）, 包, 命名空间（含糊）
+
+**Skill Layout**:
+Skill 的安装目标，清单在 `src/agents/layouts.py`：`shared`（`~/.agents/skills`）、`kiro`（`${KIRO_HOME:-~/.kiro}/skills`）、`claude`（`~/.claude/skills`）。每个 layout × 来源（一手 / 第三方 / OpenSpec）派生各自的 owner 前缀，因为 runtime manifest 是全 layout 共用的一份，前缀必须互不重叠。Kiro 在 `SKILL.md` 末尾补 `$ARGUMENTS`；Claude Code 自己消费参数，走与 shared 相同的渲染。
+_Avoid_: 工具（那是 vendor 身份，不是安装目标）, 镜像（Kiro 只是其一）, target root（实现细节）
 
 **Kind**:
 `modules.yaml` 里模块的物种声明：`binary` 负责把软件装到本机（必须声明 install 且有 install handler），`config` 只部署配置（不得声明 install、不得有 install handler；专用 `config.sh` 仍是合法配置触点）。`artifact` 为保留值（未来制品型模块），当前校验拒绝。registry validate 强制 kind ↔ install ↔ Handler 对齐。
@@ -65,13 +69,13 @@ _Avoid_: uninstall, deconfig（用在 Skill 上时）, 只删文件
 _Avoid_: update, 更新（作为动作名）
 
 **Conflict**:
-owned 目标的内容已不等于上次受管 hash。deconfig / remove 必须留下它并报告，不得当未修改目标撤掉。
-_Avoid_: drift（当已能判定是 Conflict 时）, 损坏
+owned 目标的内容或 mode 已不等于上次受管 hash。默认 fail closed：正向动作报告并保留，deconfig / remove 必须留下它并报告，不得当未修改目标撤掉。唯一出口是 `--on-conflict=backup`：只对"owned 目标漂移"这一类先把当前内容备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 再覆写；不安全类型、manifest 不可解析、所有权不符、无所有权目标、越界目标，以及所有反向动作，都不受该开关影响。
+_Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖
 
 ### Scope
 
 **Desired Set**:
-这台机器同步之后应该存在的 Skill。默认 = 编目内全部 id ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方。
+这台机器同步之后应该存在的 Skill。默认 = 编目内非 optional id ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方；optional 编目条目只有被 overlay 启用才进入。
 _Avoid_: catalog（那是仓库编目）, 清单（含糊）
 
 **Dependent**:

@@ -291,7 +291,8 @@ def _skill_catalog_ids(repo_root: Path) -> frozenset[str]:
         for group in groups.values():
             if not isinstance(group, dict):
                 continue
-            for skill_id in group.get("skills") or []:
+            for member in group.get("skills") or []:
+                skill_id = member.get("id") if isinstance(member, dict) else member
                 if isinstance(skill_id, str) and skill_id and not skill_id.startswith("openspec-"):
                     ids.add(skill_id)
     return frozenset(ids)

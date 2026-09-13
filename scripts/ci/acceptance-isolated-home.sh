@@ -31,9 +31,8 @@ case "$HOME" in
 esac
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 
-# The research profile can render runtime credential references without values.
-# Remove relevant inherited values so acceptance cannot persist a real credential.
-unset ZHIPU_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+# Isolate acceptance from inherited cloud credentials so no real credential can persist.
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
 printf '%s\n' "==> offline locked default skills"
 PYTHONPATH="$ROOT/src/agents:$ROOT/src" "$PYTHON_BIN" - "$ROOT" <<'PY'

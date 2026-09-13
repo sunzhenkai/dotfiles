@@ -1,6 +1,6 @@
-# research：coding 基线 + 网页研究所需的远程 API key 检查（安全默认）
+# research：coding 基线 + env schema 变量检查（当前无受管变量，安全默认）
 version: 1
 id: research
-description: "coding 工具检查 + 智谱 provider 密钥检查"
+description: "coding 工具检查 + env schema 变量检查（当前无受管变量）"
 risk: low
 modules: [tools, env, security, agents]

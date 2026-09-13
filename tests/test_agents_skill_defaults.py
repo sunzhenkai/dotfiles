@@ -42,8 +42,53 @@ def test_repository_catalog_matches_strict_lock() -> None:
     # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
     assert "taste-skill" not in set(catalog.ids())
+    # lark-cli / en-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
+    by_id = catalog.by_id()
+    assert by_id["lark-cli"].optional is True
+    assert by_id["en-chat"].optional is True
+    assert "lark-cli" not in catalog.default_ids()
+    assert "commit-push" in catalog.default_ids()
     assert "ask-matt" not in ids
     assert all(item.audit.status == "approved" for item in lock.skills)
+
+
+_OPTIONAL_CATALOG = """
+version: 3
+lock: skills.lock.yaml
+groups:
+  dotfiles:
+    type: first-party
+    skills:
+      - commit-push
+      - id: lark-cli
+        optional: true
+"""
+
+
+def test_catalog_optional_member_form() -> None:
+    catalog_mod = _load("skills_catalog")
+    catalog = catalog_mod.parse_catalog(yaml.safe_load(_OPTIONAL_CATALOG))
+    by_id = catalog.by_id()
+    assert by_id["commit-push"].optional is False
+    assert by_id["lark-cli"].optional is True
+    assert catalog.default_ids() == ["commit-push"]
+    assert catalog.ids() == ["commit-push", "lark-cli"]
+
+
+def test_catalog_optional_member_form_rejects_bad_shapes() -> None:
+    catalog_mod = _load("skills_catalog")
+    with pytest.raises(catalog_mod.SkillsCatalogError, match="optional must be a boolean"):
+        catalog_mod.parse_catalog(
+            yaml.safe_load(_OPTIONAL_CATALOG.replace("optional: true", "optional: 1"))
+        )
+    with pytest.raises(catalog_mod.SkillsCatalogError, match="unknown keys"):
+        catalog_mod.parse_catalog(
+            yaml.safe_load(_OPTIONAL_CATALOG.replace("optional: true", "optional: true\n        extra: 1"))
+        )
+    with pytest.raises(catalog_mod.SkillsCatalogError, match="non-empty skill id"):
+        catalog_mod.parse_catalog(
+            yaml.safe_load(_OPTIONAL_CATALOG.replace("- id: lark-cli", "- id: ''"))
+        )
 
 
 def _write_min_repo(repo: Path, lock_body: str, *, ids: list[str]) -> None:
@@ -176,20 +221,31 @@ def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownershi
     monkeypatch.setattr(defaults, "acquire_all", acquire)
     shared_destination = tmp_home / ".agents" / "skills"
     kiro_destination = tmp_home / ".kiro" / "skills"
-    assert defaults.install_defaults(repo, dest_roots=(shared_destination, kiro_destination)) == 0
+    claude_destination = tmp_home / ".claude" / "skills"
+    assert defaults.install_defaults(
+        repo, dest_roots=(shared_destination, kiro_destination, claude_destination)
+    ) == 0
     shared_target = shared_destination / "demo" / "SKILL.md"
     kiro_target = kiro_destination / "demo" / "SKILL.md"
+    claude_target = claude_destination / "demo" / "SKILL.md"
     assert shared_target.is_file()
     assert kiro_target.is_file()
+    assert claude_target.is_file()
+    # Claude Code consumes $ARGUMENTS itself; only Kiro needs the explicit marker.
     assert kiro_target.read_text().rstrip().endswith("$ARGUMENTS")
+    assert claude_target.read_text().rstrip().endswith("$ARGUMENTS") is False
+    assert claude_target.read_bytes() == shared_target.read_bytes()
     manifest = yaml.safe_load((tmp_home / ".local" / "state" / "dotf" / "agents-manifest.json").read_text())
     assert {item["owner"] for item in manifest["items"]} == {
         "agents:third-party:demo",
         "agents:kiro-third-party:demo",
+        "agents:claude-third-party:demo",
     }
     shared_before = shared_target.stat().st_mtime_ns
     kiro_before = kiro_target.stat().st_mtime_ns
-    assert defaults.install_defaults(repo, dest_roots=(shared_destination, kiro_destination)) == 0
+    assert defaults.install_defaults(
+        repo, dest_roots=(shared_destination, kiro_destination, claude_destination)
+    ) == 0
     assert shared_target.stat().st_mtime_ns == shared_before
     assert kiro_target.stat().st_mtime_ns == kiro_before
 

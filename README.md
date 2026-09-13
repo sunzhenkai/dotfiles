@@ -121,9 +121,10 @@ skills、profiles 与 doctor 已收敛为单一对外模块 `agents`：
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ 全局 AGENTS.md
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro + Claude Code）+ 全局 AGENTS.md
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs
+dotf agents skill apply grill-with-docs --on-conflict=backup   # 先备份本机漂移再覆写
 dotf skills -i frontend-design             # npx skills 按需安装（交互式；-g -y 跳过询问）
 dotf skills -r design-taste-frontend       # npx skills 移除已安装 skill
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）

@@ -1,4 +1,0 @@
-# OPENAI_API_KEY read from env
-API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-#API_BASE_URL=https://api.deepseek.com
-DEFAULT_MODEL=qwen-plus

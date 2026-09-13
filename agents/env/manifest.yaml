@@ -9,7 +9,6 @@ tools:
   - kimi-code
   - pi
   - zcode
-  - dsh
 
 default_profile: research
 

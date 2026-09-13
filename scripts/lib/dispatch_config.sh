@@ -61,11 +61,9 @@ install_tmux() { install_config tmux; }
 install_cursor() { install_config cursor; }
 install_kiro_config() { install_config kiro; }
 install_zcode_config() { install_config zcode; }
-install_ocr_config() { install_config ocr; }
 install_opencode_config() { install_config opencode; }
 install_opencode() { install_config opencode; }
 install_kimi_code_config() { install_config kimi-code; }
-install_pi_config() { install_config pi; }
 
 # Agent sync is intentionally separate from config deployment until its own
 # plan/manifest transaction work is complete.

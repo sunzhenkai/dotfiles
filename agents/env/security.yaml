@@ -3,7 +3,7 @@ version: 1
 
 risk_levels:
   low:
-    description: "远程只读能力（如 provider API 调用），不接触本机登录态"
+    description: "远程只读能力（如外部 API 调用），不接触本机登录态"
   medium:
     description: "本地进程或文件系统相关能力，需注意工作区范围"
   high:

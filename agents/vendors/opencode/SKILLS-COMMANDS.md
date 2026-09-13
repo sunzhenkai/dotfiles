@@ -6,15 +6,9 @@
 本目录 `agents/vendors/opencode/` 只保留手写内容（人格 `agents/`、`plugins.json`、`opencode.json` 模板等），
 **不再**存放 sync 生成的 skills/commands，也**不再**整目录软链到 `~/.config/opencode`。
 
+**本仓库不声明 LLM provider 与模型**；provider/模型请在本机配置或 OpenCode 登录流程中设置。
+
 ```shell
-dotf opencode -c                 # 安装手写配置 + 托管 providers
-opencode -m kimi/kimi-for-coding               # 仅本次会话
-opencode -m deepseek/deepseek-v4-pro           # 仅本次会话
-scripts/modules/agents/sync.sh opencode          # 同步 skills
+dotf opencode -c                       # 安装手写配置
+scripts/modules/agents/sync.sh opencode  # 同步 skills
 ```
-
-五家 provider 写在 `opencode.json` 里，会话内用 `/models` 或 `opencode -m` 切换。`dotf` 不提供 LLM provider 切换入口。
-
-MiniMax / 智谱 / SCNet 按 Responses（`@ai-sdk/openai`）；DeepSeek 官方也支持 Responses，但 OpenCode 内置定义走 OpenAI-compatible Chat；Kimi 官方是 Chat。
-
-详见 `agents/env/README.md`。

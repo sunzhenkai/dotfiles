@@ -32,7 +32,8 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 - **先读缓存**：缓存存在且关键文件 mtime 未变 → 用缓存清单，跳过探索。
 - **缓存失效或不存在**：执行 discover，完成后写入缓存。
 - 缓存字段：
-  - `services[]`：`name`、`command`、`cwd`、`port`、`source`、可选 `compose_file`、`health`
+  - `services[]`：`name`、`command`、`cwd`、`port`、`source`、可选 `compose_file`、`health`、`recipe`
+  - `profiles[]`：可选；`name`、`services`、可选 `prepare`，来源必须是 `.service-manager.md` 已声明内容
   - `discovered_at`、`source_mtimes`
   - `runs`：`name` → 原生：`pgid`、`pid`、`log`、`started_at`；compose：`container`、`compose_file`、`started_at`（不记 pid）
 
@@ -91,7 +92,15 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 - **cwd**: `.` 或子目录
 - **port**: 8080（未知则写「待确认」）
 - **source**: Makefile / package.json / docker-compose / ...
+- **recipe**: 可选；项目根相对路径，如 `.service-manager/recipes/<name>.sh`
 - **notes**: 环境变量、需先 `cp .env.example .env` 等；开发/测试服务注明 bind（如 `0.0.0.0`）与是否热更新
+
+## Profiles
+
+### @<profile>
+
+- **services**: `[dependency, app]`
+- **prepare**: 可选；项目根相对脚本或 shell 命令，用于 build / preflight
 
 ## 踩坑
 
@@ -103,6 +112,38 @@ description: 项目服务管理：从 Makefile、package.json、docker-compose �
 - 只写与**启动/停止/依赖/端口/环境**相关的信息；不写业务逻辑、密钥明文。
 - 不要把 pid、pgid、临时日志路径写进此文件。
 - 用户若明确要求不提交该文件，提醒可加入 `.gitignore`，但仍在本地维护。
+
+## Project Profiles & Recipes
+
+项目组合和项目特有构建逻辑保存在项目内；Skill 只提供通用执行协议。
+
+### Profile
+
+`Profiles` 是显式声明的服务组合，名字必须带 `@`，例如 `@test` / `@dev`：
+
+1. `services` 必须引用已定义服务，并按依赖顺序书写。
+2. `prepare` 可选；在项目根执行一次，退出码非 0 时停止本次启动。
+3. 不自动推导 profile；未声明时不得把「测试服务」等语义映射成固定组合。用户明确说「全部 / all」时保留现有全起规则。
+4. profile 名与 service 名冲突属于配置错误，fail-closed 并要求用户明确选择。
+
+### Service recipe
+
+服务可声明项目根相对的可执行 `recipe`，例如 `.service-manager/recipes/api.sh`。recipe 只需实现两个前台子命令：
+
+```bash
+<recipe> prepare   # 可选前置：构建、迁移检查、workspace 修复；失败必须非 0 退出
+<recipe> start     # 在前台启动服务；必须加载自己的环境，但不得自行 daemonize
+```
+
+Skill 的统一职责不变：把 `start` 包进新进程组和项目隔离日志，采集 pid/pgid，执行健康验证，写回运行缓存。recipe 不得输出明文 secret；项目可从 `.env` 或其他本地环境来源加载。
+
+### 启动解析
+
+- `start <service>`：保持原行为。
+- `start @<profile>`：执行 profile 的 `prepare`，再按声明顺序启动服务。
+- 已运行的成员跳过；单个成员失败不回滚已启动成员，但要报告每个成员状态和失败日志。
+- `restart @<profile>` 复用同一 profile 解析，对成员逐个 stop 后 start。
+- bare 名称同时命中 service 与 profile 时停止并询问；未命中时列出可用 service/profile。
 
 ## 开发/测试启动约定
 
@@ -143,7 +184,7 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
 
 扫描顺序（后源可追加服务；同名服务保留更具体者：子目录 package 脚本 > 根 Makefile 泛化 target，并在输出说明）：
 
-1. **先读** `.service-manager.md`（若存在）。
+1. **先读** `.service-manager.md`（若存在），并校验其中 `Profiles` 与服务 `recipe` 引用的服务都存在、脚本路径不越出项目根。
 2. **Makefile** / **Justfile** / **Taskfile.yml**：关注 `run`、`start`、`dev`、`serve`、`up`、`server`、`watch` 类任务；读内容确认实际命令；同服务多候选时按「优先热更新方式」选取。
 3. **package.json**（含 workspace 子包）：`scripts` 中的 `dev`、`watch`、`start`、`serve`、`preview`；注意 pnpm/npm/yarn；同包多脚本时优先 `dev`/`watch` 等热更新入口。
 4. **docker-compose.yml / compose.yaml**（及 `-f` 常见覆盖文件）：服务名即单元；记录 `compose_file` 与 compose 所在 `cwd`；区分 `docker compose` 与 `docker-compose`。
@@ -182,7 +223,7 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
 - 读 `.service-manager.md`（若有）与缓存，或 discover；表格：name、source、command、port、运行状态。
 - 缓存命中时说明「来自缓存」；源文件 mtime 变了则先重新 discover。
 
-### start `<name>`
+### start `<name>` 或 `@<profile>`
 
 **缺 name 时**：
 
@@ -192,10 +233,10 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
 
 步骤：
 
-1. 查 `.service-manager.md` / 缓存；没有则先 discover。
-2. 已在运行（见「运行状态判定」）→ 告知并跳过。
+1. 查 `.service-manager.md` / 缓存；没有则先 discover。按「启动解析」识别单个 service 或 `@<profile>`。
+2. 单个 service 已在运行（见「运行状态判定」）→ 告知并跳过；profile 已运行的成员跳过。
 3. **环境**：若 notes/文档要求 `.env`，检查 `<cwd>/.env`（或项目根）；缺且存在 `.env.example` → 先告知并询问是否 `cp`，未经同意不擅自复制；缺依赖运行时则写入踩坑并停下。
-4. **开发/测试约定**：若属开发/测试原生服务，按「开发/测试启动约定」确认 command 为热更新优先入口，并在需要时补 `0.0.0.0` 绑定；得到实际执行用的 command（可与缓存原文不同，成功后按冲突规则写回）。
+4. **准备**：先执行 profile `prepare`；原生 service 有 `recipe` 时执行其 `prepare`，再用 `<recipe> start` 替换裸 command 进入下一步。开发/测试原生服务仍按「开发/测试启动约定」确认热更新入口与 `0.0.0.0` 绑定；得到实际执行用的 command 或 recipe 动作（可与缓存原文不同，成功后按冲突规则写回）。
 5. 后台启动（原生）——**新进程组**，便于整组停止：
    ```bash
    mkdir -p ~/.cache/service-manager/logs/<ph>
@@ -204,12 +245,12 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
    记录 `pid`、`pgid`（`ps -p <pid> -o pgid=`）、`log`、`started_at`。
    compose：在 compose 文件所在目录执行 `docker compose -f <compose_file> up -d <name>`（必要时加 project 名）；记 `container` 与 `compose_file`，不记 pid。
 6. 写回缓存 `runs`。
-7. **就绪验证**（默认 2–5s，慢服务可延长到 ~30s，或看 `.service-manager.md` 的 health/notes）：
+7. **就绪验证**（单个 service 默认 2–5s，慢服务可延长到 ~30s；profile 用总窗口 ~30s，或看 `.service-manager.md` 的 health/notes）：
    - 进程/容器仍在；
    - 有端口则已监听（开发服务期望绑在 `0.0.0.0` 或全网卡；若实际仅 `127.0.0.1` 且本应宽绑定，记入踩坑）；
    - 若配置了 HTTP health / 日志就绪关键字，一并满足。
-   失败 → tail 项目隔离日志，写踩坑。
-8. 成功 → 按冲突规则同步 `.service-manager.md`（含实际 bind / 是否热更新，若适用）。
+   失败 → tail 项目隔离日志，写踩坑；profile 输出成员汇总，不隐藏已成功成员。
+8. 成功 → 按冲突规则同步 `.service-manager.md`（含实际 bind / 是否热更新 / recipe 生效结果，若适用）。
 
 ### stop `<name>`
 
@@ -220,9 +261,9 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
 5. pid/pgid/容器都对不上 → 不猜杀，列候选请用户确认。
 6. 新坑立刻写入 `.service-manager.md`。
 
-### restart `<name>`
+### restart `<name>` 或 `@<profile>`
 
-`stop` 后 `start`；复用已有命令，不重新 discover（除非 start 失败需再探索）。缺 name 时规则同 start。
+`stop` 后 `start`；复用已有命令，不重新 discover（除非 start 失败需再探索）。缺 name 时规则同 start；`@<profile>` 对成员逐个 stop 后 start。
 
 ### status `[name]`
 

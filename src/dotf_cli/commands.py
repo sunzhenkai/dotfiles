@@ -262,6 +262,17 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
             ctx.continue_on_error = True
         elif arg == "--json":
             ctx.json = True
+        elif arg == "--on-conflict" or arg.startswith("--on-conflict="):
+            if arg == "--on-conflict":
+                i += 1
+                if i >= len(rest):
+                    raise DotfError("usage", "错误: --on-conflict 需要参数（block|backup）")
+                value = rest[i]
+            else:
+                value = arg.split("=", 1)[1]
+            if value not in ("block", "backup"):
+                raise DotfError("usage", "错误: --on-conflict 只接受 block 或 backup")
+            ctx.on_conflict = value
         elif arg.startswith("-"):
             raise DotfError("usage", f"错误: 未知选项 '{arg}'")
         else:

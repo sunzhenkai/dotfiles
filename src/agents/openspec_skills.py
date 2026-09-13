@@ -16,14 +16,27 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from defaults import first_party_skill_ids
-from managed_runtime import AgentRuntimeConflict, apply_skills_plan, compile_skills_plan
-from sync import inject_kiro_arguments, kiro_skills_target, skills_target
-
-OPENSPEC_OWNER = "agents:openspec:"
-KIRO_OPENSPEC_OWNER = "agents:kiro-openspec:"
-IDENTITY_PREFIX = "openspec-cli"
-KIRO_IDENTITY_PREFIX = "openspec-cli:kiro"
-ADOPT_REASON = "target exists without agents ownership"
+from layouts import (
+    LAYOUTS,
+    OPENSPEC_IDENTITY,
+    SHARED_LAYOUT,
+    SkillLayout,
+    home_for_target,
+    identity_prefix,
+    layout_for_target,
+    owner_prefix,
+    skills_target,
+)
+from managed_runtime import (
+    ADOPT_REASON,
+    AgentRuntimeConflict,
+    OnConflict,
+    adoptable_equivalent,
+    apply_skills_plan,
+    compile_skills_plan,
+    on_conflict_from_env,
+)
+from sync import inject_kiro_arguments
 
 
 class OpenSpecSkillsError(RuntimeError):
@@ -53,6 +66,12 @@ def render_openspec_kiro_skill_bytes(skill_dir: Path, skill_id: str) -> bytes:
     if not text.endswith("\n"):
         text += "\n"
     return inject_kiro_arguments(text).encode("utf-8")
+
+
+def renderers_for(layout: SkillLayout):
+    return (
+        render_openspec_kiro_skill_bytes if layout.render == "kiro" else render_openspec_skill_bytes
+    )
 
 
 def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
@@ -89,44 +108,16 @@ def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
     return skills
 
 
-def _home_for_target(destination: Path) -> Path:
-    destination = destination.expanduser().absolute()
-    if destination.name == "skills" and destination.parent.name == ".agents":
-        return destination.parent.parent
-    if destination.name == "skills" and destination.parent.name == ".kiro":
-        return destination.parent.parent
-    return Path.home().expanduser().absolute()
-
-
 def _destination_specs(
     dest_roots: Optional[Sequence[Path]],
-) -> tuple[tuple[Path, str, str], ...]:
+) -> tuple[tuple[SkillLayout, Path], ...]:
+    """Explicit destinations keep their layout when recognisable, else shared."""
     if dest_roots is not None:
-        result = []
-        for destination in dest_roots:
-            destination = destination.expanduser().absolute()
-            if destination.parent.name == ".kiro":
-                result.append((destination, KIRO_OPENSPEC_OWNER, "kiro"))
-            else:
-                result.append((destination, OPENSPEC_OWNER, "shared"))
-        return tuple(result)
-    return (
-        (skills_target(), OPENSPEC_OWNER, "shared"),
-        (kiro_skills_target(), KIRO_OPENSPEC_OWNER, "kiro"),
-    )
-
-
-def _adoptable_equivalent(plan) -> list:
-    adoptable = []
-    for operation in plan.conflicts:
-        if operation.conflict != ADOPT_REASON or operation.expected is None:
-            continue
-        target = Path(operation.target)
-        if not target.is_file() or target.is_symlink():
-            continue
-        if target.read_bytes() == operation.expected.content:
-            adoptable.append(operation)
-    return adoptable
+        return tuple(
+            (layout_for_target(destination) or SHARED_LAYOUT, destination.expanduser().absolute())
+            for destination in dest_roots
+        )
+    return tuple((layout, skills_target(layout)) for layout in LAYOUTS)
 
 
 def _apply_generated(
@@ -134,39 +125,25 @@ def _apply_generated(
     source_root: Path,
     *,
     destination: Path,
-    owner_prefix: str,
-    identity_prefix: str,
-    layout: str,
+    layout: SkillLayout,
     dry_run: bool,
+    on_conflict: OnConflict = "block",
 ) -> int:
-    home = _home_for_target(destination)
-    renderer = render_openspec_kiro_skill_bytes if layout == "kiro" else render_openspec_skill_bytes
-    print(f"==> openspec skills ({layout}) → {destination}")
+    home = home_for_target(destination)
+    renderer = renderers_for(layout)
+    owners = owner_prefix(layout, "openspec")
+    identity = identity_prefix(layout, OPENSPEC_IDENTITY)
+    print(f"==> openspec skills ({layout.key}) → {destination}")
     plan = compile_skills_plan(
         root,
         renderer,
         home=home,
         target_root=destination,
         source_root=source_root,
-        owner_prefix=owner_prefix,
-        identity_prefix=identity_prefix,
+        owner_prefix=owners,
+        identity_prefix=identity,
+        on_conflict=on_conflict,
     )
-    released: list[tuple[Path, bytes]] = []
-    if not dry_run:
-        for operation in _adoptable_equivalent(plan):
-            target = Path(operation.target)
-            released.append((target, operation.expected.content))
-            target.unlink()
-        if released:
-            plan = compile_skills_plan(
-                root,
-                renderer,
-                home=home,
-                target_root=destination,
-                source_root=source_root,
-                owner_prefix=owner_prefix,
-                identity_prefix=identity_prefix,
-            )
 
     markers = {
         "none": "=",
@@ -177,9 +154,9 @@ def _apply_generated(
         "block": "!",
     }
     for operation in plan.operations:
-        marker = markers[operation.action]
-        suffix = ""
-        if dry_run and operation.conflict == ADOPT_REASON and operation.expected is not None:
+        marker = "~" if operation.remediated else markers[operation.action]
+        suffix = " (overwrite, backup)" if operation.remediated else ""
+        if operation.conflict == ADOPT_REASON and operation.expected is not None:
             target = Path(operation.target)
             if target.is_file() and target.read_bytes() == operation.expected.content:
                 marker = "+"
@@ -192,10 +169,10 @@ def _apply_generated(
         changed = sum(item.action in {"create", "update", "chmod"} for item in plan.operations)
         pruned = sum(item.action == "prune" for item in plan.operations)
         unchanged = sum(item.action == "none" for item in plan.operations)
-        adoptable = len(_adoptable_equivalent(plan))
+        adoptable = len(adoptable_equivalent(plan))
         conflicts = len(plan.conflicts) - adoptable
         print(
-            f"  done openspec ({layout}, plan): changed={changed} pruned={pruned} "
+            f"  done openspec ({layout.key}, plan): changed={changed} pruned={pruned} "
             f"unchanged={unchanged} adopt={adoptable} conflicts={conflicts}"
         )
         return 1 if conflicts else 0
@@ -203,14 +180,10 @@ def _apply_generated(
     try:
         result = apply_skills_plan(plan, renderer)
     except AgentRuntimeConflict as exc:
-        for target, content in released:
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(content)
         print(f"error: openspec skills: {exc}", file=sys.stderr)
         return 1
     print(
-        f"  done openspec ({layout}): changed={result.changed} "
+        f"  done openspec ({layout.key}): changed={result.changed} "
         f"pruned={result.pruned} unchanged={result.unchanged}"
     )
     return 0
@@ -224,12 +197,14 @@ def install_openspec_skills(
     dest_roots: Optional[Sequence[Path]] = None,
     generate=generate_openspec_skills,
     openspec: Optional[Path] = None,
+    on_conflict: OnConflict | None = None,
 ) -> int:
     """Generate OpenSpec skills with --tools agents and install them globally."""
     command = openspec if openspec is not None else openspec_command()
     if command is None:
         print("warning: openspec CLI 未安装，跳过全局 OpenSpec skills（dotf npm -i）", file=sys.stderr)
         return 0
+    policy = on_conflict if on_conflict is not None else on_conflict_from_env()
 
     # Defense in depth: reject any first-party skill named like an OpenSpec CLI
     # skill, whether catalogued or present only as a raw agents/skills/<id>/ dir.
@@ -258,16 +233,14 @@ def install_openspec_skills(
         with tempfile.TemporaryDirectory(prefix="dotf-openspec-") as temporary:
             source_root = generate(Path(temporary), openspec=command)
             rc = 0
-            for destination, owner_prefix, layout in destinations:
-                identity = KIRO_IDENTITY_PREFIX if layout == "kiro" else IDENTITY_PREFIX
+            for layout, destination in destinations:
                 step = _apply_generated(
                     root,
                     source_root,
                     destination=destination,
-                    owner_prefix=owner_prefix,
-                    identity_prefix=identity,
                     layout=layout,
                     dry_run=dry_run,
+                    on_conflict=policy,
                 )
                 rc = max(rc, step)
             return rc
@@ -278,13 +251,14 @@ def install_openspec_skills(
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Install OpenSpec CLI skills into ~/.agents/skills (and Kiro)"
+        description="Install OpenSpec CLI skills into every managed runtime layout"
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--on-conflict", choices=("block", "backup"), default=None)
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
     root = args.root.resolve() if args.root else repo_root()
-    return install_openspec_skills(root, dry_run=args.dry_run)
+    return install_openspec_skills(root, dry_run=args.dry_run, on_conflict=args.on_conflict)
 
 
 if __name__ == "__main__":

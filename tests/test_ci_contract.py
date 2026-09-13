@@ -90,7 +90,7 @@ def test_isolated_acceptance_fail_closed_contract() -> None:
     offline_locks = acceptance.index("==> offline locked default skills")
     assert export_home < offline_locks < first_runtime_command
     for marker in (
-        "unset ZHIPU_API_KEY",
+        "unset AWS_ACCESS_KEY_ID",
         "NETWORK_ATTEMPTED",
         "disabled_skills",
         "network/acquisition is disabled",
@@ -155,9 +155,7 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     assert "symlink 到本仓库" not in codex_readme
     for marker in (
         "dotf codex -c",
-        "不要用 `dotf` 去切 LLM provider",
-        "~/.codex/model-catalogs/*.json",
-        "manifest",
+        "本仓库不声明 LLM provider",
         "真实文件",
         "不创建或读取 `.dotf-profile`",
     ):

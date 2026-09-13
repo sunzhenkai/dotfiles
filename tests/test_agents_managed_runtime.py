@@ -45,10 +45,18 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _run(repo: Path, home: Path, *, dry_run: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    repo: Path,
+    home: Path,
+    *,
+    dry_run: bool = False,
+    on_conflict: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
+    if on_conflict is not None:
+        env["DOTF_ON_CONFLICT"] = on_conflict
     cmd = [sys.executable, str(ROOT / "src" / "agents" / "sync.py"), "--root", str(repo)]
     if dry_run:
         cmd.append("--dry-run")
@@ -57,6 +65,15 @@ def _run(repo: Path, home: Path, *, dry_run: bool = False) -> subprocess.Complet
 
 def _manifest(home: Path) -> Path:
     return home / ".state" / "dotf" / AGENTS_MANIFEST_NAME
+
+
+def _backups(home: Path, *relative: str) -> list[Path]:
+    """Backups keep the run id and suffix the leaf with its content digest."""
+    root = home / ".state" / "dotf" / "backups"
+    if not root.is_dir():
+        return []
+    pattern = "*/" + "/".join((*relative[:-1], relative[-1] + ".*"))
+    return sorted(root.glob(pattern))
 
 
 def test_manifest_permissions_records_and_idempotence(tmp_path: Path) -> None:
@@ -74,6 +91,7 @@ def test_manifest_permissions_records_and_idempotence(tmp_path: Path) -> None:
     assert {item["owner"] for item in data["items"]} == {
         "agents:skill:demo",
         "agents:kiro-skill:demo",
+        "agents:claude-skill:demo",
     }
     assert all(item["expected_hash"] == item["installed_hash"] for item in data["items"])
     target = home / ".agents" / "skills" / "demo" / "SKILL.md"
@@ -82,6 +100,7 @@ def test_manifest_permissions_records_and_idempotence(tmp_path: Path) -> None:
     assert second.returncode == 0, second.stderr + second.stdout
     assert "done skills: changed=0" in second.stdout
     assert "done kiro skills: changed=0" in second.stdout
+    assert "done claude skills: changed=0" in second.stdout
     assert manifest.stat().st_mtime_ns == before
     assert target.stat().st_mtime_ns == target_before
 
@@ -113,6 +132,136 @@ def test_malformed_manifest_degrades_without_prune_or_overwrite(tmp_path: Path) 
     assert manifest.read_bytes() == before
 
 
+def test_owned_drift_blocks_by_default(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    target.write_text("local edit\n", encoding="utf-8")
+    result = _run(repo, home)
+    assert result.returncode != 0
+    assert "owned target was modified locally" in result.stdout
+    assert target.read_text(encoding="utf-8") == "local edit\n"
+    assert _backups(home, ".agents", "skills", "demo", "SKILL.md") == []
+
+
+def test_on_conflict_backup_overwrites_drift_and_keeps_the_original(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    installed = target.read_bytes()
+    target.write_text("local edit\n", encoding="utf-8")
+
+    result = _run(repo, home, on_conflict="backup")
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "(overwrite, backup)" in result.stdout
+    assert target.read_bytes() == installed
+    # The taken-over bytes are recoverable, not silently discarded.
+    saved = _backups(home, ".agents", "skills", "demo", "SKILL.md")
+    assert len(saved) == 1, saved
+    assert saved[0].read_text(encoding="utf-8") == "local edit\n"
+    # The overwrite is recorded as owned, so a later run is a no-op.
+    again = _run(repo, home)
+    assert again.returncode == 0, again.stderr + again.stdout
+    assert "done skills: changed=0" in again.stdout
+
+
+def test_on_conflict_backup_never_remediates_unsafe_or_malformed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+
+    # A symlinked leaf stays fail-closed even under the backup policy.
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    outside = tmp_path / "outside"
+    outside.write_text("outside\n", encoding="utf-8")
+    target.unlink()
+    target.symlink_to(outside)
+    link = _run(repo, home, on_conflict="backup")
+    assert link.returncode != 0
+    assert outside.read_text(encoding="utf-8") == "outside\n"
+
+    # So does a manifest dotf cannot trust.
+    target.unlink()
+    manifest = _manifest(home)
+    manifest.write_text('{"schema_version": 99}\n', encoding="utf-8")
+    before = manifest.read_bytes()
+    malformed = _run(repo, home, on_conflict="backup")
+    assert malformed.returncode != 0
+    assert manifest.read_bytes() == before
+
+
+def test_claude_reserved_skill_id_fails_closed(tmp_path: Path) -> None:
+    """Claude Code owns ~/.claude/skills/synced and skips user skills there."""
+    repo = _repo(tmp_path)
+    reserved = repo / "agents" / "skills" / "synced"
+    reserved.mkdir()
+    (reserved / "SKILL.md").write_text(
+        "---\nname: synced\ndescription: reserved\n---\nbody\n", encoding="utf-8"
+    )
+    write_skills_catalog(repo)
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = _run(repo, home)
+
+    assert result.returncode != 0
+    assert "reserved" in result.stderr
+    assert not (home / ".claude" / "skills" / "synced").exists()
+
+
+def test_identical_unowned_targets_are_adopted(tmp_path: Path) -> None:
+    """A machine where npx skills installed the same bytes must still reconcile."""
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    installed = target.read_bytes()
+    # Drop ownership, as if another installer had put these files there.
+    _manifest(home).unlink()
+
+    result = _run(repo, home)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == installed
+    data = json.loads(_manifest(home).read_text(encoding="utf-8"))
+    assert {item["owner"] for item in data["items"]} == {
+        "agents:skill:demo",
+        "agents:kiro-skill:demo",
+        "agents:claude-skill:demo",
+    }
+
+
+def test_divergent_unowned_targets_stay_blocked(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    target.write_text("someone else's version\n", encoding="utf-8")
+    _manifest(home).unlink()
+
+    result = _run(repo, home)
+
+    assert result.returncode != 0
+    assert "target exists without agents ownership" in result.stdout
+    assert target.read_text(encoding="utf-8") == "someone else's version\n"
+
+
+def test_unknown_on_conflict_policy_fails_closed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    result = _run(repo, home, on_conflict="overwrite")
+    assert result.returncode != 0
+    assert "unknown on-conflict policy" in result.stderr
+
+
 def test_parent_and_leaf_symlink_attacks_are_preserved(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     for leaf in (False, True):
@@ -126,15 +275,22 @@ def test_parent_and_leaf_symlink_attacks_are_preserved(tmp_path: Path) -> None:
             outside_file = outside / "victim"
             outside_file.write_text("outside\n", encoding="utf-8")
             (target_dir / "SKILL.md").symlink_to(outside_file)
+            attacked = target_dir / "SKILL.md"
         else:
             (home / ".agents").mkdir()
             (home / ".agents" / "skills").symlink_to(outside, target_is_directory=True)
             outside_file = outside / "sentinel"
             outside_file.write_text("outside\n", encoding="utf-8")
+            attacked = home / ".agents" / "skills"
+        link_before = os.readlink(attacked)
         result = _run(repo, home)
         assert result.returncode != 0
         assert outside_file.read_text(encoding="utf-8") == "outside\n"
-        assert not _manifest(home).exists()
+        # The attacked layout is preserved verbatim. Sibling layouts are
+        # independent, so they may still install and record their own entries.
+        assert os.path.islink(attacked)
+        assert os.readlink(attacked) == link_before
+        assert not (outside / "demo").exists()
 
 
 def test_stale_sidecar_and_whole_skill_prune_only_when_unmodified(tmp_path: Path) -> None:
@@ -228,8 +384,8 @@ def test_concurrent_syncs_serialize_without_manifest_loss(tmp_path: Path) -> Non
     assert one.returncode == 0, err1 + out1
     assert two.returncode == 0, err2 + out2
     data = json.loads(_manifest(home).read_text(encoding="utf-8"))
-    assert len(data["items"]) == 6
-    assert len({item["target"] for item in data["items"]}) == 6
+    assert len(data["items"]) == 9
+    assert len({item["target"] for item in data["items"]}) == 9
 
 
 def test_symlinked_lock_is_rejected(tmp_path: Path) -> None:

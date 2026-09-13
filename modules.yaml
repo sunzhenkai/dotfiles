@@ -130,24 +130,6 @@ modules:
     doctor: true
     bin: lark-cli
 
-  - name: ocr
-    kind: binary
-    desc: Open Code Review CLI + 配置（MiniMax-M3）
-    group: tools
-    depends_on: [sdk]
-    install: true
-    doctor: true
-    bin: ocr
-    config:
-      source: config/tools/ocr
-      target: ~/.opencodereview
-      strategy: merge
-      writable: true
-      sensitive: true
-      target_mode: "0700"
-      preserve: []
-      exclude: []
-
   - name: trae-cli
     kind: binary
     desc: 安装 Trae CLI
@@ -155,15 +137,6 @@ modules:
     install: true
     doctor: true
     enabled: false   # archived
-
-  - name: dsh
-    kind: binary
-    desc: 安装 DeepSeek Harness CLI（dsh，npm @deepseek-ai/dsh）
-    group: agents
-    depends_on: [sdk]
-    install: true
-    doctor: true
-    bin: dsh
 
   - name: vcpkg
     kind: binary
@@ -294,7 +267,7 @@ modules:
 
   - name: codex
     kind: binary
-    desc: Codex CLI + 默认 MiniMax 配置（仓库声明 MiniMax / Kimi / 智谱 / SCNet / DeepSeek）
+    desc: Codex CLI + 配置（不声明 LLM provider / 模型 / 密钥）
     group: agents
     install: true
     doctor: true
@@ -336,12 +309,12 @@ modules:
     config:
       source: agents/vendors/pi
       target: ~/.pi/agent
-      strategy: merge
+      strategy: copy
       writable: true
       sensitive: true
       target_mode: "0700"
       preserve: [npm]
-      exclude: []
+      exclude: [README.md]
 
   - name: zcode
     kind: binary
@@ -637,22 +610,6 @@ modules:
       sensitive: true
       target_mode: "0700"
       preserve: [cache, clusters, history, plugins, screen-dumps, sessions, snapshots]
-      exclude: []
-
-  - name: shell_gpt
-    kind: config
-    desc: Shell-GPT 配置
-    group: utils
-    doctor: true
-    enabled: false   # archived
-    config:
-      source: config/tools/shell_gpt
-      target: ~/.config/shell_gpt
-      strategy: copy
-      writable: true
-      sensitive: true
-      target_mode: "0700"
-      preserve: [.sgptrc, cache, history, sessions]
       exclude: []
 
   - name: logseq

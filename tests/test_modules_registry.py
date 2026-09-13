@@ -129,7 +129,7 @@ def test_os_filter_config_modules() -> None:
 def test_disabled_modules_excluded_from_default_lists() -> None:
     mods = modules.load_registry()
     cpp = modules.find_module(mods, "cpp-dev")
-    archived_names = ("trae-cli", "fcitx5", "shell_gpt", "logseq")
+    archived_names = ("trae-cli", "fcitx5", "logseq")
     zcode = modules.find_module(mods, "zcode")
     kiro = modules.find_module(mods, "kiro")
     claude = modules.find_module(mods, "claude-code")

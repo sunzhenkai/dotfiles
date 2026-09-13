@@ -1,27 +1,74 @@
 #!/usr/bin/env python3
-"""Install agents/ skills into shared and Kiro-specific runtime layouts."""
+"""Install agents/ skills into every managed agent runtime layout."""
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
+_AGENTS = Path(__file__).resolve().parent
+_SCRIPTS = _AGENTS.parent
+for _path in (_SCRIPTS, _AGENTS):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
+from layouts import (  # noqa: E402
+    FIRST_PARTY_IDENTITY,
+    LAYOUTS,
+    SkillLayout,
+    identity_prefix,
+    owner_prefix,
+    skills_target,
+)
 from managed_runtime import (
     AgentRuntimeConflict,
+    OnConflict,
     RenderSkill,
+    adoptable_equivalent,
     apply_skills_plan,
     compile_skills_plan,
+    on_conflict_from_env,
 )
 
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 POSITIONAL_RE = re.compile(r"\$\{\d+\}")
-KIRO_SKILL_OWNER_PREFIX = "agents:kiro-skill:"
-KIRO_SKILL_IDENTITY_PREFIX = "agents/skills:kiro"
+
+
+@dataclass(frozen=True, slots=True)
+class SyncOutcome:
+    """One layout's sync result, with the first conflict for reporting."""
+
+    label: str
+    rc: int
+    detail: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.rc == 0
+
+
+def summarize(outcomes: List["SyncOutcome"]) -> str:
+    """One-line reason naming the failing layout(s) and why."""
+    failed = [item for item in outcomes if not item.ok]
+    if not failed:
+        return ""
+    parts = []
+    for item in failed:
+        parts.append(f"{item.label}: {item.detail}" if item.detail else item.label)
+    return "; ".join(parts)
+
+
+def _relative_target(target: str, base: Path) -> str:
+    """`<skill-id>/SKILL.md` reads better in a one-line reason than a basename."""
+    try:
+        return Path(target).relative_to(base).as_posix()
+    except ValueError:
+        return target
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -33,20 +80,8 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def skills_target(home: Path | None = None) -> Path:
-    return (home or Path.home()).expanduser().absolute() / ".agents" / "skills"
-
-
-def kiro_home(home: Path | None = None) -> Path:
-    """Resolve Kiro's global home; explicit home supplies HOME, not KIRO_HOME."""
-    configured = os.environ.get("KIRO_HOME")
-    if home is None and configured:
-        return Path(configured).expanduser().absolute()
-    return (home or Path.home()).expanduser().absolute() / ".kiro"
-
-
-def kiro_skills_target(home: Path | None = None) -> Path:
-    return kiro_home(home) / "skills"
+def renderers_for(layout: SkillLayout) -> RenderSkill:
+    return render_kiro_skill_bytes if layout.render == "kiro" else render_skill_bytes
 
 
 def _is_indented(line: str) -> bool:
@@ -194,7 +229,8 @@ def _sync_runtime(
     label: str,
     dry_run: bool,
     only_ids: frozenset[str] | None = None,
-) -> int:
+    on_conflict: OnConflict = "block",
+) -> SyncOutcome:
     print(f"==> sync {label} → {base}")
     plan = compile_skills_plan(
         root,
@@ -203,6 +239,7 @@ def _sync_runtime(
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
         only_ids=only_ids,
+        on_conflict=on_conflict,
     )
 
     markers = {
@@ -213,63 +250,75 @@ def _sync_runtime(
         "prune": "-",
         "block": "!",
     }
+    adoptable = {item.target for item in adoptable_equivalent(plan)}
     for operation in plan.operations:
-        print(f"  {markers[operation.action]} {operation.target}")
-        if operation.conflict:
+        marker = "~" if operation.remediated else markers[operation.action]
+        suffix = " (overwrite, backup)" if operation.remediated else ""
+        if operation.target in adoptable:
+            # Already the managed bytes on disk; the apply re-records ownership.
+            marker, suffix = "+", " (adopt equivalent)"
+        print(f"  {marker} {operation.target}{suffix}")
+        if operation.conflict and not suffix:
             print(f"    conflict: {operation.conflict}")
+
+    unresolved = [item for item in plan.conflicts if item.target not in adoptable]
+    first_conflict = next(
+        (f"{_relative_target(item.target, base)}: {item.conflict}" for item in unresolved),
+        "",
+    )
 
     if dry_run:
         changed = sum(item.action in {"create", "update", "chmod"} for item in plan.operations)
         pruned = sum(item.action == "prune" for item in plan.operations)
         unchanged = sum(item.action == "none" for item in plan.operations)
-        conflicts = len(plan.conflicts)
         print(
             f"  done {label} (plan): changed={changed} pruned={pruned} "
-            f"unchanged={unchanged} conflicts={conflicts}"
+            f"unchanged={unchanged} adopt={len(adoptable)} conflicts={len(unresolved)}"
         )
-        return 1 if conflicts else 0
+        return SyncOutcome(label, 1 if unresolved else 0, first_conflict)
 
     try:
         result = apply_skills_plan(plan, renderer)
     except AgentRuntimeConflict as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return 1
+        return SyncOutcome(label, 1, first_conflict or str(exc))
     print(
         f"  done {label}: changed={result.changed} pruned={result.pruned} "
         f"unchanged={result.unchanged}"
     )
-    return 0
+    return SyncOutcome(label, 0)
 
 
-def sync_skills(root: Path, dry_run: bool = False) -> int:
+def sync_layout(
+    root: Path,
+    layout: SkillLayout,
+    *,
+    dry_run: bool = False,
+    on_conflict: OnConflict | None = None,
+) -> SyncOutcome:
+    """Sync first-party skills into one layout."""
     from desired_set import resolve_skill_desired_set
 
     return _sync_runtime(
         root,
-        skills_target(),
-        render_skill_bytes,
-        owner_prefix="agents:skill:",
-        identity_prefix="agents/skills",
-        label="skills",
+        skills_target(layout),
+        renderers_for(layout),
+        owner_prefix=owner_prefix(layout, "first-party"),
+        identity_prefix=identity_prefix(layout, FIRST_PARTY_IDENTITY),
+        label=layout.label,
         dry_run=dry_run,
         only_ids=resolve_skill_desired_set(root),
+        on_conflict=on_conflict if on_conflict is not None else on_conflict_from_env(),
     )
 
 
-def sync_kiro_skills(root: Path, dry_run: bool = False) -> int:
-    """Kiro CLI does not consume ~/.agents, so keep a dedicated managed copy."""
-    from desired_set import resolve_skill_desired_set
-
-    return _sync_runtime(
-        root,
-        kiro_skills_target(),
-        render_kiro_skill_bytes,
-        owner_prefix=KIRO_SKILL_OWNER_PREFIX,
-        identity_prefix=KIRO_SKILL_IDENTITY_PREFIX,
-        label="kiro skills",
-        dry_run=dry_run,
-        only_ids=resolve_skill_desired_set(root),
-    )
+def sync_skills(
+    root: Path, dry_run: bool = False, on_conflict: OnConflict | None = None
+) -> List[SyncOutcome]:
+    return [
+        sync_layout(root, layout, dry_run=dry_run, on_conflict=on_conflict)
+        for layout in LAYOUTS
+    ]
 
 
 SHIMS: Dict[str, str] = {}
@@ -301,7 +350,7 @@ def install_shims(root: Path, dry_run: bool = False) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Sync shared agents skills to ~/.agents/skills and Kiro CLI (tool 无关)"
+        description="Sync agents skills into every managed runtime layout (tool 无关)"
     )
     parser.add_argument(
         "tool",
@@ -310,6 +359,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="仅兼容旧用法，必须省略或为 all（skills 同步已与 tool 无关）",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--on-conflict",
+        choices=("block", "backup"),
+        default=None,
+        help="block（默认）遇到本机改动即失败；backup 先备份再覆写已受管目标的漂移",
+    )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
 
@@ -320,14 +375,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     rc = 0
     try:
-        rc = sync_skills(root, dry_run=args.dry_run)
-        if rc == 0:
-            rc = sync_kiro_skills(root, dry_run=args.dry_run)
+        outcomes = sync_skills(root, dry_run=args.dry_run, on_conflict=args.on_conflict)
+        rc = max((item.rc for item in outcomes), default=0)
     except SystemExit as e:
         rc = int(e.code) if e.code else 1
     except Exception as e:
         print(f"error syncing skills: {e}", file=sys.stderr)
-        rc = 1
+        return 1
     if rc == 0:
         print("==> shims")
         install_shims(root, dry_run=args.dry_run)

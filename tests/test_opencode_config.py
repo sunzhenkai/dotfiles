@@ -1,4 +1,4 @@
-"""OpenCode provider 合并、默认 MiniMax 安装，以及不再提供 -f 切换。"""
+"""OpenCode vendor→目标 merge、安装，以及不再提供 -f 切换。"""
 
 from __future__ import annotations
 
@@ -11,11 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-from dotf_core.config_producers import (  # noqa: E402
-    OPENCODE_DEFAULT_MODEL as DEFAULT_MODEL,
-    OPENCODE_MANAGED_PROVIDER_IDS as MANAGED_PROVIDER_IDS,
-    opencode_merge as merge,
-)
+from dotf_core.config_producers import opencode_merge as merge  # noqa: E402
 
 VENDOR = ROOT / "agents" / "vendors" / "opencode"
 VENDOR_JSON = VENDOR / "opencode.json"
@@ -47,13 +43,12 @@ install_opencode
     )
 
 
-def test_vendor_providers_match_managed_ids() -> None:
+def test_vendor_declares_no_provider_or_model() -> None:
     vendor = _vendor()
-    providers = vendor["provider"]
-    assert set(providers) == set(MANAGED_PROVIDER_IDS)
-    assert vendor["model"] == DEFAULT_MODEL
-    pid, slug = DEFAULT_MODEL.split("/", 1)
-    assert slug in providers[pid]["models"]
+    assert "provider" not in vendor
+    assert "model" not in vendor
+    assert vendor["$schema"] == "https://opencode.ai/config.json"
+    assert set(vendor["agent"]) == {"build", "plan"}
 
 
 def test_vendor_files_have_no_company_secrets() -> None:
@@ -70,52 +65,49 @@ def test_vendor_files_have_no_company_secrets() -> None:
     assert '"company"' not in text
 
 
-def test_merge_preserves_local_provider_and_agent() -> None:
+def test_merge_preserves_existing_and_fills_vendor_defaults() -> None:
     vendor = _vendor()
     existing = {
-        "model": "kimi/k3",
+        "model": "local/ollama-qwen",
         "provider": {"ollama": {"name": "Local Ollama"}},
         "agent": {"build": {"prompt": "local"}},
     }
     out = merge(existing, vendor)
-    assert out["model"] == "kimi/k3"
+    assert out["model"] == "local/ollama-qwen"
     assert out["agent"] == existing["agent"]
-    assert out["provider"]["ollama"] == {"name": "Local Ollama"}
-    assert "minimax" in out["provider"]
-    assert "kimi" in out["provider"]
-    assert "company" not in out["provider"]
-    assert "nativex" not in out["provider"]
+    assert out["provider"] == existing["provider"]
+    assert out["$schema"] == vendor["$schema"]
 
 
-def test_merge_uses_vendor_default_when_missing_model() -> None:
-    vendor = _vendor()
-    out = merge({}, vendor)
-    assert out["model"] == DEFAULT_MODEL
+def test_merge_uses_vendor_doc_when_no_existing() -> None:
+    out = merge({}, _vendor())
+    assert out == _vendor()
 
 
-def test_install_opencode_uses_vendor_default(tmp_home: Path) -> None:
+def test_install_opencode_uses_vendor_doc(tmp_home: Path) -> None:
     r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
     target = tmp_home / ".config" / "opencode"
     cfg = json.loads((target / "opencode.json").read_text(encoding="utf-8"))
-    assert cfg["model"] == DEFAULT_MODEL
+    assert cfg == _vendor()
     assert "COMPANY_BASE_URL" not in json.dumps(cfg)
     assert not (target / ".dotf-profile").exists()
 
 
-def test_install_opencode_keeps_existing_model_on_reinstall(tmp_home: Path) -> None:
+def test_install_opencode_keeps_existing_keys_on_reinstall(tmp_home: Path) -> None:
     target = tmp_home / ".config" / "opencode"
     r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
     cfg_path = target / "opencode.json"
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-    cfg["model"] = "kimi/kimi-for-coding"
+    cfg["model"] = "local/ollama-qwen"
     cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     r = _install(tmp_home)
     assert r.returncode == 0, r.stdout + r.stderr
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-    assert cfg["model"] == "kimi/kimi-for-coding"
+    assert cfg["model"] == "local/ollama-qwen"
+    assert cfg["agent"] == _vendor()["agent"]
     assert not (target / ".dotf-profile").exists()
 
 

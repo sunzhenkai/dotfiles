@@ -17,11 +17,13 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Callable, Literal
+from typing import Callable, Literal, Mapping
 
-_SCRIPTS = Path(__file__).resolve().parent.parent
-if str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
+_AGENTS = Path(__file__).resolve().parent
+_SCRIPTS = _AGENTS.parent
+for _path in (_SCRIPTS, _AGENTS):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 from dotf_core.atomic import atomic_write  # noqa: E402
 from dotf_core.backup import generate_run_id  # noqa: E402
@@ -42,6 +44,7 @@ from dotf_core.schemas import (  # noqa: E402
     validate_managed_manifest,
 )
 from ensure_pyyaml import ensure_yaml  # noqa: E402
+from layouts import layout_for_target  # noqa: E402
 
 yaml = ensure_yaml()
 
@@ -51,6 +54,33 @@ RUNTIME_SCHEMA_VERSION = 1
 OWNER_PREFIX = "agents:skill:"
 _REQUIRED_EXCLUSIONS = frozenset({"patches", "evals", "experience", "evolutions", "authoring"})
 RenderSkill = Callable[[Path, str], bytes]
+
+OnConflict = Literal["block", "backup"]
+ON_CONFLICT_ENV = "DOTF_ON_CONFLICT"
+
+# `--on-conflict=backup` may only take over an owned target that drifted from the
+# bytes we installed. Anything else (unsafe path, malformed manifest, ownership
+# identity mismatch, unowned target) stays fail-closed: those signal that dotf
+# does not know what it is about to overwrite.
+CONTENT_DRIFT = "owned target was modified locally"
+MODE_DRIFT = "owned target mode was modified locally"
+_REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT})
+
+# A target we did not install, but whose bytes already match what we would write.
+# Another installer (`npx skills`) leaves exactly this behind, and refusing it
+# would make a machine that used one unreconcilable by dotf forever.
+ADOPT_REASON = "target exists without agents ownership"
+
+
+def parse_on_conflict(value: str | None) -> OnConflict:
+    policy = (value or "block").strip().lower()
+    if policy not in ("block", "backup"):
+        raise AgentRuntimeError(f"unknown on-conflict policy: {value!r} (expected block or backup)")
+    return policy  # type: ignore[return-value]
+
+
+def on_conflict_from_env(env: Mapping[str, str] | None = None) -> OnConflict:
+    return parse_on_conflict((env if env is not None else os.environ).get(ON_CONFLICT_ENV))
 
 
 class AgentRuntimeError(RuntimeError):
@@ -96,6 +126,7 @@ class RuntimeOperation:
     expected: RuntimeFile | None
     prior: ManagedItem | None
     actual_state: Literal["missing", "present", "unsafe"]
+    remediated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +145,7 @@ class SkillsPlan:
     prior_manifest: ManagedManifest
     operations: tuple[RuntimeOperation, ...]
     only_ids: frozenset[str] | None = None
+    on_conflict: OnConflict = "block"
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -316,6 +348,8 @@ def collect_runtime_files(
     if not source_root.is_dir():
         raise AgentRuntimeError(f"missing first-party skills source: {source_root}")
     target_base = assert_path_confined(home, target_root)
+    reserved = layout_for_target(target_base)
+    reserved_ids = reserved.reserved_ids if reserved is not None else frozenset()
     result: list[RuntimeFile] = []
     targets: set[str] = set()
     declared = set(policy.files) | set(policy.sidecars) | set(policy.excluded)
@@ -347,6 +381,10 @@ def collect_runtime_files(
         skill_id = skill_dir.name
         if only_ids is not None and skill_id not in only_ids:
             continue
+        if skill_id in reserved_ids:
+            raise AgentRuntimeError(
+                f"skill id {skill_id!r} is reserved in target {target_base}: {reserved.label}"
+            )
         marker = skill_dir / "SKILL.md"
         if not marker.is_file() or marker.is_symlink():
             continue
@@ -438,6 +476,29 @@ def _read_actual(home: Path, target: Path) -> _Actual:
         os.close(fd)
 
 
+def adoptable_equivalent(plan: SkillsPlan) -> tuple[RuntimeOperation, ...]:
+    """Conflicts for a target we never installed whose bytes are already ours.
+
+    Taking these over only records ownership — no unverified content is lost, so
+    no `--on-conflict` decision is involved. Drift on a target we *do* own is
+    deliberately excluded: there the manifest is the authority, and appearance
+    matching the new source must not be read as "nothing to review".
+    """
+    result: list[RuntimeOperation] = []
+    for operation in plan.conflicts:
+        if operation.conflict != ADOPT_REASON or operation.expected is None:
+            continue
+        target = Path(operation.target)
+        try:
+            if not target.is_file() or target.is_symlink():
+                continue
+            if target.read_bytes() == operation.expected.content:
+                result.append(operation)
+        except OSError:
+            continue
+    return tuple(result)
+
+
 def _conflict(
     target: str,
     source_identity: str,
@@ -447,7 +508,24 @@ def _conflict(
     reason: str,
     expected: RuntimeFile | None,
     prior: ManagedItem | None,
+    *,
+    on_conflict: OnConflict = "block",
 ) -> RuntimeOperation:
+    """Block on a conflict, or turn owned drift into a backed-up overwrite.
+
+    `apply_owned_plan` already routes updates through `atomic_write` with a
+    backup root, so a remediated operation needs no new write path.
+    """
+    if (
+        on_conflict == "backup"
+        and reason in _REMEDIABLE_CONFLICTS
+        and expected is not None
+        and prior is not None
+    ):
+        return RuntimeOperation(
+            "update", "update", target, source_identity, expected_hash,
+            actual.digest, installed_hash, reason, expected, prior, actual.state, True,
+        )
     return RuntimeOperation(
         "conflict", "block", target, source_identity, expected_hash,
         actual.digest, installed_hash, reason, expected, prior, actual.state,
@@ -466,6 +544,7 @@ def compile_skills_plan(
     identity_prefix: str = "agents/skills",
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
+    on_conflict: OnConflict = "block",
 ) -> SkillsPlan:
     """Compile expected first-party runtime and ownership decisions without writes."""
     repo = root.expanduser().absolute()
@@ -493,6 +572,7 @@ def compile_skills_plan(
         identity_prefix=identity_prefix,
         include_unlisted=include_unlisted,
         only_ids=only_ids,
+        on_conflict=on_conflict,
         outside_root_message="stale manifest target is outside the skills root",
     )
 
@@ -509,6 +589,7 @@ def compile_owned_plan(
     identity_prefix: str,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
+    on_conflict: OnConflict = "block",
     outside_root_message: str = "stale manifest target is outside the owned root",
 ) -> SkillsPlan:
     """Compile ownership decisions for an explicit set of HOME files."""
@@ -527,6 +608,7 @@ def compile_owned_plan(
             operations.append(_conflict(
                 item.target, item.source_identity, item.expected_hash, actual, None,
                 "agents manifest is malformed or incompatible", item, None,
+                on_conflict=on_conflict,
             ))
     else:
         for item in expected:
@@ -542,17 +624,20 @@ def compile_owned_plan(
                     operations.append(_conflict(
                         item.target, item.source_identity, item.expected_hash, actual, None,
                         "target exists without agents ownership", item, None,
+                        on_conflict=on_conflict,
                     ))
                 continue
             if prior.owner != item.owner or prior.source_identity != item.source_identity:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, "manifest ownership identity differs", item, prior,
+                    on_conflict=on_conflict,
                 ))
             elif actual.state == "unsafe":
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, "target path contains a symlink or unsafe type", item, prior,
+                    on_conflict=on_conflict,
                 ))
             elif actual.state == "missing":
                 operations.append(RuntimeOperation(
@@ -562,12 +647,14 @@ def compile_owned_plan(
             elif actual.digest != prior.installed_hash:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, "owned target was modified locally", item, prior,
+                    prior.installed_hash, CONTENT_DRIFT, item, prior,
+                    on_conflict=on_conflict,
                 ))
             elif actual.mode != prior.mode:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, "owned target mode was modified locally", item, prior,
+                    prior.installed_hash, MODE_DRIFT, item, prior,
+                    on_conflict=on_conflict,
                 ))
             elif actual.digest == item.expected_hash and actual.mode == item.mode:
                 operations.append(RuntimeOperation(
@@ -634,6 +721,7 @@ def compile_owned_plan(
         snapshot.manifest,
         tuple(sorted(operations, key=lambda item: (item.target, item.action))),
         only_ids,
+        on_conflict,
     )
 
 
@@ -685,6 +773,10 @@ def _expected_signature(plan: SkillsPlan) -> tuple[tuple[str, str, str, int], ..
 
 
 def _actual_matches(operation: RuntimeOperation, actual: _Actual) -> bool:
+    if operation.remediated:
+        # Drift was accepted up front, so the lock-time re-check must not demand
+        # the very equality the conflict already reported as broken.
+        return actual.state == operation.actual_state and actual.digest == operation.current_hash
     expected_mode = operation.expected.mode if operation.action == "chmod" and operation.prior is None else (
         operation.prior.mode if operation.prior is not None else None
     )
@@ -890,6 +982,7 @@ def apply_skills_plan(
             identity_prefix=plan.identity_prefix,
             include_unlisted=plan.include_unlisted,
             only_ids=plan.only_ids,
+            on_conflict=plan.on_conflict,
         )
 
     return apply_owned_plan(plan, compile_current, run_id=run_id)
@@ -929,82 +1022,122 @@ def apply_owned_plan(
         snapshot = _repair_manifest_mode(home, state_home, snapshot)
         if manifest_mode_changed:
             changed += 1
-        if current.conflicts:
-            details = "; ".join(f"{item.target}: {item.conflict}" for item in current.conflicts)
-            raise AgentRuntimeConflict(details)
 
-        retained = [
-            item for item in snapshot.manifest.items
-            if not item.owner.startswith(plan.owner_prefix)
-        ]
-        expected_items: list[ManagedItem] = []
-        backup_root = state_home / "dotf" / "backups"
-        pruned_parents: list[Path] = []
+        # Take over unowned targets that already hold the managed bytes, then
+        # re-plan so they come back as creates under our ownership. Nothing
+        # unverified is overwritten: these bytes match what we would write.
+        released: list[tuple[Path, bytes]] = []
+        for operation in adoptable_equivalent(current):
+            assert operation.expected is not None
+            target = Path(operation.target)
+            released.append((target, operation.expected.content))
+            target.unlink()
+        if released:
+            current = compile_current()
 
-        for operation in current.operations:
-            actual = _read_actual(home, Path(operation.target))
-            if not _actual_matches(operation, actual):
-                raise AgentRuntimeConflict(f"runtime target changed after planning: {operation.target}")
-            if operation.action == "none":
-                assert operation.prior is not None
+        try:
+            return _apply_operations(
+                current, home, state_home, target_root, snapshot, run,
+                changed=changed, unchanged=unchanged, pruned=pruned,
+                manifest_file=manifest_file,
+            )
+        except BaseException:
+            for target, content in released:
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(content)
+            raise
+
+
+def _apply_operations(
+    current: SkillsPlan,
+    home: Path,
+    state_home: Path,
+    target_root: Path,
+    snapshot: _ManifestSnapshot,
+    run: str,
+    *,
+    changed: int,
+    unchanged: int,
+    pruned: int,
+    manifest_file: Path,
+) -> SkillsApplyResult:
+    if current.conflicts:
+        details = "; ".join(f"{item.target}: {item.conflict}" for item in current.conflicts)
+        raise AgentRuntimeConflict(details)
+
+    retained = [
+        item for item in snapshot.manifest.items
+        if not item.owner.startswith(current.owner_prefix)
+    ]
+    expected_items: list[ManagedItem] = []
+    backup_root = state_home / "dotf" / "backups"
+    pruned_parents: list[Path] = []
+
+    for operation in current.operations:
+        actual = _read_actual(home, Path(operation.target))
+        if not _actual_matches(operation, actual):
+            raise AgentRuntimeConflict(f"runtime target changed after planning: {operation.target}")
+        if operation.action == "none":
+            assert operation.prior is not None
+            expected_items.append(operation.prior)
+            unchanged += 1
+            continue
+        if operation.action in {"create", "update"}:
+            assert operation.expected is not None
+            result = atomic_write(
+                operation.target,
+                operation.expected.content,
+                root=home,
+                format="text" if operation.target.endswith((".md", ".mdc", ".py", ".sh")) else "binary",
+                mode=operation.expected.mode,
+                backup_root=backup_root if operation.action == "update" else None,
+                run_id=run if operation.action == "update" else None,
+                sensitive=False,
+            )
+            del result
+            expected_items.append(_managed_item(operation.expected, run))
+            changed += 1
+            continue
+        if operation.action == "chmod":
+            assert operation.expected is not None
+            assert operation.prior is not None
+            assert actual.mode is not None
+            _chmod_owned(
+                home,
+                Path(operation.target),
+                operation.prior.installed_hash,
+                actual.mode,
+                operation.expected.mode,
+            )
+            if (
+                operation.prior.expected_hash == operation.expected.expected_hash
+                and operation.prior.mode == operation.expected.mode
+            ):
                 expected_items.append(operation.prior)
-                unchanged += 1
-                continue
-            if operation.action in {"create", "update"}:
-                assert operation.expected is not None
-                result = atomic_write(
-                    operation.target,
-                    operation.expected.content,
-                    root=home,
-                    format="text" if operation.target.endswith((".md", ".mdc", ".py", ".sh")) else "binary",
-                    mode=operation.expected.mode,
-                    backup_root=backup_root if operation.action == "update" else None,
-                    run_id=run if operation.action == "update" else None,
-                    sensitive=False,
-                )
-                del result
+            else:
                 expected_items.append(_managed_item(operation.expected, run))
-                changed += 1
-                continue
-            if operation.action == "chmod":
-                assert operation.expected is not None
-                assert operation.prior is not None
-                assert actual.mode is not None
-                _chmod_owned(
-                    home,
-                    Path(operation.target),
-                    operation.prior.installed_hash,
-                    actual.mode,
-                    operation.expected.mode,
-                )
-                if (
-                    operation.prior.expected_hash == operation.expected.expected_hash
-                    and operation.prior.mode == operation.expected.mode
-                ):
-                    expected_items.append(operation.prior)
-                else:
-                    expected_items.append(_managed_item(operation.expected, run))
-                changed += 1
-                continue
-            if operation.action == "prune":
-                assert operation.prior is not None
-                if actual.state == "present":
-                    _unlink_owned(home, Path(operation.target), operation.prior.installed_hash)
-                    pruned_parents.append(Path(operation.target).parent)
-                pruned += 1
-                changed += 1
+            changed += 1
+            continue
+        if operation.action == "prune":
+            assert operation.prior is not None
+            if actual.state == "present":
+                _unlink_owned(home, Path(operation.target), operation.prior.installed_hash)
+                pruned_parents.append(Path(operation.target).parent)
+            pruned += 1
+            changed += 1
 
-        for parent in sorted(set(pruned_parents), key=lambda value: len(value.parts), reverse=True):
-            _remove_empty_parents(home, target_root, parent)
+    for parent in sorted(set(pruned_parents), key=lambda value: len(value.parts), reverse=True):
+        _remove_empty_parents(home, target_root, parent)
 
-        new_manifest = ManagedManifest(
-            schema_version=MANIFEST_SCHEMA_VERSION,
-            kind="managed-manifest",
-            generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            items=tuple(sorted(retained + expected_items, key=lambda item: item.target)),
-        )
-        if new_manifest.items != snapshot.manifest.items:
-            manifest_file = _write_manifest(home, state_home, new_manifest)
+    new_manifest = ManagedManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        kind="managed-manifest",
+        generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        items=tuple(sorted(retained + expected_items, key=lambda item: item.target)),
+    )
+    if new_manifest.items != snapshot.manifest.items:
+        manifest_file = _write_manifest(home, state_home, new_manifest)
 
     return SkillsApplyResult(
         "changed" if changed else "unchanged",

@@ -25,16 +25,17 @@ if str(_SCRIPTS) not in sys.path:
 
 from common import Catalog, TOOLS  # noqa: E402
 from instructions import compile_instructions_plan  # noqa: E402
-from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
-from openspec_skills import openspec_command  # noqa: E402
-from sync import (  # noqa: E402
-    KIRO_SKILL_IDENTITY_PREFIX,
-    KIRO_SKILL_OWNER_PREFIX,
-    kiro_skills_target,
-    render_kiro_skill_bytes,
-    render_skill_bytes,
+from layouts import (  # noqa: E402
+    FIRST_PARTY_IDENTITY,
+    LAYOUTS,
+    SHARED_LAYOUT,
+    identity_prefix,
+    owner_prefix,
     skills_target,
 )
+from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
+from openspec_skills import openspec_command  # noqa: E402
+from sync import renderers_for  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
@@ -216,6 +217,7 @@ def _check_skills_plan(
     renderer: Callable[[Path, str], bytes],
     target_root: Path,
     owner_prefix: str,
+    identity_prefix: str,
     label: str,
 ) -> None:
     """Reuse the runtime planner; never approximate manifest/target drift."""
@@ -234,9 +236,7 @@ def _check_skills_plan(
             state_home=state_home,
             target_root=target_root,
             owner_prefix=owner_prefix,
-            identity_prefix=(
-                "agents/skills" if owner_prefix == "agents:skill:" else KIRO_SKILL_IDENTITY_PREFIX
-            ),
+            identity_prefix=identity_prefix,
             only_ids=only_ids,
         )
     except (AgentRuntimeError, OSError, SystemExit, ValueError) as exc:
@@ -308,27 +308,19 @@ def _check_skills_plan(
 
 
 def check_skills_plan(root: Path, report: DoctorReport, *, home: Path, state_home: Path | None = None) -> None:
-    """Check both the shared runtime and Kiro CLI's dedicated mirror."""
-    _check_skills_plan(
-        root,
-        report,
-        home=home,
-        state_home=state_home,
-        renderer=render_skill_bytes,
-        target_root=home / ".agents" / "skills",
-        owner_prefix="agents:skill:",
-        label="shared",
-    )
-    _check_skills_plan(
-        root,
-        report,
-        home=home,
-        state_home=state_home,
-        renderer=render_kiro_skill_bytes,
-        target_root=kiro_skills_target(),
-        owner_prefix=KIRO_SKILL_OWNER_PREFIX,
-        label="kiro",
-    )
+    """Check the shared runtime and every tool-specific mirror."""
+    for layout in LAYOUTS:
+        _check_skills_plan(
+            root,
+            report,
+            home=home,
+            state_home=state_home,
+            renderer=renderers_for(layout),
+            target_root=skills_target(layout, home),
+            owner_prefix=owner_prefix(layout, "first-party"),
+            identity_prefix=identity_prefix(layout, FIRST_PARTY_IDENTITY),
+            label=layout.key,
+        )
 
 
 def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
@@ -342,7 +334,7 @@ def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
             "dotf npm -i",
         )
         return
-    propose = skills_target(home) / "openspec-propose" / "SKILL.md"
+    propose = skills_target(SHARED_LAYOUT, home) / "openspec-propose" / "SKILL.md"
     if propose.is_file() and not propose.is_symlink():
         report.add("skills", "openspec-global", STATUS_PASS, f"OpenSpec skills 已安装到 {propose.parent.parent}")
         return

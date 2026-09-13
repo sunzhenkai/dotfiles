@@ -1,4 +1,4 @@
-"""Codex merge, managed catalogs, default MiniMax install, and no LLM -f CLI."""
+"""Codex base+overlay merge, managed config install, env expansion, and no LLM -f CLI."""
 
 from __future__ import annotations
 
@@ -15,13 +15,6 @@ from dotf_core.config_producers import codex_expand_env as expand_env  # noqa: E
 from dotf_core.config_producers import codex_merge as merge  # noqa: E402
 
 VENDOR = ROOT / "agents" / "vendors" / "codex"
-CATALOG_NAMES = {
-    "kimi-catalog.json",
-    "minimax-catalog.json",
-    "scnet-catalog.json",
-    "deepseek-catalog.json",
-    "zhipu-catalog.json",
-}
 
 
 def _install(tmp_home: Path) -> subprocess.CompletedProcess[str]:
@@ -46,22 +39,24 @@ install_codex
     )
 
 
-def test_vendor_declares_all_providers_without_overlays() -> None:
+def test_vendor_declares_policy_without_model_or_providers() -> None:
     document = tomllib.loads((VENDOR / "config.toml").read_text(encoding="utf-8"))
-    assert document["model_provider"] == "minimax"
-    assert document["model"] == "MiniMax-M3"
-    for name in ("minimax", "kimi", "zhipu", "scnet", "deepseek"):
-        assert name in document["model_providers"]
-    assert "nativex" not in document["model_providers"]
-    assert "company" not in document["model_providers"]
+    assert "model" not in document
+    assert "model_provider" not in document
+    assert "model_context_window" not in document
+    assert "model_catalog_json" not in document
+    assert "model_providers" not in document
+    assert document["approval_policy"] == "on-request"
+    assert document["sandbox_mode"] == "workspace-write"
+    assert document["shell_environment_policy"]["inherit"] == "core"
     assert not list(VENDOR.glob("*.config.toml"))
 
 
 def test_merge_appends_local_projects() -> None:
-    base = 'model = "MiniMax-M3"\nmodel_provider = "minimax"\n'
+    base = 'approval_policy = "on-request"\nsandbox_mode = "workspace-write"\n'
     local = '[projects."/tmp/demo"]\ntrust_level = "trusted"\n'
     out = merge(base, local)
-    assert 'model_provider = "minimax"' in out
+    assert 'approval_policy = "on-request"' in out
     assert 'trust_level = "trusted"' in out
     assert "XDG dotf overlay" in out
 
@@ -77,29 +72,13 @@ def test_merge_harvests_runtime_projects_and_prefers_local() -> None:
     )
     local = '[projects."/tmp/overlay"]\ntrust_level = "trusted"\n'
     out = merge(base, local, actual=actual)
-    preamble = out.split("[model_providers")[0]
-    assert 'model_provider = "minimax"' in preamble
-    assert 'model = "MiniMax-M3"' in preamble
     parsed = tomllib.loads(out)
+    assert parsed["approval_policy"] == "on-request"
     assert parsed["projects"]["/tmp/runtime"]["trust_level"] == "trusted"
     assert parsed["projects"]["/tmp/overlay"]["trust_level"] == "trusted"
 
 
-def test_all_catalogs_are_valid_repository_json() -> None:
-    document = tomllib.loads((VENDOR / "config.toml").read_text(encoding="utf-8"))
-    value = document["model_catalog_json"]
-    prefix = "~/.codex/model-catalogs/"
-    assert value.startswith(prefix)
-    names = {path.name for path in (VENDOR / "model-catalogs").glob("*.json")}
-    assert names == CATALOG_NAMES
-    assert value.removeprefix(prefix) in names
-    for path in sorted((VENDOR / "model-catalogs").glob("*.json")):
-        parsed = json.loads(path.read_text(encoding="utf-8"))
-        assert isinstance(parsed, dict) and isinstance(parsed.get("models"), list), path
-        assert parsed["models"], path
-
-
-def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
+def test_install_codex_manages_config_only_and_preserves_runtime(
     tmp_home: Path,
 ) -> None:
     codex_home = tmp_home / ".codex"
@@ -116,20 +95,10 @@ def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
     assert first.returncode == 0, first.stdout + first.stderr
     cfg_path = codex_home / "config.toml"
     cfg = cfg_path.read_text(encoding="utf-8")
-    preamble = cfg.split("[model_providers")[0]
-    assert 'model_provider = "minimax"' in preamble
-    assert 'model = "MiniMax-M3"' in preamble
-
-    installed_catalogs = codex_home / "model-catalogs"
-    assert {path.name for path in installed_catalogs.glob("*.json")} == CATALOG_NAMES
-    selected_catalog = Path(
-        tomllib.loads(cfg)["model_catalog_json"].replace("~", str(tmp_home), 1)
-    )
-    assert selected_catalog.is_file()
-    assert not selected_catalog.is_symlink()
-    for catalog in installed_catalogs.glob("*.json"):
-        assert catalog.is_file() and not catalog.is_symlink()
-        assert json.loads(catalog.read_text(encoding="utf-8"))["models"]
+    parsed = tomllib.loads(cfg)
+    assert "model_provider" not in parsed
+    assert "model_providers" not in parsed
+    assert parsed["approval_policy"] == "on-request"
 
     assert (codex_home / "auth.json").read_text(encoding="utf-8") == '{"token":"local-only"}\n'
     assert (codex_home / "history.jsonl").read_text(encoding="utf-8") == '{"local":true}\n'
@@ -138,22 +107,22 @@ def test_install_codex_manages_config_and_catalogs_only_and_preserves_runtime(
     assert (codex_home / "state_5.sqlite").read_bytes() == b"runtime-db"
     assert not (codex_home / ".dotf-profile").exists()
     assert not list(codex_home.glob("*.config.toml"))
+    assert not (codex_home / "model-catalogs").exists()
 
     manifest_path = tmp_home / ".local" / "state" / "dotf" / "config-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     codex_items = [item for item in manifest["items"] if item["owner"] == "config:codex"]
     assert {Path(item["target"]).relative_to(codex_home).as_posix() for item in codex_items} == {
-        "config.toml",
-        *(f"model-catalogs/{name}" for name in CATALOG_NAMES),
+        "config.toml"
     }
     assert all(item["strategy"] == "merge" and item["sensitive"] for item in codex_items)
 
-    mtimes = {path: path.stat().st_mtime_ns for path in [cfg_path, *installed_catalogs.glob("*.json")]}
+    mtime = cfg_path.stat().st_mtime_ns
     manifest_before = manifest_path.read_bytes()
     second = _install(tmp_home)
     assert second.returncode == 0, second.stdout + second.stderr
     assert "unchanged" in second.stdout
-    assert {path: path.stat().st_mtime_ns for path in mtimes} == mtimes
+    assert cfg_path.stat().st_mtime_ns == mtime
     assert manifest_path.read_bytes() == manifest_before
 
 
@@ -170,9 +139,6 @@ def test_install_codex_reconciles_runtime_projects_on_reinstall(tmp_home: Path) 
     harvested = _install(tmp_home)
     assert harvested.returncode == 0, harvested.stdout + harvested.stderr
     cfg = cfg_path.read_text(encoding="utf-8")
-    preamble = cfg.split("[model_providers")[0]
-    assert 'model_provider = "minimax"' in preamble
-    assert 'model = "MiniMax-M3"' in preamble
     parsed = tomllib.loads(cfg)
     assert parsed["projects"]["/tmp/runtime"]["trust_level"] == "trusted"
 
@@ -233,7 +199,8 @@ def test_expand_env_keeps_placeholder_when_unset() -> None:
 def test_merge_expands_placeholders(monkeypatch: object) -> None:
     monkeypatch.setenv("EXAMPLE_BASE_URL", "http://127.0.0.1:9/v1")
     base = (
-        'model = "MiniMax-M3"\nmodel_provider = "minimax"\n\n'
+        'approval_policy = "on-request"\n\n'
+        '[shell_environment_policy]\ninherit = "core"\n\n'
         '[model_providers.demo]\nbase_url = "${EXAMPLE_BASE_URL}"\n'
     )
     out = merge(base)
@@ -251,7 +218,6 @@ def test_vendor_files_have_no_company_secrets() -> None:
         VENDOR / "config.toml",
         VENDOR / "README.md",
         ROOT / "agents" / "env" / "env.schema.yaml",
-        *[VENDOR / "model-catalogs" / name for name in CATALOG_NAMES],
     ]
     for path in paths:
         text = path.read_text(encoding="utf-8")

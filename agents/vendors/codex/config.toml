@@ -1,98 +1,17 @@
-# Codex 配置 - 默认直连 MiniMax（MiniMax-M3）
+# Codex 配置 - 基础配置（base），安装时与 XDG overlay 合并生成 ~/.codex/config.toml
 # 文档: https://developers.openai.com/codex/config-reference
 #
-# 自定义 provider（均 requires_openai_auth = false，启动跳过 ChatGPT 登录）：
-#   minimax  — MiniMax 国内站（默认）  MINIMAX_API_KEY
-#   kimi     — Kimi For Coding         KIMI_API_KEY
-#   zhipu    — 智谱 GLM Coding Plan    ZHIPU_API_KEY
-#   scnet    — 超算互联网 Token Plan    SCNET_API_KEY
-#   deepseek — DeepSeek 官方 API       DEEPSEEK_API_KEY
-#
-# 切换模型：TUI /model 或 codex exec -m <slug>（catalog 为数据源）。
-# 注意: codex 0.130+ 仅支持 wire_api = "responses"。
+# 本仓库不再声明 LLM provider / 模型 / 密钥；运行时 provider 配置请走
+# ${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/*.yaml 的 codex.local_toml。
 
 # ============================================================
 # 顶级配置（必须在任何 [table] 头之前）
 # ============================================================
-model = "MiniMax-M3"
-model_provider = "minimax"
-model_context_window = 1000000
-# 模型能力目录：声明 MiniMax-M3 的多模态输入、reasoning level、工具类型等。
-# 安装后由 config_deploy 管理为 ~/.codex/model-catalogs/minimax-catalog.json 真实文件。
-model_catalog_json = "~/.codex/model-catalogs/minimax-catalog.json"
 
 # 审批策略: untrusted | on-request | never
 approval_policy = "on-request"
 # 沙箱模式: read-only | workspace-write | danger-full-access
 sandbox_mode = "workspace-write"
-
-# 隐藏冗长的推理输出（CI 日志更清爽）
-hide_agent_reasoning = true
-model_reasoning_effort = "high"
-
-# ============================================================
-# 自定义模型提供商 - MiniMax（默认）
-# ============================================================
-# 认证通过 env_key 从 MINIMAX_API_KEY 环境变量读取，无需在此硬编码密钥。
-# wire_api = "responses"：MiniMax Code Companion 提供 Responses API 协议。
-# requires_openai_auth = false：显式声明不要求 OpenAI 登录（默认即 false，
-#   启动时直接跳过 ChatGPT 登录选择器）。
-# 国内站 api.minimaxi.com（不是海外站 api.minimax.io）。
-[model_providers.minimax]
-name = "MiniMax"
-base_url = "https://api.minimaxi.com/v1"
-env_key = "MINIMAX_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - Kimi For Coding
-# ============================================================
-# 官方 Base URL 为 Chat Completions；Codex 仍发 /v1/responses。
-# 若直连失败，需 Responses 网关（如 CC Switch）做协议转换。
-[model_providers.kimi]
-name = "Kimi"
-base_url = "https://api.kimi.com/coding/v1"
-env_key = "KIMI_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - 智谱 GLM Coding Plan（open.bigmodel.cn）
-# ============================================================
-# 官方 Codex 端点为 OpenAI Responses：https://open.bigmodel.cn/api/v1
-# （Chat Completions 套餐端点 /api/coding/paas/v4 不能给现行 Codex 直连）
-[model_providers.zhipu]
-name = "Zhipu Coding Plan"
-base_url = "https://open.bigmodel.cn/api/v1"
-env_key = "ZHIPU_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - SCNet（超算互联网）
-# ============================================================
-# OpenAI 兼容（含 Responses）：https://api.scnet.cn/api/llm/v1
-# Anthropic 兼容（Codex 不用）：https://api.scnet.cn/api/llm/anthropic
-# 官方文档 env 名为 SCNET_TOKEN_PLAN_API_KEY；本仓库统一 SCNET_API_KEY。
-[model_providers.scnet]
-name = "SCNet"
-base_url = "https://api.scnet.cn/api/llm/v1"
-env_key = "SCNET_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-# ============================================================
-# 自定义模型提供商 - DeepSeek 官方 API
-# ============================================================
-# 官方原生支持 OpenAI Responses：https://api.deepseek.com/
-# 认证通过 env_key 从 DEEPSEEK_API_KEY 环境变量读取，密钥不入库。
-[model_providers.deepseek]
-name = "DeepSeek"
-base_url = "https://api.deepseek.com/"
-env_key = "DEEPSEEK_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
 
 # ============================================================
 # 子进程环境变量策略

@@ -1,4 +1,4 @@
-"""sync.py 分发 skill 到共享与 Kiro 目标：references/scripts 原样拷贝。"""
+"""sync.py 分发 skill 到各 layout：references/scripts 原样拷贝。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src" / "agents"))
 
-from sync import kiro_skills_target  # noqa: E402
+from layouts import CLAUDE, KIRO, SHARED, skills_target  # noqa: E402
 from sync import validate_output  # noqa: E402
 
 
@@ -108,7 +108,33 @@ def test_sync_kiro_cli_respects_kiro_home(tmp_path: Path) -> None:
 
 def test_explicit_home_still_defaults_to_kiro_directory() -> None:
     home = Path("/tmp/dotf-test-home")
-    assert kiro_skills_target(home) == home / ".kiro" / "skills"
+    assert skills_target(KIRO, home) == home / ".kiro" / "skills"
+
+
+def test_claude_target_loads_skills_code_writes_verbatim(tmp_path: Path) -> None:
+    # Claude Code reads personal skills from ~/.claude/skills/<id>/SKILL.md and
+    # consumes $ARGUMENTS itself, so this layout must not inject the Kiro marker.
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run_sync(home)
+    assert r.returncode == 0, r.stderr + r.stdout
+    claude = home / ".claude" / "skills" / "task-design" / "SKILL.md"
+    assert claude.is_file(), f"Claude skills 未分发: {claude}\n{r.stdout}"
+    assert claude.read_text().rstrip().endswith("$ARGUMENTS") is False
+    assert "{{slash:" not in claude.read_text()
+    assert skills_target(CLAUDE, home) == home / ".claude" / "skills"
+
+
+def test_every_layout_receives_identical_first_party_files(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run_sync(home)
+    assert r.returncode == 0, r.stderr + r.stdout
+    relative = Path("task-design") / "references" / "design-template.md"
+    shared = skills_target(SHARED, home) / relative
+    kiro = skills_target(KIRO, home) / relative
+    claude = skills_target(CLAUDE, home) / relative
+    assert shared.read_bytes() == kiro.read_bytes() == claude.read_bytes()
 
 
 def test_sync_installs_no_taskctl_shim(tmp_path: Path) -> None:

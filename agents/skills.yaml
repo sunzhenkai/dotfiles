@@ -2,9 +2,10 @@
 #
 # - 按 group 组织：组声明来源属性，成员只写安装 id。group 名兼作 CLI 展开单位，
 #   例如 `dotf skills -i mattpocock` 展开为整组。
-# - 编目里的条目 = 默认全量安装（`dotf agents -c`）。不想装就注释掉该条目：
-#   注释掉即不在编目内，于是既不自动装，也不能经 overlay / agents apply 引用，
-#   `dotf skills -i` 只会把它当普通名字透传给 npx。
+# - 编目里的条目 = 默认全量安装（`dotf agents -c`）。条目可写成映射 `- id: <id>` 并加
+#   `optional: true`：仍在编目内（可经 overlay / agents apply 按需启用），但不进默认安装。
+#   不想保留就注释掉该条目：注释掉即不在编目内，于是既不自动装，也不能经 overlay /
+#   agents apply 引用，`dotf skills -i` 只会把它当普通名字透传给 npx。
 # - type 是语义字段：first-party 来源是仓库内 agents/skills/<id>/；
 #   third-party 来源由 lock（skills.lock.yaml）固定，且必须被 lock 覆盖。
 #   type 不得由 group 推断，也不得由 package 形态推断。
@@ -20,8 +21,10 @@ groups:
       - dotf-code-explore
       - dotf-code-review
       - dotf-ui-design
-      - en-chat
-      - lark-cli
+      - id: en-chat
+        optional: true
+      - id: lark-cli
+        optional: true
       - pretty-view-html
       - pretty-view-ppt
       - project-init

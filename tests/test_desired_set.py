@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 from desired_set import DesiredSetError, resolve_skill_desired_set  # noqa: E402
-from defaults import catalog_skill_ids, first_party_skill_ids  # noqa: E402
+from defaults import catalog_skill_ids  # noqa: E402
 from dotf_core.overlays import (  # noqa: E402
     OVERLAY_KIND,
     OVERLAY_SCHEMA_VERSION,
@@ -24,14 +24,20 @@ from dotf_core.overlays import (  # noqa: E402
 )
 
 
-def test_default_desired_set_is_the_whole_catalog() -> None:
+def test_default_desired_set_is_the_non_optional_catalog() -> None:
     desired = resolve_skill_desired_set(ROOT, overlay_agents={})
-    first = set(first_party_skill_ids(ROOT))
     catalogued = set(catalog_skill_ids(ROOT))
-    assert first <= desired
-    # no per-entry default: every catalogued id is in the desired set.
-    assert catalogued == desired
+    # optional: true 条目仍在编目内（可经 overlay 启用），但不进默认 Desired Set。
+    optional = {"en-chat", "lark-cli"}
+    assert optional <= catalogued
+    assert desired == catalogued - optional
     assert all(not item.startswith("openspec-") for item in desired)
+
+
+def test_optional_skill_enters_desired_set_via_overlay_enable() -> None:
+    desired = resolve_skill_desired_set(ROOT, overlay_agents={"enabled_skills": ["lark-cli"]})
+    assert "lark-cli" in desired
+    assert "en-chat" not in desired
 
 
 def test_overlay_disable_removes_skill() -> None:

@@ -9,7 +9,7 @@ Agent **运行环境**真相源（依赖检查、env schema、安全策略、pro
 | 子目录 | 职责 |
 |--------|------|
 | `agents/skills/`、`agents/commands/` | 提示词与工作流 |
-| `agents/vendors/` | 各工具配置模板（provider/model 等） |
+| `agents/vendors/` | 各工具配置模板 |
 | `agents/env/` | CLI/runtime 检查、env 检查、安全边界 |
 
 不要把 skill/command 写进本目录；也不要把 API Key、cookie 提交到仓库。
@@ -43,8 +43,8 @@ agents/env/
 | Profile | 内容 | 风险 |
 |---------|------|------|
 | `coding` | 本地 CLI/runtime 检查 | low |
-| `research` | coding 检查 + 智谱 provider 密钥检查（默认） | low |
-| `full` | 全部 runtime 与 provider 密钥检查 | low |
+| `research` | coding 检查 + env schema 变量检查（默认；当前无受管变量，等价 coding） | low |
+| `full` | 全部 runtime 与 env schema 变量检查 | low |
 
 `dotf agents -c` 默认使用 `research` profile；显式 `--profile` 或外置 overlay 可切换。
 
@@ -76,11 +76,9 @@ PYTHONPATH=scripts python3 -m dotf_core.overlays migrate
 
 ## 安全
 
-- 仓库只存变量**名**与用途说明（见 `env.schema.yaml`）；真实密钥只放环境变量或系统 keychain
+- 仓库只存变量**名**与用途说明（见 `env.schema.yaml`）；真实密钥只放环境变量或系统 keychain。当前 schema 不声明任何 AI provider key，provider/密钥完全由本机自管。
 - 本机路径只放 XDG external overlay；仓库 local 文件仅为只读迁移输入
 - doctor 会扫描明显 secret / 内网 URL，且**永不打印** secret 值
-- MiniMax：`MINIMAX_API_KEY`（本仓库 Codex 打**国内** `api.minimaxi.com`）与 Pi 海外 provider `minimax`（`api.minimax.io`）**不是一回事**；国内 key 用 Pi 须走 `minimax-cn` / `MINIMAX_CN_API_KEY`。专题：`repos/codeup/agent-data/knowledge/snippets/minimax-cn-vs-intl.md`
-- Kimi（Pi）：`KIMI_API_KEY` → 内置 provider `kimi-coding`；`dotf pi -c` 会写入 `auth.json` 的 `$KIMI_API_KEY` 引用
 
 ### Doctor 安全边界
 

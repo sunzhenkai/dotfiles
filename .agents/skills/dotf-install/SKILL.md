@@ -38,17 +38,17 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 |-------|--------------|----------|---------------|
 | core | system, homebrew | **系统级**（sudo 装 / 改源） | ❌ 需显式确认 |
 | core | sdk (mise), golang | 用户级（~/.local/share/mise, GOPATH） | ✅ 可直接装 |
-| tools | delta, grepom, senv, mdserve, ocr, npm | 多为用户级（cargo/go/bin） | ✅（确认依赖） |
+| tools | delta, grepom, senv, mdserve, npm | 多为用户级（cargo/go/bin） | ✅（确认依赖） |
 | tools | ossutil, aws, aliyun, gcp | 用户级二进制 | ✅ |
 | tools | vcpkg, d2 | 用户级 | ✅ |
 | 办公 | dws, lark-cli | 用户级（npm/npx） | ✅（需 sdk/Node） |
-| agents | agents, cursor, kiro, opencode, codex, kimi-code, pi, zcode, claude-code, trae-cli, dsh | 用户级 CLI + 配置 | ✅ |
+| agents | agents, cursor, kiro, opencode, codex, kimi-code, pi, zcode, claude-code, trae-cli | 用户级 CLI + 配置 | ✅ |
 | shell | git, zsh, starship | git 用户级配置；**zsh 可能 chsh**；starship 用户级 | ⚠️ zsh 见下 |
 | editors | nvim, helix, zed | 用户级配置 + 可能装编辑器 | ✅（装编辑器时确认） |
 | terminals | kitty, alacritty, wezterm, ghostty, iterm2 | 用户级配置；装终端可能系统级 | ✅（装终端时确认） |
 | multiplexers | tmux, zellij | 用户级 | ✅ |
 | desktop | hypr, fcitx5 | **系统级**（改桌面/输入法） | ❌ 需显式确认 |
-| utils | fonts, yazi, k9s, shell_gpt, logseq | fonts 可能系统级；其余用户级 | ⚠️ fonts 确认 |
+| utils | fonts, yazi, k9s, logseq | fonts 可能系统级；其余用户级 | ⚠️ fonts 确认 |
 
 > 上述「级别」是基于现有脚本的归纳。无法确定时，**先 `--dry-run`** 看计划里有没有 sudo / 改 /etc / chsh。
 
@@ -57,10 +57,10 @@ dotf <mod> -i --dry-run                         # 单模块计划预览
 以下模块在 shared-user / shared-home 下通常可直接装（用户级、不改系统、不 chsh）：
 
 ```
-sdk golang delta grepom senv mdserve ocr npm ossutil aws aliyun gcp vcpkg d2
+sdk golang delta grepom senv mdserve npm ossutil aws aliyun gcp vcpkg d2
 dws lark-cli
-agents cursor kiro opencode codex kimi-code pi zcode claude-code trae-cli dsh
-nvim helix tmux zellij yazi k9s shell_gpt
+agents cursor kiro opencode codex kimi-code pi zcode claude-code trae-cli
+nvim helix tmux zellij yazi k9s
 git starship（仅配置，不 chsh）
 ```
 
@@ -108,7 +108,8 @@ dotf <mod> -i --yes         # 非交互（shared 下系统级动作仍会确认�
 ```bash
 dotf <mod> -c --dry-run
 dotf <mod> -c --yes
-dotf agents -c                # 聚合同步 skills（~/.agents/skills）+ 全局指令
+dotf agents -c                # 聚合同步 skills（~/.agents/skills → Kiro → Claude Code）+ 全局指令
+dotf agents skill apply <id> --on-conflict=backup   # 先备份本机漂移再覆写
 ```
 
 历史整目录软链由 config 计划仅 unlink 链接本身并迁移为真实目录；外来软链、未托管目标或本机修改默认 `conflict`，不得静默覆盖。Agent runtime 只 reconcile managed manifest 拥有且 hash 未变的项。失败先查看 XDG state 下的 journal；普通 failed 动作用 `dotf retry` 重新经过 planner，`failed-rollback` 则保留 journal/备份并人工恢复。shared 下仍须确认目标位于当前用户 HOME。

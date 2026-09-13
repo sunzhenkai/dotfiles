@@ -39,15 +39,21 @@ def resolve_skill_desired_set(
     home: Path | None = None,
     overlay_agents: Mapping[str, Any] | None = None,
 ) -> frozenset[str]:
-    """编目内全部 id ∪ overlay 启用 − overlay 停用。
+    """非 optional 编目 id ∪ overlay 启用 − overlay 停用。
 
-    There is no per-entry default: everything catalogued is installed by the
-    automatic full install. Opting out is done by commenting the entry out of
-    the catalog, so overlay may only enable/disable catalogued ids.
+    Catalogued `optional: true` entries are approved but stay out of the default
+    Desired Set; overlay enabled_skills (or `dotf agents skill apply`) brings
+    them in on demand. Opting out entirely is done by commenting the entry out
+    of the catalog, so overlay may only enable/disable catalogued ids.
     """
     catalog = load_skills_catalog(root)
     known = frozenset(
         entry.id for entry in catalog.skills if not entry.id.startswith("openspec-")
+    )
+    defaults = frozenset(
+        entry.id
+        for entry in catalog.skills
+        if not entry.optional and not entry.id.startswith("openspec-")
     )
     agents = dict(overlay_agents) if overlay_agents is not None else _overlay_agents(root, home)
     enabled = frozenset(agents.get("enabled_skills") or [])
@@ -58,4 +64,4 @@ def resolve_skill_desired_set(
         raise DesiredSetError("OpenSpec skills cannot enter Desired Set: " + ", ".join(openspec))
     if unknown:
         raise DesiredSetError("unlocked or unknown skills cannot enter Desired Set: " + ", ".join(unknown))
-    return (known | enabled) - disabled
+    return (defaults | enabled) - disabled

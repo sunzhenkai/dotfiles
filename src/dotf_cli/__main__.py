@@ -219,6 +219,17 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
             ctx.usage_profile = args[i]
             config_extra += ["--profile", args[i]]
             doctor_extra += ["--profile", args[i]]
+        elif a == "--on-conflict" or a.startswith("--on-conflict="):
+            if a == "--on-conflict":
+                i += 1
+                if i >= len(args):
+                    raise DotfError("usage", "错误: --on-conflict 需要参数（block|backup）")
+                value = args[i]
+            else:
+                value = a.split("=", 1)[1]
+            if value not in ("block", "backup"):
+                flag_error("错误: --on-conflict 只接受 block 或 backup")
+            ctx.on_conflict = value
         elif a.startswith("-"):
             print(f"错误: 未知选项 '{a}'")
             print()

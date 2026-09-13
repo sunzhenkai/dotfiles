@@ -31,17 +31,6 @@ def _json_object(raw: bytes | None, *, label: str) -> dict[str, Any]:
     return value
 
 
-def _deep_overlay(base: Mapping[str, Any], managed: Mapping[str, Any]) -> dict[str, Any]:
-    result = dict(base)
-    for key, value in managed.items():
-        current = result.get(key)
-        if isinstance(current, Mapping) and isinstance(value, Mapping):
-            result[key] = _deep_overlay(current, value)
-        else:
-            result[key] = value
-    return result
-
-
 def _copy_single(context: ProducerContext) -> ProducedContent:
     return ProducedContent(context.source_files["."])
 
@@ -77,45 +66,17 @@ def _preserve_single(context: ProducerContext) -> ProducedContent:
     return ProducedContent(context.actual_files.get(".", context.source_files["."]))
 
 
-def _ocr(context: ProducerContext) -> list[ProducedFile]:
-    source = _json_object(context.source_files.get("config.json"), label="OCR source")
-    actual = _json_object(context.actual_files.get("config.json"), label="OCR target")
-    return [ProducedFile("config.json", _deep_overlay(actual, source), format="json")]
-
-
-# ---- OpenCode provider 合并（原 scripts/modules/opencode/merge_config.py） ----
-
-OPENCODE_DEFAULT_MODEL = "minimax/MiniMax-M3"
-OPENCODE_MANAGED_PROVIDER_IDS = frozenset({"minimax", "kimi", "zhipu", "scnet", "deepseek"})
+# ---- OpenCode vendor→目标合并（原 scripts/modules/opencode/merge_config.py） ----
 
 
 def opencode_merge(
     existing: dict[str, Any] | None,
     vendor: dict[str, Any],
 ) -> dict[str, Any]:
-    """Merge vendor-managed providers; keep an existing default model."""
+    """Overlay vendor-managed keys into the target without clobbering local ones."""
+    out = dict(vendor)
     if existing:
-        out = dict(existing)
-    else:
-        out = {key: value for key, value in vendor.items() if key not in ("provider", "model")}
-
-    vendor_providers = vendor.get("provider")
-    if not isinstance(vendor_providers, dict):
-        vendor_providers = {}
-    current_providers = out.get("provider")
-    if not isinstance(current_providers, dict):
-        current_providers = {}
-    merged_providers = dict(current_providers)
-    for pid, pcfg in vendor_providers.items():
-        merged_providers[pid] = pcfg
-    out["provider"] = merged_providers
-
-    if "$schema" not in out and "$schema" in vendor:
-        out["$schema"] = vendor["$schema"]
-
-    if "model" not in out:
-        out["model"] = vendor.get("model") or OPENCODE_DEFAULT_MODEL
-
+        out.update(existing)
     return out
 
 
@@ -146,30 +107,6 @@ def _opencode_factory(repo_root: Path):
         return outputs
 
     return produce
-
-
-def _pi(context: ProducerContext) -> list[ProducedFile]:
-    managed = _json_object(context.source_files.get("settings.json"), label="Pi settings source")
-    actual_settings = _json_object(
-        context.actual_files.get("settings.json"), label="Pi settings target"
-    )
-    settings = dict(actual_settings)
-    settings.update(managed)
-
-    defaults = _json_object(context.source_files.get("auth.json.example"), label="Pi auth source")
-    auth = _json_object(context.actual_files.get("auth.json"), label="Pi auth target")
-    for provider, default in defaults.items():
-        existing = auth.get(provider)
-        if not (
-            isinstance(existing, dict)
-            and existing.get("type")
-            and existing.get("key")
-        ):
-            auth[provider] = default
-    return [
-        ProducedFile("settings.json", settings, format="json"),
-        ProducedFile("auth.json", auth, format="json"),
-    ]
 
 
 def _logseq(context: ProducerContext) -> list[ProducedFile]:
@@ -298,30 +235,11 @@ def _codex_factory(repo_root: Path, home: Path):
             raise ConfigDeployError(f"{label} is malformed TOML") from exc
         return text, document
 
-    def _catalog_relative(document: Mapping[str, Any], *, label: str) -> str:
-        value = document.get("model_catalog_json")
-        prefix = "~/.codex/"
-        if not isinstance(value, str) or not value.startswith(prefix):
-            raise ConfigDeployError(
-                f"{label} model_catalog_json must be below ~/.codex"
-            )
-        relative = value[len(prefix) :]
-        if not relative.startswith("model-catalogs/"):
-            raise ConfigDeployError(
-                f"{label} model_catalog_json must reference model-catalogs"
-            )
-        return relative
-
     def produce(context: ProducerContext) -> list[ProducedFile]:
         base_raw = context.source_files.get("config.toml")
         if base_raw is None:
             raise ConfigDeployError("Codex source is missing config.toml")
-        base, base_document = _toml_document(base_raw, label="Codex base")
-
-        catalog_paths = {_catalog_relative(base_document, label="Codex base")}
-        for relative, raw in sorted(context.source_files.items()):
-            if relative.startswith("model-catalogs/") and relative.endswith(".json"):
-                catalog_paths.add(relative)
+        base, _ = _toml_document(base_raw, label="Codex base")
 
         try:
             local = load_overlays(
@@ -337,7 +255,7 @@ def _codex_factory(repo_root: Path, home: Path):
         if actual_raw is not None:
             actual_text, _ = _toml_document(actual_raw, label="Codex target")
 
-        outputs = [
+        return [
             ProducedFile(
                 "config.toml",
                 codex_merge(base, local, actual=actual_text),
@@ -345,15 +263,6 @@ def _codex_factory(repo_root: Path, home: Path):
                 reconcile_owned=actual_raw is not None,
             )
         ]
-        for relative in sorted(catalog_paths):
-            try:
-                catalog = context.source_files[relative]
-            except KeyError as exc:
-                raise ConfigDeployError(
-                    f"Codex referenced catalog is missing: {relative}"
-                ) from exc
-            outputs.append(ProducedFile(relative, catalog, format="json"))
-        return outputs
 
     return produce
 
@@ -365,10 +274,8 @@ def producer_for(
     repo = Path(repo_root).absolute()
     home_path = Path(home).absolute()
     factories = {
-        "ocr": _ocr,
         "agents": _copy_single,
         "kimi-code": _preserve_single,
-        "pi": _pi,
         "logseq": _logseq,
     }
     if module_name == "codex":

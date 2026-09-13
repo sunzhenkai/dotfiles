@@ -3,9 +3,12 @@
 
 One file is the single source of truth for every Skill, organised by group.
 Each group declares its source attributes and lists member install ids; the
-group name doubles as a CLI expansion unit. There is no per-entry "default"
-flag: everything catalogued is installed by the automatic full install, and
-opting out means commenting the entry out of the catalog.
+group name doubles as a CLI expansion unit. A member is either a plain id
+(string) or a mapping `- id: <id>` with `optional: true`: optional entries
+stay catalogued (overlay / agents apply may enable them on demand) but are
+excluded from the default full install. Everything else catalogued is
+installed by `dotf agents -c`; opting out entirely means commenting the entry
+out of the catalog.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ THIRD_PARTY = "third-party"
 SOURCE_REGISTRY = "registry"
 SOURCE_GITHUB = "github"
 _GROUP_KEYS = {"type", "source", "package", "skills"}
+_MEMBER_KEYS = {"id", "optional"}
 _THIRD_PARTY_SOURCES = {SOURCE_REGISTRY, SOURCE_GITHUB}
 
 
@@ -39,6 +43,7 @@ class SkillEntry:
     type: str
     package: Optional[str] = None
     source: Optional[str] = None
+    optional: bool = False
 
     @property
     def is_first_party(self) -> bool:
@@ -52,6 +57,7 @@ class SkillGroup:
     ids: tuple[str, ...]
     package: Optional[str] = None
     source: Optional[str] = None
+    optional_ids: tuple[str, ...] = ()
 
     @property
     def is_first_party(self) -> bool:
@@ -74,6 +80,10 @@ class SkillsCatalog:
     def ids(self) -> List[str]:
         return [entry.id for entry in self.skills]
 
+    def default_ids(self) -> List[str]:
+        """Catalogued ids that enter the default Desired Set (non-optional)."""
+        return [entry.id for entry in self.skills if not entry.optional]
+
     def first_party_ids(self) -> List[str]:
         return [entry.id for entry in self.skills if entry.is_first_party]
 
@@ -87,6 +97,28 @@ class SkillsCatalog:
 
 def _fail(message: str) -> SkillsCatalogError:
     return SkillsCatalogError(f"skills catalog: {message}")
+
+
+def _parse_member(group: str, index: int, member: object) -> tuple[str, bool]:
+    """One skills list entry: a plain id string or an {id, optional} mapping."""
+    label = f"group {group!r}.skills[{index}]"
+    if isinstance(member, str):
+        skill_id, optional = member, False
+    elif isinstance(member, dict):
+        unknown = set(member) - _MEMBER_KEYS
+        if unknown:
+            raise _fail(f"{label} has unknown keys: {', '.join(sorted(unknown))}")
+        skill_id = member.get("id")
+        optional = member.get("optional", False)
+        if not isinstance(optional, bool):
+            raise _fail(f"{label}.optional must be a boolean")
+    else:
+        raise _fail(f"{label} must be a non-empty skill id or a mapping with id/optional")
+    if not isinstance(skill_id, str) or not skill_id:
+        raise _fail(f"{label} id must be a non-empty skill id")
+    if "/" in skill_id:
+        raise _fail(f"{label} id must not contain '/'")
+    return skill_id, optional
 
 
 def _parse_group(name: str, raw: object) -> SkillGroup:
@@ -124,17 +156,24 @@ def _parse_group(name: str, raw: object) -> SkillGroup:
     if not isinstance(members, list):
         raise _fail(f"group {name!r} requires a skills list")
     ids: list[str] = []
+    optionals: list[str] = []
     for index, member in enumerate(members):
-        if not isinstance(member, str) or not member:
-            raise _fail(f"group {name!r}.skills[{index}] must be a non-empty skill id")
-        if "/" in member:
-            raise _fail(f"group {name!r}.skills[{index}] id must not contain '/'")
-        ids.append(member)
+        skill_id, optional = _parse_member(name, index, member)
+        ids.append(skill_id)
+        if optional:
+            optionals.append(skill_id)
     duplicates = sorted({item for item in ids if ids.count(item) > 1})
     if duplicates:
         raise _fail(f"group {name!r} has duplicate skill ids: " + ", ".join(duplicates))
 
-    return SkillGroup(name=name, type=kind, ids=tuple(ids), package=package, source=source)
+    return SkillGroup(
+        name=name,
+        type=kind,
+        ids=tuple(ids),
+        package=package,
+        source=source,
+        optional_ids=tuple(optionals),
+    )
 
 
 def parse_catalog(data: object) -> SkillsCatalog:
@@ -158,6 +197,7 @@ def parse_catalog(data: object) -> SkillsCatalog:
     entries: list[SkillEntry] = []
     seen: set[str] = set()
     for group in groups:
+        optional_set = set(group.optional_ids)
         for skill_id in group.ids:
             if skill_id in seen:
                 raise _fail(f"duplicate skill id across groups: {skill_id}")
@@ -169,6 +209,7 @@ def parse_catalog(data: object) -> SkillsCatalog:
                     type=group.type,
                     package=group.package,
                     source=group.source,
+                    optional=skill_id in optional_set,
                 )
             )
 

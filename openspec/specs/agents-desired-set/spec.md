@@ -4,11 +4,12 @@
 定义本机 Skill 的 Desired Set：它如何组成、如何经 overlay 持久化，以及 apply / remove 如何与 sync prune 绑在同一次计划里。
 ## Requirements
 ### Requirement: Desired Set 组成
-本机 Desired Set SHALL 为：一手 catalog ∪ 默认选中的第三方 Skill ∪ overlay 显式启用的 Locked Skill，再减去 overlay 停用项。未锁定第三方 SHALL NOT 进入 Desired Set。OpenSpec 生成的 skill SHALL NOT 进入 Desired Set。未写 overlay 时 SHALL 保持现有默认（catalog 与默认选中项全量 sync）。
+本机 Desired Set SHALL 为：非 optional 编目条目 ∪ overlay 显式启用的编目 Skill，再减去 overlay 停用项。编目标记 `optional: true` 的条目 SHALL NOT 进入默认 Desired Set，但 SHALL 可经 overlay 启用进入。未锁定第三方 SHALL NOT 进入 Desired Set。OpenSpec 生成的 skill SHALL NOT 进入 Desired Set。未写 overlay 时 SHALL 保持现有默认（编目非 optional 条目全量 sync）。
 
-#### Scenario: 默认不过滤一手 skill
+#### Scenario: 默认安装非 optional 编目条目
 - **WHEN** overlay 未声明任何 skill 停用或额外启用
-- **THEN** sync SHALL 仍安装一手 catalog 与默认选中第三方
+- **THEN** sync SHALL 仍安装全部非 optional 编目条目（一手与默认选中第三方）
+- **THEN** SHALL NOT 安装 optional 编目条目（如 `lark-cli`、`en-chat`）
 - **THEN** SHALL NOT 要求用户先写 overlay
 
 #### Scenario: 停用后不再期望
@@ -16,8 +17,8 @@
 - **THEN** Desired Set SHALL NOT 包含该 Skill
 - **THEN** 随后 sync SHALL 把它视为应 prune 的 owned 目标（若 hash 未漂）
 
-#### Scenario: 启用 lock 但不在默认列表的 skill
-- **WHEN** overlay 启用一条 lock 已批准、但不在默认选中列表中的第三方 Skill
+#### Scenario: 启用不在默认 Desired Set 中的编目 skill
+- **WHEN** overlay 启用一条编目内、但不在默认 Desired Set 中的 Skill（`optional: true` 条目或未默认选中的 Locked 第三方）
 - **THEN** Desired Set SHALL 包含它
 - **THEN** apply SHALL 能把它装到本机
 

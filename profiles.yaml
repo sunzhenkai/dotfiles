@@ -29,6 +29,7 @@ profiles:
       - golang
       - nvim
       - tmux
+      - herdr
       - delta
       - grepom
       - agents
@@ -39,6 +40,7 @@ profiles:
     modules:
       - nvim
       - tmux
+      - herdr
       - fonts
       - kitty
       - alacritty

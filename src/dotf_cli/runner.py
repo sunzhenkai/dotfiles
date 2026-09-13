@@ -29,12 +29,15 @@ class Ctx:
         self.deep = False
         self.continue_on_error = False
         self.usage_profile = ""
+        self.on_conflict = ""
         self.verbose = os.environ.get("DOTF_VERBOSE", "") == "1"
 
     def export(self) -> None:
         """把开关写入环境，供 run_plan.sh 与 handler 子进程读取。"""
         if self.deep:
             os.environ["DOTF_DEEP"] = "1"
+        if self.on_conflict:
+            os.environ["DOTF_ON_CONFLICT"] = self.on_conflict
 
 
 def _python(*args: str, **kwargs) -> subprocess.CompletedProcess:

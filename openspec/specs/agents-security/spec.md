@@ -6,10 +6,10 @@ TBD - created by archiving change agent-env. Update Purpose after archive.
 ### Requirement: Secrets are never committed
 The system SHALL manage only secret references and validation rules in repository files, never real secret values.
 
-#### Scenario: Provider requires API key
-- **WHEN** a provider configuration requires an API key
-- **THEN** the repository source SHALL reference an environment variable name or supported credential provider
-- **THEN** it MUST NOT contain the API key value
+#### Scenario: Repository declares no LLM provider keys
+- **WHEN** repository agent vendor configuration is maintained
+- **THEN** it SHALL NOT declare LLM providers, models, or provider API keys (removed per ADR-0017); provider/key configuration is machine-local only
+- **THEN** the env schema MAY declare non-provider variables, referencing environment variable names or supported credential providers, never values
 
 #### Scenario: Doctor reports secret status
 - **WHEN** doctor reports whether a secret variable is configured
@@ -38,7 +38,7 @@ The system SHALL load machine-specific paths, private overrides, and experimenta
 The system SHALL classify agent environment capabilities by risk level and SHALL expose that classification to sync, doctor, and documentation.
 
 #### Scenario: Low-risk capability is enabled
-- **WHEN** a low-risk capability such as remote provider API access is enabled
+- **WHEN** a low-risk capability such as remote external API access is enabled
 - **THEN** sync SHALL install it according to the selected profile
 - **THEN** doctor SHALL report its risk classification
 

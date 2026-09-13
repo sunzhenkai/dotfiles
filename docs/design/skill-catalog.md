@@ -10,7 +10,7 @@
 
 1. **一份编目**覆盖全部 skill：个人（一手）skill、第三方 skill（skills.sh 注册表 + GitHub 直装）。
 2. 两种安装模式：**全量安装**（`dotf agents -c` 自动装编目内全部）与**手动安装**（`dotf agents skill apply <id|group>` 受管，或 `dotf skills -i <name>` npx）。
-3. **取消 `default` 开关**：编目内即默认全装；不想装就注释掉条目。
+3. **无 per-entry `default` 开关**：编目内即默认全装；唯一例外是成员可写 `optional: true`——仍在编目内、可经 overlay 按需启用，但不进默认安装。彻底不想装就注释掉条目。
 4. group 既是组织维度，也是 CLI 展开单位。
 5. 保持不变量：未锁定第三方拒绝、lock 不可变、overlay 只改本机、remove 必须 overlay + prune。
 
@@ -29,13 +29,15 @@ groups:
     type: first-party | third-party     # 必填
     source: registry | github           # 第三方必填
     package: <url|name>                 # 第三方必填
-    skills:                             # 成员安装 id；可为空
+    skills:                             # 成员安装 id（或映射 `- id` + `optional`）；可为空
       - <skill-id>
+      - id: <skill-id>
+        optional: true                  # 可选：编目内但默认不装，可经 overlay / apply 启用
 ```
 
 - 组声明来源属性；成员只写 id，**不可能在组内写错来源**。
 - group 名兼作 CLI 展开单位：`dotf skills -i <group>` / `dotf agents skill apply <group>`。
-- **没有 `default` 字段**：编目内即自动全量安装。不想装 → 注释掉条目。
+- **没有 `default` 字段**：编目内即自动全量安装；`optional: true` 条目是唯一例外（不进默认安装，但可受管启用）。不想保留 → 注释掉条目。
 - 一手组（`dotfiles`）不声明 `source`/`package`；其来源是 `agents/skills/<id>/`。
 - 第三方 `source` 两值：`github`（URL/owner-repo）与 `registry`（skills.sh 名）。
 
@@ -49,6 +51,7 @@ groups:
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
 - `ui-template-design` 在编目内 → 会默认安装（其 lock 条目已补，钉在 `446922a`）。
+- `lark-cli` / `en-chat` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id>` 按需启用。
 - `taste-skill` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` 会把它当普通名字透传给 npx。
 
 ## 4. 核心决策
@@ -56,7 +59,7 @@ groups:
 ### D1. 组内声明来源，取消 default
 
 - 来源属性提升到 group 级，成员只写 id。
-- 编目内 = 要装。"不装" = 注释掉。
+- 编目内 = 默认要装。"不装"分两级：`optional: true` = 默认不装但可受管启用；注释 = 移出编目。
 - 收益：新增一手 skill 只需加一行 id + 建目录；默认集不再分散在每条上。
 
 ### D2. source 分 `registry` 与 `github`
@@ -70,14 +73,30 @@ groups:
 | | 全量安装 | 手动安装 |
 |---|---|---|
 | 入口 | `dotf agents -c` | `dotf agents skill apply <id\|group>` / `dotf skills -i <...>` |
-| 依据 | 编目内全部 | 显式指定 + 写 overlay |
+| 依据 | 编目内非 optional 条目 | 显式指定 + 写 overlay |
 | 第三方前提 | 必须 lock | 受管路必须 lock；npx 路不要求 |
-| 落 overlay | 否 | **是**（否则下次 sync prune） |
+| 落 overlay | 否（optional 条目除外：启用须写 overlay） | **是**（否则下次 sync prune） |
 | prune | 是（stale 且未漂） | remove 时是 |
 
-注：取消 `default` 后没有"默认不装但可手动装"的编目状态；要手动装就必须在编目内。若想"平时不装、偶尔手动装"，目前不支持（可用 `dotf skills -i` 的 npx 通道绕过受管模型）。
+注：`optional: true` 条目是"平时不装、偶尔受管装"的编目状态：默认全量安装跳过它们，overlay `enabled_skills` 或 `dotf agents skill apply` 可启用；注释掉的条目才完全不可受管安装（`dotf skills -i` 只当普通名字透传 npx）。
 
-### D4. 名字解析优先级
+### D4. 安装目标：layout 注册表
+
+Skill 装到哪些目录由 `src/agents/layouts.py` 的 `LAYOUTS` 单一表达，一手 / 第三方 / OpenSpec 三类来源都遍历它：
+
+| layout | 目标 | 渲染 |
+|---|---|---|
+| `shared` | `~/.agents/skills/<id>/` | `{{slash:x}}` → `/x` |
+| `kiro` | `${KIRO_HOME:-~/.kiro}/skills/<id>/` | 同上 + 末尾补 `$ARGUMENTS` |
+| `claude` | `~/.claude/skills/<id>/` | 同 shared（Claude Code 自消费 `$ARGUMENTS`） |
+
+owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id>`），**必须**互不重叠：runtime manifest 是全 layout 共用的一份，`apply_owned_plan` 按 owner 前缀决定保留哪些既有条目。identity 前缀为 `<base>[:kiro][:claude]`。`claude` 拒绝编目 id `synced`（Claude Code 保留目录名）。
+
+### D5. 冲突出口
+
+默认 fail closed。"owned 目标漂移"（内容或 mode）可由 `--on-conflict=backup` 解除：编译期改判为 update，写路径复用 `atomic_write(backup_root=...)`，旧字节留在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`。不安全类型、manifest 不可解析、所有权不符、无所有权目标、越界目标，以及所有反向动作，都不受该开关影响。
+
+### D6. 名字解析优先级
 
 `dotf skills -i/-r <name>` 与 `dotf agents skill apply/remove <name>`：
 
@@ -96,17 +115,21 @@ groups:
 3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。
 4. 编目里每个 third-party id 必须在 lock 覆盖；一手 id 不得在 lock。
 5. overlay 只能启用/停用编目内 id。
+6. `optional` 只允许写在成员映射上，且必须是布尔；optional 条目与其他条目一样参与 1–5 全部校验。
 
 ## 6. 对代码的影响
 
 | 模块 | 变更 |
 |---|---|
-| `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺；无 default |
-| `src/agents/defaults.py` | `catalog_skill_ids` 取代 `selected_default_ids`；lock 校验用组 type |
-| `src/agents/desired_set.py` | Desired Set = 编目全部 ∪ overlay 启用 − 停用 |
+| `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺（支持 `optional: true` 映射）；无 default |
+| `src/agents/layouts.py` | 安装目标注册表（shared / kiro / claude）+ owner/identity 前缀派生 |
+| `src/agents/defaults.py` | `catalog_skill_ids` 取代 `selected_default_ids`；lock 校验用组 type；遍历 LAYOUTS |
+| `src/agents/desired_set.py` | Desired Set = 编目非 optional ∪ overlay 启用 − 停用 |
+| `src/agents/desired_ops.py` | apply 按 id 来源补齐（一手目录 / 第三方锁定获取）；逐 layout 失败摘要 |
+| `src/agents/managed_runtime.py` | `on_conflict` 策略（block/backup）、`remediated` 操作、保留名守卫 |
 | `src/agents/skills_map.py` | 解析读 group；`--expand-group` 供受管路展开 |
 | `src/dotf_core/overlays.py` | 编目 id 从 group 成员收集 |
-| `bin/dotf` | `agents skill apply/remove` 支持 group 展开 |
+| `bin/dotf` | `agents skill apply/remove` 支持 group 展开；`--on-conflict` |
 | `agents/skills.yaml` | 重写为 group 结构 |
 | 测试 | schema / 解析 / desired-set / fixtures 全部更新 |
 
@@ -114,7 +137,8 @@ groups:
 
 - 编目重写完成；`taste` 组注释、`ui-template-design` 编目内。
 - `dotf skills -i <group>`、`dotf agents skill apply <group>` 组展开可用。
-- 全量测试 581 passed。
+- 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
+- 全量测试 606 passed。
 
 ## 8. 后续可选项（未实现）
 

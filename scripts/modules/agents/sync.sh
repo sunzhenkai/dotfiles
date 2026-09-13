@@ -19,6 +19,7 @@ fi
 
 DRY_RUN=0
 STRICT=0
+ON_CONFLICT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,6 +33,21 @@ while [ $# -gt 0 ]; do
     ;;
   --strict)
     STRICT=1
+    ;;
+  --on-conflict)
+    shift
+    ON_CONFLICT="${1:-}"
+    if [ "$ON_CONFLICT" != "block" ] && [ "$ON_CONFLICT" != "backup" ]; then
+      echo "error: --on-conflict 只接受 block 或 backup" >&2
+      exit 1
+    fi
+    ;;
+  --on-conflict=*)
+    ON_CONFLICT="${1#--on-conflict=}"
+    if [ "$ON_CONFLICT" != "block" ] && [ "$ON_CONFLICT" != "backup" ]; then
+      echo "error: --on-conflict 只接受 block 或 backup" >&2
+      exit 1
+    fi
     ;;
   --root)
     shift
@@ -66,10 +82,15 @@ fi
 python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
 
 echo "--- skills ---"
-# skills 同步到共享 ~/.agents/skills，并为 Kiro CLI 写 ~/.kiro/skills
+# skills 同步到共享 ~/.agents/skills、Kiro ~/.kiro/skills 与 Claude Code ~/.claude/skills
 skills_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then
   skills_args+=(--dry-run)
+fi
+if [ -n "$ON_CONFLICT" ]; then
+  skills_args+=(--on-conflict "$ON_CONFLICT")
+  # 同一次运行的 OpenSpec 步骤也读同一策略
+  export DOTF_ON_CONFLICT="$ON_CONFLICT"
 fi
 python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
 echo "--- default skills ---"

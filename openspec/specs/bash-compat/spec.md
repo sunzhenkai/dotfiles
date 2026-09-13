@@ -56,30 +56,6 @@
 - **WHEN** 执行 `scripts/lib/dispatch_config.sh --list-desc`
 - **THEN** 每行输出格式为 `<name>\t<description>`，与 install.sh 的 `--list-desc` 格式一致
 
-### Requirement: install-claude.sh 独立运行完整
-
-`install-claude.sh` 独立运行时 SHALL 自行设置所有必要变量（`DOTFILES_ROOT`、`TIMESTAMP`、`BACKUP_DIR`），不依赖调用方提供。
-
-#### Scenario: 直接执行 install-claude.sh
-- **WHEN** 执行 `bash scripts/install-claude.sh`（非 source 方式）
-- **THEN** 脚本正常运行，`BACKUP_DIR` 被设置为 `~/.config/backups`
-
-### Requirement: install-claude.sh 提示信息一致
-
-`install-claude.sh` 中关于 API Key 的提示信息 SHALL 统一使用 `ZHIPU_API_KEY`，不出现 `ANTHROPIC_AUTH_TOKEN`。
-
-#### Scenario: API Key 缺失时的提示
-- **WHEN** `ZHIPU_API_KEY` 环境变量未设置
-- **THEN** 输出 "please update ZHIPU_API_KEY manually"，不出现 `ANTHROPIC_AUTH_TOKEN`
-
-### Requirement: install-claude.sh 按需加载
-
-`config.sh` SHALL NOT 在文件顶部无条件 source `install-claude.sh`。SHALL 在处理 `claude` 配置或 `--all` 时才 source。
-
-#### Scenario: 只配置 nvim 时不加载 claude 逻辑
-- **WHEN** 执行 `scripts/config.sh nvim`
-- **THEN** `install-claude.sh` 不会被 source
-
 ### Requirement: homebrew.sh 自包含 OS 检测
 
 `homebrew.sh` 的 `init_homebrew()` SHALL NOT 依赖外部设置的 `$ID` 变量。SHALL 在函数内部自行检测操作系统。
