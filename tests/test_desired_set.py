@@ -43,7 +43,7 @@ def test_overlay_disable_removes_skill() -> None:
 
 def test_overlay_can_narrow_to_one_locked_skill(tmp_path: Path) -> None:
     catalogued = set(catalog_skill_ids(ROOT))
-    extra = "wayfinder"
+    extra = "lark-cli"
     assert extra in catalogued
     desired = resolve_skill_desired_set(
         ROOT,
@@ -61,7 +61,6 @@ def test_unlocked_skill_rejected() -> None:
 def test_old_overlay_without_skill_keys_still_valid() -> None:
     catalog = OverlayCatalog(
         profiles=frozenset({"research"}),
-        servers=frozenset({"web-reader"}),
         tools=frozenset({"cursor"}),
         skills=frozenset({"grill-with-docs"}),
     )
@@ -69,7 +68,7 @@ def test_old_overlay_without_skill_keys_still_valid() -> None:
         {
             "schema_version": OVERLAY_SCHEMA_VERSION,
             "kind": OVERLAY_KIND,
-            "agents": {"profile": "research", "disabled_servers": ["web-reader"]},
+            "agents": {"profile": "research"},
         },
         catalog,
     )

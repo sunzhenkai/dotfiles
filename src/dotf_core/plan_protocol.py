@@ -17,10 +17,9 @@ PLAN_HEADER = "DOTF_EXECUTION_PLAN"
 PLAN_VERSION = 1
 PLAN_SUCCESS_MARKER = "DOTF_PLAN_COMPLETE_V1"
 ACTION_ORDER = ("install", "config", "doctor", "uninstall", "deconfig")
-AGENT_ACTIONS = ("skill.apply", "skill.remove", "mcp.apply", "mcp.remove")
+AGENT_ACTIONS = ("skill.apply", "skill.remove")
 ALL_ACTIONS = ACTION_ORDER + AGENT_ACTIONS
 SKILL_PREFIX = "skill:"
-MCP_PREFIX = "mcp:"
 PLAN_KEYS = {
     "header",
     "version",
@@ -81,24 +80,16 @@ def is_agent_action(action: str) -> bool:
 
 
 def is_artifact_module(name: str) -> bool:
-    return name.startswith(SKILL_PREFIX) or name.startswith(MCP_PREFIX)
+    return name.startswith(SKILL_PREFIX)
 
 
 def parse_artifact_selector(name: str) -> tuple[str, str, str | None]:
-    """Return (kind, artifact_id, tool_or_none). tool is ``*`` for all MCP tools."""
+    """Return (kind, artifact_id, tool_or_none)."""
     if name.startswith(SKILL_PREFIX):
         skill_id = name[len(SKILL_PREFIX) :]
         if not skill_id or "/" in skill_id or skill_id.startswith("openspec-"):
             raise ProtocolError(f"非法 skill 选择器: {name}")
         return "skill", skill_id, None
-    if name.startswith(MCP_PREFIX):
-        rest = name[len(MCP_PREFIX) :]
-        if "/" not in rest:
-            raise ProtocolError(f"mcp 选择器必须是 mcp:<tool>/<id> 或 mcp:*/<id>: {name}")
-        tool, server_id = rest.split("/", 1)
-        if not tool or not server_id or "/" in server_id:
-            raise ProtocolError(f"非法 mcp 选择器: {name}")
-        return "mcp", server_id, tool
     raise ProtocolError(f"不是制品选择器: {name}")
 
 
@@ -453,7 +444,7 @@ def validate(document: dict[str, Any], *, dry_run: bool = False) -> dict[str, An
             raise ProtocolError(f"未知动作: {action}")
         if is_agent_action(action):
             if not is_artifact_module(name):
-                raise ProtocolError(f"制品动作必须使用 skill:/mcp: 选择器: {name}/{action}")
+                raise ProtocolError(f"制品动作必须使用 skill: 选择器: {name}/{action}")
         elif name not in names:
             raise ProtocolError(f"动作引用未知或截断模块: {name}")
         pair = (name, action)

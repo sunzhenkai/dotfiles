@@ -251,7 +251,6 @@ def test_vendor_files_have_no_company_secrets() -> None:
         VENDOR / "config.toml",
         VENDOR / "README.md",
         ROOT / "agents" / "env" / "env.schema.yaml",
-        ROOT / "agents" / "env" / "template-bases" / "opencode.json",
         *[VENDOR / "model-catalogs" / name for name in CATALOG_NAMES],
     ]
     for path in paths:

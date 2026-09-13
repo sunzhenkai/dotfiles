@@ -1,19 +1,17 @@
-# 安全策略：风险等级、敏感模式、浏览器状态与本机私有边界
+# 安全策略：风险等级、敏感模式与本机私有边界
 version: 1
 
 risk_levels:
   low:
-    description: "远程只读能力（如网页搜索/阅读），不接触本机浏览器状态"
+    description: "远程只读能力（如 provider API 调用），不接触本机登录态"
   medium:
     description: "本地进程或文件系统相关能力，需注意工作区范围"
   high:
-    description: "浏览器自动化、真实登录态、本机 profile；必须显式 profile 启用"
+    description: "真实登录态、本机 profile、密钥明文；必须显式确认后启用"
 
 defaults:
   enable_high_risk: false
-  isolate_browser_profile: true
   never_commit_secrets: true
-  never_commit_browser_state: true
 
 sensitive_patterns:
   # doctor 扫描用；匹配时只报告路径与模式名，不打印完整匹配值
@@ -29,38 +27,6 @@ sensitive_patterns:
   - name: codeup_private
     pattern: '(?i)codeup\.aliyun\.com'
     severity: warn
-
-browser_state:
-  protected_kinds:
-    - cookies
-    - sessions
-    - downloads
-    - screenshots
-    - traces
-    - profiles
-  forbidden_in_repo:
-    - "**/browser-profile/**"
-    - "**/playwright-report/**"
-    - "**/*screenshot*.png"
-    - "**/page-*.png"
-    - "**/page-*.jpeg"
-    - "**/page-*.jpg"
-    - "**/trace.zip"
-  artifact_hint: "/tmp/agent-env/browser/ 或本机 ignored/cache 目录；不要提交截图/trace；截图勿传自定义 filename"
-
-private_boundary:
-  local_override_files:
-    - agents/env/local.yaml
-    - agents/env/local/*.yaml
-  allowed_in_local_only:
-    - browser executable paths
-    - browser profile paths
-    - CDP endpoints
-    - private workspace paths
-  never_in_repo:
-    - API keys / tokens / cookies
-    - real browser profile contents
-    - company-internal URLs or credentials
 
 # Conservative default: sensitive backups expire after 7 days. Operators may
 # change retention_days here; this committed, versioned policy is the authority.
@@ -80,9 +46,7 @@ private_runtime:
     - ".codex/sessions/**"
     - ".kiro/sessions/**"
     - ".zcode/history/**"
-    - "**/agent-transactions/**"
     - "**/agents-manifest.json"
-    - "**/agents-mcp-manifest.json"
     - "**/credentials.json"
     - "**/cookies.json"
 
@@ -92,8 +56,6 @@ scan:
   rule_version: 1
   tracked_roots:
     - agents
-    - scripts/agents
-    - scripts/dotf_core
     - scripts/modules/agents
   text_extensions:
     - .py

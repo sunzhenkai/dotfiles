@@ -243,7 +243,7 @@ modules:
 
   - name: agents
     kind: binary
-    desc: agents CLI 工具包 + skills/MCP 同步
+    desc: agents CLI 工具包 + skills/全局指令同步
     group: agents
     # install 由 planner 展开为各单工具动作（见 planner.AGENTS_INSTALL_BUNDLE）
     install: true
@@ -260,7 +260,7 @@ modules:
 
   - name: cursor
     kind: binary
-    desc: Cursor Agent CLI（MCP 由 agents sync 管理）
+    desc: Cursor Agent CLI
     group: agents
     install: true
     doctor: true
@@ -268,7 +268,7 @@ modules:
 
   - name: kiro
     kind: binary
-    desc: Kiro CLI（skills/MCP 由 agents sync 管理）
+    desc: Kiro CLI（skills 镜像由 agents sync 管理）
     group: agents
     install: true
     doctor: true
@@ -345,7 +345,7 @@ modules:
 
   - name: zcode
     kind: binary
-    desc: ZCode CLI（MCP 由 agents sync 管理）
+    desc: ZCode CLI
     group: agents
     install: true
     doctor: true

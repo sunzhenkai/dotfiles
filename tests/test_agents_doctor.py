@@ -20,7 +20,6 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "agents"))
 
 import doctor  # noqa: E402
-from common import Catalog  # noqa: E402
 
 
 def _report() -> doctor.DoctorReport:
@@ -92,60 +91,6 @@ def test_openspec_skills_doctor_skips_warns_and_passes(
     assert present.status == doctor.STATUS_PASS
 
 
-def test_mcp_plan_reports_all_states_malformed_counts_and_pinned_runtime(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    entries = (
-        SimpleNamespace(ownership="owned", state="create", conflict=None, server_id="missing"),
-        SimpleNamespace(ownership="owned", state="update", conflict=None, server_id="changed"),
-        SimpleNamespace(ownership="owned", state="prune", conflict=None, server_id="stale"),
-        SimpleNamespace(ownership="unowned", state="unchanged", conflict=None, server_id="private"),
-        SimpleNamespace(ownership="owned", state="conflict", conflict="owned MCP entry was modified locally", server_id="local"),
-    )
-    normal = SimpleNamespace(
-        adapter="cursor", target=str(tmp_path / "mcp.json"), actual_state="present",
-        state="update", conflict=None, entries=entries,
-        declared_runtime_versions=(SimpleNamespace(resource_id="vision", package="@vendor/runtime", version="1.2.3"),),
-    )
-    malformed = SimpleNamespace(
-        adapter="kiro", target=str(tmp_path / "bad.json"), actual_state="malformed",
-        state="conflict", conflict="actual-malformed", entries=(), declared_runtime_versions=(),
-    )
-    unsafe = SimpleNamespace(
-        adapter="opencode", target=str(tmp_path / "link.json"), actual_state="unsafe",
-        state="conflict", conflict="actual-unsafe", entries=(), declared_runtime_versions=(),
-    )
-    permission = SimpleNamespace(
-        adapter="zcode", target=str(tmp_path / "mode.json"), actual_state="present",
-        state="permission", conflict=None, entries=(), declared_runtime_versions=(),
-    )
-    plan = SimpleNamespace(items=(normal, malformed, unsafe, permission))
-    snapshot = SimpleNamespace(status="ok", manifest=SimpleNamespace(items=(object(),)))
-    monkeypatch.setattr(doctor, "compile_sync_plan", lambda *args, **kwargs: plan)
-    monkeypatch.setattr(doctor, "read_mcp_manifest", lambda *args, **kwargs: snapshot)
-
-    class Matrix:
-        adapter_tools = ("cursor", "kiro", "opencode", "zcode")
-
-        @staticmethod
-        def capability(_name: str) -> SimpleNamespace:
-            return SimpleNamespace(mcp=True)
-
-    cat = SimpleNamespace(vendor_matrix=Matrix(), selected_servers=lambda *args: {})
-    report = _report()
-    doctor.check_mcp_plan(cat, report, "research", None, False, home=tmp_path)
-
-    text = _messages(report)
-    for state in ("missing", "changed", "stale", "unowned", "conflict", "permission", "malformed", "link-boundary"):
-        assert state in text
-    assert "vision declared runtime @vendor/runtime@1.2.3" in text
-    summary = next(item for item in report.items if item.group == "mcp" and item.id == "sync-plan")
-    assert "managed=4" in summary.message
-    assert "malformed=1" in summary.message
-    local = next(item for item in report.items if "server=local" in item.message)
-    assert "禁止静默覆盖" in local.hint
-
-
 def _write_minimal_registry(repo: Path, declarations: list[dict]) -> None:
     import yaml
 
@@ -196,27 +141,6 @@ def test_existing_malformed_json_yaml_toml_fail_preserve_and_omit_content(
     output = _messages(report)
     assert "DO-NOT-PRINT" not in output
     assert "content omitted" in output
-
-
-def test_real_mcp_adapter_malformed_json_is_fail_and_preserved(
-    tmp_home: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("HOME", str(tmp_home))
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_home / ".config"))
-    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_home / ".state"))
-    target = tmp_home / ".cursor" / "mcp.json"
-    target.parent.mkdir(parents=True)
-    payload = b'{"mcpServers":{},"mcpServers":{"token":"DO-NOT-PRINT"}}'
-    target.write_bytes(payload)
-    cat = Catalog(ROOT)
-    report = _report()
-
-    doctor.check_mcp_plan(cat, report, "research", "cursor", False, home=tmp_home)
-
-    assert target.read_bytes() == payload
-    malformed = [item for item in report.items if "malformed" in item.id]
-    assert malformed and all(item.status == doctor.STATUS_FAIL for item in malformed)
-    assert "DO-NOT-PRINT" not in _messages(report)
 
 
 def test_registry_boundary_root_internal_links_sensitive_modes_and_allowed_link(
@@ -371,7 +295,7 @@ def test_canonical_text_json_parity_redaction_and_exit_threshold(
     assert canonical["id"] in text and canonical["message"] in text and canonical["hint"] in text
     assert doctor.exit_code(report, "fail") == 0
     assert doctor.exit_code(report, "warn") == 1
-    report.add("mcp", "broken", doctor.STATUS_FAIL, "failed")
+    report.add("skills", "broken", doctor.STATUS_FAIL, "failed")
     assert doctor.exit_code(report, "fail") == 1
 
 
@@ -382,22 +306,22 @@ def test_planner_failure_does_not_stop_unrelated_checks(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_home / ".config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_home / ".state"))
 
-    def fail_mcp(*args: object, **kwargs: object) -> None:
+    def fail_env(*args: object, **kwargs: object) -> None:
         raise RuntimeError("planner unavailable")
 
     def skills_ok(_root: Path, report: doctor.DoctorReport, **kwargs: object) -> None:
         report.add("skills", "continued", doctor.STATUS_PASS, "unrelated check continued")
 
-    monkeypatch.setattr(doctor, "check_mcp_plan", fail_mcp)
+    monkeypatch.setattr(doctor, "check_env", fail_env)
     monkeypatch.setattr(doctor, "check_skills_plan", skills_ok)
     args = argparse.Namespace(
-        profile="research", tool="cursor", deep=False, json=True,
+        profile="research", tool=None, deep=False, json=True,
         verbose=False, fail_on="fail", root=ROOT,
     )
 
     report = doctor.build_report(args)
 
-    assert any(item.group == "mcp" and item.status == doctor.STATUS_FAIL for item in report.items)
+    assert any(item.group == "env" and item.status == doctor.STATUS_FAIL for item in report.items)
     assert any(item.group == "skills" and item.id == "continued" and item.status == doctor.STATUS_PASS for item in report.items)
 
 

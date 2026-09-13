@@ -9,7 +9,7 @@ The system SHALL provide `agents/env/` as the single handwritten source for reus
 #### Scenario: Catalog directory exists
 - **WHEN** the change is implemented
 - **THEN** `agents/env/` SHALL exist under `agents/`
-- **THEN** it SHALL contain documented sources for MCP servers, profiles, environment variables, tool dependencies, browser settings, and security policy
+- **THEN** it SHALL contain documented sources for profiles, environment variables, tool dependencies, and security policy
 
 #### Scenario: Skills remain outside agent environment catalog
 - **WHEN** a maintainer adds or edits a shared skill or command
@@ -30,18 +30,16 @@ The system SHALL define an agent environment manifest that declares supported ta
 - **THEN** doctor SHALL report the skip as intentional rather than a failure
 
 ### Requirement: Profiles compose environment capabilities
-The system SHALL support named profiles that compose MCP servers, browser capabilities, tool checks, risk level, and documentation into reusable agent modes.
+The system SHALL support named profiles that compose tool checks, risk level, and documentation into reusable agent modes.
 
-#### Scenario: Default profile includes browser MCP
+#### Scenario: Default profile is research
 - **WHEN** no local override selects a profile
-- **THEN** the default profile SHALL be `browser`
-- **THEN** it SHALL include research capabilities plus Playwright browser automation MCP
-- **THEN** the profile SHALL be marked as high risk in catalog metadata
+- **THEN** the default profile SHALL be `research`
+- **THEN** it SHALL include coding and research tool checks at low risk
 
-#### Scenario: Research profile remains low risk
-- **WHEN** a user selects the `research` profile (CLI flag or local override)
-- **THEN** the selected profile SHALL include coding and research capabilities
-- **THEN** it SHALL NOT enable high-risk browser automation MCP
+#### Scenario: Full profile covers every check
+- **WHEN** a user selects the `full` profile (CLI flag or local override)
+- **THEN** the selected profile SHALL include every declared runtime tool and env check
 
 ### Requirement: Environment variable schema is documented
 The system SHALL define an environment variable schema listing variable names, purpose, requiredness, sensitive classification, and the checks that use them.
@@ -73,7 +71,7 @@ The system SHALL define a tool dependency catalog for agent development tasks, i
 The system SHALL support local override files for machine-specific choices and SHALL ensure those files are ignored by git.
 
 #### Scenario: Local profile override exists
-- **WHEN** a local override selects a default profile or browser path
+- **WHEN** a local override selects a default profile
 - **THEN** sync and doctor SHALL use the local value on that machine
 - **THEN** the local override file SHALL NOT be committed to the repository
 

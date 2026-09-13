@@ -160,7 +160,7 @@ runner_run_action() {
         ;;
       esac
     ) >"$capture" 2>&1 || rc=$?
-  elif [[ "$action" == skill.* || "$action" == mcp.* ]]; then
+  elif [[ "$action" == skill.* ]]; then
     runner_mark_loaded "$module" "$action" "agents"
     (
       set -euo pipefail

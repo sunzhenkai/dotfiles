@@ -5,7 +5,7 @@ TBD - created by archiving change unified-agent-skills. Update Purpose after arc
 ## Requirements
 ### Requirement: 共享源目录作为 skills/commands 唯一真相源
 
-仓库 SHALL 提供共享目录 `agents/`，作为跨工具复用的 skills 与 commands 的唯一手写真相源。工具专属运行时文件（MCP、settings、model 配置等）MUST NOT 放入该目录作为真相源。
+仓库 SHALL 提供共享目录 `agents/`，作为跨工具复用的 skills 与 commands 的唯一手写真相源。工具专属运行时文件（settings、model 配置等）MUST NOT 放入该目录作为真相源。
 
 #### Scenario: 共享目录结构存在
 

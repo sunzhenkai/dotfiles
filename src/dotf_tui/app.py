@@ -12,7 +12,7 @@ from typing import Any
 from rich.text import Text
 
 from . import state
-from .state import ModuleRow, SkillRow, McpRow
+from .state import ModuleRow, SkillRow
 
 try:
     from textual import events
@@ -30,13 +30,12 @@ except ImportError as exc:  # pragma: no cover - handled by __main__
 
 LOG = logging.getLogger(__name__)
 
-TAB_IDS = ("modules", "skills", "mcp", "status", "conflicts")
+TAB_IDS = ("modules", "skills", "status", "conflicts")
 TAB_TITLES = {
     "modules": "1 Modules",
     "skills": "2 Skills",
-    "mcp": "3 MCP",
-    "status": "4 Status",
-    "conflicts": "5 Conflicts",
+    "status": "3 Status",
+    "conflicts": "4 Conflicts",
 }
 
 _MODULE_ACTIONS: tuple[tuple[str, str, str, str], ...] = (
@@ -83,7 +82,7 @@ def half_page_row(cursor: int, row_count: int, view_height: int, *, down: bool) 
 
 
 def format_action_status(
-    item: ModuleRow | SkillRow | McpRow | None,
+    item: ModuleRow | SkillRow | None,
     *,
     selected_count: int = 0,
     readonly: bool = False,
@@ -101,7 +100,7 @@ def format_action_status(
         for cap, key, name, desc in _MODULE_ACTIONS:
             if cap in item.capabilities:
                 parts.append(f"{key} {name} {desc}")
-    elif isinstance(item, (SkillRow, McpRow)):
+    elif isinstance(item, SkillRow):
         for _cap, key, name, desc in _AGENT_ACTIONS:
             parts.append(f"{key} {name} {desc}")
     extra = "  ·  ".join(parts)
@@ -596,7 +595,7 @@ class ModulesPane(_SubPane):
         return _dotf_cmd(self.app.dotfiles_root, module, *extra, "--yes")
 
 
-# -------------------------- Skills / MCP panes ----------------------------
+# -------------------------- Skills pane -----------------------------------
 
 
 class SkillsPane(_SubPane):
@@ -644,57 +643,6 @@ class SkillsPane(_SubPane):
         action = SelectedAction(label=f"{verb} {row.skill_id}", argv=tuple(argv))
         if verb == "remove":
             self._confirm_then_run(action, f"确认 remove skill {row.skill_id}？输入 y 确认。")
-            return
-        self._run_with_progress([action])
-
-
-class McpPane(_SubPane):
-    BINDINGS = [
-        Binding("a", "act('apply')", "apply", show=False),
-        Binding("x", "act('remove')", "remove", show=False),
-    ]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._rows: list[McpRow] = []
-
-    def _populate(self) -> None:
-        self._rows = state.load_mcp(self.app.dotfiles_root)
-        needle = self.query_one("#filter", Input).value.strip().lower()
-        rows: list[tuple[Any, list[str]]] = []
-        visible: list[McpRow] = []
-        keys: list[Any] = []
-        for row in self._rows:
-            label = f"{row.tool}/{row.server}"
-            if needle and needle not in label.lower():
-                continue
-            key = ("mcp", label)
-            cells = [label, row.actions_text, row.status_text, "", ""]
-            rows.append((key, cells))
-            keys.append(key)
-            visible.append(row)
-        self._key_to_row = dict(zip(keys, visible))
-        self._populate_filtered(["server", "actions", "status", "", ""], rows)
-
-    def action_act(self, verb: str) -> None:
-        row = self.current_item()
-        if row is None:
-            return
-        argv = _dotf_cmd(
-            self.app.dotfiles_root,
-            "agents",
-            "mcp",
-            verb,
-            row.server,
-            "--tool",
-            row.tool,
-        )
-        # 与 SkillsPane 相同：remove/apply 都已在 TUI 内处理确认，
-        # 传 --yes 避免 run_plan.sh 从 /dev/tty 读确认导致卡死。
-        argv.append("--yes")
-        action = SelectedAction(label=f"{verb} {row.tool}/{row.server}", argv=tuple(argv))
-        if verb == "remove":
-            self._confirm_then_run(action, f"确认 remove MCP {row.tool}/{row.server}？输入 y 确认。")
             return
         self._run_with_progress([action])
 
@@ -788,7 +736,6 @@ def _argv_change_label(argv: list[str]) -> str:
 _PANE_TYPES: dict[str, type[_SubPane]] = {
     "modules": ModulesPane,
     "skills": SkillsPane,
-    "mcp": McpPane,
     "status": StatusPane,
     "conflicts": ConflictsPane,
 }
@@ -796,7 +743,6 @@ _PANE_TYPES: dict[str, type[_SubPane]] = {
 # Back-compat aliases for tests / smoke that imported *Screen names.
 ModulesScreen = ModulesPane
 SkillsScreen = SkillsPane
-McpScreen = McpPane
 StatusScreen = StatusPane
 ConflictsScreen = ConflictsPane
 
@@ -838,8 +784,6 @@ class DotfTuiApp(App[list[str] | None]):
                 yield ModulesPane()
             with TabPane(TAB_TITLES["skills"], id="skills"):
                 yield SkillsPane()
-            with TabPane(TAB_TITLES["mcp"], id="mcp"):
-                yield McpPane()
             with TabPane(TAB_TITLES["status"], id="status"):
                 yield StatusPane()
             with TabPane(TAB_TITLES["conflicts"], id="conflicts"):

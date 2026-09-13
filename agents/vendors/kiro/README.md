@@ -5,7 +5,6 @@
 ```text
 ~/.kiro/
 ├── settings/
-│   ├── mcp.json          ← 全局 MCP（托管写入处）
 │   └── cli.json          ← CLI 设置
 ├── skills/               ← 用户级 skills（亦作 /skill-name slash）
 ├── prompts/              ← 用户级无参 prompts（@name / /prompts）
@@ -30,12 +29,12 @@ dotf agents -i
 
 ## 配置
 
-Kiro 不读取共享 `~/.agents/skills`；`dotf agents -c` 会托管 Kiro skills 与 MCP，并为 slash skill 追加 `$ARGUMENTS`。`dotf kiro` 模块只负责安装 CLI：
+Kiro 不读取共享 `~/.agents/skills`；`dotf agents -c` 会托管 Kiro skills 镜像，并为 slash skill 追加 `$ARGUMENTS`。`dotf kiro` 模块只负责安装 CLI：
 
 ```shell
-dotf agents -c --tool kiro
+dotf agents -c
 # 或
-scripts/agents/sync.sh kiro
+scripts/modules/agents/sync.sh all
 ```
 
 ## 官方资源布局
@@ -44,11 +43,8 @@ scripts/agents/sync.sh kiro
 |------|------------|------------|
 | Skills | `~/.kiro/skills/` | `.kiro/skills/` |
 | Prompts | `~/.kiro/prompts/` | `.kiro/prompts/` |
-| MCP | `~/.kiro/settings/mcp.json` | `.kiro/settings/mcp.json` |
 | Agents | `~/.kiro/agents/` | `.kiro/agents/` |
 | Steering | `~/.kiro/steering/` | `.kiro/steering/` |
-
-加载优先级（MCP）：Agent Config > Workspace > Global。
 
 ## 本仓库 sync 写入范围
 
@@ -56,17 +52,5 @@ scripts/agents/sync.sh kiro
 |------|----------|------|
 | Skills | `~/.kiro/skills/` | 用户级；workspace `.kiro/` 不写 |
 | Commands | `~/.kiro/skills/<skill-id>/SKILL.md` | 共享 skill 映射为可接收 `$ARGUMENTS` 的 slash skill |
-| MCP | merge → `~/.kiro/settings/mcp.json` 的 `mcpServers` | 保留非托管 server |
 
 Kiro skills 由 managed manifest 独立跟踪（owner 前缀 `agents:kiro-skill:`）。未托管或本机修改的同名文件会保持原样并报告 conflict，不会静默覆盖。
-
-`agents/vendors/kiro/mcp.json` 是不参与部署的安全生成参考，用于 drift/占位符检查。请改 `agents/env/mcp/` 后运行：
-
-```shell
-dotf agents -c
-scripts/agents/sync.sh kiro
-```
-
-默认 profile 为低风险 `research`（不含浏览器自动化）。只有显式选择 `--profile browser` 或 `--profile full` 时才启用 Playwright 等高风险 browser 能力。
-
-密钥使用占位符 `${ZHIPU_API_KEY}`，在环境变量中设置真实值。详见 `agents/env/README.md`。

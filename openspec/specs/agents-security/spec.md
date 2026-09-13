@@ -6,8 +6,8 @@ TBD - created by archiving change agent-env. Update Purpose after archive.
 ### Requirement: Secrets are never committed
 The system SHALL manage only secret references and validation rules in repository files, never real secret values.
 
-#### Scenario: MCP server requires API key
-- **WHEN** an MCP server requires an API key
+#### Scenario: Provider requires API key
+- **WHEN** a provider configuration requires an API key
 - **THEN** the repository source SHALL reference an environment variable name or supported credential provider
 - **THEN** it MUST NOT contain the API key value
 
@@ -17,7 +17,7 @@ The system SHALL manage only secret references and validation rules in repositor
 - **THEN** it MUST NOT print the secret value, authorization header, cookie, or token
 
 ### Requirement: Local private configuration is isolated
-The system SHALL load machine-specific paths, browser profiles, private overrides, and experimental settings from an XDG user configuration location outside the dotfiles repository. Repository files SHALL contain only schemas, safe defaults, and examples; a legacy gitignored repository-local override MAY be read only for migration and SHALL trigger a deprecation warning.
+The system SHALL load machine-specific paths, private overrides, and experimental settings from an XDG user configuration location outside the dotfiles repository. Repository files SHALL contain only schemas, safe defaults, and examples; a legacy gitignored repository-local override MAY be read only for migration and SHALL trigger a deprecation warning.
 
 #### Scenario: Local override file is created
 - **WHEN** a user creates or initializes an agent local override
@@ -27,10 +27,10 @@ The system SHALL load machine-specific paths, browser profiles, private override
 #### Scenario: Legacy repository-local override exists
 - **WHEN** a gitignored `agents/env/local.yaml` or vendor local file exists
 - **THEN** the system SHALL warn and provide a migration destination
-- **THEN** it SHALL NOT copy private values into generated repository templates
+- **THEN** it SHALL NOT copy private values into committed repository files
 
 #### Scenario: Private path is needed
-- **WHEN** a configuration needs a browser profile, local binary, workspace, socket, endpoint, or private host
+- **WHEN** a configuration needs a local binary, workspace, socket, endpoint, or private host
 - **THEN** the value SHALL come from the external local override, environment, or supported credential provider
 - **THEN** committed source SHALL contain only a safe placeholder or example
 
@@ -38,63 +38,14 @@ The system SHALL load machine-specific paths, browser profiles, private override
 The system SHALL classify agent environment capabilities by risk level and SHALL expose that classification to sync, doctor, and documentation.
 
 #### Scenario: Low-risk capability is enabled
-- **WHEN** a low-risk capability such as remote web reading is enabled
+- **WHEN** a low-risk capability such as remote provider API access is enabled
 - **THEN** sync SHALL install it according to the selected profile
 - **THEN** doctor SHALL report its risk classification
 
 #### Scenario: High-risk capability is enabled
-- **WHEN** a high-risk capability such as browser automation or local filesystem control is enabled
+- **WHEN** a high-risk capability such as broad local filesystem control is enabled
 - **THEN** the capability SHALL be marked high risk in the catalog
 - **THEN** doctor SHALL include a warning explaining the risk category
-
-### Requirement: High-risk capabilities require explicit profile selection
-The system SHALL use a default profile that excludes high-risk capabilities. Browser automation, real browser state, broad local filesystem access, and equivalent high-risk capabilities SHALL require an explicit profile or local consent selection.
-
-#### Scenario: User runs default install
-- **WHEN** the user syncs agent environment without selecting a profile or recording local consent
-- **THEN** high-risk MCP servers SHALL remain disabled
-- **THEN** doctor SHALL not require their dependencies
-
-#### Scenario: User selects high-risk profile
-- **WHEN** the user explicitly selects `browser`, `full`, or another high-risk profile
-- **THEN** sync SHALL display the capability risk in its plan
-- **THEN** apply MAY install it only for compatible tools
-
-### Requirement: Browser state is protected
-The system SHALL protect browser cookies, sessions, downloads, screenshots, traces, and profiles from accidental repository tracking.
-
-#### Scenario: Real browser profile is configured
-- **WHEN** a user configures a real browser profile for automation
-- **THEN** the profile path SHALL be stored only in local override or environment variable
-- **THEN** doctor SHALL warn that logged-in browser state may be exposed to the agent
-
-#### Scenario: Browser output appears inside repository
-- **WHEN** doctor detects known browser output paths inside the repository
-- **THEN** doctor SHALL warn if those paths are not ignored
-- **THEN** doctor SHALL recommend moving them to a temporary or ignored directory
-
-### Requirement: Generated configuration is auditable
-The system SHALL make generated or managed agent environment configuration auditable without exposing secrets.
-
-#### Scenario: Sync writes managed MCP configuration
-- **WHEN** sync writes target MCP configuration
-- **THEN** managed server ids SHALL be traceable back to `agents/env` source declarations
-- **THEN** generated files SHALL not contain expanded secret values unless the target tool has no safe placeholder mechanism and the write is explicitly documented
-
-#### Scenario: Secret expansion is unavoidable
-- **WHEN** a target tool requires literal secret expansion in its config file
-- **THEN** sync SHALL warn before writing
-- **THEN** the written file SHALL be treated as user-level private state, not repository content
-
-#### Scenario: ZCode requires expanded ZHIPU_API_KEY
-- **WHEN** sync writes ZCode MCP configuration
-- **THEN** `${ZHIPU_API_KEY}` SHALL be expanded in the home config because ZCode has no placeholder interpolation
-- **THEN** the committed vendor template SHALL still contain only the placeholder
-
-#### Scenario: Kimi Code maps ZHIPU_API_KEY at spawn without writing secrets
-- **WHEN** sync writes Kimi Code MCP configuration for a stdio server that needs `Z_AI_API_KEY`
-- **THEN** the configuration SHALL map `ZHIPU_API_KEY` from the process environment at spawn time
-- **THEN** neither the home config nor the vendor template SHALL contain the expanded secret value
 
 ### Requirement: Repository scans catch obvious sensitive leakage
 The system SHALL provide checks that catch obvious sensitive data patterns in `agents/env` source files and generated repository files.
@@ -109,45 +60,11 @@ The system SHALL provide checks that catch obvious sensitive data patterns in `a
 - **THEN** doctor SHALL warn according to configured sensitive pattern rules
 - **THEN** the user SHALL be directed to move that information into local override when appropriate
 
-### Requirement: Browser debugging uses isolated state unless explicitly overridden
-The system SHALL protect user browser state by using isolated browser state for agent browser debugging unless the user explicitly opts into a higher-risk local configuration.
-
-#### Scenario: Default browser profile is generated
-- **WHEN** sync generates browser MCP configuration without a local override
-- **THEN** the configuration SHALL use an isolated browser user data directory
-- **THEN** the configuration SHALL NOT reference the user's primary browser profile
-
-#### Scenario: Real browser state is requested
-- **WHEN** a local override enables a real browser profile or CDP endpoint
-- **THEN** the override SHALL remain outside committed repository files
-- **THEN** doctor SHALL warn that authenticated pages and private browsing state may be exposed to the agent
-
-### Requirement: Browser debugging artifacts are treated as private
-The system SHALL treat screenshots, traces, downloads, and browser profiles created during agent browser debugging as private local artifacts.
-
-#### Scenario: Browser artifact directory is documented
-- **WHEN** documentation describes browser debugging output
-- **THEN** it SHALL direct artifacts to a temporary, cache, or ignored directory outside tracked source files
-- **THEN** it SHALL warn users not to commit screenshots or traces containing private information
-
-#### Scenario: Browser artifacts are detected in repository-managed paths
-- **WHEN** doctor or validation detects likely browser artifacts under repository-managed paths
-- **THEN** it SHALL report a warning or failure according to severity
-- **THEN** it SHALL recommend moving the artifacts to the configured artifact directory or adding an appropriate ignore rule
-
-### Requirement: Browser debugging avoids secret expansion in generated templates
-The system SHALL keep generated browser MCP repository templates free of expanded secrets and private machine state.
-
-#### Scenario: Browser MCP template is regenerated
-- **WHEN** sync updates repository-managed MCP templates for the browser profile
-- **THEN** the generated template SHALL contain only shared command declarations and safe placeholders
-- **THEN** the generated template SHALL NOT contain cookies, tokens, internal page URLs, CDP endpoints, or private browser profile paths
-
 ### Requirement: Sensitive agent output is confined and permissioned
 Agent-generated files containing expanded credentials or private state SHALL be written only to declared user-level targets, SHALL use permissions no wider than `0600` for files and `0700` for parent directories, and SHALL never be written to repository templates or reports.
 
 #### Scenario: Target requires literal credential
-- **WHEN** an adapter must materialize a credential in a HOME config
+- **WHEN** a deployment must materialize a credential in a HOME config
 - **THEN** secret resolution SHALL occur only during apply after plan approval
 - **THEN** the target and any permitted backup SHALL use sensitive permissions
 - **THEN** logs SHALL include only the secret variable name

@@ -108,11 +108,10 @@ dotf <mod> -i --yes         # 非交互（shared 下系统级动作仍会确认�
 ```bash
 dotf <mod> -c --dry-run
 dotf <mod> -c --yes
-dotf agents -c                # 聚合同步 skills（~/.agents/skills）+ MCP
-dotf agents -c --tool cursor  # 过滤 MCP 同步目标（skills 与 tool 无关）
+dotf agents -c                # 聚合同步 skills（~/.agents/skills）+ 全局指令
 ```
 
-历史整目录软链由 config 计划仅 unlink 链接本身并迁移为真实目录；外来软链、未托管目标或本机修改默认 `conflict`，不得静默覆盖。Agent runtime/MCP 只 reconcile managed manifest 拥有且 hash 未变的项。失败先查看 XDG state 下的 journal；普通 failed 动作用 `dotf retry` 重新经过 planner，`failed-rollback` 则保留 journal/备份并人工恢复。shared 下仍须确认目标位于当前用户 HOME。
+历史整目录软链由 config 计划仅 unlink 链接本身并迁移为真实目录；外来软链、未托管目标或本机修改默认 `conflict`，不得静默覆盖。Agent runtime 只 reconcile managed manifest 拥有且 hash 未变的项。失败先查看 XDG state 下的 journal；普通 failed 动作用 `dotf retry` 重新经过 planner，`failed-rollback` 则保留 journal/备份并人工恢复。shared 下仍须确认目标位于当前用户 HOME。
 
 ### all（全量补装）
 

@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）
-# + 全局 AGENTS.md + MCP/env（按 tool 过滤）。
+# + 全局 AGENTS.md。
 # 用法:
-#   sync.sh [<tool>|all]
-#           [--skills-only|--env-only] [--profile NAME] [--dry-run] [--strict]
-# 工具名称与能力由 agents/env/vendors.yaml 校验。
-# 诊断请用: dotf agents -d  或  python3 src/agents/doctor.py
+#   sync.sh [all|<tool>] [--dry-run] [--strict]
+# <tool> 仅为兼容旧调用保留；skills/instructions 与工具过滤无关，一律全量执行。
+# 诊断请用: dotf agents -d  或  PYTHONPATH=scripts python3 src/agents/doctor.py
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,32 +17,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-TOOL="all"
-TOOL_SET=0
-SKILLS=1
-ENV=1
-PROFILE=""
 DRY_RUN=0
 STRICT=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-  --skills-only)
-    SKILLS=1
-    ENV=0
-    ;;
-  --env-only)
-    SKILLS=0
-    ENV=1
-    ;;
-  --profile)
-    shift
-    PROFILE="${1:-}"
-    if [ -z "$PROFILE" ]; then
-      echo "error: --profile 需要参数" >&2
-      exit 1
-    fi
-    ;;
   --dry-run)
     DRY_RUN=1
     ;;
@@ -72,27 +50,13 @@ while [ $# -gt 0 ]; do
     exit 1
     ;;
   *)
-    if [ "$TOOL_SET" -eq 1 ]; then
-      echo "error: 只能指定一个工具（额外参数: '$1'）" >&2
-      exit 1
-    fi
-    TOOL="$1"
-    TOOL_SET=1
+    # 兼容旧 `<tool>|all` 位置参数：忽略
     ;;
   esac
   shift
 done
 
-validation_args=("$TOOL" --root "$ROOT" --validate-tool)
-if [ -n "$PROFILE" ]; then
-  validation_args+=(--profile "$PROFILE")
-fi
-if [ "$ENV" -eq 1 ] && [ "$SKILLS" -eq 0 ] && [ "$TOOL" != "all" ]; then
-  validation_args+=(--require-mcp)
-fi
-python3 "$_SRC_AGENTS/env_sync.py" "${validation_args[@]}"
-
-echo "agents sync  tool=$TOOL  skills=$SKILLS  env=$ENV  profile=${PROFILE:-default}  dry_run=$DRY_RUN"
+echo "agents sync  dry_run=$DRY_RUN"
 
 echo "--- instructions ---"
 instructions_args=(--root "$ROOT")
@@ -101,32 +65,17 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
 
-if [ "$SKILLS" -eq 1 ]; then
-  echo "--- skills ---"
-  # skills 同步到共享 ~/.agents/skills，并为 Kiro CLI 写 ~/.kiro/skills；
-  # 与 tool 过滤无关，一次性执行
-  skills_args=(--root "$ROOT")
-  if [ "$DRY_RUN" -eq 1 ]; then
-    skills_args+=(--dry-run)
-  fi
-  python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
-  echo "--- default skills ---"
-  python3 "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
-  echo "--- openspec skills ---"
-  python3 "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
+echo "--- skills ---"
+# skills 同步到共享 ~/.agents/skills，并为 Kiro CLI 写 ~/.kiro/skills
+skills_args=(--root "$ROOT")
+if [ "$DRY_RUN" -eq 1 ]; then
+  skills_args+=(--dry-run)
 fi
-
-if [ "$ENV" -eq 1 ]; then
-  echo "--- mcp/env ---"
-  env_args=(--root "$ROOT" "$TOOL")
-  if [ -n "$PROFILE" ]; then
-    env_args+=(--profile "$PROFILE")
-  fi
-  if [ "$DRY_RUN" -eq 1 ]; then
-    env_args+=(--dry-run)
-  fi
-  python3 "$_SRC_AGENTS/env_sync.py" "${env_args[@]}"
-fi
+python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
+echo "--- default skills ---"
+python3 "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
+echo "--- openspec skills ---"
+python3 "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
 
 # --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）
 if [ "$STRICT" -eq 1 ]; then

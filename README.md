@@ -83,7 +83,7 @@ Actions / controls:
   -h                Show help
 
 There is no standalone update verb; re-run install/config/apply to re-apply.
-Skill/MCP apply and remove only change this machine's XDG overlay, never the repo catalog or lock.
+Skill apply and remove only change this machine's XDG overlay, never the repo catalog or lock.
 
 Confirm model:
   Plan confirm before execute (default N); no per-module install/config prompts after.
@@ -100,7 +100,6 @@ Examples:
   dotf grepom --uninstall --dry-run
   dotf nvim --deconfig --yes
   dotf agents skill remove grill-with-docs --yes
-  dotf agents mcp apply web-reader --tool cursor --yes
   dotf tui
   dotf -d -a --dry-run
 ```
@@ -117,26 +116,22 @@ Examples:
 
 ## Agents（统一入口）
 
-skills、MCP/profiles 与 doctor 已收敛为单一对外模块 `agents`：
+skills、profiles 与 doctor 已收敛为单一对外模块 `agents`：
 
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ 全局 AGENTS.md + MCP
-dotf agents -c --tool cursor   # 过滤同步（仅 MCP/env；skills 与 tool 无关）
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro）+ 全局 AGENTS.md
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs
-dotf skills -i frontend-design
-dotf agents mcp remove web-reader --tool cursor
-dotf agents mcp apply web-reader --all-tools
 dotf skills -i frontend-design             # npx skills 按需安装（交互式；-g -y 跳过询问）
 dotf skills -r design-taste-frontend       # npx skills 移除已安装 skill
 dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/modules/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（一手 skills + skill 编目与第三方 lock + 工具专属 vendors + MCP/env 真相源）
-- 脚本：Python 包 `src/agents/`（`doctor.py` / `env_sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
+- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（一手 skills + skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）
+- 脚本：Python 包 `src/agents/`（`doctor.py` / `sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
 
 详见 `agents/README.md`、`agents/env/README.md`。

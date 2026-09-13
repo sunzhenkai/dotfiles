@@ -14,7 +14,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from dotf_tui.app import (  # noqa: E402
     ConfirmModal,
     DotfTuiApp,
-    McpPane,
     ModulesPane,
     ProgressModal,
     SkillsPane,
@@ -24,7 +23,6 @@ from dotf_tui.app import (  # noqa: E402
     selection_mark,
 )
 from dotf_tui.state import (  # noqa: E402
-    McpRow,
     ModuleRow,
     SkillRow,
     load_instructions,
@@ -110,18 +108,15 @@ def test_format_row_cells_marks_selected():
     assert selection_mark(False) == "[ ]"
 
 
-def test_format_action_status_skill_and_mcp():
+def test_format_action_status_skill():
     skill = format_action_status(SkillRow("grill-with-docs", "desired", True))
     assert "j/k 上下" in skill
     assert "a apply 写入 Desired Set" in skill
     assert "x remove 移出 Desired Set" in skill
-    mcp = format_action_status(McpRow("cursor", "web-reader", True))
-    assert "a apply" in mcp
-    assert "x remove" in mcp
 
 
-def test_skill_and_mcp_actions_always_pass_yes(home, monkeypatch):
-    """Skill/MCP 的 apply 与 remove 子进程都必须带 --yes 非交互执行。
+def test_skill_actions_always_pass_yes(home, monkeypatch):
+    """Skill 的 apply 与 remove 子进程都必须带 --yes 非交互执行。
 
     remove 的确认已由 TUI ConfirmModal 完成；若子进程缺 --yes，
     run_plan.sh 会读 /dev/tty 等待确认，在 Textual 接管终端时
@@ -141,17 +136,10 @@ def test_skill_and_mcp_actions_always_pass_yes(home, monkeypatch):
 
     monkeypatch.setattr(SkillsPane, "_run_with_progress", fake_run)
     monkeypatch.setattr(SkillsPane, "_confirm_then_run", fake_confirm)
-    monkeypatch.setattr(McpPane, "_run_with_progress", fake_run)
-    monkeypatch.setattr(McpPane, "_confirm_then_run", fake_confirm)
     monkeypatch.setattr(
         tui_state,
         "load_skills",
         lambda _root: [SkillRow("demo-skill", "desired", True)],
-    )
-    monkeypatch.setattr(
-        tui_state,
-        "load_mcp",
-        lambda _root: [McpRow("cursor", "demo-server", True)],
     )
 
     async def main():
@@ -166,21 +154,11 @@ def test_skill_and_mcp_actions_always_pass_yes(home, monkeypatch):
             await pilot.press("x")
             await pilot.pause()
 
-            await pilot.press("3")
-            await pilot.pause()
-            assert isinstance(app.active_pane, McpPane)
-            await pilot.press("a")
-            await pilot.pause()
-            await pilot.press("x")
-            await pilot.pause()
-
     _run(main())
 
     assert [(pane, action.label) for pane, action in captured] == [
         ("SkillsPane", "apply demo-skill"),
         ("SkillsPane", "remove demo-skill"),
-        ("McpPane", "apply cursor/demo-server"),
-        ("McpPane", "remove cursor/demo-server"),
     ]
     for _pane, action in captured:
         assert action.argv[-1] == "--yes"
@@ -212,7 +190,7 @@ def test_tabs_visible_on_start(home):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             tabs = app.query_one("#tabs", TabbedContent)
-            assert tabs.tab_count == 5
+            assert tabs.tab_count == 4
             assert tabs.active == "modules"
             assert isinstance(app.active_pane, ModulesPane)
 
@@ -417,7 +395,7 @@ def test_vim_gg_and_G_jump(home):
     _run(main())
 
 
-def test_skills_and_mcp_render(home):
+def test_skills_render(home):
     async def main():
         app = DotfTuiApp(Path.cwd())
         async with app.run_test(size=(120, 40)) as pilot:
@@ -425,9 +403,6 @@ def test_skills_and_mcp_render(home):
             await pilot.press("2")
             await pilot.pause()
             assert isinstance(app.active_pane, SkillsPane)
-            await pilot.press("3")
-            await pilot.pause()
-            assert isinstance(app.active_pane, McpPane)
 
     _run(main())
 
@@ -439,11 +414,11 @@ def test_status_and_conflicts_render(home):
         app = DotfTuiApp(Path.cwd())
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            await pilot.press("4")
+            await pilot.press("3")
             await pilot.pause()
             assert app.query_one("#tabs", TabbedContent).active == "status"
             assert "只读" in _bar_text(app)
-            await pilot.press("5")
+            await pilot.press("4")
             await pilot.pause()
             assert app.query_one("#tabs", TabbedContent).active == "conflicts"
 
@@ -477,7 +452,7 @@ def test_status_and_conflicts_show_instructions_drift(home):
         app = DotfTuiApp(ROOT)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            await pilot.press("4")
+            await pilot.press("3")
             await pilot.pause()
             assert app.query_one("#tabs", TabbedContent).active == "status"
             status_rows = [
@@ -488,7 +463,7 @@ def test_status_and_conflicts_show_instructions_drift(home):
                 line.startswith("instructions:agents") and "drift=missing" in line
                 for line in status_rows
             )
-            await pilot.press("5")
+            await pilot.press("4")
             await pilot.pause()
             assert app.query_one("#tabs", TabbedContent).active == "conflicts"
             conflict_rows = [
@@ -555,8 +530,8 @@ def test_filter_clear_with_escape(home):
     _run(main())
 
 
-def test_tab_ids_are_the_five_categories():
-    assert TAB_IDS == ("modules", "skills", "mcp", "status", "conflicts")
+def test_tab_ids_are_the_four_categories():
+    assert TAB_IDS == ("modules", "skills", "status", "conflicts")
 
 
 def _first_cell(table, row: int = 0) -> str:

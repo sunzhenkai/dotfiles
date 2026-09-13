@@ -1,4 +1,4 @@
-"""External Agent/Codex overlays, safe defaults, runtime pins, and manifest status."""
+"""External Agent/Codex overlays, safe defaults, and manifest status."""
 
 from __future__ import annotations
 
@@ -31,9 +31,9 @@ from common import Catalog  # noqa: E402
 from managed_status import inspect_agents_manifest  # noqa: E402
 
 CATALOG = OverlayCatalog(
-    profiles=frozenset({"coding", "research", "browser", "full"}),
-    servers=frozenset({"web-reader", "zai-vision", "playwright"}),
+    profiles=frozenset({"coding", "research", "full"}),
     tools=frozenset({"cursor", "opencode"}),
+    skills=frozenset({"grill-with-docs"}),
 )
 
 
@@ -49,19 +49,15 @@ def _write_overlay(path: Path, value: dict) -> None:
 def _fake_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     env = repo / "agents" / "env"
-    profiles = env / "mcp" / "profiles"
+    profiles = env / "profiles"
     profiles.mkdir(parents=True)
     (repo / "agents" / "vendors" / "codex").mkdir(parents=True)
     (env / "manifest.yaml").write_text(
         "version: 1\ntools: [cursor, opencode]\ndefault_profile: research\n",
         encoding="utf-8",
     )
-    (env / "mcp" / "servers.yaml").write_text(
-        "version: 1\nservers:\n  web-reader: {}\n  playwright: {}\n",
-        encoding="utf-8",
-    )
-    for name in ("coding", "research", "browser", "full"):
-        (profiles / f"{name}.yaml").write_text(f"id: {name}\nmcp_servers: []\n", encoding="utf-8")
+    for name in ("coding", "research", "full"):
+        (profiles / f"{name}.yaml").write_text(f"version: 1\nid: {name}\n", encoding="utf-8")
     return repo
 
 
@@ -69,15 +65,15 @@ def test_overlay_files_merge_in_utf8_name_order(tmp_home: Path) -> None:
     directory = overlay_directory(tmp_home)
     _write_overlay(
         directory / "20-last.yaml",
-        _doc(agents={"profile": "research", "disabled_servers": ["zai-vision"]}),
+        _doc(agents={"profile": "research"}),
     )
     _write_overlay(
         directory / "10-first.yaml",
-        _doc(agents={"profile": "coding", "disabled_servers": ["web-reader"]}),
+        _doc(agents={"profile": "coding", "enabled_skills": ["grill-with-docs"]}),
     )
     loaded = load_overlays(repo_root=ROOT, catalog=CATALOG, home=tmp_home, include_legacy=False)
     assert [path.name for path in loaded.files] == ["10-first.yaml", "20-last.yaml"]
-    assert loaded.agents == {"profile": "research", "disabled_servers": ["zai-vision"]}
+    assert loaded.agents == {"profile": "research", "enabled_skills": ["grill-with-docs"]}
 
 
 @pytest.mark.parametrize(
@@ -85,8 +81,8 @@ def test_overlay_files_merge_in_utf8_name_order(tmp_home: Path) -> None:
     [
         (_doc(unknown=True), "unknown keys"),
         (_doc(agents={"profile": 3}), "non-empty string"),
-        (_doc(agents={"enabled_servers": ["missing-server"]}), "unknown servers"),
-        (_doc(agents={"exclude": {"missing-tool": {"servers": []}}}), "unknown tools"),
+        (_doc(agents={"enabled_skills": ["missing-skill"]}), "unknown or unlocked skills"),
+        (_doc(agents={"disabled_skills": ["openspec-propose"]}), "rejects OpenSpec skills"),
         ({"schema_version": 99, "kind": OVERLAY_KIND}, "schema_version"),
     ],
 )
@@ -120,7 +116,7 @@ def test_legacy_inputs_warn_and_migrate_only_to_xdg(
 ) -> None:
     repo = _fake_repo(tmp_path)
     legacy = repo / "agents" / "env" / "local.yaml"
-    legacy.write_text("profile: coding\ndisabled_servers: [web-reader]\n", encoding="utf-8")
+    legacy.write_text("profile: coding\nenabled_skills: []\n", encoding="utf-8")
     codex = repo / "agents" / "vendors" / "codex" / "config.local.toml"
     codex.write_text('[projects."/private/work"]\ntrust_level = "trusted"\n', encoding="utf-8")
 
@@ -140,102 +136,23 @@ def test_legacy_inputs_warn_and_migrate_only_to_xdg(
     assert migrated["codex"]["local_toml"].startswith('[projects."/private/work"]')
 
 
-def test_safe_default_profile_excludes_browser_and_requires_no_browser_consent(tmp_home: Path) -> None:
+def test_safe_default_profile_is_research_and_low_risk(tmp_home: Path) -> None:
     cat = Catalog(ROOT)
     assert cat.default_profile() == "research"
     assert cat.resolve_profile()["risk"] == "low"
-    assert "playwright" not in cat.selected_servers("cursor")
-    assert "browser" not in cat.resolve_profile()["modules"]
+    assert sorted(cat.resolve_profile()["modules"]) == ["agents", "env", "security", "tools"]
 
 
-def test_runtime_packages_are_exact_and_no_normal_path_uses_latest(tmp_home: Path) -> None:
-    cat = Catalog(ROOT)
-    assert cat.servers["playwright"]["version"] == "0.0.80"
-    assert cat.servers["zai-vision"]["version"] == "0.1.5"
+def test_no_latest_pins_in_agent_sources() -> None:
     normal_paths = [ROOT / "agents" / "env", ROOT / "agents" / "vendors"]
     offenders = []
     for base in normal_paths:
         for path in base.rglob("*"):
             if path.is_file() and path.suffix in {".yaml", ".yml", ".json", ".toml", ".md"}:
                 text = path.read_text(encoding="utf-8", errors="ignore")
-                if "@playwright/mcp@latest" in text or "@z_ai/mcp-server@latest" in text:
+                if "@latest" in text:
                     offenders.append(path.relative_to(ROOT))
     assert offenders == []
-
-
-def test_plan_and_doctor_show_declared_runtime_version(tmp_home: Path) -> None:
-    env = os.environ.copy()
-    sync = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "env_sync.py"),
-            "cursor",
-            "--profile",
-            "research",
-            "--dry-run",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert sync.returncode == 0, sync.stdout + sync.stderr
-    assert "declared_runtime_versions=" in sync.stdout
-    assert "@z_ai/mcp-server@0.1.5" in sync.stdout
-    assert "@playwright/mcp@0.0.80" not in sync.stdout
-
-    doctor = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "doctor.py"),
-            "--profile",
-            "research",
-            "--tool",
-            "cursor",
-            "--verbose",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert "declared runtime @z_ai/mcp-server@0.1.5" in doctor.stdout
-
-
-def test_plan_shows_overlay_enabled_runtime_version(tmp_home: Path) -> None:
-    _write_overlay(
-        overlay_directory(tmp_home) / "10-browser-consent.yaml",
-        _doc(agents={"profile": "research", "enabled_servers": ["playwright"]}),
-    )
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "env_sync.py"),
-            "cursor",
-            "--profile",
-            "research",
-            "--dry-run",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=os.environ.copy(),
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    header = next(
-        line for line in result.stdout.splitlines() if line.startswith("declared_runtime_versions=")
-    )
-    assert "playwright:@playwright/mcp@0.0.80" in header
-    assert "zai-vision:@z_ai/mcp-server@0.1.5" in header
 
 
 def test_registry_has_no_dotfiles_agents_source_link_target() -> None:
@@ -311,84 +228,3 @@ install_codex
     output = tmp_home / ".codex" / "config.toml"
     assert '/external/work' in output.read_text(encoding="utf-8")
     assert not (ROOT / "agents" / "vendors" / "codex" / "config.local.toml").exists()
-
-
-def test_default_doctor_skips_browser_capability(tmp_home: Path) -> None:
-    env = os.environ.copy()
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "doctor.py"),
-            "--json",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    payload = json.loads(result.stdout)
-    assert payload["profile"] == "research"
-    browser = [item for item in payload["checks"] if item["group"] == "browser"]
-    assert browser == [
-        {
-            "group": "browser",
-            "id": "profile",
-            "status": "skip",
-            "message": "profile=research 未启用 browser 模块",
-            "hint": "",
-        }
-    ]
-    assert "playwright" not in json.dumps(payload)
-
-
-def test_runtime_sync_never_writes_repository_templates(tmp_home: Path) -> None:
-    templates = [
-        ROOT / "agents" / "vendors" / "cursor" / "mcp.json",
-        ROOT / "agents" / "vendors" / "kiro" / "mcp.json",
-        ROOT / "agents" / "vendors" / "opencode" / "opencode.json",
-        ROOT / "agents" / "vendors" / "kimi-code" / "mcp.json",
-        ROOT / "agents" / "vendors" / "zcode" / "mcp.json",
-    ]
-    before = {path: path.read_bytes() for path in templates}
-    env = os.environ.copy()
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "env_sync.py"),
-            "cursor",
-            "--profile",
-            "research",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (tmp_home / ".cursor" / "mcp.json").is_file()
-    assert {path: path.read_bytes() for path in templates} == before
-
-    rejected = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "src" / "agents" / "env_sync.py"),
-            "cursor",
-            "--dry-run",
-            "--also-repo-templates",
-            "--root",
-            str(ROOT),
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(ROOT),
-        check=False,
-    )
-    assert rejected.returncode != 0
-    assert "unrecognized arguments" in rejected.stderr

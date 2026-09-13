@@ -113,31 +113,6 @@ def test_cursor_install_plan_is_solo() -> None:
     assert ("install", "agents") not in planned
 
 
-def test_pure_mcp_tool_config_directs_to_agents_sync() -> None:
-    for tool in ("cursor", "kiro", "zcode"):
-        result = subprocess.run(
-            [
-                "python3",
-                str(ROOT / "src" / "dotf_core" / "planner.py"),
-                "plan",
-                "--actions",
-                "config",
-                "--modules",
-                tool,
-                "--os",
-                "ubuntu",
-                "--format",
-                "machine",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(ROOT),
-            check=False,
-        )
-        assert result.returncode != 0
-        assert f"dotf agents -c --tool {tool}" in result.stderr
-
-
 def test_single_tool_config_source_has_no_sync_call() -> None:
     text = (ROOT / "scripts" / "lib" / "dispatch_config.sh").read_text(encoding="utf-8")
     # install_cursor 等函数体内不应再调用 sync
@@ -152,43 +127,20 @@ def test_single_tool_config_source_has_no_sync_call() -> None:
     assert "sync_agents all" in text or "sync_agents()" in text
 
 
-def test_sync_tool_filter_dry_run_idempotent(tmp_home: Path) -> None:
+def test_sync_dry_run_idempotent(tmp_home: Path) -> None:
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
     cmd = [
         "bash",
         str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
-        "cursor",
-        "--skills-only",
         "--dry-run",
     ]
     r1 = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(ROOT))
     r2 = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(ROOT))
     assert r1.returncode == 0, r1.stderr
     assert r2.returncode == 0, r2.stderr
-    assert "tool=cursor" in r1.stdout
+    assert "agents sync" in r1.stdout
     assert r1.stdout == r2.stdout
-
-
-def test_sync_removed_tools_rejected(tmp_home: Path) -> None:
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_home)
-    for tool in ("claude", "qoder", "codebuddy-code"):
-        r = subprocess.run(
-            [
-                "bash",
-                str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
-                tool,
-                "--skills-only",
-                "--dry-run",
-            ],
-            capture_output=True,
-            text=True,
-            env=env,
-            cwd=str(ROOT),
-        )
-        assert r.returncode != 0
-        assert "未知参数" in r.stderr
 
 
 def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
@@ -199,8 +151,6 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         [
             "bash",
             str(ROOT / "scripts" / "modules" / "agents" / "sync.sh"),
-            "cursor",
-            "--skills-only",
             "--dry-run",
         ],
         capture_output=True,
@@ -234,7 +184,6 @@ def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
             str(ROOT / "bin" / "dotf"),
             "agents",
             "-c",
-            "--skills-only",
             "--yes",
         ],
         capture_output=True,

@@ -1,0 +1,6 @@
+# full：coding + research 的全量工具与密钥检查
+version: 1
+id: full
+description: "完整 agent 环境检查（全部 provider 密钥与 runtime）"
+risk: low
+modules: [tools, env, security, agents]

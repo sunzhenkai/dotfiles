@@ -7,14 +7,11 @@ import argparse
 import fnmatch
 import json
 import os
-import queue
 import re
 import shutil
 import stat
 import subprocess
 import sys
-import threading
-import time
 import tomllib
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -26,11 +23,9 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from adapters import adapter_for  # noqa: E402
 from common import Catalog, TOOLS  # noqa: E402
 from instructions import compile_instructions_plan  # noqa: E402
 from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
-from mcp_runtime import read_manifest as read_mcp_manifest  # noqa: E402
 from openspec_skills import openspec_command  # noqa: E402
 from sync import (  # noqa: E402
     KIRO_SKILL_IDENTITY_PREFIX,
@@ -40,7 +35,6 @@ from sync import (  # noqa: E402
     render_skill_bytes,
     skills_target,
 )
-from sync_plan import compile_sync_plan  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
@@ -133,83 +127,6 @@ def run_cmd(cmd: Sequence[str], timeout: float = 15.0) -> tuple[int, str]:
         return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, str(exc)
-
-
-def run_mcp_browser_probe(cmd: Sequence[str], timeout: float = 30.0) -> tuple[int, str]:
-    """Start a stdio MCP server and trigger a minimal browser launch."""
-    try:
-        proc = subprocess.Popen(
-            list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, bufsize=1,
-        )
-    except OSError as exc:
-        return 127, str(exc)
-    assert proc.stdin is not None and proc.stdout is not None and proc.stderr is not None
-    out_q: queue.Queue[str] = queue.Queue()
-    err_lines: list[str] = []
-
-    def read_stdout() -> None:
-        for line in proc.stdout:
-            out_q.put(line)
-
-    def read_stderr() -> None:
-        for line in proc.stderr:
-            err_lines.append(line)
-
-    threading.Thread(target=read_stdout, daemon=True).start()
-    threading.Thread(target=read_stderr, daemon=True).start()
-
-    def send(value: Mapping[str, Any]) -> None:
-        proc.stdin.write(json.dumps(value) + "\n")
-        proc.stdin.flush()
-
-    def receive(id_: int, deadline: float) -> dict[str, Any]:
-        while time.monotonic() < deadline:
-            try:
-                line = out_q.get(timeout=0.25)
-            except queue.Empty:
-                if proc.poll() is not None:
-                    break
-                continue
-            try:
-                message = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if message.get("id") == id_:
-                return message
-        raise TimeoutError(f"MCP response timeout for id={id_}")
-
-    deadline = time.monotonic() + timeout
-    try:
-        send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-            "protocolVersion": "2024-11-05", "capabilities": {},
-            "clientInfo": {"name": "agents-doctor", "version": "1"},
-        }})
-        initialized = receive(1, deadline)
-        if "error" in initialized:
-            return 1, json.dumps(initialized["error"], ensure_ascii=False)
-        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
-        send({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
-            "name": "browser_navigate", "arguments": {"url": "about:blank"},
-        }})
-        navigated = receive(2, deadline)
-        if navigated.get("result", {}).get("isError") or "error" in navigated:
-            return 1, json.dumps(navigated, ensure_ascii=False)
-        send({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
-            "name": "browser_snapshot", "arguments": {"depth": 1},
-        }})
-        snapshot = receive(3, deadline)
-        if snapshot.get("result", {}).get("isError") or "error" in snapshot:
-            return 1, json.dumps(snapshot, ensure_ascii=False)
-        return 0, "MCP browser navigate/snapshot ok"
-    except (BrokenPipeError, TimeoutError) as exc:
-        return 1, f"{exc}; {''.join(err_lines)[-300:]}"
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            proc.kill()
 
 
 def check_env(cat: Catalog, report: DoctorReport, profile: str) -> None:
@@ -507,101 +424,6 @@ def check_instructions_plan(
             )
     summary_status = max(statuses, key=lambda value: _STATUS_ORDER[value]) if statuses else STATUS_PASS
     report.add("instructions", "sync-plan", summary_status, "instructions runtime plan " + _counts_message(counts))
-
-
-def check_mcp_plan(
-    cat: Catalog,
-    report: DoctorReport,
-    profile: str,
-    tool: str | None,
-    deep: bool,
-    *,
-    home: Path,
-    state_home: Path | None = None,
-) -> None:
-    targets = [tool] if tool else list(cat.vendor_matrix.adapter_tools)
-    unsupported = [name for name in targets if not cat.vendor_matrix.capability(name).mcp]
-    for name in unsupported:
-        report.add("mcp", f"{name}-support", STATUS_SKIP, f"{name}: MCP adapter unsupported")
-    selected = [name for name in targets if cat.vendor_matrix.capability(name).mcp]
-    snapshot = read_mcp_manifest(home, state_home)
-    if snapshot.status == "malformed":
-        _record_state(report, "mcp", "manifest-malformed", "malformed", str((state_home or home / ".local" / "state") / "dotf" / "agents-mcp-manifest.json"), "ownership manifest")
-    elif snapshot.status == "missing":
-        report.add("mcp", "managed-manifest", STATUS_WARN, "MCP ownership manifest missing")
-    else:
-        report.add("mcp", "managed-manifest", STATUS_PASS, f"MCP ownership manifest valid managed={len(snapshot.manifest.items)}")
-    try:
-        plan = compile_sync_plan(cat, profile, selected, home=home, state_home=state_home)
-    except (OSError, SystemExit, ValueError) as exc:
-        report.add("mcp", "planner", STATUS_FAIL, f"MCP planner unavailable: {exc}")
-        return
-
-    counts = Counter({name: 0 for name in (
-        "managed", "missing", "changed", "stale", "unowned", "conflict", "permission", "malformed"
-    )})
-    statuses: list[str] = []
-    for item in plan.items:
-        for version in item.declared_runtime_versions:
-            report.add(
-                "mcp", f"{item.adapter}-{version.resource_id}-version", STATUS_PASS,
-                f"{version.resource_id} declared runtime {version.package}@{version.version}",
-            )
-        if item.actual_state == "malformed":
-            counts["malformed"] += 1
-            statuses.append(_record_state(report, "mcp", f"{item.adapter}-malformed", "malformed", item.target, "JSON parse category"))
-            continue
-        if item.actual_state == "unsafe":
-            counts["conflict"] += 1
-            statuses.append(_record_state(report, "mcp", f"{item.adapter}-link-boundary", "link-boundary", item.target, item.conflict or "unsafe target"))
-            continue
-        if item.state == "permission":
-            counts["permission"] += 1
-            statuses.append(_record_state(report, "mcp", f"{item.adapter}-permission", "permission", item.target, "sensitive mode is broader than declared"))
-        if item.actual_state == "missing" and not item.entries:
-            counts["missing"] += 1
-            statuses.append(_record_state(report, "mcp", f"{item.adapter}-missing", "missing", item.target))
-        for entry in item.entries:
-            if entry.ownership == "owned":
-                counts["managed"] += 1
-            category: str | None = None
-            if entry.ownership == "unowned":
-                category = "unowned"
-            elif entry.state == "create":
-                category = "missing"
-            elif entry.state == "update":
-                category = "changed"
-            elif entry.state == "prune":
-                category = "stale"
-            elif entry.state == "conflict":
-                reason = (entry.conflict or "").lower()
-                if "without ownership" in reason:
-                    category = "unowned"
-                    counts["conflict"] += 1
-                elif "malformed" in reason:
-                    category = None
-                else:
-                    category = "conflict"
-            if category is not None:
-                counts[category] += 1
-                statuses.append(_record_state(
-                    report, "mcp", f"{item.adapter}-{category}-{entry.server_id}", category,
-                    item.target, f"server={entry.server_id}; {entry.conflict or entry.state}",
-                ))
-        selected_servers = cat.selected_servers(item.adapter, profile)
-        for server_id, server in selected_servers.items():
-            auth = server.get("auth") or {}
-            env_name = auth.get("env")
-            if env_name and not os.environ.get(env_name):
-                report.add("mcp", f"{item.adapter}-{server_id}-env", STATUS_FAIL, f"{server_id} 需要环境变量 {env_name}", f"export {env_name}=...")
-            if deep and server.get("url"):
-                code, output = run_cmd(["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "8", str(server["url"])], timeout=12)
-                if code == 0 and output.strip().isdigit():
-                    report.add("mcp", f"{item.adapter}-{server_id}-reach", STATUS_PASS, f"{server_id} 可达 HTTP {output.strip()}（未发送鉴权头）")
-                else:
-                    report.add("mcp", f"{item.adapter}-{server_id}-reach", STATUS_WARN, f"{server_id} 可达性检查失败", "检查网络或 URL；未发送 Authorization")
-    summary_status = max(statuses, key=lambda value: _STATUS_ORDER[value]) if statuses else STATUS_PASS
-    report.add("mcp", "sync-plan", summary_status, "MCP plan " + _counts_message(counts))
 
 
 def _relative_rule_match(relative: str, rules: Iterable[str]) -> bool:
@@ -1020,57 +842,6 @@ def check_security_scan(root: Path, security: Mapping[str, Any], report: DoctorR
     report.add("security", "tracked-scan", boundary_status, f"tracked security scan rule_version={rule_version} scanned={scanned} skipped={skipped} findings={findings}")
 
 
-def check_browser(cat: Catalog, report: DoctorReport, profile: str, deep: bool) -> None:
-    pdata = cat.resolve_profile(profile)
-    if "browser" not in (pdata.get("modules") or []) and profile not in ("browser", "full"):
-        report.add("browser", "profile", STATUS_SKIP, f"profile={profile} 未启用 browser 模块")
-        return
-    report.add("browser", "risk", STATUS_WARN, "browser 自动化为 high risk（隔离 profile；勿提交截图/trace）", "artifact_dir 使用仓库外缓存目录；不要提交截图、trace、downloads 或 profile")
-    browser = cat.browser_local()
-    if browser.get("use_real_profile") or browser.get("cdp_endpoint") or os.environ.get("AGENT_ENV_CDP_ENDPOINT"):
-        report.add("browser", "real-profile", STATUS_WARN, "已配置真实浏览器 profile / CDP；可能暴露登录态")
-    else:
-        report.add("browser", "isolate", STATUS_PASS, "默认隔离 profile 已配置（本机路径已隐藏）")
-    provider = browser.get("provider") or browser.get("default_provider") or "playwright"
-    meta = (browser.get("providers") or {}).get(provider) or {}
-    for check in meta.get("checks") or []:
-        check_id = check.get("id", "check")
-        kind = check.get("kind")
-        if kind == "command":
-            command = check.get("command")
-            status = STATUS_PASS if command and cmd_exists(command) else STATUS_FAIL
-            report.add("browser", f"{provider}-{check_id}", status, f"{command} {'可用' if status == STATUS_PASS else '未找到'}", "" if status == STATUS_PASS else str(check.get("hint") or ""))
-        elif kind == "hint":
-            report.add("browser", f"{provider}-{check_id}", STATUS_WARN, str(check.get("hint") or check_id))
-        elif kind in {"env_or_local", "optional_path"}:
-            found = any(os.environ.get(key) or browser.get(key) for key in (check.get("keys") or []))
-            if found:
-                report.add("browser", f"{provider}-{check_id}", STATUS_PASS, f"{check_id} 已配置")
-            elif kind == "optional_path":
-                report.add("browser", f"{provider}-{check_id}", STATUS_SKIP, f"{check_id} 未配置（可选）")
-            else:
-                report.add("browser", f"{provider}-{check_id}", STATUS_FAIL, f"{check_id} 未配置", str(check.get("hint") or ""))
-    if not deep:
-        return
-    command: list[str] = []
-    if provider == "playwright":
-        selected_tool = report.tool if report.tool in TOOLS else "cursor"
-        server = cat.selected_servers(selected_tool or "cursor", profile).get("playwright")
-        if server:
-            command = [str(server["command"]), *[str(arg) for arg in (server.get("args") or [])]]
-            code, output = run_mcp_browser_probe(command, timeout=45)
-        else:
-            code, output = 1, "playwright server is not selected"
-    else:
-        command = [str(value) for value in ((meta.get("deep_check") or {}).get("command") or [])]
-        code, output = run_cmd(command, timeout=60) if command else (0, "skip")
-    if command:
-        if code == 0:
-            report.add("browser", "deep-launch", STATUS_PASS, "provider 最小启动检查通过")
-        else:
-            report.add("browser", "deep-launch", STATUS_FAIL, f"provider 深度检查失败: {output[:200]}")
-
-
 def check_agents(root: Path, report: DoctorReport) -> None:
     script = root / "scripts" / "modules" / "agents" / "sync.sh"
     status = STATUS_PASS if script.is_file() else STATUS_WARN
@@ -1118,11 +889,9 @@ def build_report(args: argparse.Namespace) -> DoctorReport:
     profile = report.profile
     _safe_check(report, "env", "environment", lambda: check_env(cat, report, profile))
     _safe_check(report, "tools", "runtime-tools", lambda: check_tools(cat, report, profile))
-    _safe_check(report, "mcp", "sync-plan-unavailable", lambda: check_mcp_plan(cat, report, profile, args.tool, args.deep, home=home))
     _safe_check(report, "skills", "sync-plan-unavailable", lambda: check_skills_plan(root, report, home=home))
     _safe_check(report, "skills", "openspec-unavailable", lambda: check_openspec_skills(report, home=home))
     _safe_check(report, "instructions", "sync-plan-unavailable", lambda: check_instructions_plan(root, report, home=home))
-    _safe_check(report, "browser", "browser-unavailable", lambda: check_browser(cat, report, profile, args.deep))
     _safe_check(report, "security", "registry-boundaries-unavailable", lambda: check_config_boundaries(root, report, home=home))
     _safe_check(report, "security", "declared-formats-unavailable", lambda: check_declared_formats(root, report, home=home))
     _safe_check(report, "security", "sensitive-backups-unavailable", lambda: check_sensitive_backups(cat.security, report, home=home))

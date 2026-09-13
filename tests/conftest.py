@@ -88,13 +88,12 @@ def write_skills_catalog(repo: Path, *, default: bool = True) -> None:
 
 
 def isolate_agents_sync_for_test(home: Path) -> None:
-    """Disable network-backed third-party defaults and secret-bearing MCP in tests."""
+    """Disable network-backed third-party skill defaults in tests."""
     import yaml
 
     overlay_dir = home / ".config" / "dotf" / "overlays"
     overlay_dir.mkdir(parents=True)
     catalog = yaml.safe_load((ROOT / "agents" / "skills.yaml").read_text(encoding="utf-8"))
-    servers = yaml.safe_load((ROOT / "agents" / "env" / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
     # Only third-party skills are network-backed; first-party skills come from
     # the repo and stay enabled so tests can exercise the sync path.
     catalog_ids = [
@@ -108,7 +107,6 @@ def isolate_agents_sync_for_test(home: Path) -> None:
         "kind": "dotf-overlay",
         "agents": {
             "profile": "research",
-            "disabled_servers": sorted((servers.get("servers") or {}).keys()),
             "disabled_skills": catalog_ids,
         },
     }

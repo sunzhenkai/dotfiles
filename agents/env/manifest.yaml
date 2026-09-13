@@ -14,14 +14,6 @@ tools:
 default_profile: research
 
 modules:
-  mcp:
-    enabled: true
-    tools: [cursor, kiro, opencode, kimi-code, zcode]
-    exclude: [codex, pi]
-  browser:
-    enabled: true
-    tools: [cursor, kiro, opencode, kimi-code, zcode]
-    exclude: [codex, pi]
   tools:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
@@ -38,15 +30,3 @@ modules:
     enabled: true
     tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
     exclude: []
-
-# Codex / Pi / DSH 当前无 agents/env 聚合 MCP 配置入口，显式降级
-unsupported:
-  codex:
-    mcp: skip
-    reason: "Codex 当前无稳定 MCP 配置入口；skills 仍由 agents/ 同步"
-  pi:
-    mcp: skip
-    reason: "Pi 无内置 MCP（可用 skills/extensions）；skills 仍由 agents/ 同步"
-  dsh:
-    mcp: skip
-    reason: "DSH 的 MCP client 配置在 profile 内（$DSH_HOME/profiles/<name>）"

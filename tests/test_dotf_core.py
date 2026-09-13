@@ -18,14 +18,11 @@ from dotf_core.backup import backup_target, generate_run_id
 from dotf_core.paths import PathBoundaryError, assert_no_symlinks, open_nofollow
 from dotf_core.sanitize import REDACTED, sanitize_for_json, sanitize_for_persistence, sanitize_for_terminal
 from dotf_core.schemas import (
-    JournalAction,
     ManagedManifest,
     PlanItem,
-    McpTransactionJournal,
     SchemaError,
     validate_managed_manifest,
     validate_plan_item,
-    validate_mcp_transaction_journal,
 )
 
 HASH = "a" * 64
@@ -35,7 +32,7 @@ def plan_data() -> dict[str, object]:
     return {
         "schema_version": 1,
         "kind": "plan-item",
-        "owner": "agents:mcp",
+        "owner": "config:agents",
         "source_identity": "catalog/server",
         "expected_hash": HASH,
         "target": "/home/test/.config/tool/config.json",
@@ -52,7 +49,7 @@ def plan_data() -> dict[str, object]:
 
 def managed_data(target: str = "/home/test/.config/tool/config.json") -> dict[str, object]:
     return {
-        "owner": "agents:mcp",
+        "owner": "config:agents",
         "target": target,
         "source_identity": "catalog/server",
         "expected_hash": HASH,
@@ -61,21 +58,6 @@ def managed_data(target: str = "/home/test/.config/tool/config.json") -> dict[st
         "mode": 0o600,
         "run_id": "run-1",
         "sensitive": True,
-    }
-
-
-def action_data() -> dict[str, object]:
-    return {
-        "module": "agents",
-        "action": "config",
-        "status": "completed",
-        "started_at": "2026-09-03T00:00:00Z",
-        "ended_at": "2026-09-03T00:00:01Z",
-        "duration_ms": 1000,
-        "reason_code": "updated",
-        "reason": "managed output updated",
-        "before_hash": None,
-        "after_hash": HASH,
     }
 
 
@@ -96,22 +78,7 @@ def test_strict_versioned_immutable_schemas_round_trip() -> None:
     )
     assert isinstance(manifest, ManagedManifest)
     assert isinstance(manifest.items, tuple)
-
-    journal = validate_mcp_transaction_journal(
-        {
-            "schema_version": 1,
-            "kind": "mcp-transaction-journal",
-            "run_id": "run-1",
-            "status": "completed",
-            "started_at": "2026-09-03T00:00:00Z",
-            "updated_at": "2026-09-03T00:00:01Z",
-            "plan_version": 1,
-            "actions": [action_data()],
-        }
-    )
-    assert isinstance(journal, McpTransactionJournal)
-    assert isinstance(journal.actions[0], JournalAction)
-    assert journal.to_dict()["schema_version"] == 1
+    assert manifest.to_dict()["schema_version"] == 1
 
 
 @pytest.mark.parametrize(
@@ -132,7 +99,7 @@ def test_plan_schema_rejects_versions_unknown_missing_and_invalid_types(mutate) 
         validate_plan_item(data)
 
 
-def test_manifest_rejects_duplicate_targets_and_journal_unknown_keys() -> None:
+def test_manifest_rejects_duplicate_targets() -> None:
     with pytest.raises(SchemaError, match="duplicate"):
         validate_managed_manifest(
             {
@@ -140,21 +107,6 @@ def test_manifest_rejects_duplicate_targets_and_journal_unknown_keys() -> None:
                 "kind": "managed-manifest",
                 "generated_at": "now",
                 "items": [managed_data(), managed_data()],
-            }
-        )
-    action = action_data()
-    action["output"] = "must never be persisted"
-    with pytest.raises(SchemaError):
-        validate_mcp_transaction_journal(
-            {
-                "schema_version": 1,
-                "kind": "mcp-transaction-journal",
-                "run_id": "r",
-                "status": "failed",
-                "started_at": "now",
-                "updated_at": "now",
-                "plan_version": 1,
-                "actions": [action],
             }
         )
 

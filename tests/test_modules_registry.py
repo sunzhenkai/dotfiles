@@ -22,32 +22,11 @@ def test_validate_registry_passes(repo_root: Path) -> None:
     assert "校验通过" in result.stdout
 
 
-def test_registry_rejects_pure_mcp_target_overlap() -> None:
-    registry = deepcopy(modules.load_registry())
-    cursor = modules.find_module(registry, "cursor")
-    assert cursor is not None
-    cursor["config"] = {
-        "source": "agents/vendors/cursor/mcp.json",
-        "target": "~/.cursor/mcp.json",
-        "strategy": "render",
-        "writable": True,
-        "sensitive": True,
-        "target_mode": "0600",
-        "preserve": [],
-        "exclude": [],
-    }
-    errors = modules.validate_registry(registry, strict_handlers=False)
-    assert any(
-        "cursor" in error and "~/.cursor/mcp.json" in error and "重叠" in error
-        for error in errors
-    )
-
-
-def test_registry_allows_coordinated_mixed_and_distinct_mcp_targets() -> None:
+def test_registry_config_targets_for_agent_modules() -> None:
     registry = modules.load_registry()
     assert not [
         error for error in modules.validate_registry(registry, strict_handlers=False)
-        if "agents sync MCP 目标重叠" in error
+        if "目标重叠" in error
     ]
     opencode = modules.find_module(registry, "opencode")
     kimi = modules.find_module(registry, "kimi-code")

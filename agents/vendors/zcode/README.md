@@ -8,8 +8,8 @@
 │   ├── agents/
 │   ├── artifacts/
 │   ├── db/  log/  exec/
-│   ├── plugins/              ← 插件、marketplace、MCP 数据
-│   ├── config.json           ← 含 mcp.servers（托管 MCP 写入处）
+│   ├── plugins/              ← 插件、marketplace
+│   ├── config.json           ← 客户端配置（hooks/plugins 等，不入库）
 │   └── rollout/
 ├── server/                   ← 内置 Node 运行时 + zcode-server.cjs
 ├── v2/                       ← 任务索引
@@ -29,12 +29,12 @@ dotf agents -i
 
 ## 配置
 
-ZCode 的 skills / commands / MCP 只由 agents sync 管理；`dotf zcode` 模块只负责安装 CLI：
+ZCode 的 skills / commands 由 agents sync 管理；`dotf zcode` 模块只负责安装 CLI：
 
 ```shell
-dotf agents -c --tool zcode
+dotf agents -c
 # 或
-scripts/agents/sync.sh zcode
+scripts/modules/agents/sync.sh all
 ```
 
 ## ZCode 资源布局（官方）
@@ -43,9 +43,8 @@ scripts/agents/sync.sh zcode
 |------|------------|------------|----------|
 | Skills | `~/.zcode/skills/`、`~/.agents/skills/` | `<repo>/.zcode/skills/`、`<repo>/.agents/skills/` | 同名第一个赢，user 优先 |
 | Commands | `~/.zcode/commands/`、`~/.agents/commands/` | `<repo>/.zcode/commands/`、`<repo>/.agents/commands/` | 同名第一个赢，user 优先 |
-| MCP | `~/.zcode/cli/config.json` → `mcp.servers` | `<repo>/.zcode/config.json` → `mcp.servers` | user 覆盖 workspace；各层自动连接 |
 | Hooks | `~/.zcode/cli/config.json` → `hooks`（需 `hooks.enabled:true`） | `<repo>/.zcode/config.json` → `hooks` | 配置式需显式 enable；插件 hook 自动追加 |
-| Plugins | marketplace 安装，开关存于 `~/.zcode/cli/config.json` → `plugins` | — | 插件可贡献 skill/command/hook/MCP/agent |
+| Plugins | marketplace 安装，开关存于 `~/.zcode/cli/config.json` → `plugins` | — | 插件可贡献 skill/command/hook/agent |
 
 ## 本仓库 sync 写入范围
 
@@ -53,9 +52,5 @@ scripts/agents/sync.sh zcode
 |------|----------|------|
 | Skills | `~/.zcode/skills/` | 用户级主路径（不写 `~/.agents/` / 项目级） |
 | Commands | `~/.zcode/commands/` | 同上 |
-| MCP | merge → `~/.zcode/cli/config.json` 的 `mcp.servers` | 保留非托管 server 与其它本机字段 |
-| Hooks / Plugins | — | 不由 agents sync 管理 |
+| Hooks / Plugins / config.json | — | 不由 agents sync 管理 |
 
-`agents/vendors/zcode/mcp.json` 为不参与部署的安全生成参考（`{"mcp":{"servers":...}}` 片段，只含占位符），用于 drift/占位符检查；请改 `agents/env/mcp/` 后重新 sync。
-
-ZCode **不展开** `${ZHIPU_API_KEY}`。同步本机 MCP 时会把密钥写入 `~/.zcode/cli/config.json`，否则 HTTP MCP 会鉴权失败。仓库模板不会写入真实密钥。

@@ -129,8 +129,8 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
         if a == "tui":
             _guard_independent("tui", modules, acting(), "错误: tui 为独立命令，不能与模块或动作旗标混用")
             return cmd_tui(ctx, args[i + 1 :])
-        if a == "agents" and (args[i + 1] if i + 1 < len(args) else "") in ("skill", "mcp"):
-            _guard_independent("agents skill|mcp", modules, acting(), "错误: agents skill|mcp 为独立命令")
+        if a == "agents" and (args[i + 1] if i + 1 < len(args) else "") == "skill":
+            _guard_independent("agents skill", modules, acting(), "错误: agents skill 为独立命令")
             return cmd_agents_artifact(ctx, args[i + 1 :])
         if a == "skills":
             _guard_independent("skills", modules, acting())
@@ -176,7 +176,7 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
         elif a in ("-h", "--help"):
             print(HELP_TEXT)
             return 0
-        elif a in ("--skills-only", "--env-only", "--strict"):
+        elif a in ("--strict",):
             config_extra.append(a)
         elif a in ("--uninstall", "--deconfig"):
             if do_i or do_c or do_d:
@@ -289,8 +289,8 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
         if not only_agents:
             agents_only = any(
                 x in (
-                    "--skills-only", "--env-only", "--strict",
-                    "--deep", "--fail-on", "--tool",
+                    "--strict",
+                    "--deep", "--fail-on",
                 )
                 for x in config_extra + doctor_extra
             )

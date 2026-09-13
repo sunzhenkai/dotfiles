@@ -29,25 +29,10 @@ PROFILE_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 _TOP_KEYS = {"schema_version", "kind", "agents", "codex"}
 _AGENT_KEYS = {
     "profile",
-    "enabled_servers",
-    "disabled_servers",
     "enabled_skills",
     "disabled_skills",
-    "browser",
-    "exclude",
 }
-_BROWSER_KEYS = {
-    "provider",
-    "headed",
-    "browser_executable",
-    "user_data_dir",
-    "artifact_dir",
-    "cdp_endpoint",
-    "use_real_profile",
-}
-_BROWSER_BOOL_KEYS = {"headed", "use_real_profile"}
 _CODEX_KEYS = {"local_toml"}
-_EXCLUDE_KEYS = {"servers"}
 
 
 class OverlayError(ValueError):
@@ -57,7 +42,6 @@ class OverlayError(ValueError):
 @dataclass(frozen=True, slots=True)
 class OverlayCatalog:
     profiles: frozenset[str]
-    servers: frozenset[str]
     tools: frozenset[str]
     skills: frozenset[str] = frozenset()
 
@@ -133,13 +117,6 @@ def _validate_agents(value: Any, catalog: OverlayCatalog, label: str) -> dict[st
         profile = _string(profile, f"{label}.profile")
         if profile not in catalog.profiles:
             raise OverlayError(f"{label}.profile references unknown profile: {profile}")
-    for key in ("enabled_servers", "disabled_servers"):
-        if key not in agents:
-            continue
-        refs = _string_list(agents[key], f"{label}.{key}")
-        unknown = sorted(set(refs) - catalog.servers)
-        if unknown:
-            raise OverlayError(f"{label}.{key} references unknown servers: {', '.join(unknown)}")
     for key in ("enabled_skills", "disabled_skills"):
         if key not in agents:
             continue
@@ -150,29 +127,6 @@ def _validate_agents(value: Any, catalog: OverlayCatalog, label: str) -> dict[st
         unknown = sorted(set(refs) - catalog.skills)
         if unknown:
             raise OverlayError(f"{label}.{key} references unknown or unlocked skills: {', '.join(unknown)}")
-    if "browser" in agents:
-        browser = _mapping(agents["browser"], f"{label}.browser")
-        _unknown(browser, _BROWSER_KEYS, f"{label}.browser")
-        for key, item in browser.items():
-            if key in _BROWSER_BOOL_KEYS:
-                if type(item) is not bool:
-                    raise OverlayError(f"{label}.browser.{key} must be a boolean")
-            else:
-                _string(item, f"{label}.browser.{key}")
-    if "exclude" in agents:
-        exclude = _mapping(agents["exclude"], f"{label}.exclude")
-        unknown_tools = sorted(set(exclude) - catalog.tools)
-        if unknown_tools:
-            raise OverlayError(f"{label}.exclude references unknown tools: {', '.join(unknown_tools)}")
-        for tool, raw in exclude.items():
-            config = _mapping(raw, f"{label}.exclude.{tool}")
-            _unknown(config, _EXCLUDE_KEYS, f"{label}.exclude.{tool}")
-            refs = _string_list(config.get("servers", []), f"{label}.exclude.{tool}.servers")
-            unknown = sorted(set(refs) - catalog.servers)
-            if unknown:
-                raise OverlayError(
-                    f"{label}.exclude.{tool}.servers references unknown servers: {', '.join(unknown)}"
-                )
     return agents
 
 
@@ -313,14 +267,12 @@ def load_overlays(
 def catalog_from_repo(repo_root: Path) -> OverlayCatalog:
     env_dir = repo_root / "agents" / "env"
     manifest = yaml.safe_load((env_dir / "manifest.yaml").read_text(encoding="utf-8")) or {}
-    servers = yaml.safe_load((env_dir / "mcp" / "servers.yaml").read_text(encoding="utf-8")) or {}
     profiles = set()
-    for path in sorted((env_dir / "mcp" / "profiles").glob("*.yaml")):
+    for path in sorted((env_dir / "profiles").glob("*.yaml")):
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         profiles.add(str(raw.get("id") or path.stem))
     return OverlayCatalog(
         profiles=frozenset(profiles),
-        servers=frozenset((servers.get("servers") or {}).keys()),
         tools=frozenset(manifest.get("tools") or []),
         skills=_skill_catalog_ids(repo_root),
     )

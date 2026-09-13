@@ -70,17 +70,15 @@ def test_vendor_files_have_no_company_secrets() -> None:
     assert '"company"' not in text
 
 
-def test_merge_preserves_mcp_and_local_provider() -> None:
+def test_merge_preserves_local_provider_and_agent() -> None:
     vendor = _vendor()
     existing = {
         "model": "kimi/k3",
-        "mcp": {"keep-me": {"type": "local", "command": ["true"]}},
         "provider": {"ollama": {"name": "Local Ollama"}},
         "agent": {"build": {"prompt": "local"}},
     }
     out = merge(existing, vendor)
     assert out["model"] == "kimi/k3"
-    assert out["mcp"] == existing["mcp"]
     assert out["agent"] == existing["agent"]
     assert out["provider"]["ollama"] == {"name": "Local Ollama"}
     assert "minimax" in out["provider"]
@@ -91,9 +89,8 @@ def test_merge_preserves_mcp_and_local_provider() -> None:
 
 def test_merge_uses_vendor_default_when_missing_model() -> None:
     vendor = _vendor()
-    out = merge({"mcp": {"x": 1}}, vendor)
+    out = merge({}, vendor)
     assert out["model"] == DEFAULT_MODEL
-    assert out["mcp"] == {"x": 1}
 
 
 def test_install_opencode_uses_vendor_default(tmp_home: Path) -> None:

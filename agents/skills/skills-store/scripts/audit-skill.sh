@@ -41,7 +41,6 @@ PATTERNS=(
   "browser_session|warn|(?i)(cookie|session|localStorage|browser-profile|playwright.*storage)"
   "internal_url|warn|(?i)https?://[a-z0-9.-]*\.(internal|local|corp|intranet)(/|\b)"
   "codeup_private|warn|(?i)codeup\.aliyun\.com"
-  "mcp_mutation|warn|(?i)(write|edit|modify|add).{0,40}(mcp\.json|\.mcp\.json|opencode\.json)"
   "binary_in_skill|warn|__BINARY__"
 )
 

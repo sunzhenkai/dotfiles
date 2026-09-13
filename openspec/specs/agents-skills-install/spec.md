@@ -62,7 +62,7 @@ skills/commands runtime bundle 安装 SHALL 记录本系统拥有的目标、来
 
 - **WHEN** 用户调用独立同步入口并指定 `cursor`
 - **THEN** 系统 SHALL 只适配并安装 Cursor 的 skills/commands
-- **THEN** SHALL NOT 要求同时重装 Cursor 的 MCP 或其他无关配置（除非该入口被实现为完整 `cursor` 配置的一部分且用户显式选择了完整配置）
+- **THEN** SHALL NOT 要求同时重装其他无关配置（除非该入口被实现为完整 `cursor` 配置的一部分且用户显式选择了完整配置）
 
 #### Scenario: 同步全部目标工具
 

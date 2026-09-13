@@ -3,7 +3,7 @@
 Read by the TUI to display module status; written by the runner hook after each
 action completes. The TUI itself never writes this file. Schema is deliberately
 minimal: install / config facts are owned here; managed manifest owns config
-hash / target / mode; XDG overlay owns Skill / MCP Desired Set. The three sources
+hash / target / mode; XDG overlay owns the Skill Desired Set. The three sources
 never overlap.
 """
 

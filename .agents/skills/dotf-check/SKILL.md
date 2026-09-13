@@ -104,7 +104,7 @@ dotf status --profile minimal              # 或更小范围
 ```bash
 # agents 诊断（L0 + 可选 L1）
 dotf agents -d                            # L0：各 agent CLI 是否就位
-dotf agents -d --deep --json              # 深度诊断（脱敏 JSON，含 skills/MCP 同步状态）
+dotf agents -d --deep --json              # 深度诊断（脱敏 JSON，含 skills 同步状态）
 
 # skills 同步状态（仓库 vs 本机）
 dotf agents -c --dry-run                  # 看哪些 skills/commands 需要同步
@@ -113,7 +113,6 @@ dotf agents -c --dry-run                  # 看哪些 skills/commands 需要同�
 **检查项**：
 - 各 agent CLI（claude/cursor/zcode/kiro/...）二进制是否在 PATH
 - skills/commands 是否与仓库 `agents/skills/` 一致（sync 差异）
-- MCP 配置是否就位（`agents/env/mcp`）
 - 重点：本 skill 自己（dotf-check）及 dotf-init/dotf-install 是否已分发到本机
 
 **聚合输出示例**：
@@ -121,8 +120,7 @@ dotf agents -c --dry-run                  # 看哪些 skills/commands 需要同�
 Agent 生态
   ✅ claude-code / cursor / zcode CLI 就位
   ⚠️ kiro CLI 未安装（按需）
-  ⚠️ skills 同步差异：dotf-check 未分发到 ~/.cursor/skills（dotf agents -c 可补）
-  ✅ MCP 配置就位
+  ⚠️ skills 同步差异：dotf-check 未分发到 ~/.agents/skills（dotf agents -c 可补）
 ```
 
 ### 维度 4：配置健康与安全隐患

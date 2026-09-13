@@ -3,7 +3,7 @@
 Composes three sources without writing any of them:
 - ``modules-state.yaml`` for module install / config facts (owned by this change)
 - ``agents-manifest.json`` for config hash / target / mode (owned by ``agents``)
-- ``agents/env/overlay.*.yaml`` for Skill / MCP Desired Set (owned by ``agents``)
+- ``agents/env/overlay.*.yaml`` for the Skill Desired Set (owned by ``agents``)
 """
 
 from __future__ import annotations
@@ -84,23 +84,6 @@ class SkillRow:
     @property
     def actions_text(self) -> str:
         return "A" if self.in_desired else "a/X"
-
-
-@dataclass(frozen=True, slots=True)
-class McpRow:
-    tool: str
-    server: str
-    enabled: bool | None  # None means unknown / not in overlay
-
-    @property
-    def status_text(self) -> str:
-        if self.enabled is None:
-            return "catalog"
-        return "enabled" if self.enabled else "disabled"
-
-    @property
-    def actions_text(self) -> str:
-        return "A/X"
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,44 +235,6 @@ def load_skills(root: Path) -> list[SkillRow]:
         in_desired = skill_id in desired
         source: Literal["desired", "available", "disabled"] = "desired" if in_desired else "available"
         rows.append(SkillRow(skill_id=skill_id, source=source, in_desired=in_desired))
-    return rows
-
-
-def load_mcp(root: Path) -> list[McpRow]:
-    """Build an MCP ``(tool, server)`` row from catalog + overlay."""
-    catalog = catalog_from_repo(root)
-    try:
-        loaded = load_overlays(repo_root=root, catalog=catalog)
-    except Exception:
-        loaded = None
-    enabled_set: set[str] = set()
-    disabled_set: set[str] = set()
-    excluded_by_tool: dict[str, set[str]] = {}
-    if loaded is not None:
-        agents = loaded.agents
-        enabled_set = set(agents.get("enabled_servers") or [])
-        disabled_set = set(agents.get("disabled_servers") or [])
-        # exclude.<tool>.servers 是 mcp.remove --tool <tool> 的产物：
-        # server 仍全局 enabled，但对单个 tool 已排除。该 tool 的行
-        # 必须显示 disabled，否则 remove 成功后 status 仍是 enabled。
-        excluded_by_tool = {
-            tool: set((entry or {}).get("servers") or [])
-            for tool, entry in (agents.get("exclude") or {}).items()
-            if isinstance(entry, dict)
-        }
-    rows: list[McpRow] = []
-    for tool in sorted(catalog.tools):
-        for server in sorted(catalog.servers):
-            enabled: bool | None
-            if server in excluded_by_tool.get(tool, set()):
-                enabled = False
-            elif server in enabled_set:
-                enabled = True
-            elif server in disabled_set:
-                enabled = False
-            else:
-                enabled = None
-            rows.append(McpRow(tool=tool, server=server, enabled=enabled))
     return rows
 
 

@@ -6,28 +6,28 @@ tools:
     command: git
     version_cmd: ["git", "--version"]
     required: true
-    profiles: [coding, research, browser, full]
+    profiles: [coding, research, full]
     install_hint: "安装 git（apt install git / brew install git）"
 
   gh:
     command: gh
     version_cmd: ["gh", "--version"]
     required: false
-    profiles: [coding, research, browser, full]
+    profiles: [coding, research, full]
     install_hint: "安装 GitHub CLI：https://cli.github.com/"
 
   node:
     command: node
     version_cmd: ["node", "--version"]
     required: false
-    profiles: [coding, research, browser, full]
+    profiles: [coding, research, full]
     install_hint: "安装 Node.js 18+（mise / nvm / 包管理器）"
 
   python3:
     command: python3
     version_cmd: ["python3", "--version"]
     required: true
-    profiles: [coding, research, browser, full]
+    profiles: [coding, research, full]
     install_hint: "安装 Python 3.10+（apt install python3 / brew install python）"
 
   go:
@@ -48,7 +48,7 @@ tools:
     command: openspec
     version_cmd: ["openspec", "--version"]
     required: false
-    profiles: [coding, research, browser, full]
+    profiles: [coding, research, full]
     install_hint: "安装 OpenSpec CLI（dotf npm -i）；skills 由 dotf agents -c 装到 ~/.agents/skills"
 
   grepom:
@@ -62,12 +62,5 @@ tools:
     command: npx
     version_cmd: ["npx", "--version"]
     required: false
-    profiles: [browser, full]
-    install_hint: "随 Node.js 提供；browser profile 需要 npx 启动 Playwright MCP"
-
-  browser-use:
-    command: browser-use
-    version_cmd: ["browser-use", "--version"]
-    required: false
-    profiles: [browser, full]
-    install_hint: "uv tool install --python 3.12 --upgrade --force browser-use"
+    profiles: [coding, research, full]
+    install_hint: "随 Node.js 提供；skills 安装（npx skills）依赖它"

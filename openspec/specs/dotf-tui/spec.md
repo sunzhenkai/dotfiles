@@ -22,12 +22,12 @@
 - **THEN** SHALL NOT 打开 TUI
 
 ### Requirement: 两区清单
-TUI SHALL 分两区展示：Modules 区列出注册表中当前 OS 适用的模块；Agent 区列出一手 catalog、默认选中第三方、lock 已批准项以及已在 Desired Set 中的 Skill，以及编目中的 MCP Server（按工具呈现为 MCP Entry）。OpenSpec 生成的 skill SHALL NOT 出现。未声明 uninstall 的模块 SHALL 不展示 uninstall 动作。
+TUI SHALL 分两区展示：Modules 区列出注册表中当前 OS 适用的模块；Agent 区列出一手 catalog、默认选中第三方、lock 已批准项以及已在 Desired Set 中的 Skill。OpenSpec 生成的 skill SHALL NOT 出现。未声明 uninstall 的模块 SHALL 不展示 uninstall 动作。
 
 #### Scenario: 分区展示
 - **WHEN** TUI 打开
 - **THEN** 用户 SHALL 能分别浏览 Modules 与 Agent 两区
-- **THEN** Agent 区 SHALL 同时列出 Skill 与 MCP Entry
+- **THEN** Agent 区 SHALL 列出 Skill
 
 #### Scenario: 不可卸载不显示卸载
 - **WHEN** 模块未声明 uninstall
@@ -56,7 +56,7 @@ TUI 发起的任何会改环境的操作 SHALL 生成与对应 CLI 相同的 pla
 - **THEN** SHALL NOT 对每一行单独执行且绕过计划
 
 ### Requirement: 状态只读展示
-TUI SHALL 展示模块的 `dotf status` 可判定状态，以及 Skill / MCP Entry 的 doctor / sync 计划可判定状态（含 Conflict、缺失、owned、未在 Desired Set）。展示 SHALL NOT 修改环境。TUI SHALL NOT 提供名为 update 的动作；对 drifted 行 MAY 提供重新执行已有 install / config / apply 的入口。
+TUI SHALL 展示模块的 `dotf status` 可判定状态，以及 Skill 的 doctor / sync 计划可判定状态（含 Conflict、缺失、owned、未在 Desired Set）。展示 SHALL NOT 修改环境。TUI SHALL NOT 提供名为 update 的动作；对 drifted 行 MAY 提供重新执行已有 install / config / apply 的入口。
 
 #### Scenario: 只读刷新状态
 - **WHEN** 用户在 TUI 中刷新状态

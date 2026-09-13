@@ -89,7 +89,7 @@
 #### Scenario: agents -d 调用深度诊断
 - **WHEN** 运行 `dotf agents -d`
 - **THEN** 系统 SHALL 运行 agents 深度 doctor
-- **THEN** 报告 SHALL 包含分组检查结果（env/tools/mcp/skills 等，按实现范围）
+- **THEN** 报告 SHALL 包含分组检查结果（env/tools/skills 等，按实现范围）
 
 #### Scenario: 透传 json 选项
 - **WHEN** 运行 `dotf agents -d --json`

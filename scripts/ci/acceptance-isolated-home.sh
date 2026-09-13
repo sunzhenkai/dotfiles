@@ -33,28 +33,36 @@ mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 
 # The research profile can render runtime credential references without values.
 # Remove relevant inherited values so acceptance cannot persist a real credential.
-unset ZHIPU_API_KEY Z_AI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+unset ZHIPU_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
 printf '%s\n' "==> offline locked default skills"
 PYTHONPATH="$ROOT/src/agents:$ROOT/src" "$PYTHON_BIN" - "$ROOT" <<'PY'
 import sys
 from pathlib import Path
 
-from agents.defaults import catalog_skill_ids
+import yaml
+
 from dotf_core.overlays import upsert_local_overlay
 
 
 root = Path(sys.argv[1]).resolve()
-locked_ids = sorted(catalog_skill_ids(root))
+catalog = yaml.safe_load((root / "agents" / "skills.yaml").read_text(encoding="utf-8"))
+# 只有第三方 skill 依赖网络获取；一手 skill 来自仓库，保持启用以检验 sync 路径。
+third_party_ids = sorted(
+    skill_id
+    for group in (catalog.get("groups") or {}).values()
+    if isinstance(group, dict) and group.get("type") == "third-party"
+    for skill_id in (group.get("skills") or [])
+)
 
 
 def mutate(agents: dict) -> None:
     agents["profile"] = "research"
-    agents["disabled_skills"] = locked_ids
+    agents["disabled_skills"] = third_party_ids
 
 
 upsert_local_overlay(root, mutate, home=Path.home())
-print(f"disabled_skills={len(locked_ids)}")
+print(f"disabled_skills={len(third_party_ids)}")
 PY
 
 snapshot_paths() {
@@ -210,7 +218,7 @@ case "$(cat "$config_second")" in
     ;;
 esac
 
-printf '%s\n' "==> offline first-party Agent skills + MCP/environment sync"
+printf '%s\n' "==> offline first-party Agent skills sync"
 STUB_BIN="$TMP_ROOT/offline-bin"
 NETWORK_ATTEMPTED="$TMP_ROOT/network-attempted"
 mkdir -p "$STUB_BIN"
@@ -226,13 +234,9 @@ done
 export PATH="$STUB_BIN:$PATH"
 
 agents_first="$TMP_ROOT/agents-first.log"
-"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" cursor --profile research >"$agents_first"
+"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" all >"$agents_first"
 if ! grep -Eq 'done skills: changed=[1-9][0-9]* ' "$agents_first"; then
   echo "error: first Agent skills sync did not report changed" >&2
-  exit 1
-fi
-if ! grep -q 'agents:mcp:cursor: changed' "$agents_first"; then
-  echo "error: first MCP/environment sync did not report changed" >&2
   exit 1
 fi
 if [ -e "$NETWORK_ATTEMPTED" ]; then
@@ -244,17 +248,9 @@ agents_before="$TMP_ROOT/agents-before.snapshot"
 snapshot_paths "$HOME" >"$agents_before"
 agents_backups_before="$(backup_count)"
 agents_second="$TMP_ROOT/agents-second.log"
-"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" cursor --profile research >"$agents_second"
+"$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" all >"$agents_second"
 if ! grep -Eq 'done skills: changed=0 pruned=0 unchanged=[1-9][0-9]*' "$agents_second"; then
   echo "error: second Agent skills sync was not fully unchanged" >&2
-  exit 1
-fi
-if ! grep -q 'agents:mcp:cursor: unchanged' "$agents_second"; then
-  echo "error: second MCP/environment sync did not report unchanged" >&2
-  exit 1
-fi
-if grep -Eq 'agents:mcp:[^:]+: changed' "$agents_second"; then
-  echo "error: second MCP/environment sync reported a changed target" >&2
   exit 1
 fi
 if [ -e "$NETWORK_ATTEMPTED" ]; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agents 聚合配置：先保留 registry 安全部署，再执行 skills/MCP 聚合 sync。
+# agents 聚合配置：先保留 registry 安全部署，再执行 skills 聚合 sync。
 set -euo pipefail
 
 # shellcheck source=/dev/null

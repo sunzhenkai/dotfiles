@@ -45,15 +45,13 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
 
 agents 示例:
   dotf agents -i              # 安装 agent CLI 工具包
-  dotf agents -c              # 同步 skills + MCP
+  dotf agents -c              # 同步 skills + 全局指令
   dotf agents -d              # 深度诊断
   dotf agents -d --json       # JSON 报告
   dotf agents -cd             # 先同步再诊断
   dotf agents -ic             # 先装后配
   dotf agents skill apply <id>
   dotf agents skill remove <id>   # 写本机 overlay 并 prune
-  dotf agents mcp apply <id> --tool cursor
-  dotf agents mcp remove <id> --all-tools
   dotf skills -i frontend-design
 
 示例:

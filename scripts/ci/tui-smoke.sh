@@ -99,7 +99,7 @@ PY
 if PYTHONPATH="$ROOT/src:$USER_SITE" python3 -c "import textual" 2>/dev/null; then
     echo "==> TUI app import"
     PYTHONPATH="$ROOT/src:$USER_SITE" python3 -c "
-from dotf_tui.app import DotfTuiApp, ModulesPane, SkillsPane, McpPane, StatusPane, ConflictsPane, ConfirmModal, ProgressModal
+from dotf_tui.app import DotfTuiApp, ModulesPane, SkillsPane, StatusPane, ConflictsPane, ConfirmModal, ProgressModal
 print('app+views import OK')
 "
 

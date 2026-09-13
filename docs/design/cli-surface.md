@@ -20,7 +20,7 @@ src/dotf_cli/
 │   ├── pull.py          # git pull + stash 逻辑（subprocess git）
 │   ├── init.py          # profile 选择与首次初始化引导
 │   ├── status.py        # 现有 --json 契约保留并扩展
-│   ├── agents.py        # agents skill/mcp artifact 动词
+│   ├── agents.py        # agents skill artifact 动词
 │   ├── skills.py        # skills -i/-r，group→id→npx 解析顺序
 │   ├── retry.py
 │   └── modules.py       # -i -c -d -u --deconfig + 编号点选入口
@@ -42,7 +42,7 @@ src/dotf_cli/
 | `dotf path` | cmd_path | 纯输出 |
 | `dotf status` | cmd_status | 现有 `--json` 字段名不动 |
 | `dotf tui` | cmd_tui | 仍 `python -m dotf_tui`；保留 tty 检查 |
-| `dotf agents <skill|mcp> ...` | cmd_agents_artifact | 直接调 `src/agents/` |
+| `dotf agents skill ...` | cmd_agents_artifact | 直接调 `src/agents/` |
 | `dotf skills ...` | cmd_skills | group→id→npx 解析顺序不变（ADR-0012） |
 | `dotf retry` | cmd_retry | 读执行状态重放 |
 | `dotf <mod> -i -c -d` | do_*_one + plan_and_run | Python 调 `src/planner.py` 出 plan，`run_plan.sh` 执行（Executor/Handler 不动） |

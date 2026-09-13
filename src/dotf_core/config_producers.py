@@ -193,14 +193,6 @@ def _logseq(context: ProducerContext) -> list[ProducedFile]:
     return outputs
 
 
-def _kiro(context: ProducerContext) -> list[ProducedFile]:
-    return [ProducedFile("settings/mcp.json", context.source_files["mcp.json"], format="json")]
-
-
-def _zcode(context: ProducerContext) -> list[ProducedFile]:
-    return [ProducedFile("cli/config.json", context.source_files["mcp.json"], format="json")]
-
-
 # ---- Codex base + XDG overlay 合并（原 scripts/modules/codex/merge_config.py） ----
 
 _CODEX_PLACEHOLDER_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
@@ -375,11 +367,8 @@ def producer_for(
     factories = {
         "ocr": _ocr,
         "agents": _copy_single,
-        "cursor": _copy_single,
-        "kiro": _kiro,
         "kimi-code": _preserve_single,
         "pi": _pi,
-        "zcode": _zcode,
         "logseq": _logseq,
     }
     if module_name == "codex":

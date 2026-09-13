@@ -26,9 +26,8 @@ def test_make_ci_exposes_every_mandatory_linux_gate_without_skip() -> None:
     makefile = _text("Makefile")
     assert "python3 -m pytest -q" in makefile
     assert "validate --strict-handlers" in makefile
-    for target in ("shellcheck", "templates", "secret-scan", "acceptance", "smoke", "bash32"):
+    for target in ("shellcheck", "secret-scan", "acceptance", "smoke", "bash32"):
         assert re.search(rf"^ci:.*\b{re.escape(target)}\b", makefile, re.MULTILINE)
-    assert "git diff --exit-code -- $(TEMPLATE_OUTPUTS)" in makefile
     assert "skip shellcheck" not in makefile
     assert "command -v shellcheck >/dev/null &&" not in makefile
 
@@ -73,9 +72,8 @@ def test_macos_workflow_requires_system_bash32_and_migration_smoke() -> None:
         "init --list",
         "legacy writable config-link migration",
         "second config run did not report unchanged",
-        "sync.sh\" cursor --profile research",
+        "sync.sh\" all",
         "done skills: changed=0 pruned=0 unchanged=",
-        "agents:mcp:cursor: unchanged",
         "metadata=inode+mtime+hash-stable",
         "repo_status=unchanged",
         "repo_diff=unchanged",
@@ -92,7 +90,7 @@ def test_isolated_acceptance_fail_closed_contract() -> None:
     offline_locks = acceptance.index("==> offline locked default skills")
     assert export_home < offline_locks < first_runtime_command
     for marker in (
-        "unset ZHIPU_API_KEY Z_AI_API_KEY",
+        "unset ZHIPU_API_KEY",
         "NETWORK_ATTEMPTED",
         "disabled_skills",
         "network/acquisition is disabled",
@@ -129,7 +127,6 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     tmux_readme = _text("config/multiplexers/tmux/README.md")
     alacritty_readme = _text("config/terminals/alacritty/README.md")
     codex_readme = _text("agents/vendors/codex/README.md")
-    cursor_readme = _text("agents/vendors/cursor/README.md")
     kiro_readme = _text("agents/vendors/kiro/README.md")
 
     assert "managed with symlinks" not in readme
@@ -153,11 +150,6 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
 
     for marker in ("dotf tmux -c --dry-run", "真实目录", "重新运行 `dotf tmux -c`", "copy"):
         assert marker in tmux_readme
-    for tool_doc in (cursor_readme, kiro_readme):
-        assert "默认 profile 为低风险 `research`" in tool_doc
-        assert "--profile browser" in tool_doc and "--profile full" in tool_doc
-        assert "默认 profile 为 `browser`" not in tool_doc
-
     assert "codex --profile" not in codex_readme
     assert "安装到 `~/.codex/<name>.config.toml`" not in codex_readme
     assert "symlink 到本仓库" not in codex_readme
@@ -179,13 +171,12 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
         "低风险 `research`",
         "managed manifest",
         "conflict",
-        "generate_templates.py",
         "failed-rollback",
         "dotf retry",
         "历史整目录软链",
     ):
         assert marker in readme
-    for marker in ("managed manifest", "conflict", "transaction journal", "generate_templates.py"):
+    for marker in ("managed manifest", "conflict"):
         assert marker in agents
     for marker in ("research", "overlays migrate", "managed ownership", "failed-rollback", "rule_version"):
         assert marker in env

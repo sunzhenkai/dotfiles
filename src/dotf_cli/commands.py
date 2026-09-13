@@ -237,13 +237,13 @@ def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
 
 
 # ============================================================
-# agents skill|mcp artifact
+# agents skill artifact
 # ============================================================
 
 def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
     kind = argv[0] if argv else ""
     verb = argv[1] if len(argv) > 1 else ""
-    if kind not in ("skill", "mcp"):
+    if kind != "skill":
         raise DotfError("usage", f"错误: 未知 agents 制品 '{kind}'")
     if verb not in ("apply", "remove"):
         print(f"用法: dotf agents {kind} apply|remove <id>")
@@ -251,19 +251,10 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
 
     rest = argv[2:]
     skill_id = ""
-    tool = ""
-    all_tools = False
     i = 0
     while i < len(rest):
         arg = rest[i]
-        if arg == "--tool":
-            i += 1
-            if i >= len(rest):
-                raise DotfError("usage", "错误: --tool 需要参数")
-            tool = rest[i]
-        elif arg == "--all-tools":
-            all_tools = True
-        elif arg in ("--yes", "-y"):
+        if arg in ("--yes", "-y"):
             ctx.yes = True
         elif arg == "--dry-run":
             ctx.dry_run = True
@@ -284,29 +275,15 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
         return 1
 
     action = f"{kind}.{verb}"
-    if kind == "skill":
-        if tool or all_tools:
-            print("错误: skill apply/remove 以本机为粒度，不接受 --tool/--all-tools")
-            return 1
-        proc = skills_map_py("--expand-group", skill_id, capture=True)
-        sys.stderr.write(proc.stderr)
-        if proc.returncode != 0:
-            return 1
-        group_ids = [line for line in proc.stdout.splitlines() if line.strip()]
-        if group_ids:
-            plan_and_run(ctx, action, modules_csv=",".join(f"skill:{g}" for g in group_ids))
-            return 0
-        plan_and_run(ctx, action, modules_csv=f"skill:{skill_id}")
+    proc = skills_map_py("--expand-group", skill_id, capture=True)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        return 1
+    group_ids = [line for line in proc.stdout.splitlines() if line.strip()]
+    if group_ids:
+        plan_and_run(ctx, action, modules_csv=",".join(f"skill:{g}" for g in group_ids))
         return 0
-
-    if all_tools and tool:
-        print("错误: --tool 与 --all-tools 不能同时使用")
-        return 1
-    if not all_tools and not tool:
-        print("错误: mcp 需要 --tool <tool> 或显式 --all-tools")
-        return 1
-    selector = f"mcp:*/{skill_id}" if all_tools else f"mcp:{tool}/{skill_id}"
-    plan_and_run(ctx, action, modules_csv=selector)
+    plan_and_run(ctx, action, modules_csv=f"skill:{skill_id}")
     return 0
 
 

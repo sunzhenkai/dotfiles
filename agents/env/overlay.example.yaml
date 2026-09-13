@@ -4,14 +4,10 @@ schema_version: 1
 kind: dotf-overlay
 
 agents:
-  # Safe low-risk default; browser/full require an explicit choice.
+  # Safe low-risk default.
   profile: research
-  disabled_servers: []
   enabled_skills: []
   disabled_skills: []
-  exclude:
-    opencode:
-      servers: []
 
 # Machine-specific Codex project trust may be stored as TOML text externally:
 # codex:

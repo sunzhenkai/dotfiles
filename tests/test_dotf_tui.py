@@ -29,7 +29,6 @@ def test_tui_catalog_hides_uninstall_and_openspec(tmp_home: Path) -> None:
     agents = list_agent_selectables(ROOT, home=tmp_home)
     assert all(not item.selector.endswith("openspec-apply-change") for item in agents)
     assert any(item.selector == "skill:grill-with-docs" for item in agents)
-    assert any(item.selector.startswith("mcp:cursor/") for item in agents)
 
 
 def test_dotf_without_args_is_help(tmp_home: Path) -> None:
@@ -89,12 +88,6 @@ def test_tui_and_cli_deconfig_plans_match(tmp_home: Path) -> None:
     assert left["plan_digest"] == right["plan_digest"]
 
 
-def test_mcp_remove_requires_tool_or_all_tools(tmp_home: Path) -> None:
-    result = run_dotf("agents", "mcp", "remove", "web-reader", "--yes")
-    assert result.returncode != 0
-    assert "--tool" in result.stdout + result.stderr
-
-
 def test_skill_apply_dry_run_builds_plan(tmp_home: Path) -> None:
     result = run_dotf("agents", "skill", "apply", "grill-with-docs", "--dry-run")
     assert result.returncode == 0, result.stderr
@@ -111,33 +104,3 @@ def test_help_lists_reverse_actions_and_tui(tmp_home: Path) -> None:
     assert "--deconfig" in out
     assert "dotf tui" in out
     assert "skill apply" in out
-
-
-def test_load_mcp_reports_per_tool_exclude_as_disabled(
-    tmp_home: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """mcp.remove --tool <tool> 写 exclude 后，该 tool 行必须显示 disabled。"""
-    import yaml
-
-    from dotf_tui import state
-
-    overlay_dir = tmp_home / ".config" / "dotf" / "overlays"
-    overlay_dir.mkdir(parents=True)
-    (overlay_dir / "00-local.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": 1,
-                "kind": "dotf-overlay",
-                "agents": {
-                    "enabled_servers": ["web-reader"],
-                    "exclude": {"cursor": {"servers": ["web-reader"]}},
-                },
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("DOTFILES_ROOT", str(ROOT))
-    rows = {(row.tool, row.server): row for row in state.load_mcp(ROOT)}
-    assert rows[("cursor", "web-reader")].status_text == "disabled"
-    assert rows[("kimi-code", "web-reader")].status_text == "enabled"

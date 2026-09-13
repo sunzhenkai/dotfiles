@@ -10,7 +10,7 @@ The system SHALL provide `dotf agents -i` (and the equivalent install script mod
 - **WHEN** the user runs `dotf agents -i`
 - **THEN** the system SHALL install or verify the declared agent-related CLI modules
 - **THEN** the system SHALL print a per-module status summary
-- **THEN** the command SHALL NOT rewrite MCP or skills configuration as its primary action
+- **THEN** the command SHALL NOT rewrite skills configuration as its primary action
 
 #### Scenario: Install is repeated
 - **WHEN** the user runs `dotf agents -i` again on a machine where modules are already present
@@ -36,7 +36,7 @@ The agents install path SHALL install binaries/tooling, while the agents config 
 #### Scenario: User only installs
 - **WHEN** the user runs `dotf agents -i` without `-c agents`
 - **THEN** CLI tools MAY be installed
-- **THEN** skills/commands and managed MCP files SHALL NOT be required to change for the install command to succeed
+- **THEN** skills/commands SHALL NOT be required to change for the install command to succeed
 
 #### Scenario: User only configures
 - **WHEN** the user runs `dotf agents -c` without `-i agents`

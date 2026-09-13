@@ -339,7 +339,7 @@ for action_pos in "${!ACTIONS[@]}"; do
   install) ;;
   uninstall) ;;
   deconfig) ;;
-  skill.apply | skill.remove | mcp.apply | mcp.remove) ;;
+  skill.apply | skill.remove) ;;
   *) echo "未知动作: $action" >&2; exit 2 ;;
   esac
 

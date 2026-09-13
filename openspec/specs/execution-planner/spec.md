@@ -98,7 +98,7 @@ planner SHALL 递归展开模块 `depends_on`，保证依赖动作先于依赖�
 - **THEN** 系统 SHALL 在任何动作前失败并说明 OS 不一致
 
 ### Requirement: 反向动作纳入同一 planner
-planner SHALL 为 uninstall、deconfig 以及 Skill / MCP 的 apply / remove 生成带版本的完整执行计划，并完成与 install/config/doctor 相同的严格校验。TUI 与 CLI 在相同输入下 SHALL 得到相同顺序的计划。uninstall 计划 SHALL 在执行前解析反向依赖：存在计划外 Dependent 时失败。apply / remove 计划 SHALL 同时包含 overlay 变更与对应 sync / prune 步骤。
+planner SHALL 为 uninstall、deconfig 以及 Skill 的 apply / remove 生成带版本的完整执行计划，并完成与 install/config/doctor 相同的严格校验。TUI 与 CLI 在相同输入下 SHALL 得到相同顺序的计划。uninstall 计划 SHALL 在执行前解析反向依赖：存在计划外 Dependent 时失败。apply / remove 计划 SHALL 同时包含 overlay 变更与对应 sync / prune 步骤。
 
 #### Scenario: TUI 与 CLI 计划一致
 - **WHEN** TUI 与 CLI 对同一模块请求 deconfig 且 OS / profile 相同

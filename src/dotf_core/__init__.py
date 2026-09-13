@@ -25,21 +25,12 @@ from .sanitize import (
 from .schemas import (
     MANIFEST_SCHEMA_VERSION,
     PLAN_SCHEMA_VERSION,
-    MCP_TRANSACTION_JOURNAL_SCHEMA_VERSION,
-    SYNC_PLAN_SCHEMA_VERSION,
-    JournalAction,
     ManagedItem,
     ManagedManifest,
     PlanItem,
-    McpTransactionJournal,
-    RuntimeVersion,
     SchemaError,
-    SyncPlan,
-    SyncPlanItem,
     validate_managed_manifest,
     validate_plan_item,
-    validate_mcp_transaction_journal,
-    validate_sync_plan,
 )
 
 __all__ = [name for name in globals() if not name.startswith("_")]

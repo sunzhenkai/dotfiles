@@ -348,7 +348,7 @@ cmd_agents_artifact() {
   fi
   shift
   case "$kind" in
-  skill | mcp) ;;
+  skill) ;;
   *)
     echo "错误: 未知 agents 制品 '$kind'"
     exit 1
@@ -363,21 +363,8 @@ cmd_agents_artifact() {
   esac
 
   local id=""
-  local tool=""
-  local all_tools=0
   while [ $# -gt 0 ]; do
     case "$1" in
-    --tool)
-      shift
-      if [ -z "${1:-}" ]; then
-        echo "错误: --tool 需要参数"
-        exit 1
-      fi
-      tool="$1"
-      ;;
-    --all-tools)
-      all_tools=1
-      ;;
     --yes | -y)
       DOTF_YES=1
       ;;
@@ -411,10 +398,6 @@ cmd_agents_artifact() {
 
   local action selector modules_csv
   if [ "$kind" = "skill" ]; then
-    if [ -n "$tool" ] || [ "$all_tools" -eq 1 ]; then
-      echo "错误: skill apply/remove 以本机为粒度，不接受 --tool/--all-tools"
-      exit 1
-    fi
     action="skill.$verb"
     # A name may be a group (agents/skills.yaml groups:) expanding to several ids.
     local group_ids=""
@@ -432,21 +415,6 @@ cmd_agents_artifact() {
       return $?
     fi
     selector="skill:$id"
-  else
-    if [ "$all_tools" -eq 1 ] && [ -n "$tool" ]; then
-      echo "错误: --tool 与 --all-tools 不能同时使用"
-      exit 1
-    fi
-    if [ "$all_tools" -eq 0 ] && [ -z "$tool" ]; then
-      echo "错误: mcp 需要 --tool <tool> 或显式 --all-tools"
-      exit 1
-    fi
-    action="mcp.$verb"
-    if [ "$all_tools" -eq 1 ]; then
-      selector="mcp:*/$id"
-    else
-      selector="mcp:$tool/$id"
-    fi
   fi
   plan_and_run "$action" --modules "$selector"
 }
@@ -879,15 +847,13 @@ show_help() {
   echo ""
   echo "agents 示例:"
   echo "  dotf agents -i              # 安装 agent CLI 工具包"
-  echo "  dotf agents -c              # 同步 skills + MCP"
+  echo "  dotf agents -c              # 同步 skills + 全局指令"
   echo "  dotf agents -d              # 深度诊断"
   echo "  dotf agents -d --json       # JSON 报告"
   echo "  dotf agents -cd             # 先同步再诊断"
   echo "  dotf agents -ic             # 先装后配"
   echo "  dotf agents skill apply <id>"
   echo "  dotf agents skill remove <id>   # 写本机 overlay 并 prune"
-  echo "  dotf agents mcp apply <id> --tool cursor"
-  echo "  dotf agents mcp remove <id> --all-tools"
   echo "  dotf skills -i frontend-design"
   echo ""
   echo "示例:"
@@ -958,9 +924,9 @@ main() {
       exit $?
       ;;
     agents)
-      if [ "${2:-}" = "skill" ] || [ "${2:-}" = "mcp" ]; then
+      if [ "${2:-}" = "skill" ]; then
         if [ ${#modules[@]} -gt 0 ] || [ "$do_i$do_c$do_d$do_uninstall$do_deconfig" != "00000" ]; then
-          echo "错误: agents skill|mcp 为独立命令"
+          echo "错误: agents skill 为独立命令"
           exit 1
         fi
         shift
@@ -1061,7 +1027,7 @@ main() {
       show_help
       exit 0
       ;;
-    --skills-only | --env-only | --strict)
+    --strict)
       config_extra+=("$1")
       ;;
     --uninstall)
@@ -1237,7 +1203,7 @@ main() {
       for x in "${config_extra[@]+"${config_extra[@]}"}" "${doctor_extra[@]+"${doctor_extra[@]}"}"; do
         case "$x" in
         --profile) ;;
-        --skills-only | --env-only | --strict | --json | --deep | --verbose | --fail-on | --tool)
+        --strict | --json | --deep | --verbose | --fail-on)
           has_agents_only_flag=1
           ;;
         esac

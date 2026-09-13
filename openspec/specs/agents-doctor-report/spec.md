@@ -4,12 +4,12 @@
 TBD - created by archiving change unify-agents. Update Purpose after archive.
 ## Requirements
 ### Requirement: Unified doctor command
-The system SHALL provide a unified agents doctor command that diagnoses skills sync, MCP/env configuration, tools, browser, security, and related agent readiness. Users SHALL invoke it via `dotf agents -d` (or combinations that include doctor such as `-cd`), not via a config/sync `--doctor` flag.
+The system SHALL provide a unified agents doctor command that diagnoses skills sync, tools, env, security, and related agent readiness. Users SHALL invoke it via `dotf agents -d` (or combinations that include doctor such as `-cd`), not via a config/sync `--doctor` flag.
 
 #### Scenario: Doctor runs with defaults
 - **WHEN** the user runs agents doctor without extra flags
 - **THEN** it SHALL evaluate the selected default profile
-- **THEN** it SHALL report grouped results covering at least env, tools, mcp, skills/agents sync, browser (if in scope), and security
+- **THEN** it SHALL report grouped results covering at least env, tools, skills/agents sync, and security
 
 #### Scenario: Doctor is requested after config
 - **WHEN** the user runs `dotf agents -cd`
@@ -49,7 +49,7 @@ Each doctor check SHALL use one of `pass`, `warn`, `fail`, or `skip`.
 - **THEN** other checks SHALL continue
 
 #### Scenario: Unsupported capability is intentional
-- **WHEN** a target tool intentionally lacks a capability such as Codex MCP
+- **WHEN** a target tool intentionally lacks a capability
 - **THEN** doctor SHALL mark it `skip`
 - **THEN** that skip alone SHALL NOT cause failure
 
@@ -68,10 +68,10 @@ The doctor command SHALL detect and report drift between shared `agents/` source
 ### Requirement: Problems include remediation next steps
 The doctor report SHALL aggregate remediation into deduplicated next steps where possible.
 
-#### Scenario: Multiple MCP drift issues share one fix
-- **WHEN** several managed MCP drift checks fail for the same tool
-- **THEN** next_steps MAY collapse to a single sync command for that tool
-- **THEN** the detailed checks list SHALL still retain per-server or per-id detail
+#### Scenario: Multiple drift issues share one fix
+- **WHEN** several managed drift checks fail for the same module
+- **THEN** next_steps MAY collapse to a single remediation command for that module
+- **THEN** the detailed checks list SHALL still retain per-item detail
 
 ### Requirement: Deep mode remains explicit
 Network reachability and expensive browser launch checks SHALL remain opt-in via a deep mode flag.

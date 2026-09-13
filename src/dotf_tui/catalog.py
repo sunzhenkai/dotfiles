@@ -14,12 +14,10 @@ if str(_SCRIPTS / "agents") not in sys.path:
 
 from dotf_core import registry as modules  # noqa: E402
 from desired_set import approved_skill_ids, resolve_skill_desired_set  # noqa: E402
-from dotf_core.overlays import catalog_from_repo  # noqa: E402
 
 
 MODULE_ACTIONS = ("install", "config", "doctor", "uninstall", "deconfig")
 SKILL_ACTIONS = ("skill.apply", "skill.remove")
-MCP_ACTIONS = ("mcp.apply", "mcp.remove")
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +61,6 @@ def list_module_selectables(os_id: str | None = None) -> list[Selectable]:
 
 
 def list_agent_selectables(root: Path, *, home: Path | None = None) -> list[Selectable]:
-    catalog = catalog_from_repo(root)
     try:
         desired = resolve_skill_desired_set(root, home=home)
     except Exception:
@@ -82,18 +79,6 @@ def list_agent_selectables(root: Path, *, home: Path | None = None) -> list[Sele
                     status=state,
                 )
             )
-    for tool in sorted(catalog.tools):
-        for server_id in sorted(catalog.servers):
-            for action in MCP_ACTIONS:
-                items.append(
-                    Selectable(
-                        label=f"{tool}/{server_id} / {action}",
-                        action=action,
-                        selector=f"mcp:{tool}/{server_id}",
-                        zone="agent",
-                        status="catalog",
-                    )
-                )
     return items
 
 

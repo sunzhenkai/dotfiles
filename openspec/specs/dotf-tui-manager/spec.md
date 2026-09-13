@@ -1,15 +1,15 @@
 # dotf-tui-manager Specification
 
 ## Purpose
-提供 `dotf tui` 作为模块、Skill、MCP 与状态漂移的**管理页面**：键盘直达、按键即时触发、不退出 TUI、状态就地刷新；批量操作走同一 plan / runner。
+提供 `dotf tui` 作为模块、Skill 与状态漂移的**管理页面**：键盘直达、按键即时触发、不退出 TUI、状态就地刷新；批量操作走同一 plan / runner。
 ## Requirements
 ### Requirement: 顶层大类菜单
 
-TUI 启动 SHALL 把五类（Modules、Skills、MCP、Status、Conflicts）显示为顶部 tab，并默认选中 Modules 的清单。用户 SHALL 通过 `Tab` / `Shift+Tab`（以及清单内的 `l` / `h`）在类间循环并立即切换内容，或按数字 `1`-`5` 直达对应类。`q` SHALL 退出 TUI。SHALL NOT 再单独占用一屏菜单、SHALL NOT 要求回车才进入该类。
+TUI 启动 SHALL 把四类（Modules、Skills、Status、Conflicts）显示为顶部 tab，并默认选中 Modules 的清单。用户 SHALL 通过 `Tab` / `Shift+Tab`（以及清单内的 `l` / `h`）在类间循环并立即切换内容，或按数字 `1`-`4` 直达对应类。`q` SHALL 退出 TUI。SHALL NOT 再单独占用一屏菜单、SHALL NOT 要求回车才进入该类。
 
 #### Scenario: 启动显示顶部 tab
 - **WHEN** 用户在 TTY 中运行 `dotf tui`
-- **THEN** TUI SHALL 在顶部显示五类 tab（Modules / Skills / MCP / Status / Conflicts）
+- **THEN** TUI SHALL 在顶部显示四类 tab（Modules / Skills / Status / Conflicts）
 - **THEN** SHALL 默认展示 Modules 清单
 
 #### Scenario: Tab 切类
@@ -86,18 +86,18 @@ TUI 发起的任何 spawn 动作（含单键即时动作与批量 Enter）SHALL 
 - **THEN** 用户按 Enter SHALL 关闭进度窗
 - **THEN** TUI SHALL 回到原清单并刷新状态
 
-### Requirement: Skill 与 MCP 一行一项 + 动作键
+### Requirement: Skill 一行一项 + 动作键
 
-Skills 子菜单 SHALL 一行一项，每项含 Skill id、来源（catalog / desired / available）、状态。MCP 子菜单 SHALL 一行一项，每项为 `(tool, server)`，含 enable / disable 状态。两个子菜单都 SHALL 支持 `a` apply、`x` remove 单键即时触发；状态变更后 SHALL 就地刷新。
+Skills 子菜单 SHALL 一行一项，每项含 Skill id、来源（catalog / desired / available）、状态，并 SHALL 支持 `a` apply、`x` remove 单键即时触发；状态变更后 SHALL 就地刷新。
 
 #### Scenario: Skill apply 即时
 - **WHEN** 光标在 Skill `foo` 行
 - **THEN** 按 `a` SHALL 立即 spawn `dotf agents skill apply foo`
 - **THEN** 完成后该行状态 SHALL 反映 overlay 已启用
 
-#### Scenario: MCP remove 即时
-- **WHEN** 光标在 MCP `(cursor, foo)` 行
-- **THEN** 按 `x` SHALL 立即 spawn `dotf agents mcp remove foo --tool cursor`
+#### Scenario: Skill remove 即时
+- **WHEN** 光标在 Skill `foo` 行
+- **THEN** 按 `x` SHALL 弹出 y/N 确认后 spawn `dotf agents skill remove foo`
 - **THEN** 完成后该行状态 SHALL 反映 overlay 已停用
 
 ### Requirement: 模糊筛选与跳转
@@ -172,7 +172,7 @@ TUI SHALL 支持 `space` 在当前子菜单勾选 / 取消勾选多行。勾选�
 
 ### Requirement: 危险动作的二次确认
 
-`uninstall` / `deconfig` / `mcp remove` / `skill remove` SHALL 在按下对应快捷键后弹出 y/N 确认；默认 SHALL 为 `N`。`install` / `config` / `apply` SHALL 在 dotf 子命令自带 `--yes` 行为之外，TUI 自身不增加额外确认。
+`uninstall` / `deconfig` / `skill remove` SHALL 在按下对应快捷键后弹出 y/N 确认；默认 SHALL 为 `N`。`install` / `config` / `apply` SHALL 在 dotf 子命令自带 `--yes` 行为之外，TUI 自身不增加额外确认。
 
 #### Scenario: uninstall 默认 N
 - **WHEN** 光标在 `grepom` 行按 `u`

@@ -39,7 +39,6 @@ dotf pi -c
 
 并同步 skills 到 `~/.pi/agent/skills/`、commands → prompt templates 到 `~/.pi/agent/prompts/`。
 
-Pi **无内置 MCP**；统一 `agents` sync 对 Pi MCP 记为 `skip`（与 Codex 同类降级）。
 
 仓库默认（可跨机器复用，与 Codex 同源约定）：
 

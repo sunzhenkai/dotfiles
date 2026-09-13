@@ -1,6 +1,6 @@
 ---
 name: dotf-repo
-description: 使用本 dotfiles 仓库管理开发环境：通过 dotf CLI 安装/配置/诊断模块，同步 Agent 运行时（skills、MCP、全局指令），并遵循仓库的开发与测试约定。当 agent 需要在当前机器上装工具、配环境、跑 doctor、同步 agent 能力，或在本仓库提交改动时加载。
+description: 使用本 dotfiles 仓库管理开发环境：通过 dotf CLI 安装/配置/诊断模块，同步 Agent 运行时（skills、全局指令），并遵循仓库的开发与测试约定。当 agent 需要在当前机器上装工具、配环境、跑 doctor、同步 agent 能力，或在本仓库提交改动时加载。
 ---
 
 # 使用 Dotfiles 仓库
@@ -31,12 +31,10 @@ dotf -a --dry-run                      # 全量预览
 ## Agent 运行时同步
 
 ```shell
-dotf agents -ic                     # 装 agent CLI 工具包 + 同步 skills/MCP/全局指令
+dotf agents -ic                     # 装 agent CLI 工具包 + 同步 skills/全局指令
 dotf agents -d --json               # 深度诊断（JSON 报告）
 dotf agents skill apply <id>        # 启用一条 Skill（写 overlay 并 sync）
 dotf agents skill remove <id>       # 停用并 prune owned 目标
-dotf agents mcp apply <id> --tool cursor
-dotf agents mcp remove <id> --all-tools
 dotf skills -i <group|skill>        # 按组装第三方 skill
 ```
 
@@ -49,5 +47,5 @@ dotf skills -i <group|skill>        # 按组装第三方 skill
 ## 仓库开发
 
 - 代码布局：`src/dotf_cli`、`src/dotf_core`、`src/dotf_tui`、`src/agents`；模块 Handler 在 `scripts/modules/<name>/`。
-- 常用校验：`make registry validate`、`make test`、`make shellcheck`、`make templates`、`make ci`。
+- 常用校验：`make registry validate`、`make test`、`make shellcheck`、`make secret-scan`、`make ci`。
 - 术语与领域模型以 `CONTEXT.md` 为准；开发/issue 流程约定见 `AGENTS.md` 与 `docs/agents/`。

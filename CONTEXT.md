@@ -38,16 +38,8 @@ _Avoid_: type（两者正交）, 包, 命名空间（含糊）
 `modules.yaml` 里模块的物种声明：`binary` 负责把软件装到本机（必须声明 install 且有 install handler），`config` 只部署配置（不得声明 install、不得有 install handler；专用 `config.sh` 仍是合法配置触点）。`artifact` 为保留值（未来制品型模块），当前校验拒绝。registry validate 强制 kind ↔ install ↔ Handler 对齐。
 _Avoid_: 物种（口语）, 用 install 字段隐式表达, 第二引擎（指 agents 引擎时）
 
-**MCP Server**:
-编目里声明的一条 MCP 服务，是 Agent 区可选行的来源。
-_Avoid_: MCP, 工具（指 server 本身时）
-
-**MCP Entry**:
-某个目标工具结构化配置文件里的一条具名 server 记录。默认按工具增删这一条，不是删整份文件，也不是默认全工具一起关。
-_Avoid_: MCP 配置（含糊）, 整个 mcp.json
-
 **TUI**:
-显式命令 `dotf tui` 打开的交互皮肤：Modules 一区，Skill 与 MCP Entry 一区。不占领无参数 `dotf`，v1 不替换编号点选。
+显式命令 `dotf tui` 打开的交互皮肤：Modules 一区，Skill 一区。不占领无参数 `dotf`，v1 不替换编号点选。
 _Avoid_: 控制面, 新安装器, 默认 `dotf`
 
 ### Actions
@@ -61,15 +53,15 @@ _Avoid_: 删除, remove（作动作名）, 卸载（当它同时指软件和配�
 _Avoid_: uninstall config, 删除配置, 清目录
 
 **apply**:
-Skill 或 MCP Entry 的正动作：写入 Desired Set 并 sync，使制品或 Entry 存在。CLI 入口与 TUI 按钮必须成对出现。
-_Avoid_: install, config（用在 Skill / MCP 上时）
+Skill 的正动作：写入 Desired Set 并 sync，使制品存在。CLI 入口与 TUI 按钮必须成对出现。
+_Avoid_: install, config（用在 Skill 上时）
 
 **remove**:
-Skill 或 MCP Entry 的反动作：移出 Desired Set 并 prune owned 目标；两步同一次计划，缺一不可。
-_Avoid_: uninstall, deconfig（用在 Skill / MCP 上时）, 只删文件
+Skill 的反动作：移出 Desired Set 并 prune owned 目标；两步同一次计划，缺一不可。
+_Avoid_: uninstall, deconfig（用在 Skill 上时）, 只删文件
 
 **re-apply**:
-对已有动作再跑一次（模块的 install / config，或 Skill / MCP 的 apply）。不是新的生命周期动词。
+对已有动作再跑一次（模块的 install / config，或 Skill 的 apply）。不是新的生命周期动词。
 _Avoid_: update, 更新（作为动作名）
 
 **Conflict**:
@@ -79,7 +71,7 @@ _Avoid_: drift（当已能判定是 Conflict 时）, 损坏
 ### Scope
 
 **Desired Set**:
-这台机器同步之后应该存在的 Skill 与 MCP Entry。默认 = 编目内全部 id ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方。
+这台机器同步之后应该存在的 Skill。默认 = 编目内全部 id ∪ overlay 显式启用，再减去 overlay 停用。不含 OpenSpec 生成的 skill，不含未锁定第三方。
 _Avoid_: catalog（那是仓库编目）, 清单（含糊）
 
 **Dependent**:
@@ -103,5 +95,5 @@ _Avoid_: 操作文件执行器, 安装器, 调度器（与 planner 混称）
 ### Surfaces
 
 **CLI**:
-脚本与自动化的对外入口。模块反动作与 Skill / MCP 的 apply / remove 必须先有 CLI，TUI 只调用它们。
+脚本与自动化的对外入口。模块反动作与 Skill 的 apply / remove 必须先有 CLI，TUI 只调用它们。
 _Avoid_: 旧入口, 旁路, 仅 TUI 能做的动作

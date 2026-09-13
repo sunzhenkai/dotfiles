@@ -1,13 +1,7 @@
-.PHONY: install registry validate test smoke bash32 shellcheck templates secret-scan acceptance ci
+.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
-TEMPLATE_OUTPUTS := \
-	agents/vendors/cursor/mcp.json \
-	agents/vendors/kiro/mcp.json \
-	agents/vendors/opencode/opencode.json \
-	agents/vendors/kimi-code/mcp.json \
-	agents/vendors/zcode/mcp.json
 
 registry validate:
 	python3 src/dotf_core/registry.py validate --strict-handlers
@@ -24,17 +18,13 @@ bash32:
 shellcheck:
 	bash scripts/ci/shellcheck-first-party.sh
 
-templates:
-	python3 src/agents/generate_templates.py
-	git diff --exit-code -- $(TEMPLATE_OUTPUTS)
-
 secret-scan:
 	python3 scripts/ci/secret-scan.py
 
 acceptance:
 	BASH_BIN="$${BASH_BIN:-bash}" bash scripts/ci/acceptance-isolated-home.sh
 
-ci: registry test shellcheck templates secret-scan acceptance smoke bash32
+ci: registry test shellcheck secret-scan acceptance smoke bash32
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \
