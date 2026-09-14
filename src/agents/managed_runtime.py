@@ -66,6 +66,13 @@ CONTENT_DRIFT = "owned target was modified locally"
 MODE_DRIFT = "owned target mode was modified locally"
 _REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT})
 
+# Third-party identity embeds the whole-lock digest, so adding or removing one
+# lock entry rewrites the identity of every already-installed third-party skill.
+# A target still owned by us whose bytes already equal the newly locked content
+# is re-recorded under the new identity instead of conflicting: no unverified
+# content is written, and real drift (bytes differ) still fails closed.
+IDENTITY_MISMATCH = "manifest ownership identity differs"
+
 # A target we did not install, but whose bytes already match what we would write.
 # Another installer (`npx skills`) leaves exactly this behind, and refusing it
 # would make a machine that used one unreconcilable by dotf forever.
@@ -517,6 +524,20 @@ def _conflict(
     backup root, so a remediated operation needs no new write path.
     """
     if (
+        reason == IDENTITY_MISMATCH
+        and expected is not None
+        and prior is not None
+        and expected.owner == prior.owner
+        and actual.digest is not None
+        and actual.digest == expected_hash
+    ):
+        # Same owner, same bytes as the newly locked content: only the attested
+        # identity moved (the lock file changed). Re-record it without review.
+        return RuntimeOperation(
+            "update", "update", target, source_identity, expected_hash,
+            actual.digest, installed_hash, reason, expected, prior, actual.state, True,
+        )
+    if (
         on_conflict == "backup"
         and reason in _REMEDIABLE_CONFLICTS
         and expected is not None
@@ -630,7 +651,7 @@ def compile_owned_plan(
             if prior.owner != item.owner or prior.source_identity != item.source_identity:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, "manifest ownership identity differs", item, prior,
+                    prior.installed_hash, IDENTITY_MISMATCH, item, prior,
                     on_conflict=on_conflict,
                 ))
             elif actual.state == "unsafe":

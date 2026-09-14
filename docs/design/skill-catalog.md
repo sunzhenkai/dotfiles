@@ -46,7 +46,7 @@ groups:
 | group | type | source | package | 成员数 |
 |---|---|---|---|---|
 | `dotfiles` | first-party | — | — | 19 |
-| `mattpocock` | third-party | github | `mattpocock/skills` | 12 |
+| `mattpocock` | third-party | github | `mattpocock/skills` | 13 |
 | `ui-templates` | third-party | github | `sunzhenkai/ui-templates-skill` | 3 |
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 

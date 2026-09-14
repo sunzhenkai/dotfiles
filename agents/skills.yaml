@@ -48,6 +48,7 @@ groups:
       - diagnosing-bugs
       - domain-modeling
       - grill-with-docs
+      - grilling
       # - implement
       # - research
       - setup-matt-pocock-skills
