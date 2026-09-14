@@ -18,7 +18,6 @@ dotf pi -i
    - `npm:pi-agent-extensions` — 扩展合集（17 个扩展 + 4 主题）
    - `npm:pi-web-access` — 网页搜索 / 抓取 / PDF / 视频理解
    - `npm:@juicesharp/rpiv-ask-user-question` — 结构化提问工具
-   - `npm:@juicesharp/rpiv-todo` — todo 工具 + `/todos` 面板
    - `npm:pi-background-tasks` — 后台任务 / 委派
    - `npm:pi-simplify` — 改动代码的简洁性审查
 

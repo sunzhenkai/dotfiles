@@ -272,6 +272,10 @@ def _codex_factory(repo_root: Path, home: Path):
 # default with a successor is declarative rather than a one-off cleanup.
 _PI_RETIRED_PACKAGES = frozenset({
     "npm:@virdis/subagents",
+    # Conflicts with pi-agent-extensions' own ``todos`` extension (duplicate
+    # ``todo`` tool name), which aborts Pi startup. Removed from defaults and
+    # stripped from machines that installed it earlier.
+    "npm:@juicesharp/rpiv-todo",
 })
 
 

@@ -68,6 +68,18 @@ def test_merge_drops_retired_package_from_existing_machine() -> None:
     assert "npm:pi-subagents" in out["packages"]
 
 
+def test_rpiv_todo_is_not_a_default_and_is_retired() -> None:
+    # pi-agent-extensions 自带 todos 扩展，rpiv-todo 的 todo 工具会与其重名，
+    # 导致 Pi 启动时 "Tool \"todo\" conflicts" 而拒绝加载扩展。
+    assert "npm:@juicesharp/rpiv-todo" not in _vendor()["packages"]
+    existing = {
+        "packages": ["npm:@juicesharp/rpiv-todo", "npm:pi-agent-extensions"],
+    }
+    out = merge(existing, _vendor())
+    assert "npm:@juicesharp/rpiv-todo" not in out["packages"]
+    assert "npm:pi-agent-extensions" in out["packages"]
+
+
 def test_merge_uses_vendor_doc_when_no_existing() -> None:
     out = merge({}, _vendor())
     assert out["packages"] == _vendor()["packages"]

@@ -13,7 +13,6 @@ PI_DEFAULT_PACKAGES=(
   "npm:pi-agent-extensions"
   "npm:pi-web-access"
   "npm:@juicesharp/rpiv-ask-user-question"
-  "npm:@juicesharp/rpiv-todo"
   "npm:pi-background-tasks"
   "npm:pi-simplify"
 )
