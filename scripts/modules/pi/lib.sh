@@ -5,12 +5,12 @@
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
-# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + 扩展合集等）
+# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + powerline footer 等）
 PI_DEFAULT_PACKAGES=(
   "npm:@ogulcancelik/pi-goal"
   "npm:pi-subagents"
   "npm:pi-mcp-adapter"
-  "npm:pi-agent-extensions"
+  "npm:pi-powerline-footer"
   "npm:pi-web-access"
   "npm:@juicesharp/rpiv-ask-user-question"
   "npm:pi-background-tasks"

@@ -15,7 +15,7 @@ dotf pi -i
    - `npm:@ogulcancelik/pi-goal` — 目标管理
    - `npm:pi-subagents` — 子代理委派
    - `npm:pi-mcp-adapter` — MCP 接入
-   - `npm:pi-agent-extensions` — 扩展合集（17 个扩展 + 4 主题）
+   - `npm:pi-powerline-footer` — 可配置 status footer（token / 缓存命中率等）
    - `npm:pi-web-access` — 网页搜索 / 抓取 / PDF / 视频理解
    - `npm:@juicesharp/rpiv-ask-user-question` — 结构化提问工具
    - `npm:pi-background-tasks` — 后台任务 / 委派

@@ -6,7 +6,7 @@
     "npm:pi-mcp-adapter",
     "npm:@ogulcancelik/pi-goal",
     "npm:pi-subagents",
-    "npm:pi-agent-extensions",
+    "npm:pi-powerline-footer",
     "npm:pi-web-access",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-background-tasks",

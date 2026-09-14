@@ -31,7 +31,8 @@ def test_vendor_declares_no_provider_model_or_secret() -> None:
 def test_vendor_packages_are_declared_defaults() -> None:
     packages = _vendor()["packages"]
     assert packages[0] == "npm:pi-mcp-adapter"
-    assert "npm:pi-agent-extensions" in packages
+    assert "npm:pi-powerline-footer" in packages
+    assert "npm:pi-agent-extensions" not in packages
     assert "npm:pi-subagents" in packages
     assert "npm:@virdis/subagents" not in packages
 
@@ -54,30 +55,36 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
     assert out["enableInstallTelemetry"] is False
     # packages 取并集，本地独有包保留
     assert "npm:someone-local-only" in out["packages"]
-    assert "npm:pi-agent-extensions" in out["packages"]
+    assert "npm:pi-powerline-footer" in out["packages"]
     assert "npm:pi-mcp-adapter" in out["packages"]
 
 
 def test_merge_drops_retired_package_from_existing_machine() -> None:
     existing = {
-        "packages": ["npm:pi-mcp-adapter", "npm:@virdis/subagents", "npm:someone-local-only"],
+        "packages": [
+            "npm:pi-mcp-adapter",
+            "npm:@virdis/subagents",
+            "npm:pi-agent-extensions",
+            "npm:someone-local-only",
+        ],
     }
     out = merge(existing, _vendor())
     assert "npm:@virdis/subagents" not in out["packages"]
+    assert "npm:pi-agent-extensions" not in out["packages"]
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-subagents" in out["packages"]
+    assert "npm:pi-powerline-footer" in out["packages"]
 
 
 def test_rpiv_todo_is_not_a_default_and_is_retired() -> None:
-    # pi-agent-extensions 自带 todos 扩展，rpiv-todo 的 todo 工具会与其重名，
-    # 导致 Pi 启动时 "Tool \"todo\" conflicts" 而拒绝加载扩展。
+    # 曾与 pi-agent-extensions 的 todos 重名冲突；合集退役后仍保持剔除。
     assert "npm:@juicesharp/rpiv-todo" not in _vendor()["packages"]
     existing = {
         "packages": ["npm:@juicesharp/rpiv-todo", "npm:pi-agent-extensions"],
     }
     out = merge(existing, _vendor())
     assert "npm:@juicesharp/rpiv-todo" not in out["packages"]
-    assert "npm:pi-agent-extensions" in out["packages"]
+    assert "npm:pi-agent-extensions" not in out["packages"]
 
 
 def test_merge_uses_vendor_doc_when_no_existing() -> None:
