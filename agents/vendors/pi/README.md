@@ -13,7 +13,14 @@ dotf pi -i
 1. Pi CLI（官方 `install.sh` / `@earendil-works/pi-coding-agent`，需 Node.js ≥ 22.19）
 2. 默认扩展包（幂等，已装则跳过）：
    - `npm:@ogulcancelik/pi-goal` — 目标管理
-   - `npm:@virdis/subagents` — 子代理委派
+   - `npm:pi-subagents` — 子代理委派
+   - `npm:pi-mcp-adapter` — MCP 接入
+   - `npm:pi-agent-extensions` — 扩展合集（17 个扩展 + 4 主题）
+   - `npm:pi-web-access` — 网页搜索 / 抓取 / PDF / 视频理解
+   - `npm:@juicesharp/rpiv-ask-user-question` — 结构化提问工具
+   - `npm:@juicesharp/rpiv-todo` — todo 工具 + `/todos` 面板
+   - `npm:pi-background-tasks` — 后台任务 / 委派
+   - `npm:pi-simplify` — 改动代码的简洁性审查
 
 验证：
 
@@ -22,19 +29,20 @@ pi --version
 pi list
 ```
 
-> **踩坑**：`@virdis/subagents@0.1.0` 自带 skill 的 frontmatter 为 `name: @virdis/subagents`，YAML 无法解析，交互启动会报 `[Skill conflicts]`。`dotf pi -i` 会在安装后把它幂等改成 `name: pi-subagents`。已装过的机器也可直接再跑一次 `dotf pi -i`。
-
 ## 配置
 
 ```shell
 dotf pi -c
 ```
 
-会把仓库模板应用到本机（**不软链**，避免 `/settings`、`/login` 写回仓库）：
+会把仓库模板应用到本机（**不软链**，避免 `/settings`、`/login` 写回仓库；`settings.json` 走纯 producer 的目录级 merge）：
 
 | 文件 | 行为 |
 |------|------|
-| `settings.json` | 合并托管键（telemetry 等布尔项）；保留本地 `packages`、`theme` 等 |
+| `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管布尔键（telemetry 等）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
+| 其余文件 | 按源逐字同步 |
+
+运行时目录（`npm/`、`sessions/`、`auth.json`、`mcp*.json`、`models*.json`、`trust.json` 等）在 `modules.yaml` 的 `preserve` 中，**不被接管也不被清理**。
 
 并同步 skills 到 `~/.pi/agent/skills/`、commands → prompt templates 到 `~/.pi/agent/prompts/`。
 

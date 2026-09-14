@@ -307,13 +307,15 @@ modules:
     doctor: true
     bin: pi
     config:
+      # settings.json 为运行时可变文件（pi 写回 packages/theme/getLastChangelog），
+      # 故走目录级 merge：packages 取并集、托管布尔键强制，其余键保留本机。
       source: agents/vendors/pi
       target: ~/.pi/agent
-      strategy: copy
+      strategy: merge
       writable: true
       sensitive: true
       target_mode: "0700"
-      preserve: [npm]
+      preserve: [npm, auth.json, sessions, archived_sessions, log, mcp.json, mcp-cache.json, mcp-npx-cache.json, models.json, models-store.json, trust.json]
       exclude: [README.md]
 
   - name: zcode

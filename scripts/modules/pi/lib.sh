@@ -5,10 +5,17 @@
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
-# 默认扩展包（目标管理 + 子代理委派）
+# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + 扩展合集等）
 PI_DEFAULT_PACKAGES=(
   "npm:@ogulcancelik/pi-goal"
-  "npm:@virdis/subagents"
+  "npm:pi-subagents"
+  "npm:pi-mcp-adapter"
+  "npm:pi-agent-extensions"
+  "npm:pi-web-access"
+  "npm:@juicesharp/rpiv-ask-user-question"
+  "npm:@juicesharp/rpiv-todo"
+  "npm:pi-background-tasks"
+  "npm:pi-simplify"
 )
 
 # 常见 npm 全局 bin（mise / ~/.local）临时加入 PATH
@@ -20,20 +27,6 @@ _ensure_pi_path() {
       export PATH="$d:$PATH"
     fi
   done
-}
-
-# 上游 @virdis/subagents 0.1.0 的 SKILL.md 写成 `name: @virdis/subagents`：
-# 1) YAML 中 @ 为保留字符，pi 启动时报 [Skill conflicts]
-# 2) pi skill name 规范只允许 [a-z0-9-]
-# 重装 packages 后会覆盖，故安装后幂等修补。
-_patch_virdis_subagents_skill() {
-  local skill="$HOME/.pi/agent/npm/node_modules/@virdis/subagents/skills/pi-subagents/SKILL.md"
-  [[ -f "$skill" ]] || return 0
-
-  if grep -qE '^name: @virdis/subagents$' "$skill"; then
-    sed -i 's/^name: @virdis\/subagents$/name: pi-subagents/' "$skill"
-    echo "  → 已修补 @virdis/subagents skill name → pi-subagents（上游 YAML 非法）"
-  fi
 }
 
 # 安装/确保默认 pi packages（幂等）
@@ -60,7 +53,6 @@ install_pi_packages() {
   done
   [[ -n "$saved_registry" ]] && export npm_config_registry="$saved_registry" || unset npm_config_registry
 
-  _patch_virdis_subagents_skill
   echo "✓ Pi packages 已就绪"
 }
 

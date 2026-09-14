@@ -267,6 +267,62 @@ def _codex_factory(repo_root: Path, home: Path):
     return produce
 
 
+# Pi packages retired from the dotf-managed defaults: they are removed from
+# ``packages`` even when a machine installed them previously, so replacing a
+# default with a successor is declarative rather than a one-off cleanup.
+_PI_RETIRED_PACKAGES = frozenset({
+    "npm:@virdis/subagents",
+})
+
+
+def pi_settings_merge(
+    existing: Mapping[str, Any] | None,
+    managed: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Overlay dotf-managed Pi settings without clobbering local preferences.
+
+    Managed booleans (telemetry etc.) are authoritative; ``packages`` is a
+    union so the defaults declared in the repo and locally installed Pi
+    extensions both survive, minus any retired package. Every other local key
+    (``defaultModel``, ``theme``, ``lastChangelogVersion``, provider auth) is
+    preserved.
+    """
+    result = dict(existing or {})
+    for key, value in managed.items():
+        if key == "packages":
+            merged: list[Any] = []
+            for entry in list(result.get("packages") or []) + list(value or []):
+                if entry and entry not in _PI_RETIRED_PACKAGES and entry not in merged:
+                    merged.append(entry)
+            result["packages"] = merged
+        else:
+            result[key] = value
+    return result
+
+
+def _pi_factory(repo_root: Path):
+    def produce(context: ProducerContext) -> list[ProducedFile]:
+        outputs: list[ProducedFile] = []
+        for path, source in sorted(context.source_files.items()):
+            if path == "settings.json":
+                managed = _json_object(source, label="Pi source settings.json")
+                actual_raw = context.actual_files.get(path)
+                actual = _json_object(actual_raw, label="Pi target settings.json")
+                outputs.append(
+                    ProducedFile(
+                        path,
+                        pi_settings_merge(actual, managed),
+                        format="json",
+                        reconcile_owned=actual_raw is not None,
+                    )
+                )
+            else:
+                outputs.append(ProducedFile(path, source))
+        return outputs
+
+    return produce
+
+
 def producer_for(
     module_name: str, *, repo_root: os.PathLike[str] | str, home: os.PathLike[str] | str
 ):
@@ -282,6 +338,8 @@ def producer_for(
         return _codex_factory(repo, home_path)
     if module_name == "opencode":
         return _opencode_factory(repo)
+    if module_name == "pi":
+        return _pi_factory(repo)
     try:
         return factories[module_name]
     except KeyError as exc:
