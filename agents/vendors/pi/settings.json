@@ -11,5 +11,11 @@
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-background-tasks",
     "npm:pi-simplify"
-  ]
+  ],
+  "powerline": {
+    "preset": "full",
+    "cache_read": {
+      "format": "both"
+    }
+  }
 }

@@ -308,7 +308,7 @@ modules:
     bin: pi
     config:
       # settings.json 为运行时可变文件（pi 写回 packages/theme/getLastChangelog），
-      # 故走目录级 merge：packages 取并集、托管布尔键强制，其余键保留本机。
+      # 故走目录级 merge：packages 取并集、托管键（布尔 + powerline）强制，其余键保留本机。
       source: agents/vendors/pi
       target: ~/.pi/agent
       strategy: merge

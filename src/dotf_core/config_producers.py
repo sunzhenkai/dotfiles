@@ -288,11 +288,11 @@ def pi_settings_merge(
 ) -> dict[str, Any]:
     """Overlay dotf-managed Pi settings without clobbering local preferences.
 
-    Managed booleans (telemetry etc.) are authoritative; ``packages`` is a
-    union so the defaults declared in the repo and locally installed Pi
-    extensions both survive, minus any retired package. Every other local key
-    (``defaultModel``, ``theme``, ``lastChangelogVersion``, provider auth) is
-    preserved.
+    Managed booleans (telemetry etc.) and ``powerline`` are authoritative;
+    ``packages`` is a union so the defaults declared in the repo and locally
+    installed Pi extensions both survive, minus any retired package. Every
+    other local key (``defaultModel``, ``theme``, ``lastChangelogVersion``,
+    provider auth) is preserved.
     """
     result = dict(existing or {})
     for key, value in managed.items():

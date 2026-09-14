@@ -37,12 +37,19 @@ def test_vendor_packages_are_declared_defaults() -> None:
     assert "npm:@virdis/subagents" not in packages
 
 
+def test_vendor_powerline_shows_tokens_and_cache_hit_rate() -> None:
+    powerline = _vendor()["powerline"]
+    assert powerline["preset"] == "full"
+    assert powerline["cache_read"]["format"] == "both"
+
+
 def test_merge_preserves_local_preferences_and_unions_packages() -> None:
     existing = {
         "defaultModel": "MiniMax-M3",
         "defaultProvider": "senv-TokenApi",
         "lastChangelogVersion": "0.85.1",
         "theme": "dark",
+        "powerline": {"preset": "minimal"},
         "packages": ["npm:pi-mcp-adapter", "npm:someone-local-only"],
     }
     out = merge(existing, _vendor())
@@ -50,9 +57,10 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
     assert out["defaultProvider"] == "senv-TokenApi"
     assert out["theme"] == "dark"
     assert out["lastChangelogVersion"] == "0.85.1"
-    # 托管布尔键由仓库强制
+    # 托管布尔键与 powerline 由仓库强制
     assert out["enableSkillCommands"] is True
     assert out["enableInstallTelemetry"] is False
+    assert out["powerline"] == _vendor()["powerline"]
     # packages 取并集，本地独有包保留
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-powerline-footer" in out["packages"]
@@ -90,6 +98,7 @@ def test_rpiv_todo_is_not_a_default_and_is_retired() -> None:
 def test_merge_uses_vendor_doc_when_no_existing() -> None:
     out = merge({}, _vendor())
     assert out["packages"] == _vendor()["packages"]
+    assert out["powerline"] == _vendor()["powerline"]
     assert out["enableSkillCommands"] is True
 
 

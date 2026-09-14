@@ -15,7 +15,7 @@ dotf pi -i
    - `npm:@ogulcancelik/pi-goal` — 目标管理
    - `npm:pi-subagents` — 子代理委派
    - `npm:pi-mcp-adapter` — MCP 接入
-   - `npm:pi-powerline-footer` — 可配置 status footer（token / 缓存命中率等）
+   - `npm:pi-powerline-footer` — 可配置 status footer；仓库默认 `powerline.preset=full` + `cache_read.format=both`（上/下 token、缓存量与命中率）
    - `npm:pi-web-access` — 网页搜索 / 抓取 / PDF / 视频理解
    - `npm:@juicesharp/rpiv-ask-user-question` — 结构化提问工具
    - `npm:pi-background-tasks` — 后台任务 / 委派
@@ -38,7 +38,7 @@ dotf pi -c
 
 | 文件 | 行为 |
 |------|------|
-| `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管布尔键（telemetry 等）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
+| `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管键（telemetry 等布尔、`powerline`）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
 | 其余文件 | 按源逐字同步 |
 
 运行时目录（`npm/`、`sessions/`、`auth.json`、`mcp*.json`、`models*.json`、`trust.json` 等）在 `modules.yaml` 的 `preserve` 中，**不被接管也不被清理**。
