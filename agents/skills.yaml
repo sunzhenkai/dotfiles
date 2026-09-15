@@ -20,7 +20,6 @@ groups:
       - commit-push
       - dotf-code-explore
       - dotf-code-review
-      - dotf-ui-design
       - id: en-chat
         optional: true
       - id: lark-cli
