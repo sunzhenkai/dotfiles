@@ -15,11 +15,9 @@ description: "以可审计 patch 更新任意已有 Skill，或将其升级为�
 | Skill | 职责 |
 |-------|------|
 | **本 skill** | 任意 Skill：模式门禁后，`update`（改正文/配套）或 `self-upgrade`（加 examples/evals/experience）；二者都走 `<skill-dir>/patches/` |
-| `pwd-skill-manager` | **本仓库套壳**：只维护 `agents/skills/<name>/`；实现上应委托本 skill 的 `update`（外加本仓库公开性/镜像边界），不另搞一套 patch 语义 |
 | `skill-evolver` | 基于多次真实执行：提案 → `evolutions/` 候选 → eval → 晋升生产稿 |
 
 - 用户明确选择 `skill-evolver` 或要求按**执行经验**进化时：停止本流程，交给 `skill-evolver`（用 `evolutions/`，不写本 skill 的 `patches/`）。
-- 用户明确选择 `pwd-skill-manager` 且目标在本仓库 `agents/skills/`：可走该套壳；套壳仍应落到与本 skill 相同的 `<skill-dir>/patches/` 协议。
 - 本 skill **不**根据经验改目标 Skill 的核心行为（那是 `skill-evolver`）。目标尚未具备自进化目录且用户要自更新时，走 `self-upgrade`。
 
 ## 模式门禁（强制）
@@ -91,10 +89,7 @@ description: "以可审计 patch 更新任意已有 Skill，或将其升级为�
 
 定位仓库根：从 `<skill-dir>` 向上找 Git 根。找不到 Git 根则停止并说明无法安全 `git apply`，不要改用直接写文件绕过。
 
-生产稿定位补充：
-
-- 本仓库共享 Skill：`agents/skills/<id>/`。**不要**改 sync 生成的 `~/.agents/skills/` 镜像。
-- 其它仓库 / 个人 skill：以含 `SKILL.md` 的目录为准。
+生产稿定位：以含 `SKILL.md` 的目录为准。不要改用户主目录或其它工具同步生成的安装副本，除非用户明确要求改安装位置。
 
 ---
 
@@ -164,7 +159,7 @@ git diff --check -- "<skill-dir>"
 
 写 `result.md`。失败则 `status: failed`，保留证据并停止；修复必须**新** patch 目录。
 
-不要自动 sync、commit 或 push。本仓库目标升级后可提醒 `scripts/agents/sync.sh` / `dotf agents -c`。
+不要自动 sync、commit 或 push。
 
 ---
 

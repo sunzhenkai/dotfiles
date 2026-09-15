@@ -16,6 +16,7 @@ class ContractTest(unittest.TestCase):
         cls.types = (ROOT / "references" / "page-types.md").read_text(encoding="utf-8")
         cls.ingest = (ROOT / "references" / "ingest.md").read_text(encoding="utf-8")
         cls.lint = (ROOT / "references" / "lint.md").read_text(encoding="utf-8")
+        cls.organize = (ROOT / "references" / "organize.md").read_text(encoding="utf-8")
 
     def test_frontmatter_name_matches_directory(self) -> None:
         self.assertIn("name: llm-wiki", self.skill)
@@ -27,6 +28,7 @@ class ContractTest(unittest.TestCase):
             "references/page-types.md",
             "references/ingest.md",
             "references/lint.md",
+            "references/organize.md",
             "scripts/lint_wiki.py",
             "agents/openai.yaml",
         ):
@@ -47,6 +49,8 @@ class ContractTest(unittest.TestCase):
         init = self.skill.split("## `init`", 1)[1].split("## ", 1)[0]
         self.assertIn("必须先获得确认", init)
         self.assertIn("未确认则停止", init)
+        self.assertIn("必须先获得确认", self.layout)
+        self.assertIn("未确认则停止", self.layout)
 
     def test_phases_are_named(self) -> None:
         for phase in ("guide", "init", "ingest", "query", "organize", "lint"):
@@ -77,6 +81,21 @@ class ContractTest(unittest.TestCase):
     def test_phase_loaded_on_demand(self) -> None:
         self.assertIn("只读该阶段详情", self.skill)
         self.assertIn("不要预加载其它 reference", self.skill)
+        self.assertIn("references/layout.md", self.skill)
+        self.assertIn("references/organize.md", self.skill)
+
+    def test_guide_and_init_live_in_layout(self) -> None:
+        self.assertIn("## `guide`", self.layout)
+        self.assertIn("真实 `ls`", self.layout)
+        self.assertIn("不要创建 `.llmwiki/`", self.layout)
+        guide = self.skill.split("## `guide`", 1)[1].split("## ", 1)[0]
+        self.assertNotIn("缺哪个就说哪个", guide)
+
+    def test_organize_procedure_lives_in_reference(self) -> None:
+        organize = self.skill.split("## `organize`", 1)[1].split("## ", 1)[0]
+        self.assertNotIn("不要编造 `wiki/entity/`", organize)
+        self.assertIn("不要编造 `wiki/entity/`", self.organize)
+        self.assertIn("确认前不改", self.organize)
 
 
 if __name__ == "__main__":

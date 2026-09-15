@@ -11,7 +11,7 @@
 └── result.md
 ```
 
-`<skill-dir>` 是含有待改 `SKILL.md` 的目录（任意仓库中的任意 Skill）。本仓库共享 Skill 通常为 `agents/skills/<skill-name>`。
+`<skill-dir>` 是含有待改 `SKILL.md` 的目录（任意仓库中的任意 Skill）。
 
 ## proposal.md
 

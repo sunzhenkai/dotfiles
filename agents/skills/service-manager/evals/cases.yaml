@@ -375,10 +375,10 @@ cases:
   - id: evolution-prefers-patch-audit
     kind: boundary
     judge: deterministic
-    description: 仓库有 patches 审计流程时优先走该流程而非 skill-evolver
-    given: 需要更新本 Skill 生产稿且仓库提供 pwd-skill-manager / patches 协议
+    description: 显式修订走 skill-upgrader patches，不与 skill-evolver 混用同一生产稿
+    given: 需要更新本 Skill 生产稿且环境有 skill-upgrader
     expect:
       must:
-        - 走 patches 审计维护流程
+        - 走 skill-upgrader 的 update 模式（patches/）
       must_not:
         - 同时混用 skill-evolver 改同一生产稿

@@ -45,7 +45,17 @@ Typed 子目录必须用**复数**：`entities/`，不是 `entity/`。
 | 业务页写成 `wiki/topic.md` | 顶层只允许三份系统页 |
 | 创建 `.llmwiki/` 或 SQLite | 本 skill 不需要应用私有状态 |
 
-## `init` 脚手架
+## `init`
+
+没有 `wiki/` 时必须先获得确认再创建。未确认则停止。
+
+1. 确认 `{WIKI_ROOT}` 与研究/知识范围一句话。
+2. 按下方脚手架创建骨架：`purpose.md`、`rules.md`、`raw/sources/`、`raw/assets/`、typed `wiki/` 子目录、三份系统页、`wiki/templates/`。
+3. **领养已有文档**：原文件复制（或经确认后移动）到 `raw/sources/`，不要在原地改成 wiki 页。随后转 `ingest`。
+4. 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
+5. 绑定工作区，追加 log：`## [YYYY-MM-DD] init | 工作区初始化`。
+
+### 脚手架
 
 `purpose.md`：标题「研究目标」；章节「目标」「关键问题」「范围」。用用户确认过的一句话填范围，其余可留待填写。
 
@@ -79,7 +89,7 @@ title: 操作日志
 
 页面模板见 [page-types.md](page-types.md)。不要把模板复制成业务页。
 
-## 领养已有文档
+### 领养已有文档
 
 用户指向一堆已有 Markdown / PDF / 文本，且尚无上述布局时：
 
@@ -87,6 +97,13 @@ title: 操作日志
 2. 确认复制还是移动。默认复制，保留原位置。
 3. 不要把整个代码仓库当 raw 源；只收录用户指定的知识文档。
 4. 骨架就绪后转 `ingest`，按文件分批，不要一次重写全部。
+
+## `guide`
+
+1. 读 `purpose.md`、`rules.md`、`wiki/overview.md`、`wiki/index.md`。缺哪个就说哪个，不补写。
+2. 列出 `wiki/` typed 子目录页数与 `raw/sources/` 文件数（真实 `ls`，不要编目录树）。
+3. 用 `rg` 或读 index 概括主题、明显缺口、错位页。
+4. 总结：目标与范围、页数按类型、关键主题、下一步建议（ingest / query / organize / lint）。
 
 ## 结构描述
 

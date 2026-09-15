@@ -300,7 +300,7 @@ start / restart 开发/测试原生服务时，监听地址应为 **`0.0.0.0`**�
 本 Skill 具备经验积累、评估与持续进化能力。目录（均相对本 Skill 根目录）：
 
 ```text
-agents/skills/service-manager/
+<skill-dir>/
 ├── SKILL.md
 ├── examples/      # 经过验证的优秀执行案例
 ├── evals/         # 可验证成功标准
@@ -327,7 +327,7 @@ agents/skills/service-manager/
 
 实际更新生产 `SKILL.md` 时：
 
-1. 不要直接覆盖原文；用 Git diff 或等价审计记录保留 version / change / reason / evidence。
-2. **若当前仓库对 `agents/skills/` 有 patches/ 审计维护流程（如 pwd-skill-manager），优先走该流程**，不与 `skill-evolver` 混用。
-3. 否则若环境有 `skill-evolver`，委托它走候选 patch → 验证 → 晋升。
-4. 未展示 Proposal 并获用户确认前，不改生产 Skill。
+1. 不要直接覆盖原文；记录 version / change / reason / evidence / evaluation。有 Git 则优先靠 Git diff 留历史。
+2. 若改动来自**真实执行经验**：优先委托 `skill-evolver`（`evolutions/` → 验证 → 晋升），不要本 Skill 自己改生产稿。
+3. 若只是结构/规则的显式修订且环境有 `skill-upgrader`：走其 `update` 模式（`<skill-dir>/patches/`），仍须先提案再应用。
+4. 未展示 Proposal 并获得用户确认前，不改生产 Skill。

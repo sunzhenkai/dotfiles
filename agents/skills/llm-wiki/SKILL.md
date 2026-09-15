@@ -19,6 +19,7 @@ description: 在本地 Markdown 工作区整理并维护可累积的知识 wiki�
 - 不探索或修改业务源码（交给 `dotf-code-explore`）。
 - 不编辑 `raw/` 中的源材料。
 - 不自动 commit / push / `dotf agents` sync。
+- 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
 
 ## 阶段
 
@@ -65,7 +66,7 @@ description: 在本地 Markdown 工作区整理并维护可累积的知识 wiki�
 | `guide` / `init` | [references/layout.md](references/layout.md) |
 | `ingest` | [references/ingest.md](references/ingest.md)；写页时再读 [references/page-types.md](references/page-types.md) |
 | `query` | 本文件步骤已够；归档到 `wiki/queries/` 时再读 page-types |
-| `organize` | [references/page-types.md](references/page-types.md) 的实体/概念边界；改完跑 lint |
+| `organize` | [references/organize.md](references/organize.md)；写页时再读 [references/page-types.md](references/page-types.md)；改完读 [references/lint.md](references/lint.md) |
 | `lint` | [references/lint.md](references/lint.md) |
 
 确定性检查：
@@ -79,26 +80,15 @@ python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
 
 ## `guide`
 
-1. 读 `purpose.md`、`rules.md`、`wiki/overview.md`、`wiki/index.md`。缺哪个就说哪个，不补写。
-2. 列出 `wiki/` typed 子目录页数与 `raw/sources/` 文件数（真实 `ls`，不要编目录树）。
-3. 用 `rg` 或读 index 概括主题、明显缺口、错位页。
-4. 总结：目标与范围、页数按类型、关键主题、下一步建议（ingest / query / organize / lint）。
+只读了解工作区。进入后读 [references/layout.md](references/layout.md) 的 `guide` 节。
 
 ## `init`
 
-没有 `wiki/` 时 **必须先获得确认** 再创建。未确认则停止。
-
-1. 确认 `{WIKI_ROOT}` 与研究/知识范围一句话。
-2. 按 [references/layout.md](references/layout.md) 创建骨架：`purpose.md`、`rules.md`、`raw/sources/`、`raw/assets/`、typed `wiki/` 子目录、三份系统页、`wiki/templates/`。
-3. **领养已有文档**：原文件复制（或经确认后移动）到 `raw/sources/`，不要在原地改成 wiki 页。随后转 `ingest`。
-4. 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
-5. 绑定工作区，追加 log：`## [YYYY-MM-DD] init | 工作区初始化`。
+没有 `wiki/` 时 **必须先获得确认** 再创建。未确认则停止。确认 `{WIKI_ROOT}` 与研究/知识范围一句话。进入后读 [references/layout.md](references/layout.md)，按其中脚手架创建，再转 `ingest`。
 
 ## `ingest`
 
-进入后读 [references/ingest.md](references/ingest.md)。
-
-短路径：理解材料 → 确认在 `purpose.md` 范围内且无密钥 → 搜索已有页 → 计划创建/更新 → 写入 → 回读 → lint → 更新 `wiki/index.md` → 追加 log。
+进入后读 [references/ingest.md](references/ingest.md)。写页时再读 [references/page-types.md](references/page-types.md)。
 
 ## `query`
 
@@ -109,12 +99,8 @@ python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
 
 ## `organize`
 
-1. 跑 lint，按真实输出描述结构；不要编造 `wiki/entity/` 或 `wiki/skills/`。
-2. 识别：重复页、孤立页、错位、实体-概念耦合、缺失反链。
-3. 给出方案（合并 / 移动 / 补链 / 拆名）。确认前不改。
-4. 执行前读所有受影响页。合并必须保留双方独有信息。
-5. 再跑 lint；更新 index；结构变更追加 `## [YYYY-MM-DD] organize | …`。
+先给方案，确认前不改。进入后读 [references/organize.md](references/organize.md)；写页时再读 [references/page-types.md](references/page-types.md)。改完跑 lint。
 
 ## `lint`
 
-进入后读 [references/lint.md](references/lint.md)。先修 error，warning 说明后处理或有意推迟。修完再跑一遍。
+进入后读 [references/lint.md](references/lint.md)。先修 error，warning 说明后处理或有意推迟。

@@ -1,0 +1,187 @@
+diff --git a/agents/skills/llm-wiki/SKILL.md b/agents/skills/llm-wiki/SKILL.md
+--- a/agents/skills/llm-wiki/SKILL.md
++++ b/agents/skills/llm-wiki/SKILL.md
+@@ -19,6 +19,7 @@ description: 在本地 Markdown 工作区整理并维护可累积的知识 wiki
+ - 不探索或修改业务源码（交给 `dotf-code-explore`）。
+ - 不编辑 `raw/` 中的源材料。
+ - 不自动 commit / push / `dotf agents` sync。
++- 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
+ 
+ ## 阶段
+ 
+@@ -65,7 +66,7 @@ description: 在本地 Markdown 工作区整理并维护可累积的知识 wiki
+ | `guide` / `init` | [references/layout.md](references/layout.md) |
+ | `ingest` | [references/ingest.md](references/ingest.md)；写页时再读 [references/page-types.md](references/page-types.md) |
+ | `query` | 本文件步骤已够；归档到 `wiki/queries/` 时再读 page-types |
+-| `organize` | [references/page-types.md](references/page-types.md) 的实体/概念边界；改完跑 lint |
++| `organize` | [references/organize.md](references/organize.md)；写页时再读 [references/page-types.md](references/page-types.md)；改完读 [references/lint.md](references/lint.md) |
+ | `lint` | [references/lint.md](references/lint.md) |
+ 
+ 确定性检查：
+@@ -79,26 +80,15 @@ python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
+ 
+ ## `guide`
+ 
+-1. 读 `purpose.md`、`rules.md`、`wiki/overview.md`、`wiki/index.md`。缺哪个就说哪个，不补写。
+-2. 列出 `wiki/` typed 子目录页数与 `raw/sources/` 文件数（真实 `ls`，不要编目录树）。
+-3. 用 `rg` 或读 index 概括主题、明显缺口、错位页。
+-4. 总结：目标与范围、页数按类型、关键主题、下一步建议（ingest / query / organize / lint）。
++只读了解工作区。进入后读 [references/layout.md](references/layout.md) 的 `guide` 节。
+ 
+ ## `init`
+ 
+-没有 `wiki/` 时 **必须先获得确认** 再创建。未确认则停止。
+-
+-1. 确认 `{WIKI_ROOT}` 与研究/知识范围一句话。
+-2. 按 [references/layout.md](references/layout.md) 创建骨架：`purpose.md`、`rules.md`、`raw/sources/`、`raw/assets/`、typed `wiki/` 子目录、三份系统页、`wiki/templates/`。
+-3. **领养已有文档**：原文件复制（或经确认后移动）到 `raw/sources/`，不要在原地改成 wiki 页。随后转 `ingest`。
+-4. 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
+-5. 绑定工作区，追加 log：`## [YYYY-MM-DD] init | 工作区初始化`。
++没有 `wiki/` 时 **必须先获得确认** 再创建。未确认则停止。确认 `{WIKI_ROOT}` 与研究/知识范围一句话。进入后读 [references/layout.md](references/layout.md)，按其中脚手架创建，再转 `ingest`。
+ 
+ ## `ingest`
+ 
+-进入后读 [references/ingest.md](references/ingest.md)。
+-
+-短路径：理解材料 → 确认在 `purpose.md` 范围内且无密钥 → 搜索已有页 → 计划创建/更新 → 写入 → 回读 → lint → 更新 `wiki/index.md` → 追加 log。
++进入后读 [references/ingest.md](references/ingest.md)。写页时再读 [references/page-types.md](references/page-types.md)。
+ 
+ ## `query`
+ 
+@@ -109,12 +99,8 @@ python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
+ 
+ ## `organize`
+ 
+-1. 跑 lint，按真实输出描述结构；不要编造 `wiki/entity/` 或 `wiki/skills/`。
+-2. 识别：重复页、孤立页、错位、实体-概念耦合、缺失反链。
+-3. 给出方案（合并 / 移动 / 补链 / 拆名）。确认前不改。
+-4. 执行前读所有受影响页。合并必须保留双方独有信息。
+-5. 再跑 lint；更新 index；结构变更追加 `## [YYYY-MM-DD] organize | …`。
++先给方案，确认前不改。进入后读 [references/organize.md](references/organize.md)；写页时再读 [references/page-types.md](references/page-types.md)。改完跑 lint。
+ 
+ ## `lint`
+ 
+-进入后读 [references/lint.md](references/lint.md)。先修 error，warning 说明后处理或有意推迟。修完再跑一遍。
++进入后读 [references/lint.md](references/lint.md)。先修 error，warning 说明后处理或有意推迟。
+diff --git a/agents/skills/llm-wiki/agents/openai.yaml b/agents/skills/llm-wiki/agents/openai.yaml
+--- a/agents/skills/llm-wiki/agents/openai.yaml
++++ b/agents/skills/llm-wiki/agents/openai.yaml
+@@ -1,4 +1,4 @@
+ interface:
+   display_name: "LLM Wiki"
+   short_description: "用本地 Markdown 整理维护可累积知识 wiki，不依赖 wiki 服务"
+-  default_prompt: "用 $llm-wiki 把本地文档编进 typed wiki：guide 了解现状，ingest 摄入，query 按引用回答，organize 重组，lint 做健康检查。raw/ 只读；不要启动 llmwiki 应用。"
++  default_prompt: "用 $llm-wiki 把本地文档编进 typed wiki：guide 了解现状，init 建骨架，ingest 摄入，query 按引用回答，organize 重组，lint 做健康检查。raw/ 只读；不要启动 llmwiki 应用。"
+diff --git a/agents/skills/llm-wiki/references/layout.md b/agents/skills/llm-wiki/references/layout.md
+--- a/agents/skills/llm-wiki/references/layout.md
++++ b/agents/skills/llm-wiki/references/layout.md
+@@ -45,7 +45,17 @@ Typed 子目录必须用**复数**：`entities/`，不是 `entity/`。
+ | 业务页写成 `wiki/topic.md` | 顶层只允许三份系统页 |
+ | 创建 `.llmwiki/` 或 SQLite | 本 skill 不需要应用私有状态 |
+ 
+-## `init` 脚手架
++## `init`
++
++没有 `wiki/` 时必须先获得确认再创建。未确认则停止。
++
++1. 确认 `{WIKI_ROOT}` 与研究/知识范围一句话。
++2. 按下方脚手架创建骨架：`purpose.md`、`rules.md`、`raw/sources/`、`raw/assets/`、typed `wiki/` 子目录、三份系统页、`wiki/templates/`。
++3. **领养已有文档**：原文件复制（或经确认后移动）到 `raw/sources/`，不要在原地改成 wiki 页。随后转 `ingest`。
++4. 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
++5. 绑定工作区，追加 log：`## [YYYY-MM-DD] init | 工作区初始化`。
++
++### 脚手架
+ 
+ `purpose.md`：标题「研究目标」；章节「目标」「关键问题」「范围」。用用户确认过的一句话填范围，其余可留待填写。
+ 
+@@ -79,7 +89,7 @@ title: 操作日志
+ 
+ 页面模板见 [page-types.md](page-types.md)。不要把模板复制成业务页。
+ 
+-## 领养已有文档
++### 领养已有文档
+ 
+ 用户指向一堆已有 Markdown / PDF / 文本，且尚无上述布局时：
+ 
+@@ -88,6 +98,13 @@ title: 操作日志
+ 3. 不要把整个代码仓库当 raw 源；只收录用户指定的知识文档。
+ 4. 骨架就绪后转 `ingest`，按文件分批，不要一次重写全部。
+ 
++## `guide`
++
++1. 读 `purpose.md`、`rules.md`、`wiki/overview.md`、`wiki/index.md`。缺哪个就说哪个，不补写。
++2. 列出 `wiki/` typed 子目录页数与 `raw/sources/` 文件数（真实 `ls`，不要编目录树）。
++3. 用 `rg` 或读 index 概括主题、明显缺口、错位页。
++4. 总结：目标与范围、页数按类型、关键主题、下一步建议（ingest / query / organize / lint）。
++
+ ## 结构描述
+ 
+ 向用户展示目录时，引用真实 `ls` / lint 统计。不要发明占位文件名，不要画带 emoji 的假树。
+diff --git a/agents/skills/llm-wiki/references/organize.md b/agents/skills/llm-wiki/references/organize.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/llm-wiki/references/organize.md
+@@ -0,0 +1,13 @@
++# 重组
++
++合并重复、搬页、补交叉引用。先给方案，确认前不改。
++
++写页时读 [page-types.md](page-types.md) 的实体/概念边界。改完读 [lint.md](lint.md)。
++
++## 步骤
++
++1. 跑 lint，按真实输出描述结构；不要编造 `wiki/entity/` 或 `wiki/skills/`。
++2. 识别：重复页、孤立页、错位、实体-概念耦合、缺失反链。
++3. 给出方案（合并 / 移动 / 补链 / 拆名）。确认前不改。
++4. 执行前读所有受影响页。合并必须保留双方独有信息。
++5. 再跑 lint；更新 index；结构变更追加 `## [YYYY-MM-DD] organize | …`。
+diff --git a/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py b/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py
+--- a/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py
++++ b/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py
+@@ -16,6 +16,7 @@ class ContractTest(unittest.TestCase):
+         cls.types = (ROOT / "references" / "page-types.md").read_text(encoding="utf-8")
+         cls.ingest = (ROOT / "references" / "ingest.md").read_text(encoding="utf-8")
+         cls.lint = (ROOT / "references" / "lint.md").read_text(encoding="utf-8")
++        cls.organize = (ROOT / "references" / "organize.md").read_text(encoding="utf-8")
+ 
+     def test_frontmatter_name_matches_directory(self) -> None:
+         self.assertIn("name: llm-wiki", self.skill)
+@@ -27,6 +28,7 @@ class ContractTest(unittest.TestCase):
+             "references/page-types.md",
+             "references/ingest.md",
+             "references/lint.md",
++            "references/organize.md",
+             "scripts/lint_wiki.py",
+             "agents/openai.yaml",
+         ):
+@@ -47,6 +49,8 @@ class ContractTest(unittest.TestCase):
+         init = self.skill.split("## `init`", 1)[1].split("## ", 1)[0]
+         self.assertIn("必须先获得确认", init)
+         self.assertIn("未确认则停止", init)
++        self.assertIn("必须先获得确认", self.layout)
++        self.assertIn("未确认则停止", self.layout)
+ 
+     def test_phases_are_named(self) -> None:
+         for phase in ("guide", "init", "ingest", "query", "organize", "lint"):
+@@ -77,6 +81,21 @@ class ContractTest(unittest.TestCase):
+     def test_phase_loaded_on_demand(self) -> None:
+         self.assertIn("只读该阶段详情", self.skill)
+         self.assertIn("不要预加载其它 reference", self.skill)
++        self.assertIn("references/layout.md", self.skill)
++        self.assertIn("references/organize.md", self.skill)
++
++    def test_guide_and_init_live_in_layout(self) -> None:
++        self.assertIn("## `guide`", self.layout)
++        self.assertIn("真实 `ls`", self.layout)
++        self.assertIn("不要创建 `.llmwiki/`", self.layout)
++        guide = self.skill.split("## `guide`", 1)[1].split("## ", 1)[0]
++        self.assertNotIn("缺哪个就说哪个", guide)
++
++    def test_organize_procedure_lives_in_reference(self) -> None:
++        organize = self.skill.split("## `organize`", 1)[1].split("## ", 1)[0]
++        self.assertNotIn("不要编造 `wiki/entity/`", organize)
++        self.assertIn("不要编造 `wiki/entity/`", self.organize)
++        self.assertIn("确认前不改", self.organize)
+ 
+ 
+ if __name__ == "__main__":

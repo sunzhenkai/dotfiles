@@ -39,7 +39,7 @@ cases:
 
 - `id` 在文件内唯一，稳定后不要改名（回归靠它）。
 - `must` / `must_not` 写可观察事实（文件是否存在、是否改了生产稿、交付里是否含某字段），不写「应该更友好」。
-- 本仓库目标 Skill 若已有 `tests/`，加一条 `kind: regression`、`judge: deterministic`，`must` 指向「相关测试仍通过」；不要在 yaml 里复制整份测试。
+- 目标 Skill 目录若已有 `tests/`，加一条 `kind: regression`、`judge: deterministic`，`must` 指向「相关测试仍通过」；不要在 yaml 里复制整份测试。
 
 ## 抽取步骤
 
