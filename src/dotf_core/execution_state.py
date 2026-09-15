@@ -517,6 +517,19 @@ def cmd_sanitize_file(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sanitize_stream(_args: argparse.Namespace) -> int:
+    """Line-buffer stdin to stdout so handler logs can be shown live and redacted."""
+    while True:
+        line = sys.stdin.readline()
+        if line == "":
+            break
+        newline = line.endswith("\n")
+        text = line[:-1] if newline else line
+        sys.stdout.write(sanitize_for_terminal(text) + ("\n" if newline else ""))
+        sys.stdout.flush()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="dotf execution state")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -548,6 +561,8 @@ def build_parser() -> argparse.ArgumentParser:
     sanitize_file = sub.add_parser("sanitize-file")
     sanitize_file.add_argument("path")
     sanitize_file.set_defaults(func=cmd_sanitize_file)
+    sanitize_stream = sub.add_parser("sanitize-stream")
+    sanitize_stream.set_defaults(func=cmd_sanitize_stream)
     return parser
 
 

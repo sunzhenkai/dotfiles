@@ -221,6 +221,7 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
         ("--- openspec skills ---", "openspec_skills.py"),
     )
     failed = 0
+    failed_steps: list[str] = []
     for label, script in steps:
         print(label, flush=True)
         cmd = [
@@ -240,9 +241,11 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
         rc = subprocess.run(cmd, env=python_env()).returncode
         if rc != 0:
             print(f"warning: {script} 失败（退出码 {rc}）", flush=True)
+            failed_steps.append(script.removesuffix(".py"))
             failed = rc
     if failed:
-        raise DotfError("handler", f"skills -c 有阶段失败（退出码 {failed}）")
+        named = ", ".join(failed_steps) if failed_steps else "unknown"
+        raise DotfError("handler", f"skills -c 有阶段失败: {named}（退出码 {failed}）")
     print("✓ skills 全量安装完成")
     return 0
 

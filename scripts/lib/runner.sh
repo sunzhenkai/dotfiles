@@ -78,6 +78,12 @@ runner_now_ms() {
   fi
 }
 
+# Copy handler output into $1 for RESULT parsing, and stream the rest live.
+# RESULT lines stay in the capture file only — runner emits its own later.
+runner_stream_to() {
+  tee "$1" | { grep -v $'^RESULT\t' || true; }
+}
+
 # 执行单个计划动作；打印人类可读行与 RESULT 行。
 # 返回: 0=非 failed，非零=failed（传播处理器退出码）
 # 用法: runner_run_action <action> <module> [extra...]
@@ -91,12 +97,17 @@ runner_run_action() {
   local rc=0
   local capture
   local status reason exit_code
+  local _runner_restore
 
   export DOTF_MODULE="$module"
   export DOTF_ACTION="$action"
+  # Handler stdout is a pipe (tee). Unbuffered Python so layout summaries appear live.
+  export PYTHONUNBUFFERED=1
 
   start_ms=$(runner_now_ms)
   capture=$(mktemp)
+
+  runner_action_body() { return 0; }
 
   # doctor：始终走 L0 + 可选 L1（doctor.sh 表示 L1，不是独占入口）
   if [ "$action" = "doctor" ]; then
@@ -112,21 +123,21 @@ runner_run_action() {
     if [ -f "$(runner_handlers_dir)/${module}/doctor.sh" ]; then
       runner_mark_loaded "$module" "doctor" "$(runner_handlers_dir)/${module}/doctor.sh"
     fi
-    (
+    runner_action_body() {
       set -euo pipefail
-      export DOTFILES_ROOT
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION=doctor
       # shellcheck source=/dev/null
       source "$DOTFILES_ROOT/scripts/lib/doctor_run.sh"
       dotf_doctor_run "$module" ${extra[@]+"${extra[@]}"}
-    ) >"$capture" 2>&1 || rc=$?
+    }
   elif handler=$(runner_handler_path "$module" "$action"); then
     runner_mark_loaded "$module" "$action" "$handler"
     # 约定式处理器：仅执行该脚本（lazy load；公共库由处理器自行 source）
-    (
+    runner_action_body() {
       set -euo pipefail
-      export DOTFILES_ROOT
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION="$action"
       # 预注入结果协议，处理器可直接调用 dotf_result_*
@@ -134,12 +145,12 @@ runner_run_action() {
       source "$DOTFILES_ROOT/scripts/lib/result.sh"
       # shellcheck source=/dev/null
       source "$handler" ${extra[@]+"${extra[@]}"}
-    ) >"$capture" 2>&1 || rc=$?
+    }
   elif [ "$action" = "deconfig" ]; then
     runner_mark_loaded "$module" "deconfig" "registry"
-    (
+    runner_action_body() {
       set -euo pipefail
-      export DOTFILES_ROOT
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION=deconfig
       # shellcheck source=/dev/null
@@ -159,26 +170,26 @@ runner_run_action() {
         exit 1
         ;;
       esac
-    ) >"$capture" 2>&1 || rc=$?
+    }
   elif [[ "$action" == skill.* ]]; then
     runner_mark_loaded "$module" "$action" "agents"
-    (
+    runner_action_body() {
       set -euo pipefail
-      export DOTFILES_ROOT
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION="$action"
       # shellcheck source=/dev/null
       source "$DOTFILES_ROOT/scripts/lib/result.sh"
       PYTHONPATH="${DOTFILES_ROOT}/src:${DOTFILES_ROOT}/src/agents${PYTHONPATH:+:$PYTHONPATH}" \
         python3 "$DOTFILES_ROOT/src/agents/desired_ops.py" "$action" "$module"
-    ) >"$capture" 2>&1 || rc=$?
+    }
   elif [ "$action" = "config" ]; then
     # Registry-declared config has one safe generic entry point. Specialized
     # modules retain a handler only when they need to parse module-specific args.
     runner_mark_loaded "$module" "config" "registry"
-    (
+    runner_action_body() {
       set -euo pipefail
-      export DOTFILES_ROOT
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION=config
       # shellcheck source=/dev/null
@@ -187,7 +198,7 @@ runner_run_action() {
       source "$DOTFILES_ROOT/scripts/lib/handler_common.sh"
       dotf_handler_init
       dotf_registry_config "$module" "${extra[@]+"${extra[@]}"}"
-    ) >"$capture" 2>&1 || rc=$?
+    }
   else
     if [ "${DOTF_REQUIRE_HANDLERS:-0}" = "1" ]; then
       end_ms=$(runner_now_ms)
@@ -201,22 +212,32 @@ runner_run_action() {
       return 1
     fi
     # 迁移期：compat 适配器
-    (
-      export DOTFILES_ROOT
+    runner_action_body() {
+      export DOTFILES_ROOT PYTHONUNBUFFERED=1
       export DOTF_MODULE="$module"
       export DOTF_ACTION="$action"
       compat_run_action "$action" "$module" "${extra[@]+"${extra[@]}"}"
-    ) >"$capture" 2>&1 || rc=$?
+    }
   fi
+
+  # Stream live; keep a copy for RESULT parsing. Restore shopts so a failing
+  # handler cannot leak `set -e` into run_plan.sh (which sources this file).
+  # Explicit subshell: handlers call `exit` via dotf_result_failed.
+  _runner_restore=$(set +o)
+  set +e
+  set +o pipefail
+  (
+    set -euo pipefail
+    export PYTHONUNBUFFERED=1
+    runner_action_body
+  ) 2>&1 | runner_stream_to "$capture"
+  rc=${PIPESTATUS[0]}
+  eval "$_runner_restore"
+  unset -f runner_action_body
 
   end_ms=$(runner_now_ms)
   duration_ms=$((end_ms - start_ms))
   [ "$duration_ms" -lt 0 ] && duration_ms=0
-
-  # 将处理器日志透出（不含 RESULT 行，避免重复）
-  if [ -s "$capture" ]; then
-    grep -v $'^RESULT\t' "$capture" || true
-  fi
 
   if runner_parse_result "$capture"; then
     status="$_RS_STATUS"

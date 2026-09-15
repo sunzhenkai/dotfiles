@@ -21,12 +21,17 @@ if grep -q $'^RESULT\tchanged\t' "$registry_log"; then
 fi
 
 sync_log="$(mktemp)"
-if ! bash "$DOTFILES_ROOT/scripts/modules/agents/sync.sh" "$@" >"$sync_log" 2>&1; then
-  cat "$sync_log"
-  dotf_result_failed "agents sync failed"
+set +e
+set +o pipefail
+bash "$DOTFILES_ROOT/scripts/modules/agents/sync.sh" "$@" 2>&1 | tee "$sync_log"
+sync_rc=${PIPESTATUS[0]}
+set -euo pipefail
+if [ "$sync_rc" -ne 0 ]; then
+  reason="$(grep '^error: agents sync 有阶段失败' "$sync_log" | tail -1 || true)"
+  reason="${reason#error: }"
+  dotf_result_failed "${reason:-agents sync failed}"
   exit 1
 fi
-cat "$sync_log"
 
 if [ "$registry_changed" -eq 1 ] || grep -Eq '^  [+~-] |(^| )changed=[1-9]|: (changed|created|updated|deleted|pruned|chmod) →' "$sync_log"; then
   dotf_result_changed "agents registry config deployed and sync completed"

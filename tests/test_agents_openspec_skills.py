@@ -170,8 +170,9 @@ def test_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_home: Path) -> 
 
 def test_sync_sh_invokes_openspec_skills() -> None:
     script = (ROOT / "scripts" / "modules" / "agents" / "sync.sh").read_text(encoding="utf-8")
-    assert 'python3 "$_SRC_AGENTS/openspec_skills.py"' in script
+    assert '"$_SRC_AGENTS/openspec_skills.py"' in script
     assert "--- openspec skills ---" in script
+    assert "_run_sync_stage openspec" in script
 
 
 @pytest.mark.skipif(shutil.which("openspec") is None, reason="openspec CLI required")

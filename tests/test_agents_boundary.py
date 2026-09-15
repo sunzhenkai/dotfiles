@@ -167,6 +167,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         tmp_home / ".local" / "bin",
         tmp_home / ".kiro" / "skills",
         tmp_home / ".claude" / "skills",
+        tmp_home / ".claude" / "CLAUDE.md",
         tmp_home / ".codex" / "AGENTS.md",
         tmp_home / ".cursor" / "rules",
     )
@@ -195,7 +196,9 @@ def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
     )
     assert r.returncode == 0, r.stderr + r.stdout
     assert "--- instructions ---" in r.stdout
-    assert f"==> sync kiro skills → {tmp_home / '.kiro' / 'skills'}" in r.stdout
+    assert "--- skills ---" in r.stdout
+    assert "==> skills  kiro skills" in r.stdout
+    assert "planning…" in r.stdout
     assert "--- openspec skills ---" in r.stdout
     assert (tmp_home / ".agents" / "AGENTS.md").is_file()
     assert (tmp_home / ".kiro" / "skills" / "task-explore" / "SKILL.md").is_file()

@@ -9,7 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, TextIO, Tuple
 
 _AGENTS = Path(__file__).resolve().parent
 _SCRIPTS = _AGENTS.parent
@@ -238,6 +238,7 @@ def _sync_runtime(
     on_takeover: OnTakeover = "skip",
     verbose: bool = False,
 ) -> SyncOutcome:
+    print(f"==> skills  {label}  planning…", flush=True)
     plan = compile_skills_plan(
         root,
         renderer,
@@ -267,18 +268,19 @@ def _sync_runtime(
 
     print(
         f"==> skills  {label}  {write_ops}↑ {adopts}adopt {skip_n}✗ "
-        f"{prunes}-  |  {total} files"
+        f"{prunes}-  |  {total} files",
+        flush=True,
     )
     if blocked_skills:
         reasons = []
         for skill_id, reason in sorted(blocked_skills.items()):
             tag = "unowned" if reason == ADOPT_REASON else reason
             reasons.append(f"{skill_id} ({tag})")
-        print(f"  ✗ {', '.join(reasons)}")
+        print(f"  ✗ {', '.join(reasons)}", flush=True)
         if on_takeover == "skip" and any(
             reason == ADOPT_REASON for reason in blocked_skills.values()
         ):
-            print("  hint: backup+takeover with --takeover=backup (TTY will also prompt)")
+            print("  hint: re-run with --takeover=backup to backup+takeover", flush=True)
 
     if verbose:
         markers = {
@@ -314,7 +316,8 @@ def _sync_runtime(
     if dry_run:
         print(
             f"  done {label} (plan): changed={write_ops} pruned={prunes} "
-            f"unchanged={unchanged} adopt={adopts} conflicts={skip_n}"
+            f"unchanged={unchanged} adopt={adopts} conflicts={skip_n}",
+            flush=True,
         )
         return SyncOutcome(label, 1 if blocked_skills else 0, first_conflict)
 
@@ -327,7 +330,8 @@ def _sync_runtime(
     print(
         f"  done {label}: changed={result.changed} pruned={result.pruned} "
         f"unchanged={result.unchanged}"
-        + (f" skipped={','.join(skipped)}" if skipped else "")
+        + (f" skipped={','.join(skipped)}" if skipped else ""),
+        flush=True,
     )
     detail = first_conflict
     if skipped and not detail:
@@ -371,18 +375,76 @@ def _takeover_candidates(
     return found
 
 
-def _confirm_takeover(candidates: list[tuple[str, str]]) -> bool:
+def _interactive_tty() -> tuple[TextIO, TextIO] | None:
+    """Return controlling-terminal streams when the user can answer a prompt.
+
+    Executor captures handler stdout, so sys.stdout.isatty() is false during
+    `dotf agents -c`. stdin still inherits the terminal; /dev/tty is the prompt.
+    Tests and pipes have a non-TTY stdin, so they never touch /dev/tty.
+    """
+    if not sys.stdin.isatty():
+        return None
+    try:
+        return (
+            open("/dev/tty", "r", encoding="utf-8"),
+            open("/dev/tty", "w", encoding="utf-8", buffering=1),
+        )
+    except OSError:
+        return None
+
+
+def _confirm_takeover(
+    candidates: list[tuple[str, str]],
+    *,
+    tty_in: TextIO,
+    tty_out: TextIO,
+) -> bool:
     skills = sorted({skill_id for _, skill_id in candidates})
     print(
         f"Takeover: {len(skills)} skill(s) have unowned divergent files "
-        f"({', '.join(skills)})."
+        f"({', '.join(skills)}).",
+        file=tty_out,
+        flush=True,
     )
-    print("Backup those files under XDG_STATE_HOME/dotf/backups/, then write managed bytes?")
+    print(
+        "Backup those files under XDG_STATE_HOME/dotf/backups/, then write managed bytes?",
+        file=tty_out,
+        flush=True,
+    )
     try:
-        answer = input("Takeover with backup? [y/N]: ").strip().lower()
-    except EOFError:
+        print("Takeover with backup? [y/N]: ", end="", file=tty_out, flush=True)
+        answer = tty_in.readline().strip().lower()
+    except (EOFError, OSError):
         return False
     return answer in {"y", "yes"}
+
+
+def decide_takeover(
+    root: Path,
+    *,
+    on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
+) -> OnTakeover:
+    """Return skip or backup; prompt on the controlling TTY when needed."""
+    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
+    if takeover == "backup":
+        return "backup"
+    conflict = on_conflict if on_conflict is not None else on_conflict_from_env()
+    streams = _interactive_tty()
+    if streams is None:
+        return "skip"
+    tty_in, tty_out = streams
+    try:
+        print("Scanning for unowned skills…", file=tty_out, flush=True)
+        candidates = _takeover_candidates(root, on_conflict=conflict)
+        if not candidates:
+            return "skip"
+        if _confirm_takeover(candidates, tty_in=tty_in, tty_out=tty_out):
+            return "backup"
+        return "skip"
+    finally:
+        tty_in.close()
+        tty_out.close()
 
 
 def sync_layout(
@@ -422,17 +484,6 @@ def sync_skills(
     conflict = on_conflict if on_conflict is not None else on_conflict_from_env()
     takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
     verbose = verbose or os.environ.get("DOTF_VERBOSE", "") == "1"
-
-    if (
-        not dry_run
-        and takeover == "skip"
-        and sys.stdin.isatty()
-        and sys.stdout.isatty()
-    ):
-        candidates = _takeover_candidates(root, on_conflict=conflict)
-        if candidates and _confirm_takeover(candidates):
-            takeover = "backup"
-            os.environ["DOTF_TAKEOVER"] = "backup"
 
     return [
         sync_layout(
@@ -503,6 +554,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="逐文件打印（默认只打 Layout 进度摘要）",
     )
+    parser.add_argument(
+        "--decide-takeover",
+        action="store_true",
+        help="print skip or backup after optional TTY confirm; do not sync",
+    )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
 
@@ -511,13 +567,28 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     root = args.root.resolve() if args.root else repo_root()
 
+    if args.decide_takeover:
+        print(
+            decide_takeover(
+                root,
+                on_conflict=args.on_conflict,
+                on_takeover=args.on_takeover,
+            )
+        )
+        return 0
+
+    takeover = args.on_takeover
+    if takeover is None and not args.dry_run:
+        takeover = decide_takeover(root, on_conflict=args.on_conflict)
+
+    outcomes: List[SyncOutcome] = []
     rc = 0
     try:
         outcomes = sync_skills(
             root,
             dry_run=args.dry_run,
             on_conflict=args.on_conflict,
-            on_takeover=args.on_takeover,
+            on_takeover=takeover,
             verbose=args.verbose,
         )
         rc = max((item.rc for item in outcomes), default=0)
@@ -526,10 +597,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception as e:
         print(f"error syncing skills: {e}", file=sys.stderr)
         return 1
-    if rc == 0:
-        print("==> shims")
-        install_shims(root, dry_run=args.dry_run)
-    return rc
+    if rc != 0:
+        print(f"error: skills: {summarize(outcomes) or 'failed'}", file=sys.stderr)
+        return rc
+    print("==> shims")
+    install_shims(root, dry_run=args.dry_run)
+    return 0
 
 
 if __name__ == "__main__":

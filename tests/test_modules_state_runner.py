@@ -118,3 +118,22 @@ def test_failed_action_does_not_write_state(tmp_path):
     assert proc.returncode != 0
     records = ms.load_state(state_home=home / ".local" / "state")
     assert "demo" not in records
+
+
+def test_handler_logs_stream_live_and_result_is_normalized(tmp_path):
+    home = tmp_path / "home"
+    handlers = tmp_path / "handlers"
+    _handler(
+        handlers,
+        "demo",
+        "install",
+        "echo LIVE_MARKER\n" + (_RESULT_OK % ("demo", "install")),
+    )
+    plan = tmp_path / "plan.json"
+    write_test_plan(plan, handlers, [("install", "demo")])
+    proc = _run_plan(plan, home)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "LIVE_MARKER" in proc.stdout
+    result_lines = [line for line in proc.stdout.splitlines() if line.startswith("RESULT\t")]
+    assert len(result_lines) == 1
+    assert result_lines[0].startswith("RESULT\tchanged\tdemo\tinstall")

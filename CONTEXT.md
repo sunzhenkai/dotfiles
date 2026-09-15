@@ -77,7 +77,7 @@ _Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖, 用 C
 _Avoid_: Conflict（那是已 owned 的漂移）, 外来文件（含糊）, 无主（口语）
 
 **Takeover**:
-把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的显式动作。与 Conflict 的 `--on-conflict=backup` 分家；CLI 为 `--takeover=backup`（环境变量 `DOTF_TAKEOVER`）。TTY 在计划确认之外对可接管项做一次汇总二次确认；非 TTY 必须带显式 flag，默认跳过。
+把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的显式动作。与 Conflict 的 `--on-conflict=backup` 分家；CLI 为 `--takeover=backup`（环境变量 `DOTF_TAKEOVER`）。TTY 在计划确认之外对可接管项做一次汇总二次确认（写到控制终端 `/dev/tty`，不依赖 Handler stdout 是否被 Executor 捕获）；非 TTY 必须带显式 flag，默认跳过。一次确认覆盖整次 agents sync（一手 / defaults / OpenSpec）。
 _Avoid_: on-conflict（管 owned 漂移）, adopt（只用于字节已等价）, 强制覆盖
 
 ### Scope

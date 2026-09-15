@@ -156,6 +156,7 @@ def install_defaults(
             if not selected:
                 source_root.mkdir(parents=True, exist_ok=True)
             for layout, destination in destinations:
+                print(f"==> defaults  {layout.key}  planning…", flush=True)
                 home = home_for_target(destination)
                 renderer = renderers_for(layout)
                 try:
@@ -177,7 +178,8 @@ def install_defaults(
                     print(
                         f"  done defaults ({layout.key}): locked={len(lock.skills)} changed={result.changed} "
                         f"pruned={result.pruned} unchanged={result.unchanged}"
-                        + (f" skipped={skipped}" if skipped else "")
+                        + (f" skipped={skipped}" if skipped else ""),
+                        flush=True,
                     )
                     if result.skipped_skills:
                         rc = 1

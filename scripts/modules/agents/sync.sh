@@ -92,6 +92,30 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+export PYTHONUNBUFFERED=1
+
+# Confirm Takeover once for the whole sync (first-party + defaults + OpenSpec).
+# Prompt goes to /dev/tty so it still works when Executor captures stdout.
+if [ -z "$ON_TAKEOVER" ] && [ "$DRY_RUN" -eq 0 ]; then
+  decide_args=(--decide-takeover --root "$ROOT")
+  if [ -n "$ON_CONFLICT" ]; then
+    decide_args+=(--on-conflict "$ON_CONFLICT")
+  fi
+  set +e
+  ON_TAKEOVER="$(python3 "$_SRC_AGENTS/sync.py" "${decide_args[@]}")"
+  decide_rc=$?
+  set -e
+  if [ "$decide_rc" -ne 0 ]; then
+    echo "error: takeover confirm failed (exit=$decide_rc)" >&2
+    exit "$decide_rc"
+  fi
+  case "$ON_TAKEOVER" in
+  backup | skip) ;;
+  *) ON_TAKEOVER=skip ;;
+  esac
+  export DOTF_TAKEOVER="$ON_TAKEOVER"
+fi
+
 echo "agents sync  dry_run=$DRY_RUN"
 
 echo "--- instructions ---"
@@ -118,34 +142,30 @@ if [ "$VERBOSE" -eq 1 ]; then
   export DOTF_VERBOSE=1
 fi
 
-# 阶段互不阻塞：一手 / defaults / OpenSpec 各自记 rc，最后汇总。
+# 阶段互不阻塞：一手 / defaults / OpenSpec 各自记 rc，最后汇总并点名失败阶段。
 sync_rc=0
-echo "--- skills ---"
-set +e
-python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
-step_rc=$?
-set -e
-if [ "$step_rc" -ne 0 ]; then
-  sync_rc=$step_rc
-fi
+failed_stages=()
 
-echo "--- default skills ---"
-set +e
-python3 "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
-step_rc=$?
-set -e
-if [ "$step_rc" -ne 0 ]; then
-  sync_rc=$step_rc
-fi
+_run_sync_stage() {
+  local stage="$1"
+  local banner="$2"
+  local step_rc
+  shift 2
+  echo "$banner"
+  set +e
+  python3 "$@"
+  step_rc=$?
+  set -e
+  if [ "$step_rc" -ne 0 ]; then
+    echo "error: agents sync 阶段失败: $stage（exit=$step_rc）" >&2
+    failed_stages+=("$stage")
+    sync_rc=$step_rc
+  fi
+}
 
-echo "--- openspec skills ---"
-set +e
-python3 "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
-step_rc=$?
-set -e
-if [ "$step_rc" -ne 0 ]; then
-  sync_rc=$step_rc
-fi
+_run_sync_stage skills "--- skills ---" "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
+_run_sync_stage defaults "--- default skills ---" "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
+_run_sync_stage openspec "--- openspec skills ---" "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
 
 # --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）
 if [ "$STRICT" -eq 1 ]; then
@@ -153,7 +173,9 @@ if [ "$STRICT" -eq 1 ]; then
 fi
 
 if [ "$sync_rc" -ne 0 ]; then
-  echo "error: agents sync 有阶段失败（exit=$sync_rc）" >&2
+  joined=$(printf '%s, ' "${failed_stages[@]}")
+  joined="${joined%, }"
+  echo "error: agents sync 有阶段失败: ${joined}（exit=$sync_rc）" >&2
   exit "$sync_rc"
 fi
 

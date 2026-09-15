@@ -347,15 +347,20 @@ for action_pos in "${!ACTIONS[@]}"; do
   chmod 600 "$out"
   CURRENT_OUT="$out"
   set +e
+  set +o pipefail
   if [ ${#extra[@]} -gt 0 ]; then
-    runner_run_action "$action" "$module" "${extra[@]}" >"$out" 2>&1
+    runner_run_action "$action" "$module" "${extra[@]}" 2>&1 \
+      | python3 -u -m dotf_core.execution_state sanitize-stream \
+      | tee "$out"
   else
-    runner_run_action "$action" "$module" >"$out" 2>&1
+    runner_run_action "$action" "$module" 2>&1 \
+      | python3 -u -m dotf_core.execution_state sanitize-stream \
+      | tee "$out"
   fi
-  rc=$?
-  set -e
+  rc=${PIPESTATUS[0]}
+  set -euo pipefail
   python3 -m dotf_core.execution_state sanitize-file "$out" >"$out.sani"
-  cat "$out.sani"
+  # Live stream already showed sanitized logs; keep .sani for RESULT parsing.
 
   rline=$(grep -E $'^RESULT\t' "$out.sani" 2>/dev/null | tail -n 1 || true)
   st="failed"

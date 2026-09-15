@@ -136,6 +136,7 @@ def _apply_generated(
     renderer = renderers_for(layout)
     owners = owner_prefix(layout, "openspec")
     identity = identity_prefix(layout, OPENSPEC_IDENTITY)
+    print(f"==> openspec  {layout.key}  planning…", flush=True)
     plan = compile_skills_plan(
         root,
         renderer,
@@ -160,10 +161,11 @@ def _apply_generated(
     )
     print(
         f"==> openspec  {layout.key}  {write_ops}↑ {len(adoptable)}adopt "
-        f"{len(blocked)}✗  |  {len(plan.operations)} files"
+        f"{len(blocked)}✗  |  {len(plan.operations)} files",
+        flush=True,
     )
     if blocked:
-        print(f"  ✗ {', '.join(blocked)}")
+        print(f"  ✗ {', '.join(blocked)}", flush=True)
 
     if dry_run:
         return 1 if blocked else 0
@@ -177,7 +179,8 @@ def _apply_generated(
     print(
         f"  done openspec ({layout.key}): changed={result.changed} "
         f"pruned={result.pruned} unchanged={result.unchanged}"
-        + (f" skipped={','.join(skipped)}" if skipped else "")
+        + (f" skipped={','.join(skipped)}" if skipped else ""),
+        flush=True,
     )
     return 1 if skipped else 0
 
