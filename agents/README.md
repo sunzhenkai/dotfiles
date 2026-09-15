@@ -31,7 +31,7 @@ agents/
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
   instructions/AGENTS.md           # 全局 agent 指令（用户级，跨项目）
-  instructions/install.yaml        # 安装目标（~/.agents、Codex、Cursor rules）
+  instructions/install.yaml        # 安装目标（~/.agents、Codex、Cursor rules、Claude Code）
   skills.yaml                      # 全量 Skill 编目（按 group；一手 + 第三方；唯一真相源）
   skills.lock.yaml                 # 第三方 skill 的严格审计锁（revision/hash/license/audit）
   vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
@@ -92,7 +92,7 @@ skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单�
 
 含 `references/`、`scripts/` sidecar，原样字节分发。Kiro CLI 不读 `~/.agents/skills`，因此额外托管一份镜像；`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。Claude Code 从 `~/.claude/skills/` 读个人级 skill，并且自己消费 `$ARGUMENTS`（无占位符时按 `ARGUMENTS: <value>` 追加），所以 claude 目标不做 Kiro 式的显式注入；`synced` 是 Claude Code 的保留目录名，编目里用它会 fail closed。
 
-同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`，以及 Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
+同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`，以及 Claude Code 的 `~/.claude/CLAUDE.md`（Claude Code 只读该文件名，不读 `AGENTS.md`）。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
 
 本机 Skill Desired Set = `agents/skills.yaml` 编目内非 optional id ∪ overlay `enabled_skills` − `disabled_skills`。**没有 default 字段**：编目内即默认全量安装；成员可写 `- id: <id>` + `optional: true` 映射表示"默认不装、可经 overlay / `agents skill apply` 按需启用"；不想保留就把该条目注释掉（注释即不在编目内，不自动装、也不能经 overlay / `agents skill apply` 引用）。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库编目 / lock。
 

@@ -1,4 +1,5 @@
-# 全局 AGENTS.md 的用户级安装目标。源文件是 AGENTS.md；Cursor 需要 .mdc frontmatter。
+# 全局 AGENTS.md 的用户级安装目标。源文件是 AGENTS.md；Cursor 需要 .mdc frontmatter；
+# Claude Code 读 ~/.claude/CLAUDE.md（不读 AGENTS.md）。
 version: 1
 source: AGENTS.md
 targets:
@@ -11,3 +12,6 @@ targets:
   - id: cursor
     path: ~/.cursor/rules/00-dotf-global.mdc
     format: cursor-mdc
+  - id: claude
+    path: ~/.claude/CLAUDE.md
+    format: markdown

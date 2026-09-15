@@ -155,7 +155,7 @@ dotf agents -ic
 dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`，按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md` 和 Cursor 用户级 rules。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`。
+`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`，按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 rules，以及 Claude Code 的 `~/.claude/CLAUDE.md`。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`；指令目标清单见 `agents/instructions/install.yaml`。
 
 > 本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-*`）；Codex、OpenCode、Pi 等工具的 provider 与密钥由本机自管。
 
