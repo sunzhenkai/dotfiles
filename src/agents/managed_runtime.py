@@ -513,19 +513,22 @@ def adoptable_equivalent(plan: SkillsPlan) -> tuple[RuntimeOperation, ...]:
     no `--on-conflict` decision is involved. Drift on a target we *do* own is
     deliberately excluded: there the manifest is the authority, and appearance
     matching the new source must not be read as "nothing to review".
+
+    Only adopt what `_read_actual` already verified as a safe regular file.
+    A skill directory that is itself a symlink (for example a foreign
+    `~/.claude/skills/<id>` pointing at `~/.agents/skills/<id>`) reads as
+    "unsafe" because the *intermediate* component is a link; `Path.is_symlink()`
+    only inspects the leaf, so re-reading the target here would follow that
+    link and wrongly adopt (and later unlink) the sibling layout's bytes.
     """
     result: list[RuntimeOperation] = []
     for operation in plan.conflicts:
         if operation.conflict != ADOPT_REASON or operation.expected is None:
             continue
-        target = Path(operation.target)
-        try:
-            if not target.is_file() or target.is_symlink():
-                continue
-            if target.read_bytes() == operation.expected.content:
-                result.append(operation)
-        except OSError:
+        if operation.actual_state != "present":
             continue
+        if operation.current_hash == operation.expected_hash:
+            result.append(operation)
     return tuple(result)
 
 

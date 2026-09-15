@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -241,6 +242,49 @@ def test_identical_unowned_targets_are_adopted(tmp_path: Path) -> None:
         "agents:kiro-skill:demo",
         "agents:claude-skill:demo",
     }
+
+
+def test_intermediate_symlink_layout_is_not_adopted(tmp_path: Path) -> None:
+    """A foreign cross-layout symlink must fail closed, not unlink its target.
+
+    When a skill directory in one layout is itself a symlink to a sibling
+    layout (for example `~/.claude/skills/demo` -> `~/.agents/skills/demo`),
+    adopting it must never follow the link and delete the sibling layout's
+    managed bytes. The intermediate link makes the leaf "unsafe", so the skill
+    is skipped and the target files survive.
+    """
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+
+    shared_demo = home / ".agents" / "skills" / "demo"
+    claude_demo = home / ".claude" / "skills" / "demo"
+    managed = (shared_demo / "SKILL.md").read_bytes()
+
+    # Drop only claude ownership for demo, as if a foreign installer had put
+    # its own layout entry there, then replace the real directory with a
+    # symlink to the shared layout.
+    data = json.loads(_manifest(home).read_text(encoding="utf-8"))
+    data["items"] = [
+        item for item in data["items"] if "/.claude/skills/demo/" not in item["target"]
+    ]
+    _manifest(home).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _manifest(home).chmod(0o600)
+    shutil.rmtree(claude_demo)
+    claude_demo.symlink_to(shared_demo, target_is_directory=True)
+
+    result = _run(repo, home)
+
+    assert result.returncode != 0, result.stderr + result.stdout
+    # The foreign symlink stays put and the shared layout is untouched: the
+    # bug would follow the link and unlink these managed bytes.
+    assert os.path.islink(claude_demo)
+    assert (shared_demo / "SKILL.md").read_bytes() == managed
+    assert (shared_demo / "references" / "guide.md").read_bytes() == b"guide\n"
+    assert (shared_demo / "scripts" / "run.sh").read_bytes() == b"#!/bin/sh\n"
+    assert "skipped=demo" in result.stdout
+    assert "unowned" in result.stdout
 
 
 def test_divergent_unowned_targets_stay_blocked(tmp_path: Path) -> None:
