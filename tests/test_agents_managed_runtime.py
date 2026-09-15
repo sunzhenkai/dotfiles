@@ -51,15 +51,21 @@ def _run(
     *,
     dry_run: bool = False,
     on_conflict: str | None = None,
+    on_takeover: str | None = None,
+    verbose: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
     if on_conflict is not None:
         env["DOTF_ON_CONFLICT"] = on_conflict
+    if on_takeover is not None:
+        env["DOTF_TAKEOVER"] = on_takeover
     cmd = [sys.executable, str(ROOT / "src" / "agents" / "sync.py"), "--root", str(repo)]
     if dry_run:
         cmd.append("--dry-run")
+    if verbose:
+        cmd.append("--verbose")
     return subprocess.run(cmd, text=True, capture_output=True, env=env, cwd=ROOT, check=False)
 
 
@@ -155,7 +161,7 @@ def test_on_conflict_backup_overwrites_drift_and_keeps_the_original(tmp_path: Pa
     installed = target.read_bytes()
     target.write_text("local edit\n", encoding="utf-8")
 
-    result = _run(repo, home, on_conflict="backup")
+    result = _run(repo, home, on_conflict="backup", verbose=True)
     assert result.returncode == 0, result.stderr + result.stdout
     assert "(overwrite, backup)" in result.stdout
     assert target.read_bytes() == installed
@@ -249,8 +255,62 @@ def test_divergent_unowned_targets_stay_blocked(tmp_path: Path) -> None:
     result = _run(repo, home)
 
     assert result.returncode != 0
-    assert "target exists without agents ownership" in result.stdout
+    assert "unowned" in result.stdout or "without agents ownership" in result.stdout
+    assert "skipped=demo" in result.stdout or "demo (unowned)" in result.stdout
     assert target.read_text(encoding="utf-8") == "someone else's version\n"
+
+
+def test_takeover_backup_adopts_divergent_unowned(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    managed = target.read_bytes()
+    target.write_text("someone else's version\n", encoding="utf-8")
+    _manifest(home).unlink()
+
+    result = _run(repo, home, on_takeover="backup")
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == managed
+    assert _backups(home, ".agents", "skills", "demo", "SKILL.md")
+    data = json.loads(_manifest(home).read_text(encoding="utf-8"))
+    assert any(item["owner"] == "agents:skill:demo" for item in data["items"])
+
+
+def test_skill_conflict_does_not_block_sibling_skill(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    other = repo / "agents" / "skills" / "other"
+    other.mkdir()
+    (other / "SKILL.md").write_text(
+        "---\nname: other\ndescription: other skill\n---\nother body\n", encoding="utf-8"
+    )
+    write_skills_catalog(repo)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+
+    demo = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    demo.write_text("local fork\n", encoding="utf-8")
+    # Drop ownership so demo is an Unowned Target; other stays owned.
+    data = json.loads(_manifest(home).read_text(encoding="utf-8"))
+    data["items"] = [item for item in data["items"] if "/demo/" not in item["target"]]
+    _manifest(home).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _manifest(home).chmod(0o600)
+
+    # Bump other skill source so sync must update sibling layouts too.
+    (other / "SKILL.md").write_text(
+        "---\nname: other\ndescription: other skill\n---\nother body v2\n", encoding="utf-8"
+    )
+
+    result = _run(repo, home)
+    assert result.returncode != 0
+    assert "demo" in result.stdout
+    other_target = home / ".agents" / "skills" / "other" / "SKILL.md"
+    assert other_target.is_file()
+    assert "other body v2" in other_target.read_text(encoding="utf-8")
+    assert demo.read_text(encoding="utf-8") == "local fork\n"
 
 
 def test_unknown_on_conflict_policy_fails_closed(tmp_path: Path) -> None:
@@ -351,7 +411,7 @@ def test_locally_modified_to_new_expected_bytes_still_conflicts(tmp_path: Path) 
     target.write_bytes(expected)
     result = _run(repo, home)
     assert result.returncode != 0
-    assert "modified locally" in result.stderr
+    assert "modified locally" in result.stdout
     assert target.read_bytes() == expected
 
 
@@ -451,7 +511,7 @@ def test_owned_target_mode_drift_conflicts_and_is_preserved(tmp_path: Path) -> N
     result = _run(repo, home)
 
     assert result.returncode != 0
-    assert "mode was modified locally" in result.stderr
+    assert "mode was modified locally" in result.stdout
     assert target.stat().st_mode & 0o777 == 0o777
     assert (target.stat().st_ino, target.stat().st_mtime_ns, target.read_bytes()) == before
 

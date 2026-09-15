@@ -30,6 +30,7 @@ class Ctx:
         self.continue_on_error = False
         self.usage_profile = ""
         self.on_conflict = ""
+        self.on_takeover = ""
         self.verbose = os.environ.get("DOTF_VERBOSE", "") == "1"
 
     def export(self) -> None:
@@ -38,6 +39,10 @@ class Ctx:
             os.environ["DOTF_DEEP"] = "1"
         if self.on_conflict:
             os.environ["DOTF_ON_CONFLICT"] = self.on_conflict
+        if self.on_takeover:
+            os.environ["DOTF_TAKEOVER"] = self.on_takeover
+        if self.verbose:
+            os.environ["DOTF_VERBOSE"] = "1"
 
 
 def _python(*args: str, **kwargs) -> subprocess.CompletedProcess:

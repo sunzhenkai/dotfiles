@@ -10,7 +10,7 @@
 
 Claude Code 目标 `~/.claude/skills/` 收全部三类来源。它自己消费 `$ARGUMENTS`（无占位符时按 `ARGUMENTS: <value>` 追加），所以不做 Kiro 式的显式注入，走与 shared 相同的渲染；`synced` 是 Claude Code 的保留目录名（它自己往那里放 claude.ai 同步来的 skill，并跳过同名用户 skill），编目里用它会 fail closed。
 
-**三、冲突补一个显式出口。** 默认仍 fail closed：owned 目标漂移时报告并保留。新增 `--on-conflict=backup`（`block` 为默认）覆盖**只有**两类可判定为"本机改过已受管目标"的冲突：内容漂移与 mode 漂移。实现上把它们在编译期改判为 update，写路径复用既有的 `atomic_write(backup_root=...)`，旧字节留在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`。不安全类型（symlink 等）、manifest 不可解析、所有权不符、无所有权目标、越界目标**永远** fail closed —— 这些意味着 dotf 不知道自己要覆盖什么；`deconfig` / `uninstall` / `remove` 的 prune 方向同样不受该开关影响。
+**三、冲突补一个显式出口。** 默认仍 fail closed：owned 目标漂移时报告并保留。新增 `--on-conflict=backup`（`block` 为默认）覆盖**只有**两类可判定为"本机改过已受管目标"的冲突：内容漂移与 mode 漂移。实现上把它们在编译期改判为 update，写路径复用既有的 `atomic_write(backup_root=...)`，旧字节留在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`。不安全类型（symlink 等）、manifest 不可解析、所有权不符、无所有权目标、越界目标**永远** fail closed —— 这些意味着 dotf 不知道自己要覆盖什么；`deconfig` / `uninstall` / `remove` 的 prune 方向同样不受该开关影响。（Unowned Target 的显式接管见 ADR-0020，不经本开关。）
 
 开关的传输沿用 `DOTF_DEEP` 的做法：CLI 解析 `--on-conflict` → `Ctx.export()` 写 `DOTF_ON_CONFLICT` → handler 子进程读取。不新增 plan 协议字段。
 

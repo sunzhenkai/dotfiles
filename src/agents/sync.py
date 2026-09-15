@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -25,13 +26,17 @@ from layouts import (  # noqa: E402
     skills_target,
 )
 from managed_runtime import (
+    ADOPT_REASON,
     AgentRuntimeConflict,
     OnConflict,
+    OnTakeover,
     RenderSkill,
     adoptable_equivalent,
     apply_skills_plan,
     compile_skills_plan,
     on_conflict_from_env,
+    on_takeover_from_env,
+    skill_id_from_target,
 )
 
 SLASH_RE = re.compile(r"\{\{slash:([a-z0-9-]+)\}\}")
@@ -230,8 +235,9 @@ def _sync_runtime(
     dry_run: bool,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
+    on_takeover: OnTakeover = "skip",
+    verbose: bool = False,
 ) -> SyncOutcome:
-    print(f"==> sync {label} → {base}")
     plan = compile_skills_plan(
         root,
         renderer,
@@ -240,53 +246,143 @@ def _sync_runtime(
         identity_prefix=identity_prefix,
         only_ids=only_ids,
         on_conflict=on_conflict,
+        on_takeover=on_takeover,
     )
 
-    markers = {
-        "none": "=",
-        "create": "+",
-        "update": "+",
-        "chmod": "~",
-        "prune": "-",
-        "block": "!",
-    }
     adoptable = {item.target for item in adoptable_equivalent(plan)}
-    for operation in plan.operations:
-        marker = "~" if operation.remediated else markers[operation.action]
-        suffix = " (overwrite, backup)" if operation.remediated else ""
-        if operation.target in adoptable:
-            # Already the managed bytes on disk; the apply re-records ownership.
-            marker, suffix = "+", " (adopt equivalent)"
-        print(f"  {marker} {operation.target}{suffix}")
-        if operation.conflict and not suffix:
-            print(f"    conflict: {operation.conflict}")
+    blocking = [item for item in plan.conflicts if item.target not in adoptable]
+    blocked_skills: dict[str, str] = {}
+    for item in blocking:
+        skill_id = skill_id_from_target(item.target, base) or "?"
+        blocked_skills.setdefault(skill_id, item.conflict or "conflict")
 
-    unresolved = [item for item in plan.conflicts if item.target not in adoptable]
+    creates = sum(1 for op in plan.operations if op.action == "create" and op.target not in adoptable)
+    updates = sum(1 for op in plan.operations if op.action == "update" or op.remediated)
+    prunes = sum(1 for op in plan.operations if op.action == "prune")
+    adopts = len(adoptable)
+    unchanged = sum(1 for op in plan.operations if op.action == "none")
+    write_ops = creates + updates
+    skip_n = len(blocked_skills)
+    total = len(plan.operations)
+
+    print(
+        f"==> skills  {label}  {write_ops}↑ {adopts}adopt {skip_n}✗ "
+        f"{prunes}-  |  {total} files"
+    )
+    if blocked_skills:
+        reasons = []
+        for skill_id, reason in sorted(blocked_skills.items()):
+            tag = "unowned" if reason == ADOPT_REASON else reason
+            reasons.append(f"{skill_id} ({tag})")
+        print(f"  ✗ {', '.join(reasons)}")
+        if on_takeover == "skip" and any(
+            reason == ADOPT_REASON for reason in blocked_skills.values()
+        ):
+            print("  hint: backup+takeover with --takeover=backup (TTY will also prompt)")
+
+    if verbose:
+        markers = {
+            "none": "=",
+            "create": "+",
+            "update": "+",
+            "chmod": "~",
+            "prune": "-",
+            "block": "!",
+        }
+        for operation in plan.operations:
+            marker = "~" if operation.remediated else markers[operation.action]
+            suffix = " (overwrite, backup)" if operation.remediated else ""
+            if operation.target in adoptable:
+                marker, suffix = "+", " (adopt equivalent)"
+            skill_id = skill_id_from_target(operation.target, base)
+            if skill_id in blocked_skills and operation.target not in adoptable:
+                marker = "!"
+            print(f"  {marker} {operation.target}{suffix}")
+            if operation.conflict and operation.target not in adoptable and not operation.remediated:
+                print(f"    conflict: {operation.conflict}")
+
     first_conflict = next(
-        (f"{_relative_target(item.target, base)}: {item.conflict}" for item in unresolved),
+        (
+            f"{_relative_target(item.target, base)}: {item.conflict}"
+            for item in blocking
+        ),
         "",
     )
+    if blocked_skills and not first_conflict:
+        first_conflict = f"skipped {', '.join(sorted(blocked_skills))}"
 
     if dry_run:
-        changed = sum(item.action in {"create", "update", "chmod"} for item in plan.operations)
-        pruned = sum(item.action == "prune" for item in plan.operations)
-        unchanged = sum(item.action == "none" for item in plan.operations)
         print(
-            f"  done {label} (plan): changed={changed} pruned={pruned} "
-            f"unchanged={unchanged} adopt={len(adoptable)} conflicts={len(unresolved)}"
+            f"  done {label} (plan): changed={write_ops} pruned={prunes} "
+            f"unchanged={unchanged} adopt={adopts} conflicts={skip_n}"
         )
-        return SyncOutcome(label, 1 if unresolved else 0, first_conflict)
+        return SyncOutcome(label, 1 if blocked_skills else 0, first_conflict)
 
     try:
         result = apply_skills_plan(plan, renderer)
     except AgentRuntimeConflict as exc:
         print(f"error: {exc}", file=sys.stderr)
         return SyncOutcome(label, 1, first_conflict or str(exc))
+    skipped = result.skipped_skills
     print(
         f"  done {label}: changed={result.changed} pruned={result.pruned} "
         f"unchanged={result.unchanged}"
+        + (f" skipped={','.join(skipped)}" if skipped else "")
     )
-    return SyncOutcome(label, 0)
+    detail = first_conflict
+    if skipped and not detail:
+        detail = f"skipped {', '.join(skipped)}"
+    return SyncOutcome(label, 1 if skipped else 0, detail)
+
+
+def _takeover_candidates(
+    root: Path,
+    *,
+    on_conflict: OnConflict,
+) -> list[tuple[str, str]]:
+    """Return (layout_label, skill_id) pairs that need Takeover if policy is skip."""
+    from desired_set import resolve_skill_desired_set
+
+    desired = resolve_skill_desired_set(root)
+    found: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for layout in LAYOUTS:
+        plan = compile_skills_plan(
+            root,
+            renderers_for(layout),
+            target_root=skills_target(layout),
+            owner_prefix=owner_prefix(layout, "first-party"),
+            identity_prefix=identity_prefix(layout, FIRST_PARTY_IDENTITY),
+            only_ids=desired,
+            on_conflict=on_conflict,
+            on_takeover="skip",
+        )
+        adoptable = {item.target for item in adoptable_equivalent(plan)}
+        for operation in plan.conflicts:
+            if operation.target in adoptable or operation.conflict != ADOPT_REASON:
+                continue
+            skill_id = skill_id_from_target(operation.target, plan.target_root)
+            if not skill_id:
+                continue
+            key = (layout.label, skill_id)
+            if key not in seen:
+                seen.add(key)
+                found.append(key)
+    return found
+
+
+def _confirm_takeover(candidates: list[tuple[str, str]]) -> bool:
+    skills = sorted({skill_id for _, skill_id in candidates})
+    print(
+        f"Takeover: {len(skills)} skill(s) have unowned divergent files "
+        f"({', '.join(skills)})."
+    )
+    print("Backup those files under XDG_STATE_HOME/dotf/backups/, then write managed bytes?")
+    try:
+        answer = input("Takeover with backup? [y/N]: ").strip().lower()
+    except EOFError:
+        return False
+    return answer in {"y", "yes"}
 
 
 def sync_layout(
@@ -295,6 +391,8 @@ def sync_layout(
     *,
     dry_run: bool = False,
     on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
+    verbose: bool = False,
 ) -> SyncOutcome:
     """Sync first-party skills into one layout."""
     from desired_set import resolve_skill_desired_set
@@ -309,14 +407,42 @@ def sync_layout(
         dry_run=dry_run,
         only_ids=resolve_skill_desired_set(root),
         on_conflict=on_conflict if on_conflict is not None else on_conflict_from_env(),
+        on_takeover=on_takeover if on_takeover is not None else on_takeover_from_env(),
+        verbose=verbose or os.environ.get("DOTF_VERBOSE", "") == "1",
     )
 
 
 def sync_skills(
-    root: Path, dry_run: bool = False, on_conflict: OnConflict | None = None
+    root: Path,
+    dry_run: bool = False,
+    on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
+    verbose: bool = False,
 ) -> List[SyncOutcome]:
+    conflict = on_conflict if on_conflict is not None else on_conflict_from_env()
+    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
+    verbose = verbose or os.environ.get("DOTF_VERBOSE", "") == "1"
+
+    if (
+        not dry_run
+        and takeover == "skip"
+        and sys.stdin.isatty()
+        and sys.stdout.isatty()
+    ):
+        candidates = _takeover_candidates(root, on_conflict=conflict)
+        if candidates and _confirm_takeover(candidates):
+            takeover = "backup"
+            os.environ["DOTF_TAKEOVER"] = "backup"
+
     return [
-        sync_layout(root, layout, dry_run=dry_run, on_conflict=on_conflict)
+        sync_layout(
+            root,
+            layout,
+            dry_run=dry_run,
+            on_conflict=conflict,
+            on_takeover=takeover,
+            verbose=verbose,
+        )
         for layout in LAYOUTS
     ]
 
@@ -363,7 +489,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--on-conflict",
         choices=("block", "backup"),
         default=None,
-        help="block（默认）遇到本机改动即失败；backup 先备份再覆写已受管目标的漂移",
+        help="block（默认）遇到本机改动即跳过该 Skill；backup 先备份再覆写已受管目标的漂移",
+    )
+    parser.add_argument(
+        "--takeover",
+        choices=("skip", "backup"),
+        default=None,
+        dest="on_takeover",
+        help="skip（默认）跳过内容不等价的无所有权目标；backup 先备份再接管并登记 ownership",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="逐文件打印（默认只打 Layout 进度摘要）",
     )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
@@ -375,7 +513,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     rc = 0
     try:
-        outcomes = sync_skills(root, dry_run=args.dry_run, on_conflict=args.on_conflict)
+        outcomes = sync_skills(
+            root,
+            dry_run=args.dry_run,
+            on_conflict=args.on_conflict,
+            on_takeover=args.on_takeover,
+            verbose=args.verbose,
+        )
         rc = max((item.rc for item in outcomes), default=0)
     except SystemExit as e:
         rc = int(e.code) if e.code else 1

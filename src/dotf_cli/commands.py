@@ -188,6 +188,19 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
             if value not in ("block", "backup"):
                 raise DotfError("usage", "错误: --on-conflict 只接受 block 或 backup")
             ctx.on_conflict = value
+        elif arg == "--takeover" or arg.startswith("--takeover="):
+            if arg == "--takeover":
+                i += 1
+                if i >= len(argv):
+                    raise DotfError("usage", "错误: --takeover 需要参数（skip|backup）")
+                value = argv[i]
+            else:
+                value = arg.split("=", 1)[1]
+            if value not in ("skip", "backup"):
+                raise DotfError("usage", "错误: --takeover 只接受 skip 或 backup")
+            ctx.on_takeover = value
+        elif arg == "--verbose":
+            ctx.verbose = True
         elif arg.startswith("-"):
             raise DotfError(
                 "usage",
@@ -207,6 +220,7 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
         ("--- default skills ---", "defaults.py"),
         ("--- openspec skills ---", "openspec_skills.py"),
     )
+    failed = 0
     for label, script in steps:
         print(label, flush=True)
         cmd = [
@@ -219,9 +233,16 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
             cmd.append("--dry-run")
         if ctx.on_conflict:
             cmd += ["--on-conflict", ctx.on_conflict]
+        if ctx.on_takeover:
+            cmd += ["--takeover", ctx.on_takeover]
+        if ctx.verbose:
+            cmd.append("--verbose")
         rc = subprocess.run(cmd, env=python_env()).returncode
         if rc != 0:
-            raise DotfError("handler", f"{script} 失败（退出码 {rc}）")
+            print(f"warning: {script} 失败（退出码 {rc}）", flush=True)
+            failed = rc
+    if failed:
+        raise DotfError("handler", f"skills -c 有阶段失败（退出码 {failed}）")
     print("✓ skills 全量安装完成")
     return 0
 
@@ -343,6 +364,17 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
             if value not in ("block", "backup"):
                 raise DotfError("usage", "错误: --on-conflict 只接受 block 或 backup")
             ctx.on_conflict = value
+        elif arg == "--takeover" or arg.startswith("--takeover="):
+            if arg == "--takeover":
+                i += 1
+                if i >= len(rest):
+                    raise DotfError("usage", "错误: --takeover 需要参数（skip|backup）")
+                value = rest[i]
+            else:
+                value = arg.split("=", 1)[1]
+            if value not in ("skip", "backup"):
+                raise DotfError("usage", "错误: --takeover 只接受 skip 或 backup")
+            ctx.on_takeover = value
         elif arg.startswith("-"):
             raise DotfError("usage", f"错误: 未知选项 '{arg}'")
         else:

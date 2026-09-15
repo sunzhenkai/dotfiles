@@ -101,20 +101,26 @@ skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单�
 
 一手 skill 来自 `agents/skills/`，并在 `agents/skills.yaml` 的 `dotfiles` 组编目（`type: first-party`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
-### 冲突
+### 冲突与接管
 
-冲突 = owned 目标的内容或 mode 已不等于上次受管 hash（本机改过）。默认 **fail closed**：sync 保留该文件、报出具体目标与原因，`RESULT` 的 reason 形如 `skill sync failed: skills: service-manager/SKILL.md: owned target was modified locally`。
+**Conflict** = owned 目标的内容或 mode 已不等于上次受管 hash。默认 **fail closed 到 Skill**：该 Skill 整份跳过，同 layout 其它 Skill 继续。`RESULT` 仍为 failed。出口是 `--on-conflict=backup`：先备份再覆写已受管漂移。
 
-第三方 skill 的 identity 内嵌整份 lock 的 digest，因此新增/删除任一 lock 条目都会改写所有第三方 identity。若目标仍由本系统拥有、且字节已等于新 lock 固定的内容，sync 会直接重记 identity（无备份、无需 flag），不报冲突；只有字节真的不同（本机漂移）才继续 fail closed。
+**Unowned Target**（无 ownership）内容不等价时走 **Takeover**，不经 `--on-conflict`：
 
-要从漂移里恢复，用 `--on-conflict=backup`：先把当前内容备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`，再写入受管版本。
+```bash
+dotf agents -c --takeover=backup
+# 或 TTY 下 sync 发现可接管项时二次确认
+```
+
+字节已等价的 unowned 仍静默 adopt。不安全类型、manifest 异常、越界目标等仍整项 fail closed。
 
 ```bash
 dotf agents skill apply codebase-design --on-conflict=backup
-dotf agents -c --on-conflict=backup
+dotf agents -c --on-conflict=backup --takeover=backup
+dotf agents -c --verbose   # 需要逐文件流水时
 ```
 
-该开关只解除"owned 目标漂移"这一类冲突。不安全类型（symlink 等）、manifest 不可解析、所有权不符、无所有权目标、越界目标**永远** fail closed；`deconfig` / `uninstall` / `remove` 的 prune 方向也永远 fail closed，不受该开关影响。
+`--on-conflict=backup` 只解除 owned 内容/mode 漂移。`--takeover=backup` 只接管内容不等价的 Unowned Target。反向动作永远 fail closed。
 
 ```bash
 # 同步 skills（三个 layout）+ 全局 AGENTS.md

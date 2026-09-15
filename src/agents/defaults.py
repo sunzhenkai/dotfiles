@@ -28,9 +28,11 @@ from layouts import (
 from managed_runtime import (
     AgentRuntimeConflict,
     OnConflict,
+    OnTakeover,
     apply_skills_plan,
     compile_skills_plan,
     on_conflict_from_env,
+    on_takeover_from_env,
 )
 from skills_catalog import (
     SkillsCatalogError,
@@ -117,12 +119,14 @@ def install_defaults(
     dest_root: Optional[Path] = None,
     dest_roots: Optional[Sequence[Path]] = None,
     on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
 ) -> int:
     """Verify the strict lock; apply only bytes acquired and checked in private staging."""
     lock = load_catalog(root)
     from desired_set import resolve_skill_desired_set
 
     policy = on_conflict if on_conflict is not None else on_conflict_from_env()
+    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
     desired = resolve_skill_desired_set(root)
     selected = tuple(item for item in lock.skills if item.id in desired)
     destinations = (
@@ -141,6 +145,7 @@ def install_defaults(
             print(f"  done defaults ({layout.key}, plan): locked={len(selected)} network=none writes=none")
         return 0
 
+    rc = 0
     try:
         with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
             staging = Path(temporary) / "acquired"
@@ -153,40 +158,56 @@ def install_defaults(
             for layout, destination in destinations:
                 home = home_for_target(destination)
                 renderer = renderers_for(layout)
-                plan = compile_skills_plan(
-                    root,
-                    renderer,
-                    home=home,
-                    target_root=destination,
-                    source_root=source_root,
-                    owner_prefix=owner_prefix(layout, "third-party"),
-                    identity_prefix=identity_prefix(layout, f"{THIRD_PARTY_IDENTITY}@{lock.digest}"),
-                    include_unlisted=True,
-                    only_ids=frozenset(item.id for item in selected),
-                    on_conflict=policy,
-                )
-                result = apply_skills_plan(plan, renderer)
-                print(
-                    f"  done defaults ({layout.key}): locked={len(lock.skills)} changed={result.changed} "
-                    f"pruned={result.pruned} unchanged={result.unchanged}"
-                )
-    except (ThirdPartyLockError, AgentRuntimeConflict, OSError, ValueError) as exc:
-        print(f"error: locked third-party skills: {exc}", file=__import__("sys").stderr)
+                try:
+                    plan = compile_skills_plan(
+                        root,
+                        renderer,
+                        home=home,
+                        target_root=destination,
+                        source_root=source_root,
+                        owner_prefix=owner_prefix(layout, "third-party"),
+                        identity_prefix=identity_prefix(layout, f"{THIRD_PARTY_IDENTITY}@{lock.digest}"),
+                        include_unlisted=True,
+                        only_ids=frozenset(item.id for item in selected),
+                        on_conflict=policy,
+                        on_takeover=takeover,
+                    )
+                    result = apply_skills_plan(plan, renderer)
+                    skipped = ",".join(result.skipped_skills) if result.skipped_skills else ""
+                    print(
+                        f"  done defaults ({layout.key}): locked={len(lock.skills)} changed={result.changed} "
+                        f"pruned={result.pruned} unchanged={result.unchanged}"
+                        + (f" skipped={skipped}" if skipped else "")
+                    )
+                    if result.skipped_skills:
+                        rc = 1
+                except (AgentRuntimeConflict, OSError, ValueError) as exc:
+                    print(f"error: locked third-party skills ({layout.key}): {exc}", file=sys.stderr)
+                    rc = 1
+    except (ThirdPartyLockError, OSError, ValueError) as exc:
+        print(f"error: locked third-party skills: {exc}", file=sys.stderr)
         return 1
-    return 0
+    return rc
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Install audited third-party skills from the strict lock")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--on-conflict", choices=("block", "backup"), default=None)
+    parser.add_argument("--takeover", choices=("skip", "backup"), default=None, dest="on_takeover")
+    parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
     root = args.root.resolve() if args.root else repo_root()
     try:
-        return install_defaults(root, dry_run=args.dry_run, on_conflict=args.on_conflict)
+        return install_defaults(
+            root,
+            dry_run=args.dry_run,
+            on_conflict=args.on_conflict,
+            on_takeover=args.on_takeover,
+        )
     except ThirdPartyLockError as exc:
-        print(f"error: {exc}", file=__import__("sys").stderr)
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
 

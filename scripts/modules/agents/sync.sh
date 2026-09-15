@@ -2,7 +2,7 @@
 # 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）
 # + 全局 AGENTS.md。
 # 用法:
-#   sync.sh [all|<tool>] [--dry-run] [--strict]
+#   sync.sh [all|<tool>] [--dry-run] [--strict] [--on-conflict=block|backup] [--takeover=skip|backup] [--verbose]
 # <tool> 仅为兼容旧调用保留；skills/instructions 与工具过滤无关，一律全量执行。
 # 诊断请用: dotf agents -d  或  PYTHONPATH=scripts python3 src/agents/doctor.py
 set -euo pipefail
@@ -20,6 +20,8 @@ fi
 DRY_RUN=0
 STRICT=0
 ON_CONFLICT=""
+ON_TAKEOVER=""
+VERBOSE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -34,6 +36,9 @@ while [ $# -gt 0 ]; do
   --strict)
     STRICT=1
     ;;
+  --verbose)
+    VERBOSE=1
+    ;;
   --on-conflict)
     shift
     ON_CONFLICT="${1:-}"
@@ -46,6 +51,21 @@ while [ $# -gt 0 ]; do
     ON_CONFLICT="${1#--on-conflict=}"
     if [ "$ON_CONFLICT" != "block" ] && [ "$ON_CONFLICT" != "backup" ]; then
       echo "error: --on-conflict 只接受 block 或 backup" >&2
+      exit 1
+    fi
+    ;;
+  --takeover)
+    shift
+    ON_TAKEOVER="${1:-}"
+    if [ "$ON_TAKEOVER" != "skip" ] && [ "$ON_TAKEOVER" != "backup" ]; then
+      echo "error: --takeover 只接受 skip 或 backup" >&2
+      exit 1
+    fi
+    ;;
+  --takeover=*)
+    ON_TAKEOVER="${1#--takeover=}"
+    if [ "$ON_TAKEOVER" != "skip" ] && [ "$ON_TAKEOVER" != "backup" ]; then
+      echo "error: --takeover 只接受 skip 或 backup" >&2
       exit 1
     fi
     ;;
@@ -81,26 +101,60 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
 
-echo "--- skills ---"
-# skills 同步到共享 ~/.agents/skills、Kiro ~/.kiro/skills 与 Claude Code ~/.claude/skills
 skills_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then
   skills_args+=(--dry-run)
 fi
 if [ -n "$ON_CONFLICT" ]; then
   skills_args+=(--on-conflict "$ON_CONFLICT")
-  # 同一次运行的 OpenSpec 步骤也读同一策略
   export DOTF_ON_CONFLICT="$ON_CONFLICT"
 fi
+if [ -n "$ON_TAKEOVER" ]; then
+  skills_args+=(--takeover "$ON_TAKEOVER")
+  export DOTF_TAKEOVER="$ON_TAKEOVER"
+fi
+if [ "$VERBOSE" -eq 1 ]; then
+  skills_args+=(--verbose)
+  export DOTF_VERBOSE=1
+fi
+
+# 阶段互不阻塞：一手 / defaults / OpenSpec 各自记 rc，最后汇总。
+sync_rc=0
+echo "--- skills ---"
+set +e
 python3 "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
+step_rc=$?
+set -e
+if [ "$step_rc" -ne 0 ]; then
+  sync_rc=$step_rc
+fi
+
 echo "--- default skills ---"
+set +e
 python3 "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
+step_rc=$?
+set -e
+if [ "$step_rc" -ne 0 ]; then
+  sync_rc=$step_rc
+fi
+
 echo "--- openspec skills ---"
+set +e
 python3 "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
+step_rc=$?
+set -e
+if [ "$step_rc" -ne 0 ]; then
+  sync_rc=$step_rc
+fi
 
 # --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）
 if [ "$STRICT" -eq 1 ]; then
   :
+fi
+
+if [ "$sync_rc" -ne 0 ]; then
+  echo "error: agents sync 有阶段失败（exit=$sync_rc）" >&2
+  exit "$sync_rc"
 fi
 
 echo "✓ agents sync 完成"

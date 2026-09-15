@@ -14,7 +14,7 @@ import json
 import os
 import stat
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Callable, Literal, Mapping
@@ -56,12 +56,13 @@ _REQUIRED_EXCLUSIONS = frozenset({"patches", "evals", "experience", "evolutions"
 RenderSkill = Callable[[Path, str], bytes]
 
 OnConflict = Literal["block", "backup"]
+OnTakeover = Literal["skip", "backup"]
 ON_CONFLICT_ENV = "DOTF_ON_CONFLICT"
+ON_TAKEOVER_ENV = "DOTF_TAKEOVER"
 
-# `--on-conflict=backup` may only take over an owned target that drifted from the
-# bytes we installed. Anything else (unsafe path, malformed manifest, ownership
-# identity mismatch, unowned target) stays fail-closed: those signal that dotf
-# does not know what it is about to overwrite.
+# `--on-conflict=backup` may only remediate an owned target that drifted from the
+# bytes we installed. Unowned targets are a different action (Takeover); unsafe
+# paths, malformed manifests, and identity mismatches stay fail-closed.
 CONTENT_DRIFT = "owned target was modified locally"
 MODE_DRIFT = "owned target mode was modified locally"
 _REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT})
@@ -88,6 +89,26 @@ def parse_on_conflict(value: str | None) -> OnConflict:
 
 def on_conflict_from_env(env: Mapping[str, str] | None = None) -> OnConflict:
     return parse_on_conflict((env if env is not None else os.environ).get(ON_CONFLICT_ENV))
+
+
+def parse_on_takeover(value: str | None) -> OnTakeover:
+    policy = (value or "skip").strip().lower()
+    if policy not in ("skip", "backup"):
+        raise AgentRuntimeError(f"unknown on-takeover policy: {value!r} (expected skip or backup)")
+    return policy  # type: ignore[return-value]
+
+
+def on_takeover_from_env(env: Mapping[str, str] | None = None) -> OnTakeover:
+    return parse_on_takeover((env if env is not None else os.environ).get(ON_TAKEOVER_ENV))
+
+
+def skill_id_from_target(target: str, target_root: str | Path) -> str | None:
+    """First path component under the skills root is the Skill id."""
+    try:
+        relative = Path(target).relative_to(Path(target_root))
+    except ValueError:
+        return None
+    return relative.parts[0] if relative.parts else None
 
 
 class AgentRuntimeError(RuntimeError):
@@ -153,6 +174,7 @@ class SkillsPlan:
     operations: tuple[RuntimeOperation, ...]
     only_ids: frozenset[str] | None = None
     on_conflict: OnConflict = "block"
+    on_takeover: OnTakeover = "skip"
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -174,6 +196,7 @@ class SkillsApplyResult:
     unchanged: int
     pruned: int
     manifest: Path
+    skipped_skills: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,8 +540,9 @@ def _conflict(
     prior: ManagedItem | None,
     *,
     on_conflict: OnConflict = "block",
+    on_takeover: OnTakeover = "skip",
 ) -> RuntimeOperation:
-    """Block on a conflict, or turn owned drift into a backed-up overwrite.
+    """Block on a conflict, or remediate owned drift / explicit Takeover.
 
     `apply_owned_plan` already routes updates through `atomic_write` with a
     backup root, so a remediated operation needs no new write path.
@@ -547,6 +571,18 @@ def _conflict(
             "update", "update", target, source_identity, expected_hash,
             actual.digest, installed_hash, reason, expected, prior, actual.state, True,
         )
+    if (
+        on_takeover == "backup"
+        and reason == ADOPT_REASON
+        and expected is not None
+        and actual.state == "present"
+    ):
+        # Takeover is outside ownership repair: backup the foreign bytes, then
+        # write managed content and record ownership for the first time.
+        return RuntimeOperation(
+            "update", "update", target, source_identity, expected_hash,
+            actual.digest, installed_hash, reason, expected, prior, actual.state, True,
+        )
     return RuntimeOperation(
         "conflict", "block", target, source_identity, expected_hash,
         actual.digest, installed_hash, reason, expected, prior, actual.state,
@@ -566,6 +602,7 @@ def compile_skills_plan(
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
+    on_takeover: OnTakeover = "skip",
 ) -> SkillsPlan:
     """Compile expected first-party runtime and ownership decisions without writes."""
     repo = root.expanduser().absolute()
@@ -594,6 +631,7 @@ def compile_skills_plan(
         include_unlisted=include_unlisted,
         only_ids=only_ids,
         on_conflict=on_conflict,
+        on_takeover=on_takeover,
         outside_root_message="stale manifest target is outside the skills root",
     )
 
@@ -611,6 +649,7 @@ def compile_owned_plan(
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
+    on_takeover: OnTakeover = "skip",
     outside_root_message: str = "stale manifest target is outside the owned root",
 ) -> SkillsPlan:
     """Compile ownership decisions for an explicit set of HOME files."""
@@ -622,6 +661,7 @@ def compile_owned_plan(
     }
     operations: list[RuntimeOperation] = []
     expected_targets = {item.target for item in expected}
+    conflict_kw = {"on_conflict": on_conflict, "on_takeover": on_takeover}
 
     if snapshot.status == "malformed":
         for item in expected:
@@ -629,7 +669,7 @@ def compile_owned_plan(
             operations.append(_conflict(
                 item.target, item.source_identity, item.expected_hash, actual, None,
                 "agents manifest is malformed or incompatible", item, None,
-                on_conflict=on_conflict,
+                **conflict_kw,
             ))
     else:
         for item in expected:
@@ -645,20 +685,20 @@ def compile_owned_plan(
                     operations.append(_conflict(
                         item.target, item.source_identity, item.expected_hash, actual, None,
                         "target exists without agents ownership", item, None,
-                        on_conflict=on_conflict,
+                        **conflict_kw,
                     ))
                 continue
             if prior.owner != item.owner or prior.source_identity != item.source_identity:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, IDENTITY_MISMATCH, item, prior,
-                    on_conflict=on_conflict,
+                    **conflict_kw,
                 ))
             elif actual.state == "unsafe":
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, "target path contains a symlink or unsafe type", item, prior,
-                    on_conflict=on_conflict,
+                    **conflict_kw,
                 ))
             elif actual.state == "missing":
                 operations.append(RuntimeOperation(
@@ -669,13 +709,13 @@ def compile_owned_plan(
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, CONTENT_DRIFT, item, prior,
-                    on_conflict=on_conflict,
+                    **conflict_kw,
                 ))
             elif actual.mode != prior.mode:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, MODE_DRIFT, item, prior,
-                    on_conflict=on_conflict,
+                    **conflict_kw,
                 ))
             elif actual.digest == item.expected_hash and actual.mode == item.mode:
                 operations.append(RuntimeOperation(
@@ -708,6 +748,7 @@ def compile_owned_plan(
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
                     outside_root_message, None, prior,
+                    **conflict_kw,
                 ))
                 continue
             actual = _read_actual(home, normalized)
@@ -715,11 +756,13 @@ def compile_owned_plan(
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
                     "stale target path contains a symlink or unsafe type", None, prior,
+                    **conflict_kw,
                 ))
             elif actual.state == "present" and actual.digest != prior.installed_hash:
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
                     "stale owned target was modified locally", None, prior,
+                    **conflict_kw,
                 ))
             else:
                 operations.append(RuntimeOperation(
@@ -743,6 +786,7 @@ def compile_owned_plan(
         tuple(sorted(operations, key=lambda item: (item.target, item.action))),
         only_ids,
         on_conflict,
+        on_takeover,
     )
 
 
@@ -1004,9 +1048,21 @@ def apply_skills_plan(
             include_unlisted=plan.include_unlisted,
             only_ids=plan.only_ids,
             on_conflict=plan.on_conflict,
+            on_takeover=plan.on_takeover,
         )
 
     return apply_owned_plan(plan, compile_current, run_id=run_id)
+
+
+def _plan_excluding_skills(plan: SkillsPlan, skip: frozenset[str]) -> SkillsPlan:
+    if not skip:
+        return plan
+    kept = tuple(
+        operation
+        for operation in plan.operations
+        if skill_id_from_target(operation.target, plan.target_root) not in skip
+    )
+    return replace(plan, operations=kept)
 
 
 def apply_owned_plan(
@@ -1044,23 +1100,66 @@ def apply_owned_plan(
         if manifest_mode_changed:
             changed += 1
 
+        # Identify Skills that cannot proceed (unresolved conflicts). Equivalent
+        # unowned bytes in those Skills are left alone — Skill-atomic skip.
+        adoptable = adoptable_equivalent(current)
+        adoptable_targets = {item.target for item in adoptable}
+        blocking = [
+            operation
+            for operation in current.conflicts
+            if operation.target not in adoptable_targets
+        ]
+        skipped: set[str] = set()
+        for operation in blocking:
+            skill_id = skill_id_from_target(operation.target, current.target_root)
+            if skill_id is None:
+                raise AgentRuntimeConflict(
+                    f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
+                )
+            skipped.add(skill_id)
+
         # Take over unowned targets that already hold the managed bytes, then
         # re-plan so they come back as creates under our ownership. Nothing
         # unverified is overwritten: these bytes match what we would write.
         released: list[tuple[Path, bytes]] = []
-        for operation in adoptable_equivalent(current):
+        for operation in adoptable:
+            skill_id = skill_id_from_target(operation.target, current.target_root)
+            if skill_id in skipped:
+                continue
             assert operation.expected is not None
             target = Path(operation.target)
             released.append((target, operation.expected.content))
             target.unlink()
         if released:
             current = compile_current()
+            # Recompute skip set after replan (adopted creates no longer conflict).
+            adoptable_after = {item.target for item in adoptable_equivalent(current)}
+            skipped = set()
+            for operation in current.conflicts:
+                if operation.target in adoptable_after:
+                    continue
+                skill_id = skill_id_from_target(operation.target, current.target_root)
+                if skill_id is None:
+                    raise AgentRuntimeConflict(
+                        f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
+                    )
+                skipped.add(skill_id)
+
+        skipped_frozen = frozenset(skipped)
+        skipped_priors = [
+            operation.prior
+            for operation in current.operations
+            if skill_id_from_target(operation.target, current.target_root) in skipped_frozen
+            and operation.prior is not None
+        ]
+        current = _plan_excluding_skills(current, skipped_frozen)
 
         try:
-            return _apply_operations(
+            result = _apply_operations(
                 current, home, state_home, target_root, snapshot, run,
                 changed=changed, unchanged=unchanged, pruned=pruned,
                 manifest_file=manifest_file,
+                retain_priors=tuple(skipped_priors),
             )
         except BaseException:
             for target, content in released:
@@ -1068,6 +1167,7 @@ def apply_owned_plan(
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(content)
             raise
+        return replace(result, skipped_skills=tuple(sorted(skipped_frozen)))
 
 
 def _apply_operations(
@@ -1082,6 +1182,7 @@ def _apply_operations(
     unchanged: int,
     pruned: int,
     manifest_file: Path,
+    retain_priors: tuple[ManagedItem, ...] = (),
 ) -> SkillsApplyResult:
     if current.conflicts:
         details = "; ".join(f"{item.target}: {item.conflict}" for item in current.conflicts)
@@ -1091,7 +1192,8 @@ def _apply_operations(
         item for item in snapshot.manifest.items
         if not item.owner.startswith(current.owner_prefix)
     ]
-    expected_items: list[ManagedItem] = []
+    expected_items: list[ManagedItem] = list(retain_priors)
+    seen_targets = {item.target for item in expected_items}
     backup_root = state_home / "dotf" / "backups"
     pruned_parents: list[Path] = []
 
@@ -1101,7 +1203,9 @@ def _apply_operations(
             raise AgentRuntimeConflict(f"runtime target changed after planning: {operation.target}")
         if operation.action == "none":
             assert operation.prior is not None
-            expected_items.append(operation.prior)
+            if operation.prior.target not in seen_targets:
+                expected_items.append(operation.prior)
+                seen_targets.add(operation.prior.target)
             unchanged += 1
             continue
         if operation.action in {"create", "update"}:
@@ -1117,7 +1221,12 @@ def _apply_operations(
                 sensitive=False,
             )
             del result
-            expected_items.append(_managed_item(operation.expected, run))
+            item = _managed_item(operation.expected, run)
+            if item.target not in seen_targets:
+                expected_items.append(item)
+                seen_targets.add(item.target)
+            else:
+                expected_items = [item if entry.target == item.target else entry for entry in expected_items]
             changed += 1
             continue
         if operation.action == "chmod":
@@ -1135,9 +1244,12 @@ def _apply_operations(
                 operation.prior.expected_hash == operation.expected.expected_hash
                 and operation.prior.mode == operation.expected.mode
             ):
-                expected_items.append(operation.prior)
+                entry = operation.prior
             else:
-                expected_items.append(_managed_item(operation.expected, run))
+                entry = _managed_item(operation.expected, run)
+            if entry.target not in seen_targets:
+                expected_items.append(entry)
+                seen_targets.add(entry.target)
             changed += 1
             continue
         if operation.action == "prune":

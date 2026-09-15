@@ -28,13 +28,15 @@ from layouts import (
     skills_target,
 )
 from managed_runtime import (
-    ADOPT_REASON,
     AgentRuntimeConflict,
     OnConflict,
+    OnTakeover,
     adoptable_equivalent,
     apply_skills_plan,
     compile_skills_plan,
     on_conflict_from_env,
+    on_takeover_from_env,
+    skill_id_from_target,
 )
 from sync import inject_kiro_arguments
 
@@ -128,12 +130,12 @@ def _apply_generated(
     layout: SkillLayout,
     dry_run: bool,
     on_conflict: OnConflict = "block",
+    on_takeover: OnTakeover = "skip",
 ) -> int:
     home = home_for_target(destination)
     renderer = renderers_for(layout)
     owners = owner_prefix(layout, "openspec")
     identity = identity_prefix(layout, OPENSPEC_IDENTITY)
-    print(f"==> openspec skills ({layout.key}) → {destination}")
     plan = compile_skills_plan(
         root,
         renderer,
@@ -143,50 +145,41 @@ def _apply_generated(
         owner_prefix=owners,
         identity_prefix=identity,
         on_conflict=on_conflict,
+        on_takeover=on_takeover,
     )
 
-    markers = {
-        "none": "=",
-        "create": "+",
-        "update": "+",
-        "chmod": "~",
-        "prune": "-",
-        "block": "!",
-    }
-    for operation in plan.operations:
-        marker = "~" if operation.remediated else markers[operation.action]
-        suffix = " (overwrite, backup)" if operation.remediated else ""
-        if operation.conflict == ADOPT_REASON and operation.expected is not None:
-            target = Path(operation.target)
-            if target.is_file() and target.read_bytes() == operation.expected.content:
-                marker = "+"
-                suffix = " (adopt equivalent)"
-        print(f"  {marker} {operation.target}{suffix}")
-        if operation.conflict and suffix == "":
-            print(f"    conflict: {operation.conflict}")
+    adoptable = {item.target for item in adoptable_equivalent(plan)}
+    blocking = [item for item in plan.conflicts if item.target not in adoptable]
+    blocked = sorted({
+        skill_id_from_target(item.target, destination) or "?"
+        for item in blocking
+    })
+    write_ops = sum(
+        1 for op in plan.operations
+        if op.action in {"create", "update", "chmod"} or op.remediated
+    )
+    print(
+        f"==> openspec  {layout.key}  {write_ops}↑ {len(adoptable)}adopt "
+        f"{len(blocked)}✗  |  {len(plan.operations)} files"
+    )
+    if blocked:
+        print(f"  ✗ {', '.join(blocked)}")
 
     if dry_run:
-        changed = sum(item.action in {"create", "update", "chmod"} for item in plan.operations)
-        pruned = sum(item.action == "prune" for item in plan.operations)
-        unchanged = sum(item.action == "none" for item in plan.operations)
-        adoptable = len(adoptable_equivalent(plan))
-        conflicts = len(plan.conflicts) - adoptable
-        print(
-            f"  done openspec ({layout.key}, plan): changed={changed} pruned={pruned} "
-            f"unchanged={unchanged} adopt={adoptable} conflicts={conflicts}"
-        )
-        return 1 if conflicts else 0
+        return 1 if blocked else 0
 
     try:
         result = apply_skills_plan(plan, renderer)
     except AgentRuntimeConflict as exc:
         print(f"error: openspec skills: {exc}", file=sys.stderr)
         return 1
+    skipped = result.skipped_skills
     print(
         f"  done openspec ({layout.key}): changed={result.changed} "
         f"pruned={result.pruned} unchanged={result.unchanged}"
+        + (f" skipped={','.join(skipped)}" if skipped else "")
     )
-    return 0
+    return 1 if skipped else 0
 
 
 def install_openspec_skills(
@@ -198,6 +191,7 @@ def install_openspec_skills(
     generate=generate_openspec_skills,
     openspec: Optional[Path] = None,
     on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
 ) -> int:
     """Generate OpenSpec skills with --tools agents and install them globally."""
     command = openspec if openspec is not None else openspec_command()
@@ -205,6 +199,7 @@ def install_openspec_skills(
         print("warning: openspec CLI 未安装，跳过全局 OpenSpec skills（dotf npm -i）", file=sys.stderr)
         return 0
     policy = on_conflict if on_conflict is not None else on_conflict_from_env()
+    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
 
     # Defense in depth: reject any first-party skill named like an OpenSpec CLI
     # skill, whether catalogued or present only as a raw agents/skills/<id>/ dir.
@@ -241,6 +236,7 @@ def install_openspec_skills(
                     layout=layout,
                     dry_run=dry_run,
                     on_conflict=policy,
+                    on_takeover=takeover,
                 )
                 rc = max(rc, step)
             return rc
@@ -255,10 +251,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--on-conflict", choices=("block", "backup"), default=None)
+    parser.add_argument("--takeover", choices=("skip", "backup"), default=None, dest="on_takeover")
+    parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
     root = args.root.resolve() if args.root else repo_root()
-    return install_openspec_skills(root, dry_run=args.dry_run, on_conflict=args.on_conflict)
+    return install_openspec_skills(
+        root,
+        dry_run=args.dry_run,
+        on_conflict=args.on_conflict,
+        on_takeover=args.on_takeover,
+    )
 
 
 if __name__ == "__main__":

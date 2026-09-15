@@ -230,6 +230,17 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
             if value not in ("block", "backup"):
                 flag_error("错误: --on-conflict 只接受 block 或 backup")
             ctx.on_conflict = value
+        elif a == "--takeover" or a.startswith("--takeover="):
+            if a == "--takeover":
+                i += 1
+                if i >= len(args):
+                    raise DotfError("usage", "错误: --takeover 需要参数（skip|backup）")
+                value = args[i]
+            else:
+                value = a.split("=", 1)[1]
+            if value not in ("skip", "backup"):
+                flag_error("错误: --takeover 只接受 skip 或 backup")
+            ctx.on_takeover = value
         elif a.startswith("-"):
             print(f"错误: 未知选项 '{a}'")
             print()

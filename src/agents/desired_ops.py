@@ -16,7 +16,13 @@ for path in (_SCRIPTS, _AGENTS):
 from desired_set import DesiredSetError, approved_skill_ids  # noqa: E402
 from dotf_core.overlays import OverlayError, upsert_local_overlay  # noqa: E402
 from dotf_core.plan_protocol import ProtocolError, parse_artifact_selector  # noqa: E402
-from managed_runtime import AgentRuntimeError, on_conflict_from_env, parse_on_conflict  # noqa: E402
+from managed_runtime import (  # noqa: E402
+    AgentRuntimeError,
+    on_conflict_from_env,
+    on_takeover_from_env,
+    parse_on_conflict,
+    parse_on_takeover,
+)
 from skills_catalog import SkillsCatalogError, load_skills_catalog  # noqa: E402
 from sync import SyncOutcome, summarize, sync_skills  # noqa: E402
 
@@ -64,21 +70,21 @@ def _emit(status: str, reason: str, exit_code: int = 0) -> None:
     print(f"RESULT\t{status}\t{module}\t{action}\t0\t{exit_code}\t{reason}")
 
 
-def sync_all(repo: Path, artifact_id: str, *, on_conflict) -> str:
+def sync_all(repo: Path, artifact_id: str, *, on_conflict, on_takeover="skip") -> str:
     """Reconcile every source that can carry `artifact_id`; return a reason on failure.
 
     First-party skills come from the repository, locked third-party skills from
     an audited checkout. Applying either must run that source's installer, or the
     overlay records a skill that is never written to disk.
     """
-    outcomes = sync_skills(repo, on_conflict=on_conflict)
+    outcomes = sync_skills(repo, on_conflict=on_conflict, on_takeover=on_takeover)
     # `acquire_all` fetches per lock entry, so only pay for it when this artifact
     # actually comes from the lock. Otherwise a first-party apply would go to the
     # network for nothing.
     if artifact_id in _third_party_ids(repo):
         from defaults import install_defaults
 
-        rc = install_defaults(repo, on_conflict=on_conflict)
+        rc = install_defaults(repo, on_conflict=on_conflict, on_takeover=on_takeover)
         if rc:
             outcomes.append(SyncOutcome("locked third-party", rc, "install failed"))
     return summarize(outcomes)
@@ -90,6 +96,7 @@ def run_desired_op(
     *,
     root: Path | None = None,
     on_conflict: str | None = None,
+    on_takeover: str | None = None,
 ) -> int:
     repo = (root or repo_root()).resolve()
     try:
@@ -105,11 +112,12 @@ def run_desired_op(
             if artifact_id not in approved_skill_ids(repo):
                 raise DesiredSetError(f"拒绝未锁定或未知 skill: {artifact_id}")
             policy = on_conflict_from_env() if on_conflict is None else parse_on_conflict(on_conflict)
+            takeover = on_takeover_from_env() if on_takeover is None else parse_on_takeover(on_takeover)
             upsert_local_overlay(
                 repo,
                 lambda agents: _mutate_skill(agents, artifact_id, enable=enable),
             )
-            reason = sync_all(repo, artifact_id, on_conflict=policy)
+            reason = sync_all(repo, artifact_id, on_conflict=policy, on_takeover=takeover)
             if reason:
                 _emit("failed", f"skill sync failed: {reason}", 1)
                 return 1
@@ -130,12 +138,23 @@ def main(argv: list[str] | None = None) -> int:
         "--on-conflict",
         choices=("block", "backup"),
         default=None,
-        help="block（默认）本机改动即失败；backup 先备份再覆写已受管目标的漂移",
+        help="block（默认）本机改动即跳过该 Skill；backup 先备份再覆写已受管目标的漂移",
+    )
+    parser.add_argument(
+        "--takeover",
+        choices=("skip", "backup"),
+        default=None,
+        dest="on_takeover",
+        help="skip（默认）跳过无所有权分歧目标；backup 先备份再接管",
     )
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
     return run_desired_op(
-        args.action, args.selector, root=args.root, on_conflict=args.on_conflict
+        args.action,
+        args.selector,
+        root=args.root,
+        on_conflict=args.on_conflict,
+        on_takeover=args.on_takeover,
     )
 
 
