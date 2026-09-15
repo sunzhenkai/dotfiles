@@ -19,6 +19,7 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
   pull                        拉取 dotfiles 最新更新（保护性 pull）
   cd                          跳转到 dotfiles 目录（需 zsh wrapper）
   skills -c                   安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
+  skills add                  通过 npx skills 安装第三方 skill（交互选择范围）
   skills -i/-r                通过 npx skills 按需安装/移除第三方 skill
 
 动作:
@@ -54,6 +55,7 @@ agents 示例:
   dotf agents skill apply <id>
   dotf agents skill remove <id>   # 写本机 overlay 并 prune
   dotf skills -c --yes
+  dotf skills add ui-skills-root
   dotf skills -i frontend-design
 
 示例:

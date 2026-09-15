@@ -24,6 +24,7 @@ groups:
         optional: true
       - id: lark-cli
         optional: true
+      - llm-wiki
       - pretty-view-html
       - pretty-view-ppt
       - project-init
@@ -64,6 +65,14 @@ groups:
       - ui-template-author
       - ui-template-apply
       - ui-template-design
+
+  ui-skills:
+    type: third-party
+    source: github
+    package: https://github.com/ibelick/ui-skills
+    skills:
+      - id: ui-skills-root
+        optional: true
 
   # taste-skill 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
   # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。

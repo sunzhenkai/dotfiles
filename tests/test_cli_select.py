@@ -85,3 +85,18 @@ def test_select_all_option_lists_modules() -> None:
     out = _run_in_pty(["-i"], "a\n")
     # a 全选后进入 plan 确认；非 tty 确认失败快速退出
     assert "可选模块" in out
+
+
+@pytest.mark.slow
+def test_skills_add_interactively_selects_project_scope() -> None:
+    out = _run_in_pty(
+        ["skills", "add", "ui-skills-root", "--dry-run"],
+        "2\n",
+    )
+    assert "请选择 skill 安装范围" in out
+    assert "项目级" in out
+    assert (
+        "==> npx skills add https://github.com/ibelick/ui-skills"
+        " -s ui-skills-root" in out
+    )
+    assert " -g" not in out

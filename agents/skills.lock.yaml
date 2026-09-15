@@ -241,3 +241,17 @@ skills:
       date: '2026-09-11'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/446922ac698e525f5667e9b6b428b304af1e2f71
+  - id: ui-skills-root
+    source: https://github.com/ibelick/ui-skills
+    revision: c5bcd86450b3582ba25204c622b9213b07464938
+    subdirectory: skills/ui-skills-root
+    content_hash: 61016c98036a78ba25ca4788390f47a0c0a06386763fe0c773713336f4d8cb0c
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: c615621c4cc1676ccde194e7a01b6469ba477780251bd71e007fc473a49c2c2b
+    audit:
+      status: approved
+      date: '2026-09-15'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/ibelick/ui-skills/commit/c5bcd86450b3582ba25204c622b9213b07464938

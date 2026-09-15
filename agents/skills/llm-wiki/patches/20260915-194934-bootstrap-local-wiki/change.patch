@@ -1,0 +1,1250 @@
+diff --git a/agents/skills/llm-wiki/SKILL.md b/agents/skills/llm-wiki/SKILL.md
+new file mode 100644
+index 0000000..3b51349
+--- /dev/null
++++ b/agents/skills/llm-wiki/SKILL.md
+@@ -0,0 +1,120 @@
++---
++id: llm-wiki
++name: llm-wiki
++description: 在本地 Markdown 工作区整理并维护可累积的知识 wiki：把源文档摄入 typed 页面、按引用回答、重组结构并做健康检查。文件系统为真相源，不依赖 llmwiki 服务或 MCP。在用户要求整理知识、维护 wiki、ingest 本地文档、查询已有 wiki、lint/重组知识库，或点名 llm-wiki 时使用。不用于项目 spec 镜像或代码探索。
++---
++
++# LLM Wiki（本地文档）
++
++面向用户的输出默认使用简体中文。命令名、路径、代码、状态值与既成术语保持原文。
++
++把本地文档**编译**成可累积的 Markdown wiki：摄入时交叉引用、标出矛盾、写入持久页面。下次提问读 wiki，而不是重新从源材料拼答案。
++
++本 skill 只操作本地文件。不启动 llmwiki 应用，不调用 MCP。不依赖 llmwiki 服务、MCP 或 SQLite。
++
++## 非目标
++
++- 不安装、运行或包装 llmwiki 二进制 / Web / MCP。
++- 不写软件项目 spec 镜像（交给 `project-spec-mirror`）。
++- 不探索或修改业务源码（交给 `dotf-code-explore`）。
++- 不编辑 `raw/` 中的源材料。
++- 不自动 commit / push / `dotf agents` sync。
++
++## 阶段
++
++用户点名 `{{slash:llm-wiki}}` 且首词命中下表时走该阶段；否则按意图推断，并用一行说明。写盘阶段在首次绑定前必须先 `guide` 或 `init`。
++
++| 阶段 | 何时 | 写入 |
++|------|------|------|
++| `guide` | 了解工作区目标、结构、覆盖与缺口 | 只读 |
++| `init` | 尚无 wiki 布局，或要把一堆本地文档收成 wiki | 确认后创建骨架 |
++| `ingest` | 把文件、粘贴文本或对话编进 wiki | 确认范围后写 `wiki/` |
++| `query` | 问 wiki 里已有的知识 | 默认只读；归档问答需确认 |
++| `organize` | 合并重复、搬页、补交叉引用 | 先给方案，确认后改 |
++| `lint` | 健康检查；可顺带修 error | 修 error 可直接做；warning 需说明 |
++
++## 绑定 `WIKI_ROOT`
++
++会话绑定一个工作区根目录 `{WIKI_ROOT}`。路径由用户给出，或在 cwd 发现既有布局后确认。
++
++**既有布局**：`{WIKI_ROOT}/purpose.md` 与 `{WIKI_ROOT}/wiki/` 同时存在。
++
++1. 用户指定了目录 → 绑定该目录。
++2. cwd 已是既有布局 → 绑定 cwd，并报告路径。
++3. 否则列出候选（cwd 下含大量 `.md` 但无 `wiki/`），请用户选择 **init** 或给出路径。确认前不写盘。
++
++禁止猜测家目录或机器特例路径。
++
++## 核心不变量
++
++1. **`raw/` 只读。** 源文件修订应作为新来源加入，不改旧文件。
++2. **`wiki/` 是 LLM 维护的知识层**，写入必须尊重 `purpose.md` 与 `rules.md`（缺失则明确说缺，不编造规则）。
++3. **文件系统是真理源。** 搜索用目录列表与内容检索（`rg` / 读文件）；不要假设有 FTS 索引。
++4. **先搜再写，写后回读。** 更新已有页必须先读全文，保留旧事实与旧 `sources`。
++5. **`wiki/log.md` 仅追加。** 条目格式：`## [YYYY-MM-DD] action | description`。不重排、不删历史。
++6. **系统页** `wiki/overview.md`、`wiki/index.md`、`wiki/log.md` 不可当业务页删除或移走。
++7. **声称必须可追溯** 到 `raw/`、`wiki/sources/` 或本轮用户提供的材料。没有证据就写「wiki 尚未覆盖」，不要编造。
++8. **摄入前做隐私自查。** 凭据、密钥、个人联系方式、内部主机名不写入 wiki；写成 `<REDACTED>` 并告知用户。
++
++## 加载
++
++进入阶段后 **只读该阶段详情**，不要预加载其它 reference。
++
++| 阶段 | 进入时读取 |
++|------|------------|
++| `guide` / `init` | [references/layout.md](references/layout.md) |
++| `ingest` | [references/ingest.md](references/ingest.md)；写页时再读 [references/page-types.md](references/page-types.md) |
++| `query` | 本文件步骤已够；归档到 `wiki/queries/` 时再读 page-types |
++| `organize` | [references/page-types.md](references/page-types.md) 的实体/概念边界；改完跑 lint |
++| `lint` | [references/lint.md](references/lint.md) |
++
++确定性检查：
++
++```bash
++python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}"
++python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
++```
++
++`<this-skill>` 是本 skill 安装目录。不要手写绝对家目录。
++
++## `guide`
++
++1. 读 `purpose.md`、`rules.md`、`wiki/overview.md`、`wiki/index.md`。缺哪个就说哪个，不补写。
++2. 列出 `wiki/` typed 子目录页数与 `raw/sources/` 文件数（真实 `ls`，不要编目录树）。
++3. 用 `rg` 或读 index 概括主题、明显缺口、错位页。
++4. 总结：目标与范围、页数按类型、关键主题、下一步建议（ingest / query / organize / lint）。
++
++## `init`
++
++没有 `wiki/` 时 **必须先获得确认** 再创建。未确认则停止。
++
++1. 确认 `{WIKI_ROOT}` 与研究/知识范围一句话。
++2. 按 [references/layout.md](references/layout.md) 创建骨架：`purpose.md`、`rules.md`、`raw/sources/`、`raw/assets/`、typed `wiki/` 子目录、三份系统页、`wiki/templates/`。
++3. **领养已有文档**：原文件复制（或经确认后移动）到 `raw/sources/`，不要在原地改成 wiki 页。随后转 `ingest`。
++4. 不要创建 `.llmwiki/`、`.obsidian/` 或任何应用私有目录。
++5. 绑定工作区，追加 log：`## [YYYY-MM-DD] init | 工作区初始化`。
++
++## `ingest`
++
++进入后读 [references/ingest.md](references/ingest.md)。
++
++短路径：理解材料 → 确认在 `purpose.md` 范围内且无密钥 → 搜索已有页 → 计划创建/更新 → 写入 → 回读 → lint → 更新 `wiki/index.md` → 追加 log。
++
++## `query`
++
++1. 先读 `wiki/index.md`，再用 `rg` 搜别名、缩写、中英变体；不要只搜一次精确词。
++2. 读最相关页面，综合回答并引用 `[[页面标题]]`。
++3. 证据不足就明说。页面冲突则并列来源，不静默挑选。
++4. 用户要求归档时，先说明将写入 `wiki/queries/`，确认后再写。
++
++## `organize`
++
++1. 跑 lint，按真实输出描述结构；不要编造 `wiki/entity/` 或 `wiki/skills/`。
++2. 识别：重复页、孤立页、错位、实体-概念耦合、缺失反链。
++3. 给出方案（合并 / 移动 / 补链 / 拆名）。确认前不改。
++4. 执行前读所有受影响页。合并必须保留双方独有信息。
++5. 再跑 lint；更新 index；结构变更追加 `## [YYYY-MM-DD] organize | …`。
++
++## `lint`
++
++进入后读 [references/lint.md](references/lint.md)。先修 error，warning 说明后处理或有意推迟。修完再跑一遍。
+diff --git a/agents/skills/llm-wiki/agents/openai.yaml b/agents/skills/llm-wiki/agents/openai.yaml
+new file mode 100644
+index 0000000..d42b152
+--- /dev/null
++++ b/agents/skills/llm-wiki/agents/openai.yaml
+@@ -0,0 +1,4 @@
++interface:
++  display_name: "LLM Wiki"
++  short_description: "用本地 Markdown 整理维护可累积知识 wiki，不依赖 wiki 服务"
++  default_prompt: "用 $llm-wiki 把本地文档编进 typed wiki：guide 了解现状，ingest 摄入，query 按引用回答，organize 重组，lint 做健康检查。raw/ 只读；不要启动 llmwiki 应用。"
+diff --git a/agents/skills/llm-wiki/references/ingest.md b/agents/skills/llm-wiki/references/ingest.md
+new file mode 100644
+index 0000000..25048d6
+--- /dev/null
++++ b/agents/skills/llm-wiki/references/ingest.md
+@@ -0,0 +1,48 @@
++# 摄入
++
++把一份本地材料编译进 wiki。一次 ingest 通常会动多页：源摘要 + 若干实体/概念 + 交叉引用。
++
++## 输入
++
++优先顺序：用户指定的本地文件 → 粘贴文本 → 当前对话中要保留的结论。
++
++不要主动去抓任意 URL。用户明确给出链接并要求纳入时，先确认范围再取回文本。
++
++大文件按章节或自然段分块，每块仍绑定同一来源。
++
++## 步骤
++
++1. **读材料**，列出候选实体、概念、关系、主张。
++2. **范围与隐私**：超出 `purpose.md` 先告诉用户。发现凭据、个人隐私、内部主机名则停止写入明文，改用 `<REDACTED>` 或拒绝该段。
++3. **搜索已有页**：对每个候选名跑 `rg`（含别名、缩写、中英变体）。读命中页，避免重复建页。
++4. **计划**（对用户可见，复杂时先确认再写）：
++   - 新建哪些 typed 页
++   - 更新哪些旧页（新事实 / 必须保留的旧事实 / 将追加的链接）
++   - 对应的 `wiki/sources/` 摘要
++5. **先写源摘要**到 `wiki/sources/`，记录关键主张、提到的实体/概念、后续问题。
++6. **写或合并业务页**。更新旧页时：
++   - 先读全文
++   - 锁定 `type` / `title` / `created`
++   - 数组字段并集去重
++   - 正文整合新事实，不覆盖旧段；冲突并列并标明来源
++7. **交叉引用**：相关页加 `[[wikilink]]`；实体-概念关系写在正文，不拼进概念标题。命名规则见 [page-types.md](page-types.md)。
++8. **验证**：回读新页；运行 `lint_wiki.py`；error 必须修。
++9. **簿记**：`--write-index` 或按同类表格更新 `wiki/index.md`；`wiki/log.md` 追加一行；必要时改 `wiki/overview.md` 的主题/状态，不要删旧综述。
++
++## 合并时不要做的事
++
++- 为了「干净」丢掉旧 `sources` 或旧事实
++- 用新标题覆盖身份字段
++- 把 raw 文件改写成 wiki 页
++- 把源摘要写进实体/概念页而不建 `wiki/sources/` 页
++- 在 `wiki/templates/` 下写业务内容
++
++## 完成标准
++
++- [ ] 材料中的关键实体与概念都有页（或已说明为何合并到旧页）
++- [ ] 相关页有 `[[wikilink]]`
++- [ ] 已搜索、无重复建页
++- [ ] 业务页 frontmatter 含 title / type / date
++- [ ] 文件类摄入有 `wiki/sources/` 摘要
++- [ ] 旧页保留原有信息与来源
++- [ ] 已回读并跑 lint，error 为 0
+diff --git a/agents/skills/llm-wiki/references/layout.md b/agents/skills/llm-wiki/references/layout.md
+new file mode 100644
+index 0000000..444b87c
+--- /dev/null
++++ b/agents/skills/llm-wiki/references/layout.md
+@@ -0,0 +1,93 @@
++# 工作区布局
++
++`{WIKI_ROOT}` 的 canonical 布局。`purpose.md` 与 `rules.md` 在工作区根，不在 `wiki/` 内。
++
++```text
++{WIKI_ROOT}/
++├── purpose.md              # 目标、关键问题、范围（人与 LLM 共读）
++├── rules.md                # 语言、引用、保留/脱敏规则
++├── raw/
++│   ├── sources/            # 不可变源文件（只读）
++│   └── assets/             # 本地图片等资源（只读）
++└── wiki/
++    ├── overview.md         # 全局总览（系统页）
++    ├── index.md            # 内容目录（系统页，ingest/organize/lint --write-index 后更新）
++    ├── log.md              # 仅追加操作日志（系统页）
++    ├── entities/           # 实体：人、组织、产品、项目
++    ├── concepts/           # 概念：术语、方法、框架
++    ├── sources/            # 源材料摘要（不是 raw 原件）
++    ├── synthesis/          # 跨源综合
++    ├── comparisons/        # 对比
++    ├── queries/            # 归档问答
++    └── templates/          # 系统模板，不是业务内容
++```
++
++Typed 子目录必须用**复数**：`entities/`，不是 `entity/`。
++
++## 路径分类
++
++| 类别 | 路径 | 规则 |
++|------|------|------|
++| 工作区配置 | `purpose.md`, `rules.md` | 根目录；缺失则说明，不编造 |
++| 不可变源 | `raw/sources/`, `raw/assets/` | 只读；修订以新文件加入 |
++| 系统页 | `wiki/overview.md`, `wiki/index.md`, `wiki/log.md` | 仅有的合法顶层 wiki Markdown |
++| 业务页 | `wiki/entities/` … `wiki/queries/` | 必须落在 typed 子目录 |
++| 系统模板 | `wiki/templates/` | init 脚手架；lint 不当地孤立业务页 |
++
++## 反模式
++
++| 错误 | 原因 |
++|------|------|
++| `wiki/purpose.md`, `wiki/rules.md` | 配置在工作区根 |
++| `wiki/raw/` | 源目录是 `{WIKI_ROOT}/raw/` |
++| `wiki/entity/`, `wiki/concept/`, `wiki/source/` | 应用复数目录名 |
++| `wiki/skills/` | 不存在 |
++| 业务页写成 `wiki/topic.md` | 顶层只允许三份系统页 |
++| 创建 `.llmwiki/` 或 SQLite | 本 skill 不需要应用私有状态 |
++
++## `init` 脚手架
++
++`purpose.md`：标题「研究目标」；章节「目标」「关键问题」「范围」。用用户确认过的一句话填范围，其余可留待填写。
++
++`rules.md` 最小内容：
++
++```markdown
++# 写作规则
++
++- 语言跟随已有页面；空库默认简体中文。
++- 事实必须能追溯到 raw 源、wiki/sources 摘要或本轮用户材料。
++- 内部引用用 `[[页面标题]]`。
++- 凭据与个人隐私写成 `<REDACTED>`，不入库。
++- 不确定标为开放问题，不删冲突，并列保存。
++```
++
++`wiki/log.md`：
++
++```markdown
++---
++title: 操作日志
++---
++
++# 操作日志
++
++## [YYYY-MM-DD] init | 工作区初始化
++```
++
++`wiki/overview.md`：章节「项目目标」「当前状态」「主要主题」。
++
++`wiki/index.md` 用 `lint_wiki.py --write-index` 生成，或按 typed 子目录建空表：实体 / 概念 / 源摘要 / 综合分析 / 对比分析 / 查询归档。
++
++页面模板见 [page-types.md](page-types.md)。不要把模板复制成业务页。
++
++## 领养已有文档
++
++用户指向一堆已有 Markdown / PDF / 文本，且尚无上述布局时：
++
++1. 说明将把原件收入 `raw/sources/`，wiki 页是编译产物，不是原地改名。
++2. 确认复制还是移动。默认复制，保留原位置。
++3. 不要把整个代码仓库当 raw 源；只收录用户指定的知识文档。
++4. 骨架就绪后转 `ingest`，按文件分批，不要一次重写全部。
++
++## 结构描述
++
++向用户展示目录时，引用真实 `ls` / lint 统计。不要发明占位文件名，不要画带 emoji 的假树。
+diff --git a/agents/skills/llm-wiki/references/lint.md b/agents/skills/llm-wiki/references/lint.md
+new file mode 100644
+index 0000000..330fc38
+--- /dev/null
++++ b/agents/skills/llm-wiki/references/lint.md
+@@ -0,0 +1,63 @@
++# Lint
++
++确定性检查由 `scripts/lint_wiki.py` 执行。LLM 负责解释、排序和修复，不要只看一遍报告就算完成。
++
++```bash
++python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}"
++python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --json
++python3 <this-skill>/scripts/lint_wiki.py "{WIKI_ROOT}" --write-index
++```
++
++`--write-index` 根据 typed 子目录与 frontmatter 重建 `wiki/index.md`，不改其它文件。
++
++## 检查码
++
++| 码 | 级别 | 含义 |
++|----|------|------|
++| `dead_link` | error | `[[link]]` 或 `[text](path)` 目标不存在 |
++| `missing_frontmatter` | error | 业务页缺 title / type / date |
++| `log_format_invalid` | error | `log.md` 条目前缀不符合 `## [YYYY-MM-DD] action \| description` |
++| `log_date_decreasing` | error | 日志日期递减（违反仅追加） |
++| `type_dir_mismatch` | warning | `type` 与所在 typed 目录不一致 |
++| `misplaced_wiki_page` | warning | 业务页不在 typed 子目录 |
++| `duplicate_page` | warning | 同目录下文件名归一化后重复（去空格/`_`/`-`/全角空格后小写） |
++| `entity_concept_coupling` | warning | 概念标题把实体名绑到抽象概念上 |
++| `orphan_page` | warning | 无入链；系统页与 `wiki/sources/` 不计入。系统页上的链接仍查死链，但不计入入链（否则 index 会掩盖孤立页） |
++
++不同目录的同名文件不报 `duplicate_page`。
++
++## 修复顺序
++
++先 error，后 warning。一页多问题一次改完。改前先读全文，避免为消警告丢掉信息。
++
++**死链**：先找是否改名或 slug 不同；不确定就提问或标开放问题，不要随便建空页。更倾向于把链接改到正确页，而不是删掉链接。
++
++**Frontmatter**：`type` 可从目录推断，但不要随便改身份字段。缺 `date` 用修复当日。
++
++**日志**：只改格式与日期顺序问题；不删条目、不改历史含义。
++
++**孤立页**：判断是否本来就该少入链（临时 query 可推迟）。否则从 overview、相关实体或概念补 `[[wikilink]]`。
++
++**错位 / 类型不一致**：让 `type` 与目录一致；移动后更新旧路径上的链接。
++
++**实体-概念耦合**：改成中性概念标题，实体作为案例链入；更新旧 wikilink。不要为消警告删概念正文。
++
++**重复页**：读两页后合并或改名，保留独有事实。
++
++## 脚本做不到的（需 LLM）
++
++- 页面间事实矛盾
++- 过时主张
++- 正文提到但尚未建页的概念
++- 缺失的交叉引用（入链检查只覆盖已有链接）
++
++`organize` 与 `lint` 可建议这些项，但不要假装脚本已经查过。
++
++## 完成标准
++
++- [ ] lint 报告 0 error
++- [ ] 死链已解析（改链或确认目标）
++- [ ] 业务页 frontmatter 合法
++- [ ] `wiki/log.md` 格式合法且日期非递减
++- [ ] warning 已修或有意推迟并说明
++- [ ] 关键修复页已回读
+diff --git a/agents/skills/llm-wiki/references/page-types.md b/agents/skills/llm-wiki/references/page-types.md
+new file mode 100644
+index 0000000..15a4d19
+--- /dev/null
++++ b/agents/skills/llm-wiki/references/page-types.md
+@@ -0,0 +1,143 @@
++# 页面类型
++
++业务页路径由 `type` 决定。文件名用标题的短 slug（可含中文），扩展名 `.md`。
++
++| type | 目录 | 用途 | 必需章节 |
++|------|------|------|----------|
++| entity | `wiki/entities/` | 可唯一指认的对象：人、组织、产品、项目 | 概述、关键事实、相关概念、来源 |
++| concept | `wiki/concepts/` | 可复用的术语、方法、框架、机制、理论 | 定义、核心要点、相关实体、来源 |
++| source | `wiki/sources/` | 一份 raw 源的摘要，不是原件 | 摘要、关键观点、相关实体/概念 |
++| synthesis | `wiki/synthesis/` | 跨源分析 | 问题/目的、分析、引用、后续 |
++| comparison | `wiki/comparisons/` | 对比 | 对比维度、异同、结论 |
++| query | `wiki/queries/` | 值得留下的问答 | 问题、回答、引用 |
++
++关系（某实体采用某概念）用正文和 `[[wikilink]]` 表达，不要做成第三种页面类型，也不要把双方名字拼进概念标题。
++
++## Frontmatter
++
++业务页：
++
++```yaml
++---
++title: 页面标题
++type: entity
++date: YYYY-MM-DD
++tags: []
++sources: []
++related: []
++---
++```
++
++- 更新时不要轻易改 `type`、`title`、`created`（若已有）。
++- `tags` / `sources` / `related` 做并集去重，不覆盖删除旧值。
++- `date` 用本次写入日；`created` 只在首次创建时加。
++- `sources` 指向 `wiki/sources/` 页标题或 raw 文件名，便于追溯。
++
++系统页可不设业务 `type`。模板页只存在于 `wiki/templates/`。
++
++## 实体 vs 概念
++
++写页前问三句：
++
++1. 这是可指认的具体对象，还是可复用的抽象？
++2. 标题是否嵌了已有实体名？
++3. 若两者同时出现，是否应拆成两页再用 wikilink 连起来？
++
++**默认**：概念标题保持中性，不把实体名嵌进去。
++
++| 不要 | 要 |
++|------|------|
++| 概念页 `青禾实验室渐进披露` | 实体 `青禾实验室` + 概念 `渐进披露`，正文互链 |
++| 把某组织的工具栈写成概念标题 | 中性概念 + 实体页记录其采用情况 |
++| 关系页 `Foo 采用 Bar` | 在 Foo / Bar 正文中写关系 |
++
++**例外**：来源把整句当作专有名词。保留组合标题，并在正文写明命名依据与出处。
++
++虚构示例：实体 `青禾实验室` 是具体组织；概念 `渐进披露` 是可被多个实体引用的方法。
++
++## 模板（init 时写入 `wiki/templates/`）
++
++创建业务页时按对应模板补齐章节，不要把「（待填写）」留在成品里。
++
++### entity
++
++```markdown
++---
++title: 示例实体
++type: entity
++date: YYYY-MM-DD
++tags: []
++---
++
++# 概述
++
++## 关键事实
++
++-
++
++## 相关概念
++
++- [[相关概念]]
++
++## 来源
++
++- [[来源页面]]
++```
++
++### concept
++
++```markdown
++---
++title: 示例概念
++type: concept
++date: YYYY-MM-DD
++tags: []
++---
++
++# 定义
++
++## 核心要点
++
++-
++
++## 相关实体
++
++- [[相关实体]]
++
++## 来源
++
++- [[来源页面]]
++```
++
++### source
++
++```markdown
++---
++title: 示例来源
++type: source
++date: YYYY-MM-DD
++tags: []
++---
++
++# 摘要
++
++## 关键观点
++
++-
++
++## 相关实体/概念
++
++- [[相关页面]]
++```
++
++### synthesis / comparison / query
++
++- synthesis：问题/目的、分析、引用、后续
++- comparison：对比维度、异同、结论
++- query：问题、回答、引用
++
++## 链接
++
++- 内部用 `[[标题]]` 或 `[[entities/slug|标题]]`。
++- 写 A 提到 B 时，尽量在 B 补反向链接（至少从 overview / 相关实体或概念链入）。
++- 不要用纯文本名字代替已有 wiki 页。
+diff --git a/agents/skills/llm-wiki/scripts/lint_wiki.py b/agents/skills/llm-wiki/scripts/lint_wiki.py
+new file mode 100755
+index 0000000..c9aa516
+--- /dev/null
++++ b/agents/skills/llm-wiki/scripts/lint_wiki.py
+@@ -0,0 +1,504 @@
++#!/usr/bin/env python3
++"""Deterministic lint (and optional index rebuild) for a local LLM wiki workspace."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import sys
++from collections import defaultdict
++from datetime import date
++from pathlib import Path
++
++TYPED_DIRS = {
++    "entities": "entity",
++    "concepts": "concept",
++    "sources": "source",
++    "synthesis": "synthesis",
++    "comparisons": "comparison",
++    "queries": "query",
++}
++TYPE_TO_DIR = {v: k for k, v in TYPED_DIRS.items()}
++SYSTEM_PAGES = {"overview.md", "index.md", "log.md"}
++INDEX_HEADINGS = [
++    ("entities", "实体 (entities)"),
++    ("concepts", "概念 (concepts)"),
++    ("sources", "源摘要 (sources)"),
++    ("synthesis", "综合分析 (synthesis)"),
++    ("comparisons", "对比分析 (comparisons)"),
++    ("queries", "查询归档 (queries)"),
++]
++ABSTRACT_KEYWORDS = (
++    "方法",
++    "方法论",
++    "模型",
++    "文化",
++    "框架",
++    "策略",
++    "机制",
++    "理论",
++    "范式",
++    "实践",
++    "流程",
++    "体系",
++    "method",
++    "methodology",
++    "model",
++    "culture",
++    "framework",
++    "strategy",
++    "mechanism",
++    "theory",
++    "paradigm",
++    "practice",
++    "process",
++    "system",
++)
++WIKILINK_RE = re.compile(r"\[\[([^\[\]]+?)\]\]")
++MDLINK_RE = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
++LOG_RE = re.compile(
++    r"^## \[(\d{4}-\d{2}-\d{2})\] ([^|]+?) \| (.+)$"
++)
++FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", re.S)
++
++
++def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("wiki_root", type=Path, help="Workspace root containing wiki/")
++    parser.add_argument("--json", action="store_true", help="Print machine-readable report")
++    parser.add_argument(
++        "--write-index",
++        action="store_true",
++        help="Rebuild wiki/index.md from typed pages",
++    )
++    return parser.parse_args(argv)
++
++
++def parse_frontmatter(text: str) -> dict[str, str]:
++    match = FRONTMATTER_RE.match(text)
++    if not match:
++        return {}
++    fields: dict[str, str] = {}
++    for raw_line in match.group(1).splitlines():
++        line = raw_line.strip()
++        if not line or line.startswith("#") or ":" not in line:
++            continue
++        key, value = line.split(":", 1)
++        fields[key.strip()] = value.strip().strip("\"'")
++    return fields
++
++
++def normalize_name_key(value: str) -> str:
++    chars = []
++    for ch in value.strip().lower():
++        if ch in {" ", "_", "-", "\u3000"}:
++            continue
++        chars.append(ch)
++    return "".join(chars)
++
++
++def title_from_filename(stem: str) -> str:
++    return stem.replace("-", " ").replace("_", " ").strip()
++
++
++def iter_wiki_pages(wiki_dir: Path) -> list[Path]:
++    if not wiki_dir.is_dir():
++        return []
++    pages = [
++        path
++        for path in wiki_dir.rglob("*.md")
++        if path.is_file() and ".git" not in path.parts
++    ]
++    return sorted(pages)
++
++
++def rel_wiki(path: Path, wiki_dir: Path) -> str:
++    return path.relative_to(wiki_dir).as_posix()
++
++
++def classify(rel: str) -> str:
++    if rel in SYSTEM_PAGES:
++        return "system"
++    parts = rel.split("/")
++    if parts[0] == "templates":
++        return "template"
++    if len(parts) >= 2 and parts[0] in TYPED_DIRS:
++        return "business"
++    return "misplaced"
++
++
++def load_pages(wiki_dir: Path) -> list[dict]:
++    pages = []
++    for path in iter_wiki_pages(wiki_dir):
++        rel = rel_wiki(path, wiki_dir)
++        text = path.read_text(encoding="utf-8")
++        fm = parse_frontmatter(text)
++        stem = path.stem
++        title = fm.get("title") or title_from_filename(stem)
++        kind = classify(rel)
++        subdir = rel.split("/", 1)[0] if "/" in rel else ""
++        pages.append(
++            {
++                "path": path,
++                "rel": rel,
++                "text": text,
++                "fm": fm,
++                "stem": stem,
++                "title": title,
++                "kind": kind,
++                "subdir": subdir,
++            }
++        )
++    return pages
++
++
++def build_resolvers(pages: list[dict]) -> dict[str, str]:
++    """Map lookup keys to page rel paths. Later pages do not override unique keys."""
++    mapping: dict[str, str] = {}
++
++    def add(key: str, rel: str) -> None:
++        key = key.strip()
++        if not key:
++            return
++        mapping.setdefault(key, rel)
++        mapping.setdefault(key.lower(), rel)
++        mapping.setdefault(normalize_name_key(key), rel)
++
++    for page in pages:
++        rel = page["rel"]
++        add(rel, rel)
++        add(rel[:-3] if rel.endswith(".md") else rel, rel)
++        add(page["stem"], rel)
++        add(page["title"], rel)
++        add(title_from_filename(page["stem"]), rel)
++        if "/" in rel:
++            add(rel.split("/", 1)[1], rel)
++            add(Path(rel).stem, rel)
++    return mapping
++
++
++def split_wikilink(raw: str) -> str:
++    # GFM tables escape wikilink aliases as [[path\|Title]]
++    raw = raw.replace("\\|", "|")
++    target = raw.split("|", 1)[0].strip()
++    target = target.split("#", 1)[0].strip()
++    return target
++
++
++def resolve_wikilink(target: str, mapping: dict[str, str]) -> str | None:
++    if not target:
++        return None
++    candidates = [
++        target,
++        target.lower(),
++        normalize_name_key(target),
++        f"{target}.md",
++        f"{target.lower()}.md",
++    ]
++    if not target.endswith(".md") and "/" in target:
++        candidates.append(f"{target}.md")
++    for key in candidates:
++        if key in mapping:
++            return mapping[key]
++    return None
++
++
++def resolve_md_link(source_rel: str, target: str, wiki_dir: Path) -> Path | None:
++    href = target.strip()
++    if not href or href.startswith(("#", "http://", "https://", "mailto:")):
++        return None
++    href = href.split("#", 1)[0]
++    if not href:
++        return None
++    base = (wiki_dir / source_rel).parent
++    dest = (base / href).resolve()
++    try:
++        dest.relative_to(wiki_dir.resolve())
++    except ValueError:
++        return dest
++    return dest
++
++
++def collect_incoming(pages: list[dict], mapping: dict[str, str], wiki_dir: Path) -> dict[str, int]:
++    incoming: dict[str, int] = defaultdict(int)
++    for page in pages:
++        # Index/overview list many pages; counting them would hide real orphans.
++        if page["kind"] in {"system", "template"}:
++            continue
++        seen: set[str] = set()
++        for match in WIKILINK_RE.finditer(page["text"]):
++            target = split_wikilink(match.group(1))
++            resolved = resolve_wikilink(target, mapping)
++            if resolved and resolved != page["rel"] and resolved not in seen:
++                incoming[resolved] += 1
++                seen.add(resolved)
++        for match in MDLINK_RE.finditer(page["text"]):
++            dest = resolve_md_link(page["rel"], match.group(2), wiki_dir)
++            if dest is None or not dest.exists() or dest.suffix != ".md":
++                continue
++            try:
++                rel = dest.relative_to(wiki_dir.resolve()).as_posix()
++            except ValueError:
++                continue
++            if rel != page["rel"] and rel not in seen:
++                incoming[rel] += 1
++                seen.add(rel)
++    return incoming
++
++
++def lint_issues(pages: list[dict], wiki_dir: Path) -> list[dict]:
++    mapping = build_resolvers(pages)
++    incoming = collect_incoming(pages, mapping, wiki_dir)
++    issues: list[dict] = []
++
++    def add(code: str, severity: str, rel: str, message: str) -> None:
++        issues.append(
++            {"code": code, "severity": severity, "path": f"wiki/{rel}", "message": message}
++        )
++
++    entity_names: list[tuple[str, str]] = []
++    for page in pages:
++        if page["kind"] != "business" or page["subdir"] != "entities":
++            continue
++        for display in (page["title"], page["stem"], title_from_filename(page["stem"])):
++            key = normalize_name_key(display)
++            if len(key) >= 3:
++                entity_names.append((display, key))
++
++    dup_groups: dict[tuple[str, str], list[str]] = defaultdict(list)
++    for page in pages:
++        rel = page["rel"]
++        kind = page["kind"]
++        fm = page["fm"]
++
++        if kind == "misplaced":
++            add(
++                "misplaced_wiki_page",
++                "warning",
++                rel,
++                "业务页不在 typed 子目录",
++            )
++
++        if kind == "business":
++            missing = [field for field in ("title", "type", "date") if not fm.get(field)]
++            if missing or not fm:
++                add(
++                    "missing_frontmatter",
++                    "error",
++                    rel,
++                    "缺少 frontmatter 字段: " + (", ".join(missing) or "title, type, date"),
++                )
++            page_type = fm.get("type", "")
++            expected_dir = TYPE_TO_DIR.get(page_type)
++            if page_type and expected_dir and page["subdir"] != expected_dir:
++                add(
++                    "type_dir_mismatch",
++                    "warning",
++                    rel,
++                    f"type={page_type} 应位于 wiki/{expected_dir}/",
++                )
++            if page["subdir"] in TYPED_DIRS:
++                dup_groups[(page["subdir"], normalize_name_key(page["stem"]))].append(rel)
++
++        if kind == "business" and page["subdir"] == "concepts":
++            for source in (page["title"], page["stem"]):
++                coupled = match_entity_concept(source, entity_names)
++                if coupled:
++                    entity, suffix = coupled
++                    add(
++                        "entity_concept_coupling",
++                        "warning",
++                        rel,
++                        f"概念标题绑定实体 {entity!r} 与抽象后缀 {suffix!r}",
++                    )
++                    break
++
++        for match in WIKILINK_RE.finditer(page["text"]):
++            target = split_wikilink(match.group(1))
++            if resolve_wikilink(target, mapping) is None:
++                add("dead_link", "error", rel, f"死链 [[{target}]]")
++
++        for match in MDLINK_RE.finditer(page["text"]):
++            href = match.group(2).strip()
++            dest = resolve_md_link(rel, href, wiki_dir)
++            if dest is None:
++                continue
++            if not dest.exists():
++                add("dead_link", "error", rel, f"死链 ({href})")
++
++    for (subdir, key), rels in dup_groups.items():
++        if key and len(rels) > 1:
++            joined = ", ".join(f"wiki/{item}" for item in rels)
++            for rel in rels:
++                add(
++                    "duplicate_page",
++                    "warning",
++                    rel,
++                    f"{subdir}/ 下归一化重名: {joined}",
++                )
++
++    for page in pages:
++        if page["kind"] != "business":
++            continue
++        if page["subdir"] == "sources":
++            continue
++        if incoming.get(page["rel"], 0) == 0:
++            add("orphan_page", "warning", page["rel"], "没有来自其它 wiki 页的入链")
++
++    log_page = next((page for page in pages if page["rel"] == "log.md"), None)
++    if log_page:
++        issues.extend(lint_log(log_page["text"]))
++
++    return issues
++
++
++def match_entity_concept(name: str, entities: list[tuple[str, str]]) -> tuple[str, str] | None:
++    key = normalize_name_key(name)
++    if not key:
++        return None
++    for display, entity_key in entities:
++        if not key.startswith(entity_key) or len(key) <= len(entity_key):
++            continue
++        suffix = key[len(entity_key) :]
++        lowered = suffix.lower()
++        if any(normalize_name_key(word) in lowered for word in ABSTRACT_KEYWORDS):
++            return display, suffix
++    return None
++
++
++def lint_log(text: str) -> list[dict]:
++    issues: list[dict] = []
++    dates: list[str] = []
++    for line in text.splitlines():
++        if not line.startswith("## ["):
++            continue
++        match = LOG_RE.match(line)
++        if not match:
++            issues.append(
++                {
++                    "code": "log_format_invalid",
++                    "severity": "error",
++                    "path": "wiki/log.md",
++                    "message": f"日志格式无效: {line}",
++                }
++            )
++            continue
++        dates.append(match.group(1))
++    for prev, curr in zip(dates, dates[1:]):
++        if curr < prev:
++            issues.append(
++                {
++                    "code": "log_date_decreasing",
++                    "severity": "error",
++                    "path": "wiki/log.md",
++                    "message": f"日期递减: {prev} → {curr}",
++                }
++            )
++            break
++    return issues
++
++
++def rebuild_index(pages: list[dict], wiki_dir: Path) -> str:
++    grouped: dict[str, list[dict]] = {name: [] for name, _ in INDEX_HEADINGS}
++    for page in pages:
++        if page["kind"] != "business" or page["subdir"] not in grouped:
++            continue
++        fm = page["fm"]
++        grouped[page["subdir"]].append(
++            {
++                "subdir": page["subdir"],
++                "slug": page["stem"],
++                "title": page["title"],
++                "description": fm.get("description", ""),
++                "date": fm.get("date", ""),
++            }
++        )
++    for entries in grouped.values():
++        entries.sort(key=lambda item: (item["title"].lower(), item["slug"]))
++
++    today = date.today().isoformat()
++    lines = [
++        "---",
++        "title: 内容目录",
++        "type: index",
++        f"date: {today}",
++        "---",
++        "",
++        "# 内容目录",
++        "",
++        "> 本文件由 llm-wiki 维护，请勿手改业务行。",
++        "",
++    ]
++    for dirname, heading in INDEX_HEADINGS:
++        lines.extend(
++            [
++                f"## {heading}",
++                "",
++                "| 页面 | 标题 | 摘要 | 更新日期 |",
++                "|------|------|------|----------|",
++            ]
++        )
++        for entry in grouped[dirname]:
++            title = escape_cell(entry["title"])
++            link = f"[[{entry['subdir']}/{entry['slug']}\\|{title}]]"
++            lines.append(
++                f"| {link} | {title} | {escape_cell(entry['description'])} | {escape_cell(entry['date'])} |"
++            )
++        lines.append("")
++    text = "\n".join(lines)
++    (wiki_dir / "index.md").write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
++    return text
++
++
++def escape_cell(value: str) -> str:
++    return value.replace("|", "\\|").replace("\n", " ")
++
++
++def render_text(issues: list[dict], page_count: int) -> str:
++    errors = [item for item in issues if item["severity"] == "error"]
++    warnings = [item for item in issues if item["severity"] == "warning"]
++    lines = [
++        f"pages: {page_count}",
++        f"errors: {len(errors)}",
++        f"warnings: {len(warnings)}",
++    ]
++    if not issues:
++        lines.append("ok")
++        return "\n".join(lines) + "\n"
++    lines.append("")
++    for item in issues:
++        lines.append(f"{item['severity']}\t{item['code']}\t{item['path']}\t{item['message']}")
++    return "\n".join(lines) + "\n"
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = parse_args(argv)
++    root = args.wiki_root.expanduser().resolve()
++    wiki_dir = root / "wiki"
++    if not wiki_dir.is_dir():
++        print(f"missing wiki directory: {wiki_dir}", file=sys.stderr)
++        return 2
++
++    pages = load_pages(wiki_dir)
++    if args.write_index:
++        rebuild_index(pages, wiki_dir)
++        pages = load_pages(wiki_dir)
++
++    issues = lint_issues(pages, wiki_dir)
++    payload = {
++        "wiki_root": str(root),
++        "pages": len(pages),
++        "errors": sum(1 for item in issues if item["severity"] == "error"),
++        "warnings": sum(1 for item in issues if item["severity"] == "warning"),
++        "issues": issues,
++    }
++    if args.json:
++        print(json.dumps(payload, ensure_ascii=False, indent=2))
++    else:
++        sys.stdout.write(render_text(issues, len(pages)))
++    return 1 if payload["errors"] else 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/agents/skills/llm-wiki/tests/test_lint_wiki.py b/agents/skills/llm-wiki/tests/test_lint_wiki.py
+new file mode 100644
+index 0000000..3cf5d7c
+--- /dev/null
++++ b/agents/skills/llm-wiki/tests/test_lint_wiki.py
+@@ -0,0 +1,138 @@
++"""lint_wiki.py 对本地 wiki 工作区的确定性检查。"""
++
++from __future__ import annotations
++
++import importlib.util
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++SCRIPT = ROOT / "scripts" / "lint_wiki.py"
++
++
++def load_lint_module():
++    spec = importlib.util.spec_from_file_location("lint_wiki", SCRIPT)
++    module = importlib.util.module_from_spec(spec)
++    assert spec.loader is not None
++    spec.loader.exec_module(module)
++    return module
++
++
++lint_wiki = load_lint_module()
++
++
++def write(path: Path, content: str) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(content, encoding="utf-8")
++
++
++class LintWikiTest(unittest.TestCase):
++    def setUp(self) -> None:
++        self.tmp = tempfile.TemporaryDirectory()
++        self.root = Path(self.tmp.name)
++        self.wiki = self.root / "wiki"
++        write(
++            self.wiki / "log.md",
++            "---\ntitle: 操作日志\n---\n\n# 操作日志\n\n## [2026-09-15] init | 工作区初始化\n",
++        )
++        write(self.wiki / "overview.md", "---\ntitle: 总览\n---\n\n# 总览\n")
++
++    def tearDown(self) -> None:
++        self.tmp.cleanup()
++
++    def run_lint(self, *extra: str) -> tuple[int, str]:
++        import io
++        from contextlib import redirect_stdout
++
++        buf = io.StringIO()
++        with redirect_stdout(buf):
++            code = lint_wiki.main([str(self.root), *extra])
++        return code, buf.getvalue()
++
++    def test_clean_workspace_ok(self) -> None:
++        write(
++            self.wiki / "entities" / "northwind.md",
++            "---\ntitle: Northwind\ntype: entity\ndate: 2026-09-15\n---\n\n见 [[渐进披露]]\n",
++        )
++        write(
++            self.wiki / "concepts" / "渐进披露.md",
++            "---\ntitle: 渐进披露\ntype: concept\ndate: 2026-09-15\n---\n\n案例 [[Northwind]]\n",
++        )
++        code, out = self.run_lint()
++        self.assertEqual(code, 0, out)
++        self.assertIn("errors: 0", out)
++
++    def test_dead_link_and_missing_frontmatter(self) -> None:
++        write(
++            self.wiki / "entities" / "orphan.md",
++            "无 frontmatter\n\n[[Missing Page]]\n",
++        )
++        code, out = self.run_lint()
++        self.assertEqual(code, 1)
++        self.assertIn("dead_link", out)
++        self.assertIn("missing_frontmatter", out)
++
++    def test_duplicate_page_same_dir_only(self) -> None:
++        body = "---\ntitle: Demo\ntype: concept\ndate: 2026-09-15\n---\n\n# x\n"
++        write(self.wiki / "concepts" / "A_Player.md", body.replace("Demo", "A"))
++        write(self.wiki / "concepts" / "A Player.md", body.replace("Demo", "B"))
++        write(
++            self.wiki / "entities" / "A_Player.md",
++            "---\ntitle: A Player\ntype: entity\ndate: 2026-09-15\n---\n\n# e\n",
++        )
++        _, out = self.run_lint()
++        self.assertIn("duplicate_page", out)
++        self.assertRegex(out, r"concepts/.*归一化重名")
++
++    def test_entity_concept_coupling_and_type_mismatch(self) -> None:
++        write(
++            self.wiki / "entities" / "青禾实验室.md",
++            "---\ntitle: 青禾实验室\ntype: entity\ndate: 2026-09-15\n---\n\n# e\n",
++        )
++        write(
++            self.wiki / "concepts" / "青禾实验室方法论.md",
++            "---\ntitle: 青禾实验室方法论\ntype: concept\ndate: 2026-09-15\n---\n\n# c\n",
++        )
++        write(
++            self.wiki / "entities" / "wrong-type.md",
++            "---\ntitle: Wrong\ntype: concept\ndate: 2026-09-15\n---\n\n# x\n",
++        )
++        write(self.wiki / "stray.md", "---\ntitle: Stray\ntype: entity\ndate: 2026-09-15\n---\n\n# s\n")
++        _, out = self.run_lint()
++        self.assertIn("entity_concept_coupling", out)
++        self.assertIn("type_dir_mismatch", out)
++        self.assertIn("misplaced_wiki_page", out)
++
++    def test_log_errors(self) -> None:
++        write(
++            self.wiki / "log.md",
++            "---\ntitle: 操作日志\n---\n\n## [2026-09-16] ingest | newer\n## [2026-09-15] ingest | older\n",
++        )
++        code, out = self.run_lint()
++        self.assertEqual(code, 1)
++        self.assertIn("log_date_decreasing", out)
++
++        write(
++            self.wiki / "log.md",
++            "---\ntitle: 操作日志\n---\n\n## [2026-09-15] ingest missing-pipe\n",
++        )
++        code, out = self.run_lint()
++        self.assertEqual(code, 1)
++        self.assertIn("log_format_invalid", out)
++
++    def test_write_index(self) -> None:
++        write(
++            self.wiki / "entities" / "northwind.md",
++            "---\ntitle: Northwind\ntype: entity\ndate: 2026-09-15\ndescription: 示例组织\n---\n\n# e\n",
++        )
++        code, _ = self.run_lint("--write-index")
++        self.assertEqual(code, 0)
++        index = (self.wiki / "index.md").read_text(encoding="utf-8")
++        self.assertIn("实体 (entities)", index)
++        self.assertIn("Northwind", index)
++        self.assertIn("llm-wiki", index)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py b/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py
+new file mode 100644
+index 0000000..a0992a1
+--- /dev/null
++++ b/agents/skills/llm-wiki/tests/test_llm_wiki_contract.py
+@@ -0,0 +1,83 @@
++"""llm-wiki：本地文档 wiki 的契约与边界。"""
++
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class ContractTest(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls) -> None:
++        cls.skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        cls.layout = (ROOT / "references" / "layout.md").read_text(encoding="utf-8")
++        cls.types = (ROOT / "references" / "page-types.md").read_text(encoding="utf-8")
++        cls.ingest = (ROOT / "references" / "ingest.md").read_text(encoding="utf-8")
++        cls.lint = (ROOT / "references" / "lint.md").read_text(encoding="utf-8")
++
++    def test_frontmatter_name_matches_directory(self) -> None:
++        self.assertIn("name: llm-wiki", self.skill)
++        self.assertEqual(ROOT.name, "llm-wiki")
++
++    def test_reference_and_script_exist(self) -> None:
++        for rel in (
++            "references/layout.md",
++            "references/page-types.md",
++            "references/ingest.md",
++            "references/lint.md",
++            "scripts/lint_wiki.py",
++            "agents/openai.yaml",
++        ):
++            self.assertTrue((ROOT / rel).is_file(), rel)
++
++    def test_no_runtime_service_dependency(self) -> None:
++        self.assertIn("不依赖 llmwiki 服务、MCP 或 SQLite", self.skill)
++        self.assertIn("不启动 llmwiki 应用", self.skill)
++        self.assertNotIn("Call the MCP", self.skill)
++        self.assertNotIn(".llmwiki/index.db", self.skill)
++        self.assertIn("不要创建 `.llmwiki/`", self.skill)
++
++    def test_raw_is_readonly(self) -> None:
++        self.assertIn("`raw/` 只读", self.skill)
++        self.assertIn("不编辑 `raw/`", self.skill)
++
++    def test_init_requires_confirm(self) -> None:
++        init = self.skill.split("## `init`", 1)[1].split("## ", 1)[0]
++        self.assertIn("必须先获得确认", init)
++        self.assertIn("未确认则停止", init)
++
++    def test_phases_are_named(self) -> None:
++        for phase in ("guide", "init", "ingest", "query", "organize", "lint"):
++            self.assertIn(f"`{phase}`", self.skill)
++
++    def test_handoff_boundaries(self) -> None:
++        self.assertIn("project-spec-mirror", self.skill)
++        self.assertIn("dotf-code-explore", self.skill)
++
++    def test_privacy_gate(self) -> None:
++        self.assertIn("摄入前做隐私自查", self.skill)
++        self.assertIn("<REDACTED>", self.skill)
++        self.assertIn("<REDACTED>", self.ingest)
++
++    def test_log_contract(self) -> None:
++        self.assertIn("## [YYYY-MM-DD] action | description", self.skill)
++        self.assertIn("仅追加", self.skill)
++
++    def test_typed_plural_directories(self) -> None:
++        self.assertIn("wiki/entities/", self.layout)
++        self.assertIn("应用复数目录名", self.layout)
++        self.assertIn("不是 `entity/`", self.layout)
++
++    def test_entity_concept_split(self) -> None:
++        self.assertIn("概念标题保持中性", self.types)
++        self.assertIn("渐进披露", self.types)
++
++    def test_phase_loaded_on_demand(self) -> None:
++        self.assertIn("只读该阶段详情", self.skill)
++        self.assertIn("不要预加载其它 reference", self.skill)
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Wiki"
+  short_description: "用本地 Markdown 整理维护可累积知识 wiki，不依赖 wiki 服务"
+  default_prompt: "用 $llm-wiki 把本地文档编进 typed wiki：guide 了解现状，ingest 摄入，query 按引用回答，organize 重组，lint 做健康检查。raw/ 只读；不要启动 llmwiki 应用。"

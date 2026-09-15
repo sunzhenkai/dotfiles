@@ -146,11 +146,13 @@ def cmd_retry(ctx: Ctx) -> int:
 # ============================================================
 
 _SKILLS_HELP = """用法: dotf skills -c|--config [选项...]
+      dotf skills add <package> [--global|--project] [选项...]
       dotf skills -i <package> [选项...]
       dotf skills -r|--uninstall [skill-name] [选项...]
   -c 安装编目 Desired Set 的全部 skill（一手 + 锁定第三方 + OpenSpec CLI）
      不含全局 AGENTS.md；完整 agent 运行时仍用 dotf agents -c
-  -i 通过 npx skills 安装；<package> 一般直接写 skill 名称
+  add 通过 npx skills 安装；未指定范围时交互选择用户级或项目级
+  -i 通过 npx skills 安装；<package> 一般直接写 skill 名称（兼容语法）
   -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除
   <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id，
   最后按字面透传给 npx skills 搜索；一手 skill 请用 dotf agents skill apply
@@ -160,6 +162,9 @@ _SKILLS_HELP = """用法: dotf skills -c|--config [选项...]
 示例:
   dotf skills -c --dry-run
   dotf skills -c --yes
+  dotf skills add ui-skills-root
+  dotf skills add ui-skills-root --global
+  dotf skills add ui-skills-root --project
   dotf skills -i frontend-design
   dotf skills -i frontend-design --project
   dotf skills -r design-taste-frontend"""
@@ -250,26 +255,60 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
     return 0
 
 
+def _select_skill_scope() -> str:
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise DotfError(
+            "env",
+            "dotf skills add 未指定安装范围；请使用 --global 或 --project",
+        )
+
+    print("请选择 skill 安装范围:")
+    print("  1) 用户级（全局）")
+    print("  2) 项目级（当前项目）")
+    print("输入 1 或 2，q 取消")
+    while True:
+        try:
+            choice = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            raise DotfError("usage", "已取消")
+        if choice in ("1", "用户级", "全局"):
+            return "-g"
+        if choice in ("2", "项目级", "项目"):
+            return ""
+        if choice in ("q", "Q"):
+            raise DotfError("usage", "已取消")
+        print("无效选择，请输入 1 或 2")
+
+
 def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
     if not argv:
-        print("错误: 需要 -c/--config、-i/--install 或 -r/--remove 动作")
+        print("错误: 需要 -c/--config、add、-i/--install 或 -r/--remove 动作")
         print("用法: dotf skills -c|--config")
+        print("      dotf skills add <package> [--global|--project] [选项...]")
         print("      dotf skills -i <package> [选项...]")
         return 1
     verb = argv[0]
     mode = "add"
+    interactive_scope = False
     if verb in ("-c", "--config"):
         return _install_all_catalog_skills(ctx, argv[1:])
     if verb in ("-i", "--install"):
         pass
+    elif verb == "add":
+        interactive_scope = True
     elif verb in ("-r", "--remove", "--uninstall"):
         mode = "remove"
     elif verb in HELP:
         print(_SKILLS_HELP)
         return 0
     else:
-        print("错误: skills 仅支持 -c/--config、-i/--install 与 -r/--remove/--uninstall")
+        print(
+            "错误: skills 仅支持 -c/--config、add、-i/--install "
+            "与 -r/--remove/--uninstall"
+        )
         print("用法: dotf skills -c|--config")
+        print("      dotf skills add <package> [--global|--project] [选项...]")
         print("      dotf skills -i <package> [选项...]")
         return 1
 
@@ -308,6 +347,10 @@ def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
     if want_global and want_project:
         print("错误: -g/--global 与 --project 只能二选一")
         return 1
+    if interactive_scope and not want_global and not want_project:
+        selected_scope = _select_skill_scope()
+        if selected_scope:
+            extra.insert(0, selected_scope)
 
     package_args: list[str] = []
     if package:

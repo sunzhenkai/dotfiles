@@ -133,6 +133,45 @@ def test_skills_install_dry_run_can_select_project(
     assert "==> npx skills add frontend-design -s demo --agent cursor" in result.stdout
 
 
+def test_skills_add_resolves_catalog_skill_and_project_scope(tmp_home: Path) -> None:
+    result = run_dotf(
+        "skills",
+        "add",
+        "ui-skills-root",
+        "--project",
+        "--dry-run",
+    )
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add https://github.com/ibelick/ui-skills"
+        " -s ui-skills-root" in result.stdout
+    )
+
+
+def test_skills_add_global_scope_passes_global_flag(tmp_home: Path) -> None:
+    result = run_dotf(
+        "skills",
+        "add",
+        "ui-skills-root",
+        "--global",
+        "--dry-run",
+    )
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add https://github.com/ibelick/ui-skills"
+        " -s ui-skills-root -g" in result.stdout
+    )
+
+
+def test_skills_add_requires_explicit_scope_without_tty(tmp_home: Path) -> None:
+    result = run_dotf("skills", "add", "ui-skills-root", "--dry-run")
+
+    assert result.returncode == 2
+    assert "请使用 --global 或 --project" in result.stderr
+
+
 def test_skills_install_global_and_yes_pass_through(stub_bin_dir: Path) -> None:
     npx = stub_bin_dir / "npx"
     npx.write_text(
