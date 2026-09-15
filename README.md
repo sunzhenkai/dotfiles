@@ -32,6 +32,7 @@ dotf -a --dry-run
 dotf sdk -i --dry-run    # 预览计划
 dotf nvim zsh -c --yes   # 非交互配置
 dotf agents -ic
+dotf skills -c --yes
 dotf skills -i frontend-design
 ```
 
@@ -122,6 +123,7 @@ skills、profiles 与 doctor 已收敛为单一对外模块 `agents`：
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro + Claude Code）+ 全局 AGENTS.md
+dotf skills -c                 # 只安装编目全部 skill（不含 AGENTS.md）
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs
 dotf agents skill apply grill-with-docs --on-conflict=backup   # 先备份本机漂移再覆写

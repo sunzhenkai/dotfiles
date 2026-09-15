@@ -1,7 +1,7 @@
 # Skill 编目与安装模型设计（v3，定稿）
 
 **状态**：已实现
-**范围**：`agents/skills.yaml` 编目 schema、`dotf agents -c` 全量安装、`dotf skills -i/-r` 手动安装、desired set
+**范围**：`agents/skills.yaml` 编目 schema、`dotf agents -c` / `dotf skills -c` 全量安装、`dotf skills -i/-r` 手动安装、desired set
 **取代**：ADR-0007 的编目表述（overlay / prune 语义仍以其为准）
 
 ---
@@ -9,7 +9,7 @@
 ## 1. 目标
 
 1. **一份编目**覆盖全部 skill：个人（一手）skill、第三方 skill（skills.sh 注册表 + GitHub 直装）。
-2. 两种安装模式：**全量安装**（`dotf agents -c` 自动装编目内全部）与**手动安装**（`dotf agents skill apply <id|group>` 受管，或 `dotf skills -i <name>` npx）。
+2. 两种安装模式：**全量安装**（`dotf agents -c` 或 `dotf skills -c` 装编目 Desired Set；后者不含全局 AGENTS.md）与**手动安装**（`dotf agents skill apply <id|group>` 受管，或 `dotf skills -i <name>` npx）。
 3. **无 per-entry `default` 开关**：编目内即默认全装；唯一例外是成员可写 `optional: true`——仍在编目内、可经 overlay 按需启用，但不进默认安装。彻底不想装就注释掉条目。
 4. group 既是组织维度，也是 CLI 展开单位。
 5. 保持不变量：未锁定第三方拒绝、lock 不可变、overlay 只改本机、remove 必须 overlay + prune。
@@ -72,7 +72,7 @@ groups:
 
 | | 全量安装 | 手动安装 |
 |---|---|---|
-| 入口 | `dotf agents -c` | `dotf agents skill apply <id\|group>` / `dotf skills -i <...>` |
+| 入口 | `dotf agents -c` / `dotf skills -c`（仅 skill，不含 AGENTS.md） | `dotf agents skill apply <id\|group>` / `dotf skills -i <...>` |
 | 依据 | 编目内非 optional 条目 | 显式指定 + 写 overlay |
 | 第三方前提 | 必须 lock | 受管路必须 lock；npx 路不要求 |
 | 落 overlay | 否（optional 条目除外：启用须写 overlay） | **是**（否则下次 sync prune） |

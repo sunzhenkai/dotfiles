@@ -43,7 +43,7 @@ src/dotf_cli/
 | `dotf status` | cmd_status | 现有 `--json` 字段名不动 |
 | `dotf tui` | cmd_tui | 仍 `python -m dotf_tui`；保留 tty 检查 |
 | `dotf agents skill ...` | cmd_agents_artifact | 直接调 `src/agents/` |
-| `dotf skills ...` | cmd_skills | group→id→npx 解析顺序不变（ADR-0012） |
+| `dotf skills ...` | cmd_skills | `-c` 全量受管安装；`-i/-r` 的 group→id→npx 解析顺序不变（ADR-0012） |
 | `dotf retry` | cmd_retry | 读执行状态重放 |
 | `dotf <mod> -i -c -d` | do_*_one + plan_and_run | Python 调 `src/planner.py` 出 plan，`run_plan.sh` 执行（Executor/Handler 不动） |
 | 反动作 `-u` / `--deconfig` | 同上 | 守卫校验平移（Dependent、Conflict 语义不变） |

@@ -35,7 +35,7 @@ groups:
       - skill-evolver
       - skill-upgrader
       - skills-store
-      - task-design
+      - task-explore
       - taskflow
 
   mattpocock:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import stat
 
-from conftest import run_dotf
+from conftest import isolate_agents_sync_for_test, run_dotf
 
 
 def test_help_lists_doctor_actions(tmp_home: Path, launch_home: Path) -> None:
@@ -15,6 +15,7 @@ def test_help_lists_doctor_actions(tmp_home: Path, launch_home: Path) -> None:
     assert "--doctor" in out
     assert "-icd" in out
     assert "不含 doctor" in out
+    assert "skills -c" in out
     assert "LLM provider" not in out
     assert "dotf codex -f" not in out
     assert Path.home().resolve() == tmp_home.resolve()
@@ -220,6 +221,53 @@ def test_skills_uninstall_resolves_multiple_mapped_skills(tmp_home: Path) -> Non
         "==> npx skills remove ui-template-author"
         " ui-template-apply ui-template-design" in result.stdout
     )
+
+
+def test_skills_config_dry_run_skips_instructions(tmp_home: Path) -> None:
+    isolate_agents_sync_for_test(tmp_home)
+    result = run_dotf("skills", "-c", "--dry-run")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--- skills ---" in result.stdout
+    assert "--- default skills ---" in result.stdout
+    assert "--- openspec skills ---" in result.stdout
+    assert "--- instructions ---" not in result.stdout
+    assert "✓ skills 全量安装完成" in result.stdout
+
+
+def test_skills_config_requires_yes_without_tty(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-c")
+
+    assert result.returncode == 2
+    assert "非 TTY" in result.stderr
+
+
+def test_skills_config_rejects_npx_flags_and_extra_args(tmp_home: Path) -> None:
+    mixed = run_dotf("skills", "-c", "-g")
+    assert mixed.returncode == 1
+    assert "npx" in mixed.stderr
+
+    extra = run_dotf("skills", "-c", "frontend-design")
+    assert extra.returncode == 1
+    assert "额外参数" in extra.stderr
+
+
+def test_skills_help_lists_config(tmp_home: Path) -> None:
+    result = run_dotf("skills", "-h")
+
+    assert result.returncode == 0
+    assert "-c 安装编目" in result.stdout
+    assert "dotf skills -c --dry-run" in result.stdout
+
+
+def test_skills_config_yes_installs_first_party_without_agents_md(tmp_home: Path) -> None:
+    isolate_agents_sync_for_test(tmp_home)
+    result = run_dotf("skills", "-c", "--yes")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    skill_dir = tmp_home / ".agents" / "skills" / "commit-push"
+    assert (skill_dir / "SKILL.md").is_file()
+    assert not (tmp_home / ".agents" / "AGENTS.md").exists()
 
 
 def test_skills_uninstall_passthrough_and_interactive(tmp_home: Path) -> None:

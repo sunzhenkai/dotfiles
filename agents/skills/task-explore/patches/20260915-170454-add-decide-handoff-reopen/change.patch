@@ -1,0 +1,417 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index 47ea3f2..dffbd68 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: task-explore
+ name: task-explore
+-description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / save / archive 阶段持续探索、询问与排查。explore 委托 grilling，术语/ADR 只写当前任务目录；design 把方案写进当前任务目录。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/保存/归档/查看任务列表时使用。路径已清、直接交付的 OpenSpec 任务改用 taskflow。
++description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / decide / save / handoff / archive / reopen 阶段推进。explore 委托 grilling；decide 冻结方案；handoff 把探索任务交给 taskflow 的 {task}-driver 后归档。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/交接/归档/重新打开任务时使用。已有探索任务要交付时用 handoff，不要绕开另起无关 driver。
+ ---
+ 
+ # 任务探索
+@@ -10,6 +10,8 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ 
+ 在任务不明确、周期可能会非常长、或进行复杂问题排查时，不断进行探索、询问、排查等操作。不写实现代码。
+ 
++**探索任务** = `tasks/ongoing|archive/.../{task-name}/`。**taskflow 任务** = `{task-name}-driver`。两套账；唯一桥是 `handoff`。交付进度只认 taskflow checkbox。
++
+ ## 阶段
+ 
+ | 阶段 | 何时 | 写入 |
+@@ -17,10 +19,13 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `new` | 立项；从输入推断任务名 | `tasks/ongoing/{task-name}/` + `INDEX.md` |
+ | `explore` | 不断探索预期目标 | 术语/ADR 可落任务目录；`TASK.md` 须经确认或 `save` |
+ | `chat` | **默认阶段**：对任务问答 | 默认不写盘 |
+-| `resume` | 恢复任务上下文 | 任务文档只读；INDEX 漂移可重建 |
++| `resume` | 恢复进行中的探索任务 | 任务文档只读；INDEX 漂移可重建 |
+ | `design` | 针对任务方案设计 | `{taskRoot}/design/` |
++| `decide` | 冻结采纳方案 | `TASK.md` 决策；INDEX |
+ | `save` | 保存任务最新进展到任务文档 | 更新 `TASK.md` 与 `INDEX.md` |
+-| `archive` | 归档已结束任务 | 搬到 `tasks/archive/{yyyy-mm-dd}/{task-name}` 并更新 `INDEX.md` |
++| `handoff` | 交接给 taskflow 后归档 | driver + 归档探索任务 |
++| `archive` | 归档已结束、不交接的探索任务 | `tasks/archive/{yyyy-mm-dd}/{task-name}` |
++| `reopen` | 把归档探索任务搬回 ongoing | `ongoing/` + `INDEX.md` |
+ 
+ 用户点名 `{{slash:task-explore}}` 且首词命中上表阶段名时走该阶段；否则走 `chat`。用户要看任务列表或检索任务时，打印 `INDEX.md`（先 Ongoing，需要时再 Archived），不另造阶段。
+ 
+@@ -32,8 +37,10 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ |------|------------|
+ | `explore` | [references/phase-explore.md](references/phase-explore.md) |
+ | `design` | [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md) |
++| `decide` | [references/phase-decide.md](references/phase-decide.md) |
++| `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
+ | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+-| `chat` / `resume` / `archive` | 本文件已够 |
++| `chat` / `resume` / `archive` / `reopen` | 本文件已够 |
+ 
+ ## 布局
+ 
+@@ -43,7 +50,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ tasks/
+ ├── INDEX.md             # 派生索引：快速检索/查看
+ ├── ongoing/{task-name}/
+-│   ├── TASK.md          # 主文档：目标、进展、未决
++│   ├── TASK.md          # 主文档：目标、进展、未决、决策、交接
+ │   ├── glossary.md      # 任务内术语（惰性）
+ │   └── design/          # 方案、ADR
+ └── archive/{yyyy-mm-dd}/{task-name}/
+@@ -60,28 +67,29 @@ tasks/
+ 
+ - 单任务真相只在 `{taskRoot}/TASK.md`
+ - 列出、选择、搜索任务时 **先读 INDEX.md**
+-- `new` / `save` / `archive` 必须同步对应行：任务名、标题、日期、一句话目标、相对 `tasks/` 的路径
++- `new` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行：任务名、标题、日期、一句话目标、相对 `tasks/` 的路径
+ - 不要把进展日志或对话抄进索引
+ - 发现漂移（目录有、索引无，或索引指向不存在的路径）：按 `ongoing/` 与 `archive/` 下的 `TASK.md` **重建** INDEX，再继续
+-- 已有 `tasks/` 但没有 INDEX：在需要列表或下一次 `new`/`save`/`archive` 时重建，不必再问
++- 已有 `tasks/` 但没有 INDEX：在需要列表或下一次会写 INDEX 的阶段重建，不必再问
++- `handoff` 归档行的一句话以 `→ {task-name}-driver` 结尾
+ 
+ ## 绑定（强制）
+ 
+-会话绑定 `{task-name}` + `{taskRoot}` = `tasks/ongoing/{task-name}`。
++会话绑定 `{task-name}` + `{taskRoot}` = `tasks/ongoing/{task-name}`（`reopen` 完成前 `{taskRoot}` 仍在 archive）。
+ 
+-**无 task 上下文时，应提示创建或者恢复（给出 ongoing 列表选择），在确认后进行 new/resume 阶段。** 不得猜测任务、不得先聊后补目录。
++**无 task 上下文时，应提示创建或者恢复（给出 ongoing 列表选择），在确认后进行 new/resume 阶段。** 归档要拉回则走 `reopen`。不得猜测任务、不得先聊后补目录。
+ 
+ 1. 先读 `tasks/INDEX.md` 的 Ongoing 表；无 INDEX 或发现漂移则扫 `ongoing/` 并重建。列出任务名 + 标题/一句话。无 `tasks/` 或 Ongoing 为空则说明「当前没有进行中的任务」。
+ 2. 请用户选择：**创建**（`new`）或 **恢复**（`resume`，从列表选）。
+-3. 用户确认前不进入 `chat` / `explore` / `design` / `save` / `archive`。
++3. 用户确认前不进入 `chat` / `explore` / `design` / `decide` / `save` / `handoff` / `archive`。
+ 
+-例外：用户本轮已明确 `new`/`resume` 及对象。`ongoing/` 仅一项且用户说「继续/恢复」→ 可直接 `resume` 该项。
++例外：用户本轮已明确 `new`/`resume`/`reopen`/`handoff` 及对象。`ongoing/` 仅一项且用户说「继续/恢复」→ 可直接 `resume` 该项。
+ 
+ 同名 `ongoing/{task-name}` 已存在时，禁止覆盖；改为提议 `resume` 或换名。
+ 
+ ## 进展提示
+ 
+-**在任务有进展时提示是否更新任务文档。** 适用于 `explore` / `chat` / `design` 之后出现了新目标、新发现、新决策或新缺口。
++**在任务有进展时提示是否更新任务文档。** 适用于 `explore` / `chat` / `design` / `decide` 之后出现了新目标、新发现、新决策或新缺口。
+ 
+ - 提示一次即可，不阻断继续问答。
+ - 用户同意 → 按 `save` 写回（含 INDEX）。
+@@ -108,36 +116,44 @@ tasks/
+ 
+ - 可只读查代码与资料；不要开始实现。
+ - 不要把 `chat` 默认为 `explore`（不自动 grill）或 `design`（不写方案稿）。
+-- 用户要把方案写下来 → 转 `design`。目标仍糊 → 建议 `explore`。
++- 用户要把方案写下来 → 转 `design`。目标仍糊 → 建议 `explore`。路径已清、要交付 → `decide` 然后 `handoff`，不要直接开一个无关名字的 driver。
+ - 用户要看有哪些任务 → 打印 INDEX，不进入 `new`。
+ - 有进展则提示是否更新任务文档。
+ 
+ ## `resume`
+ 
+-恢复任务上下文。**任务文档只读**；发现 INDEX 漂移时允许重建 `INDEX.md`，不要改 `TASK.md` / `glossary.md` / `design/`。
++恢复进行中的探索任务。**任务文档只读**；发现 INDEX 漂移时允许重建 `INDEX.md`，不要改 `TASK.md` / `glossary.md` / `design/`。
+ 
+ 1. 未指定名字：用 INDEX 的 Ongoing 表列出请用户选。指定了则用该名字。
+-2. 任务不在 `ongoing/`：先查 INDEX 的 Archived 表，再扫 `tasks/archive/`。告知已归档路径；不要自动恢复。找不到则说明，改走 `new`。
++2. 任务不在 `ongoing/`：先查 INDEX 的 Archived 表，再扫 `tasks/archive/`。告知已归档路径；**不要自动恢复**，拉回走 `reopen`。找不到则说明，改走 `new`。
+ 3. 读 `TASK.md`、`glossary.md`、`design/`（有则读索引与最新稿）。
+-4. 用短摘要恢复：**目标 / 当前进展 / 未决 / 建议下一步**（`explore` / `chat` / `design` / `save` / `archive`）。然后等用户。
++4. 用短摘要恢复：**目标 / 当前进展 / 未决 / 建议下一步**（`explore` / `chat` / `design` / `decide` / `save` / `handoff` / `archive`）。然后等用户。
+ 
+ ## `design`
+ 
+ 方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。
+ 
++## `decide`
++
++冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
++
+ ## `save`
+ 
+ 保存任务最新进展到任务文档。
+ 
+ 1. 必须已绑定。读现有 `TASK.md`，合并本轮进展，不抹掉仍有效的旧内容。
+-2. 更新 `updated`、目标/非目标、现状、进展、未决、下一步。有设计结论则链到 `design/`。
++2. 更新 `updated`、目标/非目标、现状、进展、决策、交接、未决、下一步。有设计结论则链到 `design/`。
+ 3. 同步更新 `INDEX.md` 中该任务的标题、日期、一句话目标；不要把进展日志抄进索引。
+ 4. 不要贴聊天记录。无新进展则说明无需写入。
+ 5. 报告改了哪些文件。
+ 
++## `handoff`
++
++把探索任务交给 taskflow（`{task-name}-driver`），成功后归档。进入本阶段后 **先读** [references/phase-handoff.md](references/phase-handoff.md)。无决策则先 `decide`。driver 未就绪则 **不归档**。
++
+ ## `archive`
+ 
+-对任务进行归档，放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。
++对不交接的探索任务归档，放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。要交付请用 `handoff`，不要用本阶段代替交接。
+ 
+ 1. 必须已绑定或用户给出名字。先确认；未确认不搬。
+ 2. 计算目标路径 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
+@@ -149,28 +165,41 @@ tasks/
+ 
+ 不要把任务内容晋升到 `docs/design/` 或其它项目文档，除非用户另说。
+ 
++## `reopen`
++
++把归档中的探索任务搬回 `tasks/ongoing/{task-name}`。
++
++1. 未指定名字：用 INDEX 的 Archived 表列出请用户选。指定了则用该名字。
++2. 在 `tasks/archive/` 定位目录。找不到则停止。
++3. 计算目标 `tasks/ongoing/{task-name}`。**目标已存在则停止并询问；此时不得改 `TASK.md`、不得移动目录。**
++4. 先确认；未确认不搬。
++5. 把 `TASK.md` 的 `status` 改回 `ongoing`，保留已有决策/交接记录。若曾 `handoff`，警告 `{task-name}-driver` 可能仍在，不要删 driver。
++6. 移动目录到 `ongoing/`。把 INDEX 该行从 Archived 移回 Ongoing。绑定该探索任务。
++7. 用短摘要恢复上下文，等用户选下一步。
++
+ ---
+ 
+ ## 何时不用
+ 
+ | 情况 | 改用 |
+ |------|------|
+-| 范围清楚、路径唯一、马上实现 | 直接实现，或 `taskflow` / `openspec-propose` |
++| 从未建探索任务，范围清楚、马上实现 | 直接实现，或 `taskflow` / `openspec-propose` |
++| 已有探索任务，路径已清、要交付 | 本 skill 的 `handoff`（不要另起无关 `{task}-driver` 名） |
+ | 只要读代码、不需要任务台账 | `dotf-code-explore` |
+ | 只要一次 grill、不需要 `tasks/` | `grill-with-docs` / `grilling` |
+ | 已在 OpenSpec change 里交付 | `taskflow` + `openspec-*` |
+ 
+-本 skill 与 `taskflow` 独立：这里管 `tasks/` 工作区，不管 `{task}-driver`。
+-
+ ## 相关
+ 
+ 进入对应阶段再读，不要一次性打开：
+ 
+ - [references/phase-explore.md](references/phase-explore.md) — `explore`
+ - [references/phase-design.md](references/phase-design.md) — `design`
++- [references/phase-decide.md](references/phase-decide.md) — `decide`
++- [references/phase-handoff.md](references/phase-handoff.md) — `handoff`
+ - [references/design-template.md](references/design-template.md) — design 落盘
+-- [references/task-template.md](references/task-template.md) — `new` / `save`
++- [references/task-template.md](references/task-template.md) — `new` / `save` / `decide`
+ - [references/index-template.md](references/index-template.md) — 建或重建 INDEX
+ - `grilling` — `explore` 委托
+-- `taskflow` — OpenSpec driver 生命周期
++- `taskflow` — `handoff` 委托的交付生命周期
+ - `dotf-code-explore` — 只读代码理解
+diff --git a/agents/skills/task-explore/references/phase-design.md b/agents/skills/task-explore/references/phase-design.md
+index 4383597..e14dd74 100644
+--- a/agents/skills/task-explore/references/phase-design.md
++++ b/agents/skills/task-explore/references/phase-design.md
+@@ -59,7 +59,7 @@
+ **已设计**：[一句话]
+ **位置**：`{taskRoot}/design/`
+ **未决问题**：[列表，或无]
+-**下一步**：save / chat / archive（不要暗示已可直接写代码，除非用户明确要求）
++**下一步**：decide / save / chat（要交付走 decide → handoff，不要直接写代码）
+ ```
+ 
+ 结束后提示是否更新 `TASK.md`。
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+index fa255fe..f3cff31 100644
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -28,13 +28,25 @@
+ 
+ - YYYY-MM-DD：[本轮结论，一条一事]
+ 
++## 决策
++
++- 采纳：[方案名] — [主因]
++- 取舍：[接受 / 放弃]
++- 带进实现的未决：[列表，或无]
++- 回退：[选错了怎么撤]
++
++## 交接
++
++- driver: `{task-name}-driver`（handoff 后填写）
++- 归档路径：[handoff / archive 后填写]
++
+ ## 未决问题
+ 
+ - [ ] [还不知道的]
+ 
+ ## 下一步
+ 
+-- [explore / chat / design / archive / 其它]
++- [explore / chat / design / decide / handoff / archive / 其它]
+ ```
+ 
+-归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。
++归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。
+diff --git a/agents/skills/task-explore/references/index-template.md b/agents/skills/task-explore/references/index-template.md
+index 1b87971..2986cb1 100644
+--- a/agents/skills/task-explore/references/index-template.md
++++ b/agents/skills/task-explore/references/index-template.md
+@@ -1,8 +1,8 @@
+ # 任务索引骨架
+ 
+-`tasks/INDEX.md` 是派生目录。单任务真相在各 `TASK.md`。`new` / `save` / `archive` 时改对应行；漂移则按目录重建。
++`tasks/INDEX.md` 是派生目录。单任务真相在各 `TASK.md`。`new` / `save` / `decide` / `handoff` / `archive` / `reopen` 时改对应行；漂移则按目录重建。
+ 
+-Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取目标首条，不要抄进展日志。
++Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取目标首条，不要抄进展日志。`handoff` 归档行以 `→ {task-name}-driver` 结尾。
+ 
+ ```markdown
+ # Tasks
+@@ -20,6 +20,7 @@ Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取
+ | 任务 | 归档日 | 标题 | 一句话 | 路径 |
+ |------|--------|------|--------|------|
+ | quota-alert | 2026-09-01 | 配额告警误报 | 确认阈值与静默窗口 | `archive/2026-09-01/quota-alert/` |
++| session-auth | 2026-09-15 | 会话方案 | 已决：服务端 session → session-auth-driver | `archive/2026-09-15/session-auth/` |
+ ```
+ 
+ 没有进行中或已归档任务时，保留表头，表体不写占位行。
+diff --git a/agents/skills/task-explore/references/phase-decide.md b/agents/skills/task-explore/references/phase-decide.md
+new file mode 100644
+index 0000000..035df43
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-decide.md
+@@ -0,0 +1,30 @@
++# decide 阶段
++
++进入本阶段后执行。未绑定则先回到 `SKILL.md` 的绑定规则。
++
++冻结 **探索任务** 的采纳方案。不写实现代码，不创建 OpenSpec change。
++
++## 门禁
++
++缺任一项就停下，建议先 `explore` / `design`：
++
++- `TASK.md` 目标能一句话说清
++- 有可推荐方案（通常来自 `design/`；无设计稿则用户必须当面确认选项）
++- 成功标准可检验
++
++## 写入
++
++更新 `{taskRoot}/TASK.md` 的 **决策** 小节（见 [task-template.md](task-template.md)）：
++
++- 采纳：方案名 + 一句话主因
++- 取舍：接受什么、放弃什么
++- 可带进实现的未决：列出；未列出的视为本探索任务内已关闭
++- 回退：选错了怎么撤
++
++有独立、难逆的权衡时，另写 `{taskRoot}/design/adr-<slug>.md`。不要写仓库 `docs/adr/`。
++
++同步 `INDEX.md` 对应行的一句话（可改成「已决：…」）。提示是否继续 `handoff`。
++
++## 压缩路径
++
++用户明确说「按 design 里的推荐冻结并交接」：本轮先完成本阶段，再立刻进入 `handoff`，不必再问一次是否 decide。
+diff --git a/agents/skills/task-explore/references/phase-handoff.md b/agents/skills/task-explore/references/phase-handoff.md
+new file mode 100644
+index 0000000..3b4e411
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-handoff.md
+@@ -0,0 +1,23 @@
++# handoff 阶段
++
++进入本阶段后执行。未绑定则先回到 `SKILL.md` 的绑定规则。
++
++把 **探索任务**（`tasks/ongoing/{task-name}`）交接给 **taskflow 任务**（`{task-name}-driver`）。交付进度之后只认 taskflow checkbox。本阶段 **不写实现代码**，不发明 openspec 等价命令。
++
++## 门禁
++
++1. `TASK.md` **决策** 小节已写明采纳方案。没有则打断，先 `decide`。例外：用户本轮明确「按推荐冻结并交接」→ 先做完 `decide` 再继续，不必再问。
++2. 计算归档目标 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问；此时不得改 TASK.md、不得跑 taskflow-new、不得移动目录。**
++
++## 步骤
++
++1. 有未写入进展则先按 `save` 写回。
++2. 在 `TASK.md` 写 **交接** 小节：driver 名 `{task-name}-driver`、采纳方案、`design/` 指针、可带进实现的未决、探索任务将归档的路径。
++3. 读取并遵循 `taskflow` 的脚手架（`taskflow-new`）。**`{task}` 必须等于探索任务 slug `{task-name}`**，不得从描述重新归纳成别的名字。`--goal` 用目标 + 已采纳方案，不要只丢一句含糊摘要。
++4. 按 taskflow 写入 `{task-name}-driver` 的 `.openspec.yaml`（`skip_specs: true`）和 `proposal.md`（含逐字 Driver 协议）。**不要写 `tasks.md`。**
++5. taskflow / openspec 不可用，或无法确定 planning root：停下报告可选项（`dotf agents -c` / `openspec init --tools agents` / 用户指定 root），**保持探索任务在 `ongoing/`**，已写的交接段可保留。
++6. `{task-name}-driver` 已存在：不要新建；把现有路径写入交接段，视为脚手架已就绪。
++7. **仅当 driver 已存在**（本轮新建或已有）：再按 `archive` 搬家（先确认目标仍不存在 → 改 `status` 为 `archived` 并记下 `handed-off` 与 `driver` → 移动 → 更新 INDEX → 清除探索任务绑定）。
++8. 报告：归档路径、`{task-name}-driver` 的 `proposal.md`。桥接 stock `openspec-propose`（方案已定时选继续已有 change；未定时先 `openspec-explore`）。之后不要再在 `tasks/` 里勾交付进度。
++
++INDEX 归档行的一句话以 `→ {task-name}-driver` 结尾，便于检索。
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+index 65d387b..9b9a8b8 100644
+--- a/agents/skills/task-explore/tests/test_task_explore_contract.py
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -18,6 +18,12 @@ class ContractTest(unittest.TestCase):
+         cls.design = (ROOT / "references" / "phase-design.md").read_text(
+             encoding="utf-8"
+         )
++        cls.decide = (ROOT / "references" / "phase-decide.md").read_text(
++            encoding="utf-8"
++        )
++        cls.handoff = (ROOT / "references" / "phase-handoff.md").read_text(
++            encoding="utf-8"
++        )
+ 
+     def test_frontmatter_name_matches_directory(self) -> None:
+         self.assertIn("name: task-explore", self.skill)
+@@ -27,6 +33,8 @@ class ContractTest(unittest.TestCase):
+         for rel in (
+             "references/phase-explore.md",
+             "references/phase-design.md",
++            "references/phase-decide.md",
++            "references/phase-handoff.md",
+             "references/design-template.md",
+             "references/task-template.md",
+             "references/index-template.md",
+@@ -52,20 +60,19 @@ class ContractTest(unittest.TestCase):
+         self.assertGreater(status, dest)
+         self.assertGreater(move, status)
+ 
+-    def test_index_sync_on_new_save_archive(self) -> None:
+-        self.assertIn("`new` / `save` / `archive` 必须同步对应行", self.skill)
+-        new = self.skill.split("## `new`", 1)[1].split("## ", 1)[0]
+-        save = self.skill.split("## `save`", 1)[1].split("## ", 1)[0]
+-        archive = self.skill.split("## `archive`", 1)[1].split("---", 1)[0]
+-        self.assertIn("INDEX.md", new)
+-        self.assertIn("INDEX.md", save)
+-        self.assertIn("INDEX", archive)
++    def test_index_sync_on_mutating_phases(self) -> None:
++        self.assertIn(
++            "`new` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
++            self.skill,
++        )
+ 
+     def test_phase_loaded_on_demand(self) -> None:
+         self.assertIn("只读该阶段详情", self.skill)
+         self.assertIn("不要预加载其它 phase", self.skill)
+         self.assertIn("references/phase-explore.md", self.skill)
+         self.assertIn("references/phase-design.md", self.skill)
++        self.assertIn("references/phase-decide.md", self.skill)
++        self.assertIn("references/phase-handoff.md", self.skill)
+         self.assertNotIn("| 方案 | 成本 |", self.skill)
+ 
+     def test_explore_does_not_write_repo_glossary(self) -> None:
+@@ -83,6 +90,35 @@ class ContractTest(unittest.TestCase):
+         resume = self.skill.split("## `resume`", 1)[1].split("## ", 1)[0]
+         self.assertIn("任务文档只读", resume)
+         self.assertIn("INDEX", resume)
++        self.assertIn("reopen", resume)
++
++    def test_two_task_kinds_are_named(self) -> None:
++        self.assertIn("探索任务", self.skill)
++        self.assertIn("taskflow 任务", self.skill)
++        self.assertIn("`{task-name}-driver`", self.skill)
++
++    def test_decide_is_required_before_handoff(self) -> None:
++        self.assertIn("决策** 小节已写明采纳方案", self.handoff)
++        self.assertIn("没有则打断，先 `decide`", self.handoff)
++        handoff_sec = self.skill.split("## `handoff`", 1)[1].split("## ", 1)[0]
++        self.assertIn("无决策则先 `decide`", handoff_sec)
++
++    def test_handoff_delegates_taskflow_same_slug(self) -> None:
++        self.assertIn("taskflow-new", self.handoff)
++        self.assertIn("必须等于探索任务 slug", self.handoff)
++        self.assertIn("不要发明", self.handoff)
++        self.assertIn("不要写 `tasks.md`", self.handoff)
++        self.assertIn("保持探索任务在 `ongoing/`", self.handoff)
++        self.assertIn("仅当 driver 已存在", self.handoff)
++
++    def test_reopen_checks_dest_before_move(self) -> None:
++        reopen = self.skill.split("## `reopen`", 1)[1].split("---", 1)[0]
++        dest = reopen.find("目标已存在则停止")
++        status = reopen.find("`status` 改回 `ongoing`")
++        move = reopen.find("移动目录到 `ongoing/`")
++        self.assertGreater(dest, -1)
++        self.assertGreater(status, dest)
++        self.assertGreater(move, status)
+ 
+ 
+ if __name__ == "__main__":

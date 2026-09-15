@@ -36,6 +36,7 @@ dotf agents -d --json               # 深度诊断（JSON 报告）
 dotf agents skill apply <id>        # 启用一条 Skill（写 overlay 并 sync，含该 id 的来源）
 dotf agents skill remove <id>       # 停用并 prune owned 目标
 dotf agents skill apply <id> --on-conflict=backup  # 先备份本机漂移再覆写
+dotf skills -c                      # 安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
 dotf skills -i <group|skill>        # 按组装第三方 skill
 ```
 

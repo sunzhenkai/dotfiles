@@ -145,8 +145,11 @@ def cmd_retry(ctx: Ctx) -> int:
 # skills
 # ============================================================
 
-_SKILLS_HELP = """用法: dotf skills -i <package> [选项...]
+_SKILLS_HELP = """用法: dotf skills -c|--config [选项...]
+      dotf skills -i <package> [选项...]
       dotf skills -r|--uninstall [skill-name] [选项...]
+  -c 安装编目 Desired Set 的全部 skill（一手 + 锁定第三方 + OpenSpec CLI）
+     不含全局 AGENTS.md；完整 agent 运行时仍用 dotf agents -c
   -i 通过 npx skills 安装；<package> 一般直接写 skill 名称
   -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除
   <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id，
@@ -155,18 +158,84 @@ _SKILLS_HELP = """用法: dotf skills -i <package> [选项...]
   默认交互式：npx skills 会询问安装位置与目标 agents
   -g 全局；--project 当前项目；-y 跳过询问；-a 指定 agents
 示例:
+  dotf skills -c --dry-run
+  dotf skills -c --yes
   dotf skills -i frontend-design
   dotf skills -i frontend-design --project
   dotf skills -r design-taste-frontend"""
 
 
+def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
+    """Sync first-party + locked third-party + OpenSpec skills to all layouts."""
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in HELP:
+            print(_SKILLS_HELP)
+            return 0
+        if arg in ("--yes", "-y"):
+            ctx.yes = True
+        elif arg == "--dry-run":
+            ctx.dry_run = True
+        elif arg == "--on-conflict" or arg.startswith("--on-conflict="):
+            if arg == "--on-conflict":
+                i += 1
+                if i >= len(argv):
+                    raise DotfError("usage", "错误: --on-conflict 需要参数（block|backup）")
+                value = argv[i]
+            else:
+                value = arg.split("=", 1)[1]
+            if value not in ("block", "backup"):
+                raise DotfError("usage", "错误: --on-conflict 只接受 block 或 backup")
+            ctx.on_conflict = value
+        elif arg.startswith("-"):
+            raise DotfError(
+                "usage",
+                f"错误: skills -c 不接受 '{arg}'（npx 选项请用 -i/-r）",
+            )
+        else:
+            raise DotfError("usage", f"错误: skills -c 不接受额外参数 '{arg}'")
+        i += 1
+
+    if not ctx.dry_run and not ctx.yes and not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise DotfError("env", "错误: 非 TTY 环境请使用 --yes 或 --dry-run")
+
+    ctx.export()
+    print("==> skills -c  安装编目全部 skill", flush=True)
+    steps = (
+        ("--- skills ---", "sync.py"),
+        ("--- default skills ---", "defaults.py"),
+        ("--- openspec skills ---", "openspec_skills.py"),
+    )
+    for label, script in steps:
+        print(label, flush=True)
+        cmd = [
+            "python3",
+            str(SRC_DIR / "agents" / script),
+            "--root",
+            str(REPO_ROOT),
+        ]
+        if ctx.dry_run:
+            cmd.append("--dry-run")
+        if ctx.on_conflict:
+            cmd += ["--on-conflict", ctx.on_conflict]
+        rc = subprocess.run(cmd, env=python_env()).returncode
+        if rc != 0:
+            raise DotfError("handler", f"{script} 失败（退出码 {rc}）")
+    print("✓ skills 全量安装完成")
+    return 0
+
+
 def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
     if not argv:
-        print("错误: 需要 -i/--install 或 -r/--remove 动作")
-        print("用法: dotf skills -i <package> [选项...]")
+        print("错误: 需要 -c/--config、-i/--install 或 -r/--remove 动作")
+        print("用法: dotf skills -c|--config")
+        print("      dotf skills -i <package> [选项...]")
         return 1
     verb = argv[0]
     mode = "add"
+    if verb in ("-c", "--config"):
+        return _install_all_catalog_skills(ctx, argv[1:])
     if verb in ("-i", "--install"):
         pass
     elif verb in ("-r", "--remove", "--uninstall"):
@@ -175,8 +244,9 @@ def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
         print(_SKILLS_HELP)
         return 0
     else:
-        print("错误: skills 仅支持 -i/--install 与 -r/--remove/--uninstall")
-        print("用法: dotf skills -i <package> [选项...]")
+        print("错误: skills 仅支持 -c/--config、-i/--install 与 -r/--remove/--uninstall")
+        print("用法: dotf skills -c|--config")
+        print("      dotf skills -i <package> [选项...]")
         return 1
 
     package = ""

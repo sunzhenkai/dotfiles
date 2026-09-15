@@ -1,0 +1,183 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index 91f4809..47ea3f2 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: task-explore
+ name: task-explore
+-description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / save / archive 阶段持续探索、询问与排查。explore 委托 grill-with-docs；design 把方案写进当前任务目录。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/保存/归档/查看任务列表时使用。路径已清、直接交付的 OpenSpec 任务改用 taskflow。
++description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / save / archive 阶段持续探索、询问与排查。explore 委托 grilling，术语/ADR 只写当前任务目录；design 把方案写进当前任务目录。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/保存/归档/查看任务列表时使用。路径已清、直接交付的 OpenSpec 任务改用 taskflow。
+ ---
+ 
+ # 任务探索
+@@ -17,7 +17,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `new` | 立项；从输入推断任务名 | `tasks/ongoing/{task-name}/` + `INDEX.md` |
+ | `explore` | 不断探索预期目标 | 术语/ADR 可落任务目录；`TASK.md` 须经确认或 `save` |
+ | `chat` | **默认阶段**：对任务问答 | 默认不写盘 |
+-| `resume` | 恢复任务上下文 | 只读加载 |
++| `resume` | 恢复任务上下文 | 任务文档只读；INDEX 漂移可重建 |
+ | `design` | 针对任务方案设计 | `{taskRoot}/design/` |
+ | `save` | 保存任务最新进展到任务文档 | 更新 `TASK.md` 与 `INDEX.md` |
+ | `archive` | 归档已结束任务 | 搬到 `tasks/archive/{yyyy-mm-dd}/{task-name}` 并更新 `INDEX.md` |
+@@ -100,7 +100,7 @@ tasks/
+ 
+ ## `explore`
+ 
+-不断探索预期目标，委托 `grill-with-docs`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。
++不断探索预期目标，委托 `grilling`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。禁止调用 `grill-with-docs` / `domain-modeling`。
+ 
+ ## `chat`（默认）
+ 
+@@ -114,7 +114,7 @@ tasks/
+ 
+ ## `resume`
+ 
+-恢复任务上下文。
++恢复任务上下文。**任务文档只读**；发现 INDEX 漂移时允许重建 `INDEX.md`，不要改 `TASK.md` / `glossary.md` / `design/`。
+ 
+ 1. 未指定名字：用 INDEX 的 Ongoing 表列出请用户选。指定了则用该名字。
+ 2. 任务不在 `ongoing/`：先查 INDEX 的 Archived 表，再扫 `tasks/archive/`。告知已归档路径；不要自动恢复。找不到则说明，改走 `new`。
+@@ -140,11 +140,12 @@ tasks/
+ 对任务进行归档，放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。
+ 
+ 1. 必须已绑定或用户给出名字。先确认；未确认不搬。
+-2. 建议先 `save` 再搬；用户拒绝则按现状归档。
+-3. 把 `TASK.md` 的 `status` 改为 `archived`，写入归档日期。
+-4. `mkdir -p tasks/archive/{yyyy-mm-dd}`，再把整个 `{taskRoot}` **移动**过去。目标已存在则停止并询问，禁止覆盖。
+-5. 把 INDEX 中该行从 Ongoing 移到 Archived（归档日与新路径）；无 INDEX 则重建。
+-6. 清除会话绑定。报告新路径。
++2. 计算目标路径 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
++3. 建议先 `save` 再搬；用户拒绝则按现状归档。
++4. 把 `TASK.md` 的 `status` 改为 `archived`，写入归档日期。
++5. `mkdir -p tasks/archive/{yyyy-mm-dd}`，再把整个 `{taskRoot}` **移动**过去。
++6. 把 INDEX 中该行从 Ongoing 移到 Archived（归档日与新路径）；无 INDEX 则重建。
++7. 清除会话绑定。报告新路径。
+ 
+ 不要把任务内容晋升到 `docs/design/` 或其它项目文档，除非用户另说。
+ 
+@@ -170,6 +171,6 @@ tasks/
+ - [references/design-template.md](references/design-template.md) — design 落盘
+ - [references/task-template.md](references/task-template.md) — `new` / `save`
+ - [references/index-template.md](references/index-template.md) — 建或重建 INDEX
+-- `grill-with-docs` / `grilling` / `domain-modeling` — `explore` 委托
++- `grilling` — `explore` 委托
+ - `taskflow` — OpenSpec driver 生命周期
+ - `dotf-code-explore` — 只读代码理解
+diff --git a/agents/skills/task-explore/references/phase-explore.md b/agents/skills/task-explore/references/phase-explore.md
+index 5127d5a..97aa425 100644
+--- a/agents/skills/task-explore/references/phase-explore.md
++++ b/agents/skills/task-explore/references/phase-explore.md
+@@ -2,13 +2,13 @@
+ 
+ 进入本阶段后执行。未绑定任务则先回到 `SKILL.md` 的绑定规则。
+ 
+-针对任务，不断探索预期目标，使用 `grill-with-docs` 进行。
++针对任务，不断探索预期目标。**只委托 `grilling`。** 禁止调用 `grill-with-docs` 或 `domain-modeling`：它们会写仓库根 `CONTEXT.md` / `docs/adr/`，与任务目录落点冲突。
+ 
+ 1. 必须已绑定任务；否则先走绑定。
+ 2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
+-3. 读取并遵循 `grill-with-docs`（它会再调 `grilling` 与 `domain-modeling`）。不可用则停下说明，改用 `grilling` 的轮次格式当面问；**不要发明等价命令**。
++3. 读取并遵循 `grilling`。不可用则用它的轮次格式当面问；**不要发明等价命令**，也不要改调 `grill-with-docs`。
+ 4. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
+-5. 文档落点改到当前任务：术语 → `{taskRoot}/glossary.md`；ADR → `{taskRoot}/design/adr-<slug>.md`。不要写仓库根 `CONTEXT.md` / `docs/adr/`。
++5. 术语结晶时由本 skill 写入 `{taskRoot}/glossary.md`；独立决策写入 `{taskRoot}/design/adr-<slug>.md`。禁止写仓库根 `CONTEXT.md`、`docs/adr/`。
+ 6. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
+ 
+-grill 结晶出的术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要按主文件提示是否更新任务文档。
++术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要按主文件提示是否更新任务文档。
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+new file mode 100644
+index 0000000..65d387b
+--- /dev/null
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -0,0 +1,89 @@
++"""task-explore：阶段门禁、落点与按需加载的文本契约。"""
++
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class ContractTest(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls) -> None:
++        cls.skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        cls.explore = (ROOT / "references" / "phase-explore.md").read_text(
++            encoding="utf-8"
++        )
++        cls.design = (ROOT / "references" / "phase-design.md").read_text(
++            encoding="utf-8"
++        )
++
++    def test_frontmatter_name_matches_directory(self) -> None:
++        self.assertIn("name: task-explore", self.skill)
++        self.assertEqual(ROOT.name, "task-explore")
++
++    def test_reference_files_exist(self) -> None:
++        for rel in (
++            "references/phase-explore.md",
++            "references/phase-design.md",
++            "references/design-template.md",
++            "references/task-template.md",
++            "references/index-template.md",
++        ):
++            self.assertTrue((ROOT / rel).is_file(), rel)
++
++    def test_missing_tasks_dir_requires_confirm(self) -> None:
++        self.assertIn("必须先获得确认再创建", self.skill)
++        self.assertIn("询问是否在当前位置创建 `tasks/`", self.skill)
++        self.assertIn("未确认则停止", self.skill)
++
++    def test_unbound_requires_new_or_resume(self) -> None:
++        self.assertIn("应提示创建或者恢复", self.skill)
++        self.assertIn("在确认后进行 new/resume 阶段", self.skill)
++        self.assertIn("用户确认前不进入", self.skill)
++
++    def test_archive_checks_dest_before_mutating_task_md(self) -> None:
++        archive = self.skill.split("## `archive`", 1)[1].split("## ", 1)[0]
++        dest = archive.find("目标已存在则停止")
++        status = archive.find("`status` 改为 `archived`")
++        move = archive.find("**移动**过去")
++        self.assertGreater(dest, -1)
++        self.assertGreater(status, dest)
++        self.assertGreater(move, status)
++
++    def test_index_sync_on_new_save_archive(self) -> None:
++        self.assertIn("`new` / `save` / `archive` 必须同步对应行", self.skill)
++        new = self.skill.split("## `new`", 1)[1].split("## ", 1)[0]
++        save = self.skill.split("## `save`", 1)[1].split("## ", 1)[0]
++        archive = self.skill.split("## `archive`", 1)[1].split("---", 1)[0]
++        self.assertIn("INDEX.md", new)
++        self.assertIn("INDEX.md", save)
++        self.assertIn("INDEX", archive)
++
++    def test_phase_loaded_on_demand(self) -> None:
++        self.assertIn("只读该阶段详情", self.skill)
++        self.assertIn("不要预加载其它 phase", self.skill)
++        self.assertIn("references/phase-explore.md", self.skill)
++        self.assertIn("references/phase-design.md", self.skill)
++        self.assertNotIn("| 方案 | 成本 |", self.skill)
++
++    def test_explore_does_not_write_repo_glossary(self) -> None:
++        self.assertIn("只委托 `grilling`", self.explore)
++        self.assertIn("禁止调用 `grill-with-docs` 或 `domain-modeling`", self.explore)
++        self.assertIn("禁止写仓库根 `CONTEXT.md`、`docs/adr/`", self.explore)
++        self.assertNotIn("使用 `grill-with-docs` 进行", self.explore)
++        explore_sec = self.skill.split("## `explore`", 1)[1].split("## ", 1)[0]
++        self.assertIn("禁止调用 `grill-with-docs`", explore_sec)
++        self.assertNotIn("委托 `grill-with-docs`", explore_sec)
++
++    def test_resume_task_docs_readonly_index_repair_allowed(self) -> None:
++        self.assertIn("任务文档只读", self.skill)
++        self.assertIn("INDEX 漂移可重建", self.skill)
++        resume = self.skill.split("## `resume`", 1)[1].split("## ", 1)[0]
++        self.assertIn("任务文档只读", resume)
++        self.assertIn("INDEX", resume)
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -33,8 +33,8 @@ def _run_sync(tmp_home: Path, *, kiro_home: str | None = None) -> subprocess.Com
 def test_sync_copies_skill_references(tmp_path: Path) -> None:
     r = _run_sync(tmp_path)
     assert r.returncode == 0, r.stderr + r.stdout
-    src = ROOT / "agents" / "skills" / "task-design" / "references" / "design-template.md"
-    dest = tmp_path / ".agents" / "skills" / "task-design" / "references" / "design-template.md"
+    src = ROOT / "agents" / "skills" / "task-explore" / "references" / "design-template.md"
+    dest = tmp_path / ".agents" / "skills" / "task-explore" / "references" / "design-template.md"
     assert dest.is_file(), f"references 未分发: {dest}\n{r.stdout}"
     # 原样拷贝：字节一致（不做 frontmatter 渲染 / slash 替换）
     assert dest.read_bytes() == src.read_bytes()
@@ -64,11 +64,11 @@ def test_sync_renders_slash_placeholders(tmp_path: Path) -> None:
     r = _run_sync(tmp_path)
     assert r.returncode == 0, r.stderr + r.stdout
     # {{slash:xxx}} 统一渲染为 /xxx；输出不得残留占位符
-    skill = tmp_path / ".agents" / "skills" / "task-design" / "SKILL.md"
+    skill = tmp_path / ".agents" / "skills" / "task-explore" / "SKILL.md"
     assert skill.is_file(), f"skill 未同步: {skill}\n{r.stdout}"
     content = skill.read_text()
     assert "{{slash:" not in content
-    assert "/openspec-propose" in content
+    assert "/task-explore" in content
 
 
 def test_validate_output_allows_literal_object_braces() -> None:
@@ -82,17 +82,17 @@ def test_sync_also_targets_kiro_cli_skills(tmp_path: Path) -> None:
     home.mkdir()
     r = _run_sync(home)
     assert r.returncode == 0, r.stderr + r.stdout
-    shared = home / ".agents" / "skills" / "task-design" / "SKILL.md"
-    kiro = home / ".kiro" / "skills" / "task-design" / "SKILL.md"
+    shared = home / ".agents" / "skills" / "task-explore" / "SKILL.md"
+    kiro = home / ".kiro" / "skills" / "task-explore" / "SKILL.md"
     assert shared.is_file()
     assert kiro.is_file(), f"Kiro skills 未分发: {kiro}\n{r.stdout}"
     assert shared.read_text().rstrip().endswith("$ARGUMENTS") is False
     assert kiro.read_text().rstrip().endswith("$ARGUMENTS")
     kiro_reference = (
-        home / ".kiro" / "skills" / "task-design" / "references" / "design-template.md"
+        home / ".kiro" / "skills" / "task-explore" / "references" / "design-template.md"
     )
     source_reference = (
-        ROOT / "agents" / "skills" / "task-design" / "references" / "design-template.md"
+        ROOT / "agents" / "skills" / "task-explore" / "references" / "design-template.md"
     )
     assert kiro_reference.read_bytes() == source_reference.read_bytes()
 
@@ -103,7 +103,7 @@ def test_sync_kiro_cli_respects_kiro_home(tmp_path: Path) -> None:
     kiro_home = home / "kiro-root"
     r = _run_sync(home, kiro_home=str(kiro_home))
     assert r.returncode == 0, r.stderr + r.stdout
-    assert (kiro_home / "skills" / "task-design" / "SKILL.md").is_file()
+    assert (kiro_home / "skills" / "task-explore" / "SKILL.md").is_file()
 
 
 def test_explicit_home_still_defaults_to_kiro_directory() -> None:
@@ -118,7 +118,7 @@ def test_claude_target_loads_skills_code_writes_verbatim(tmp_path: Path) -> None
     home.mkdir()
     r = _run_sync(home)
     assert r.returncode == 0, r.stderr + r.stdout
-    claude = home / ".claude" / "skills" / "task-design" / "SKILL.md"
+    claude = home / ".claude" / "skills" / "task-explore" / "SKILL.md"
     assert claude.is_file(), f"Claude skills 未分发: {claude}\n{r.stdout}"
     assert claude.read_text().rstrip().endswith("$ARGUMENTS") is False
     assert "{{slash:" not in claude.read_text()
@@ -130,7 +130,7 @@ def test_every_layout_receives_identical_first_party_files(tmp_path: Path) -> No
     home.mkdir()
     r = _run_sync(home)
     assert r.returncode == 0, r.stderr + r.stdout
-    relative = Path("task-design") / "references" / "design-template.md"
+    relative = Path("task-explore") / "references" / "design-template.md"
     shared = skills_target(SHARED, home) / relative
     kiro = skills_target(KIRO, home) / relative
     claude = skills_target(CLAUDE, home) / relative

@@ -1,0 +1,13 @@
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+index 9b9a8b8..e88c717 100644
+--- a/agents/skills/task-explore/tests/test_task_explore_contract.py
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -106,7 +106,7 @@ class ContractTest(unittest.TestCase):
+     def test_handoff_delegates_taskflow_same_slug(self) -> None:
+         self.assertIn("taskflow-new", self.handoff)
+         self.assertIn("必须等于探索任务 slug", self.handoff)
+-        self.assertIn("不要发明", self.handoff)
++        self.assertIn("不发明", self.handoff)
+         self.assertIn("不要写 `tasks.md`", self.handoff)
+         self.assertIn("保持探索任务在 `ongoing/`", self.handoff)
+         self.assertIn("仅当 driver 已存在", self.handoff)

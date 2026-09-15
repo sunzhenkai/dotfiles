@@ -1,0 +1,233 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index af905cb..91f4809 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -24,6 +24,17 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ 
+ 用户点名 `{{slash:task-explore}}` 且首词命中上表阶段名时走该阶段；否则走 `chat`。用户要看任务列表或检索任务时，打印 `INDEX.md`（先 Ongoing，需要时再 Archived），不另造阶段。
+ 
++## 加载
++
++进入阶段时 **只读该阶段详情**，不要预加载其它 phase 或文档骨架。
++
++| 阶段 | 进入时读取 |
++|------|------------|
++| `explore` | [references/phase-explore.md](references/phase-explore.md) |
++| `design` | [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md) |
++| `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
++| `chat` / `resume` / `archive` | 本文件已够 |
++
+ ## 布局
+ 
+ 默认 `TASKS_ROOT` = 当前工作目录下的 `tasks/`。
+@@ -43,8 +54,6 @@ tasks/
+ - 单任务产物只写当前任务目录。`tasks/INDEX.md` 是唯一允许的根级任务文件。禁止写到仓库 `docs/design/`、`docs/adr/`、根 `CONTEXT.md`。
+ - 是否把 `tasks/` 纳入 git 由项目决定，不要擅自改 `.gitignore`。
+ 
+-主文档骨架见 [references/task-template.md](references/task-template.md)。索引骨架见 [references/index-template.md](references/index-template.md)。
+-
+ ## 索引
+ 
+ `tasks/INDEX.md` 供快速检索与查看，**不是第二份真相**。
+@@ -79,8 +88,6 @@ tasks/
+ - 用户点名 `save` → 直接写，不必再问。
+ - 不要把整段对话粘进 `TASK.md`。
+ 
+-`explore` 里 grill 结晶出的术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要提示是否更新任务文档。
+-
+ ---
+ 
+ ## `new`
+@@ -93,14 +100,7 @@ tasks/
+ 
+ ## `explore`
+ 
+-针对任务，不断探索预期目标，使用 `grill-with-docs` 进行。
+-
+-1. 必须已绑定任务；否则先走绑定。
+-2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
+-3. 读取并遵循 `grill-with-docs`（它会再调 `grilling` 与 `domain-modeling`）。不可用则停下说明，改用 `grilling` 的轮次格式当面问；**不要发明等价命令**。
+-4. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
+-5. 文档落点改到当前任务：术语 → `{taskRoot}/glossary.md`；ADR → `{taskRoot}/design/adr-<slug>.md`。不要写仓库根 `CONTEXT.md` / `docs/adr/`。
+-6. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
++不断探索预期目标，委托 `grill-with-docs`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。
+ 
+ ## `chat`（默认）
+ 
+@@ -123,67 +123,7 @@ tasks/
+ 
+ ## `design`
+ 
+-针对任务方案进行设计。从原 `task-design` 移植：**写入 `{taskRoot}/design/`，不是 `docs/design/`，也不是 OpenSpec driver。**
+-
+-**在方案不明朗时，应主动打断，提示缺口。** 未过门禁不得假装设计完成。
+-
+-### 门禁（先于落盘）
+-
+-缺任一项就停下，列出缺口，建议先 `explore` 或继续 `chat`，不要写空心方案：
+-
+-- 目标能一句话说清
+-- 成功标准可检验
+-- 约束（技术 / 时间 / 范围）已知或已标明未知
+-- 能形成至少两个可行方案；否则说明还缺哪些信息
+-
+-推荐若依赖未决项，把未决单独列出，不要写成已定。
+-
+-### 三阶段：探索 → 设计 → 写入任务
+-
+-停在实现边界。只写入 `{taskRoot}/design/`。
+-
+-1. **探索（对话，可不落盘）**：干系人与成功标准；现状（读代码与已有文档）；约束；未知与风险（写明「还不知道 X」）。问题仍模糊时给 2–3 种问题框架让用户选。
+-2. **设计**：至少两个可行方案再推荐。选项 + 对比表（成本、风险、复杂度、可逆性、工期）。产物见 [references/design-template.md](references/design-template.md)。多用 ASCII / Mermaid。
+-3. **写入当前任务**（不晋升到仓库文档）：
+-
+-| 文件 | 作用 |
+-|------|------|
+-| `design/README.md` | 文档索引 |
+-| `design/<topic>.md` | 主设计（可多篇） |
+-| `design/adr-<slug>.md` | 独立决策 |
+-
+-### 边界
+-
+-- 不写实现代码，不创建 OpenSpec `tasks.md`
+-- 不把设计写到任务目录以外（尤其禁止 `docs/design/`）
+-- 必须有图和权衡表；推荐与未决分开写
+-- kebab-case、一篇一个 H1
+-
+-### 对比表 / 推荐
+-
+-```
+-| 方案 | 成本 | 风险 | 可逆性 | 工期 | 复杂度 |
+-|------|------|------|--------|------|--------|
+-| A    | $$   | 低   | 高     | 2w   | 低     |
+-| B    | $    | 中   | 低     | 1w   | 高     |
+-
+-**推荐：方案 B**，因为 [主因]。
+-接受的取舍：[列表]。
+-回退计划：[如何撤回]。
+-```
+-
+-### 交接
+-
+-```
+-## 交接
+-
+-**已设计**：[一句话]
+-**位置**：`{taskRoot}/design/`
+-**未决问题**：[列表，或无]
+-**下一步**：save / chat / archive（不要暗示已可直接写代码，除非用户明确要求）
+-```
+-
+-结束后提示是否更新 `TASK.md`。
++方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。
+ 
+ ## `save`
+ 
+@@ -223,9 +163,13 @@ tasks/
+ 
+ ## 相关
+ 
++进入对应阶段再读，不要一次性打开：
++
++- [references/phase-explore.md](references/phase-explore.md) — `explore`
++- [references/phase-design.md](references/phase-design.md) — `design`
++- [references/design-template.md](references/design-template.md) — design 落盘
++- [references/task-template.md](references/task-template.md) — `new` / `save`
++- [references/index-template.md](references/index-template.md) — 建或重建 INDEX
+ - `grill-with-docs` / `grilling` / `domain-modeling` — `explore` 委托
+ - `taskflow` — OpenSpec driver 生命周期
+ - `dotf-code-explore` — 只读代码理解
+-- [references/task-template.md](references/task-template.md)
+-- [references/index-template.md](references/index-template.md)
+-- [references/design-template.md](references/design-template.md)
+diff --git a/agents/skills/task-explore/references/phase-explore.md b/agents/skills/task-explore/references/phase-explore.md
+new file mode 100644
+index 0000000..5127d5a
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-explore.md
+@@ -0,0 +1,14 @@
++# explore 阶段
++
++进入本阶段后执行。未绑定任务则先回到 `SKILL.md` 的绑定规则。
++
++针对任务，不断探索预期目标，使用 `grill-with-docs` 进行。
++
++1. 必须已绑定任务；否则先走绑定。
++2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
++3. 读取并遵循 `grill-with-docs`（它会再调 `grilling` 与 `domain-modeling`）。不可用则停下说明，改用 `grilling` 的轮次格式当面问；**不要发明等价命令**。
++4. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
++5. 文档落点改到当前任务：术语 → `{taskRoot}/glossary.md`；ADR → `{taskRoot}/design/adr-<slug>.md`。不要写仓库根 `CONTEXT.md` / `docs/adr/`。
++6. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
++
++grill 结晶出的术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要按主文件提示是否更新任务文档。
+diff --git a/agents/skills/task-explore/references/phase-design.md b/agents/skills/task-explore/references/phase-design.md
+new file mode 100644
+index 0000000..4383597
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-design.md
+@@ -0,0 +1,65 @@
++# design 阶段
++
++进入本阶段后执行。未绑定任务则先回到 `SKILL.md` 的绑定规则。落盘时再读 [design-template.md](design-template.md)。
++
++针对任务方案进行设计。从原 `task-design` 移植：**写入 `{taskRoot}/design/`，不是 `docs/design/`，也不是 OpenSpec driver。**
++
++**在方案不明朗时，应主动打断，提示缺口。** 未过门禁不得假装设计完成。
++
++## 门禁（先于落盘）
++
++缺任一项就停下，列出缺口，建议先 `explore` 或继续 `chat`，不要写空心方案：
++
++- 目标能一句话说清
++- 成功标准可检验
++- 约束（技术 / 时间 / 范围）已知或已标明未知
++- 能形成至少两个可行方案；否则说明还缺哪些信息
++
++推荐若依赖未决项，把未决单独列出，不要写成已定。
++
++## 三阶段：探索 → 设计 → 写入任务
++
++停在实现边界。只写入 `{taskRoot}/design/`。
++
++1. **探索（对话，可不落盘）**：干系人与成功标准；现状（读代码与已有文档）；约束；未知与风险（写明「还不知道 X」）。问题仍模糊时给 2–3 种问题框架让用户选。
++2. **设计**：至少两个可行方案再推荐。选项 + 对比表（成本、风险、复杂度、可逆性、工期）。产物见 [design-template.md](design-template.md)。多用 ASCII / Mermaid。
++3. **写入当前任务**（不晋升到仓库文档）：
++
++| 文件 | 作用 |
++|------|------|
++| `design/README.md` | 文档索引 |
++| `design/<topic>.md` | 主设计（可多篇） |
++| `design/adr-<slug>.md` | 独立决策 |
++
++## 边界
++
++- 不写实现代码，不创建 OpenSpec `tasks.md`
++- 不把设计写到任务目录以外（尤其禁止 `docs/design/`）
++- 必须有图和权衡表；推荐与未决分开写
++- kebab-case、一篇一个 H1
++
++## 对比表 / 推荐
++
++```
++| 方案 | 成本 | 风险 | 可逆性 | 工期 | 复杂度 |
++|------|------|------|--------|------|--------|
++| A    | $$   | 低   | 高     | 2w   | 低     |
++| B    | $    | 中   | 低     | 1w   | 高     |
++
++**推荐：方案 B**，因为 [主因]。
++接受的取舍：[列表]。
++回退计划：[如何撤回]。
++```
++
++## 交接
++
++```
++## 交接
++
++**已设计**：[一句话]
++**位置**：`{taskRoot}/design/`
++**未决问题**：[列表，或无]
++**下一步**：save / chat / archive（不要暗示已可直接写代码，除非用户明确要求）
++```
++
++结束后提示是否更新 `TASK.md`。

@@ -1,4 +1,4 @@
-"""show_help 文案（与旧 bash 版逐字对齐）。"""
+"""show_help 文案。"""
 
 HELP_TEXT = """dotf — Dotfiles 管理工具
 
@@ -18,7 +18,8 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
   tui                         两区 TUI（需 TTY；无参数 dotf 仍是帮助）
   pull                        拉取 dotfiles 最新更新（保护性 pull）
   cd                          跳转到 dotfiles 目录（需 zsh wrapper）
-  skills                      通过 npx skills 按需安装第三方 skill
+  skills -c                   安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
+  skills -i/-r                通过 npx skills 按需安装/移除第三方 skill
 
 动作:
   -i, --install               安装
@@ -52,6 +53,7 @@ agents 示例:
   dotf agents -ic             # 先装后配
   dotf agents skill apply <id>
   dotf agents skill remove <id>   # 写本机 overlay 并 prune
+  dotf skills -c --yes
   dotf skills -i frontend-design
 
 示例:
