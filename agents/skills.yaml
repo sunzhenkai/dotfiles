@@ -53,9 +53,15 @@ groups:
       # - research
       - setup-matt-pocock-skills
       # - tdd
+      - id: to-questionnaire
+        optional: true
       # - to-spec
       # - to-tickets
+      - wait-what
       # - wayfinder
+      - id: wizard
+        optional: true
+      - writing-for-agents
 
   agent-roster:
     type: third-party

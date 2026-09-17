@@ -28,7 +28,10 @@ def test_default_desired_set_is_the_non_optional_catalog() -> None:
     desired = resolve_skill_desired_set(ROOT, overlay_agents={})
     catalogued = set(catalog_skill_ids(ROOT))
     # optional: true 条目仍在编目内（可经 overlay 启用），但不进默认 Desired Set。
-    optional = {"en-chat", "lark-cli"}
+    from skills_catalog import load_skills_catalog
+
+    catalog = load_skills_catalog(ROOT)
+    optional = {entry.id for entry in catalog.skills if entry.optional}
     assert optional <= catalogued
     assert desired == catalogued - optional
     assert all(not item.startswith("openspec-") for item in desired)

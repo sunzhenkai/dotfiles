@@ -39,6 +39,10 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "ui-template-author" in ids
     assert "ui-template-design" in ids
     assert "setup-matt-pocock-skills" in ids
+    assert "wait-what" in ids
+    assert "writing-for-agents" in ids
+    assert "wizard" in ids
+    assert "to-questionnaire" in ids
     # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
     assert "taste-skill" not in set(catalog.ids())
@@ -46,8 +50,14 @@ def test_repository_catalog_matches_strict_lock() -> None:
     by_id = catalog.by_id()
     assert by_id["lark-cli"].optional is True
     assert by_id["en-chat"].optional is True
+    assert by_id["wizard"].optional is True
+    assert by_id["to-questionnaire"].optional is True
     assert "lark-cli" not in catalog.default_ids()
+    assert "wizard" not in catalog.default_ids()
+    assert "to-questionnaire" not in catalog.default_ids()
     assert "commit-push" in catalog.default_ids()
+    assert "wait-what" in catalog.default_ids()
+    assert "writing-for-agents" in catalog.default_ids()
     assert "ask-matt" not in ids
     assert all(item.audit.status == "approved" for item in lock.skills)
 
