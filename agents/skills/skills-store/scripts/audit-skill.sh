@@ -60,31 +60,29 @@ add_finding() {
 scan_text_file() {
   local file="$1"
   local rel="${file#"$SKILL_DIR"/}"
-  local line_num=0
 
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line_num=$((line_num + 1))
-    for entry in "${PATTERNS[@]}"; do
-      [[ "$entry" == *"__BINARY__"* ]] && continue
-      name="${entry%%|*}"
-      rest="${entry#*|}"
-      sev="${rest%%|*}"
-      regex="${rest#*|}"
-      if echo "$line" | grep -qiP "$regex" 2>/dev/null; then
-        # 跳过「禁止/不要/avoid」语境下的误报（安全规范类 skill 常提及危险命令）
-        case "$name" in
-          skip_hooks|force_push|sudo_usage|modify_git_config|global_shell_rc)
-            if echo "$line" | grep -qiP '(不要|禁止|avoid|never|do not|don'\''t|不得|不可|warn|警告)'; then
-              continue
-            fi
-            ;;
-        esac
-        local snippet="${line:0:120}"
-        [[ ${#line} -gt 120 ]] && snippet="${snippet}..."
-        add_finding "$sev" "$name" "$rel" "$line_num" "$snippet"
-      fi
-    done
-  done < "$file"
+  for entry in "${PATTERNS[@]}"; do
+    [[ "$entry" == *"__BINARY__"* ]] && continue
+    local name="${entry%%|*}"
+    local rest="${entry#*|}"
+    local sev="${rest%%|*}"
+    local regex="${rest#*|}"
+    local line_num line
+    while IFS= read -r line; do
+      line_num="${line%%:*}"
+      line="${line#*:}"
+      case "$name" in
+        skip_hooks | force_push | sudo_usage | modify_git_config | global_shell_rc)
+          if echo "$line" | grep -qiP '(不要|禁止|avoid|never|do not|don'\''t|不得|不可|warn|警告)' 2>/dev/null; then
+            continue
+          fi
+          ;;
+      esac
+      local snippet="${line:0:120}"
+      [[ ${#line} -gt 120 ]] && snippet="${snippet}..."
+      add_finding "$sev" "$name" "$rel" "$line_num" "$snippet"
+    done < <(grep -nPi -e "$regex" "$file" 2>/dev/null || true)
+  done
 }
 
 scan_binaries() {

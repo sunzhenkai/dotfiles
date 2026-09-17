@@ -99,7 +99,7 @@ skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单�
 
 `agents skill apply/remove <id>` 与 `agents -c` 一样会补齐该 id 所属来源：一手 id 走仓库目录；第三方 id 追加一次锁定获取（`acquire_all` 按 lock 条目逐条 fetch，所以一手 apply 不会走网络）。OpenSpec 的 `openspec-*` 只由 `agents -c` 安装。
 
-一手 skill 来自 `agents/skills/`，并在 `agents/skills.yaml` 的 `dotfiles` 组编目（`type: first-party`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
+一手 skill 来自 `agents/skills/`，并在 `agents/skills.yaml` 的 `dotfiles` 组编目（`type: first-party`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ### 冲突与接管
 

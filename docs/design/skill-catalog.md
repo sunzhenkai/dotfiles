@@ -140,7 +140,8 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 - 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
 - 全量测试 606 passed。
 
-## 8. 后续可选项（未实现）
+## 8. 后续可选项
 
-- `dotf skills lock <name>`：从上游 fetch 并写 lock + 编目（当前 lock 更新仍是手改/脚本）。
+- GitHub 来源 lock 升级：`make skills-lock-update`（`src/agents/lock_update.py`）。按 source 仓升到当前 HEAD，审计通过后写 `agents/skills.lock.yaml`；`-c` 仍只装 lock，不直接跟 HEAD。
+- `dotf skills lock <name>` CLI 封装尚未做。
 - registry 来源的 lock 获取流程。

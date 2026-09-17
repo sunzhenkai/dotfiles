@@ -1,4 +1,4 @@
-.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci
+.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
@@ -25,6 +25,12 @@ acceptance:
 	BASH_BIN="$${BASH_BIN:-bash}" bash scripts/ci/acceptance-isolated-home.sh
 
 ci: registry test shellcheck secret-scan acceptance smoke bash32
+
+# 把第三方 skills.lock.yaml 升到各 source 当前 HEAD（先审计再写仓库）。
+# 警告默认 fail closed；确认后加 ACCEPT_WARN=1。
+# critical 审计不过的条目会留在旧 revision，不阻断其它 source。
+skills-lock-update:
+	PYTHONUNBUFFERED=1 python3 src/agents/lock_update.py $(if $(filter 1,$(ACCEPT_WARN)),--accept-warn,)
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \
