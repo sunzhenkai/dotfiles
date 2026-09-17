@@ -52,5 +52,5 @@ make skills-lock-update             # 升级第三方 lock 到各 source HEAD（
 
 - 代码布局：`src/dotf_cli`、`src/dotf_core`、`src/dotf_tui`、`src/agents`；模块 Handler 在 `scripts/modules/<name>/`。
 - 常用校验：`make registry validate`、`make test`、`make shellcheck`、`make secret-scan`、`make ci`。
-- 升级第三方 lock：`make skills-lock-update`（警告 fail closed；`ACCEPT_WARN=1` 才带警告写入）。
+- 升级第三方 lock：`make skills-lock-update`（警告默认接受并写入；`FAIL_ON_WARN=1` 才 fail closed）。
 - 术语与领域模型以 `CONTEXT.md` 为准；开发/issue 流程约定见 `AGENTS.md` 与 `docs/agents/`。

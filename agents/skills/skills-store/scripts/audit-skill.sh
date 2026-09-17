@@ -24,11 +24,11 @@ PATTERNS=(
   "pipe_to_shell|critical|(?i)(curl|wget).{0,120}\|\s*(ba)?sh"
   "destructive_rm_root|critical|rm\s+-rf\s+(/|\~|\*|\$HOME\b|\$\{HOME\})"
   "destructive_mkfs|critical|(?i)\bmkfs\.|\bdd\s+if=.*of=/dev/"
-  "credential_paths|critical|(?i)(~/?\.ssh|/\.ssh/id_|~/?\.aws/credentials|~/?\.gnupg|~/?\.config/gcloud|\.netrc\b|\.env\b.*(read|cat|source|export))"
+  "credential_paths|critical|(?i)(~/?\.ssh|/\.ssh/id_|~/?\.aws/credentials|~/?\.gnupg|~/?\.config/gcloud|\.netrc\b|\.env\b.*\b(read|cat|source|export)\b|\b(cat|source)\b.{0,80}\.env\b)"
   "exfil_env_secret|critical|(?i)(curl|wget|fetch|post|upload|send).{0,80}(\$(API|TOKEN|KEY|SECRET|PASSWORD|ENV|HOME)|process\.env|getenv|os\.environ)"
   "hardcoded_secret|critical|(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{20,}"
   "bearer_literal|critical|(?i)Bearer\s+[A-Za-z0-9\-._~+/]{20,}=*"
-  "eval_external|critical|(?i)\beval\s+.*(\$\(|\\\`|curl|wget|base64)"
+  "eval_external|critical|(?i)\beval\s+.{0,80}(\$\(|\bcurl\b|\bwget\b|base64\s+(-d|--decode))"
   "obfuscated_exec|critical|(?i)base64\s+(-d|--decode).{0,40}\|\s*(ba)?sh"
   "modify_git_config|critical|(?i)git\s+config\s+(--global\s+)?(user\.|credential\.|url\.)"
   # --- warn: 需用户确认 ---
@@ -38,8 +38,8 @@ PATTERNS=(
   "global_shell_rc|warn|(?i)(~/?\.(bashrc|zshrc|profile)|/etc/(profile|bash\.bashrc))"
   "download_execute|warn|(?i)(curl|wget).{0,80}(https?://(?!github\.com|raw\.githubusercontent\.com|gitlab\.com))[^\\s]*.{0,40}(chmod|execute|run|install)"
   "npm_pip_untrusted|warn|(?i)(npm|pnpm|yarn|pip|pip3)\s+(install|i)\s+(git\+|https?://|http://)"
-  "browser_session|warn|(?i)(cookie|session|localStorage|browser-profile|playwright.*storage)"
-  "internal_url|warn|(?i)https?://[a-z0-9.-]*\.(internal|local|corp|intranet)(/|\b)"
+  "browser_session|warn|(?i)(cookie|sessionStorage|localStorage|browser-profile|playwright.*storage)"
+  "internal_url|warn|(?i)https?://[a-z0-9.-]*\.(internal|corp|intranet)(/|\b)"
   "codeup_private|warn|(?i)codeup\.aliyun\.com"
   "binary_in_skill|warn|__BINARY__"
 )
@@ -72,8 +72,8 @@ scan_text_file() {
       line_num="${line%%:*}"
       line="${line#*:}"
       case "$name" in
-        skip_hooks | force_push | sudo_usage | modify_git_config | global_shell_rc)
-          if echo "$line" | grep -qiP '(不要|禁止|avoid|never|do not|don'\''t|不得|不可|warn|警告)' 2>/dev/null; then
+        skip_hooks | force_push | sudo_usage | modify_git_config | global_shell_rc | browser_session)
+          if echo "$line" | grep -qiP '(不要|禁止|不记录|avoid|never|do not|don'\''t|不得|不可|warn|警告)' 2>/dev/null; then
             continue
           fi
           ;;
@@ -88,15 +88,21 @@ scan_text_file() {
 scan_binaries() {
   while IFS= read -r -d '' file; do
     local rel="${file#"$SKILL_DIR"/}"
+    local base
+    base="$(basename "$file")"
+    # GNU find -regex 默认 emacs 语法，TEXT_EXTS 的 ERE 分组不会排除 .py/.sh。
+    if [[ "$file" =~ $TEXT_EXTS || "$base" =~ $TEXT_NAMES ]]; then
+      continue
+    fi
     local mime
     mime="$(file -b "$file" 2>/dev/null || true)"
-    if echo "$mime" | grep -qiE 'executable|ELF|Mach-O|PE32|shared object'; then
+    # shebang 纯文本会被 file 标成 "text executable"；只认真正的二进制格式。
+    if echo "$mime" | grep -qiE 'ELF|Mach-O|PE32|shared object'; then
       add_finding "warn" "binary_in_skill" "$rel" "0" "${mime:0:80}"
     fi
   done < <(
     find "$SKILL_DIR" -type f \
       ! -path '*/.git/*' ! -path '*/node_modules/*' ! -path '*/vendor/*' \
-      ! -regex '.*'"$TEXT_EXTS" \
       -print0 2>/dev/null
   )
 }

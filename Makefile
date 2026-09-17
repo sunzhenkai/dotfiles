@@ -27,10 +27,10 @@ acceptance:
 ci: registry test shellcheck secret-scan acceptance smoke bash32
 
 # 把第三方 skills.lock.yaml 升到各 source 当前 HEAD（先审计再写仓库）。
-# 警告默认 fail closed；确认后加 ACCEPT_WARN=1。
+# 警告默认接受并写入；要 fail closed 加 FAIL_ON_WARN=1。
 # critical 审计不过的条目会留在旧 revision，不阻断其它 source。
 skills-lock-update:
-	PYTHONUNBUFFERED=1 python3 src/agents/lock_update.py $(if $(filter 1,$(ACCEPT_WARN)),--accept-warn,)
+	PYTHONUNBUFFERED=1 python3 src/agents/lock_update.py $(if $(filter 1,$(FAIL_ON_WARN)),--fail-on-warn,)
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \

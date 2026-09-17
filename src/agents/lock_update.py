@@ -214,11 +214,11 @@ def _audit_skill(
     if rc == 0:
         return
     if rc == 1 and accept_warn:
-        print(f"warning: {item.id}: audit warnings accepted (--accept-warn)")
+        print(f"warning: {item.id}: audit warnings accepted")
         return
     if rc == 1:
         raise LockUpdateError(
-            f"{item.id}: audit reported warnings; re-run with --accept-warn after review"
+            f"{item.id}: audit reported warnings; re-run without --fail-on-warn after review"
         )
     raise AuditBlocked(f"{item.id}: audit failed (exit {rc})")
 
@@ -227,7 +227,7 @@ def update_lock(
     root: Path,
     *,
     dry_run: bool = False,
-    accept_warn: bool = False,
+    accept_warn: bool = True,
     run: Run = subprocess.run,
     audit: Audit | None = None,
     today: str | None = None,
@@ -340,14 +340,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--fail-on-warn",
+        action="store_true",
+        help="stop when audit-skill.sh exits 1 (warnings only); default is to accept warnings",
+    )
+    parser.add_argument(
         "--accept-warn",
         action="store_true",
-        help="continue when audit-skill.sh exits 1 (warnings only); critical keeps the old revision",
+        help="deprecated no-op; warnings are accepted by default",
     )
     args = parser.parse_args(argv)
     root = (args.root or repo_root()).resolve()
     try:
-        update_lock(root, dry_run=args.dry_run, accept_warn=args.accept_warn)
+        update_lock(root, dry_run=args.dry_run, accept_warn=not args.fail_on_warn)
     except LockUpdateError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

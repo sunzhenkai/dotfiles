@@ -95,16 +95,19 @@ bash "$AUDIT" "$AUDIT_DIR/src/<skill-path>"
 
 向用户报告审计摘要时包含：规则名、文件、行号、片段；**不要**复读可能含密钥的完整匹配内容。
 
-**复核通道（阻断项）**：脚本靠关键词正则命中，判不出上下文，误报是常态。`exit 2` 时 **MUST** 打开每处命中读原文，逐条给出「真风险 / 误报」的判断与依据，再交用户决定。判为误报也 **不得**自行安装：必须由用户明确豁免该条后才继续。**禁止**为了放行去改 `audit-skill.sh` 的关键词表——那只会让下一个 skill 漏检。
+**复核通道（阻断项）**：脚本靠关键词正则命中，判不出上下文，误报是常态。`exit 2` 时 **MUST** 打开每处命中读原文，逐条给出「真风险 / 误报」的判断与依据，再交用户决定。判为误报也 **不得**自行安装：必须由用户明确豁免该条后才继续。**禁止**为了给某个 skill 放行而删规则或放宽关键词——那只会让下一个 skill 漏检。安装当场不得改脚本。过宽 token、误把纯文本当二进制这类精度修复，走本 Skill 的更新流程。
 
 已知误报（复核时优先对照，见 `pretty-view-ppt/references/UPSTREAM.md` 实例）：
 
 | 命中规则 | 典型误报来源 |
 |----------|--------------|
 | `jailbreak_role` | MIT LICENSE 正文的 `without limitation` |
-| `browser_session` | 前端代码里的 `localStorage`、`cookie` |
-| `binary_in_skill` | 带 shebang 的纯文本脚本（`scripts/*.sh`、`scripts/*.py`）被 `file` 判成 executable |
-| `sudo_usage` / `force_push` 等 | 安全规范类 skill 在讲反面例子（脚本已尝试按「禁止/不要/avoid」跳过，但覆盖不全） |
+| `browser_session` | 前端代码里的 `localStorage`、`document.cookie`。文档写「不记录 cookie」应跳过 |
+| `credential_paths` | 清单里的 `.env` + `README` 曾因 `README` 命中 `read`；现要求独立单词 `read`/`cat`/`source` |
+| `eval_external` | Markdown 反引号 + 单词 Eval 不是 `eval $(curl …)` |
+| `internal_url` | JSON Schema `$id` 的 `https://*.local/schemas/…`、文档里的 `localhost` 开发地址不是内网主机 |
+| `binary_in_skill` | 真正的 ELF / Mach-O / PE32 / shared object。带 shebang 的纯文本脚本不再报 |
+| `sudo_usage` / `force_push` 等 | 安全规范类 skill 在讲反面例子（脚本已尝试按「禁止/不要/avoid/不记录」跳过，但覆盖不全） |
 
 **`-s '*'` / `--all` 批量安装**：应对**每个** skill 子目录分别审计；任一阻断则整批中止，除非用户明确只要通过项。
 

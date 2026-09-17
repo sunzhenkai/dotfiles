@@ -241,6 +241,7 @@ def test_update_lock_dry_run_and_audit_warn_do_not_write(tmp_path: Path) -> None
     with pytest.raises(lock_update.LockUpdateError, match="warnings"):
         lock_update.update_lock(
             dotfiles,
+            accept_warn=False,
             aliases={SOURCE: str(upstream)},
             audit=lambda path: (1, "warn"),
             today="2026-09-17",
@@ -249,7 +250,6 @@ def test_update_lock_dry_run_and_audit_warn_do_not_write(tmp_path: Path) -> None
 
     accepted = lock_update.update_lock(
         dotfiles,
-        accept_warn=True,
         aliases={SOURCE: str(upstream)},
         audit=lambda path: (1, "warn"),
         today="2026-09-17",
