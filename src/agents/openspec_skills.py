@@ -166,6 +166,11 @@ def _apply_generated(
     )
     if blocked:
         print(f"  ✗ {', '.join(blocked)}", flush=True)
+        for operation in blocking:
+            print(
+                f"  ✗ {operation.target}: {operation.conflict or 'conflict'}",
+                flush=True,
+            )
 
     if dry_run:
         return 1 if blocked else 0

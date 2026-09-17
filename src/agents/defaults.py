@@ -29,6 +29,7 @@ from managed_runtime import (
     AgentRuntimeConflict,
     OnConflict,
     OnTakeover,
+    adoptable_equivalent,
     apply_skills_plan,
     compile_skills_plan,
     on_conflict_from_env,
@@ -173,6 +174,15 @@ def install_defaults(
                         on_conflict=policy,
                         on_takeover=takeover,
                     )
+                    adoptable = {item.target for item in adoptable_equivalent(plan)}
+                    for operation in plan.conflicts:
+                        if operation.target in adoptable:
+                            continue
+                        print(
+                            f"  ✗ {operation.target}: {operation.conflict or 'conflict'}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     result = apply_skills_plan(plan, renderer)
                     skipped = ",".join(result.skipped_skills) if result.skipped_skills else ""
                     print(

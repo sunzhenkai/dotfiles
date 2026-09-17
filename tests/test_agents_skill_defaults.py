@@ -301,6 +301,59 @@ def test_third_party_install_copies_unlisted_runtime_files(
     assert not (installed / "patches").exists()
 
 
+def test_install_conflict_reports_file_and_reason(
+    tmp_path: Path,
+    tmp_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8"
+    )
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    content_hash = third_party.tree_hash(skill)
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    _write_min_repo(
+        repo,
+        "schema_version: 1\nkind: third-party-skills-lock\nskills:\n"
+        "  - id: demo\n    source: https://github.com/example/demo\n"
+        f"    revision: '{revision}'\n    subdirectory: skill\n    content_hash: {content_hash}\n"
+        f"    license: {{spdx: MIT, file: LICENSE, hash: {license_hash}}}\n"
+        "    audit: {status: approved, date: '2026-09-04', tool: test-review-v1, evidence: https://example.com/audit/demo}\n",
+        ids=["demo"],
+    )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    target = destination / "demo" / "SKILL.md"
+    target.write_text("local edit\n", encoding="utf-8")
+    capsys.readouterr()
+
+    assert defaults.install_defaults(repo, dest_root=destination) == 1
+
+    captured = capsys.readouterr()
+    assert str(target) in captured.err
+    assert "owned target was modified locally" in captured.err
+
+
 def _lock_body_for(
     content_hash: str, license_hash: str, revision: str, *, extra_entry: bool
 ) -> str:

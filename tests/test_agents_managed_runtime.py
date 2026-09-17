@@ -439,6 +439,32 @@ def test_local_and_unowned_conflicts_are_preserved(tmp_path: Path) -> None:
     assert unowned.read_text(encoding="utf-8") == "local\n"
 
 
+def test_missing_owned_target_with_stale_identity_is_recreated(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    expected = target.read_bytes()
+    target.unlink()
+
+    manifest = _manifest(home)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    item = next(entry for entry in data["items"] if entry["target"] == str(target))
+    item["source_identity"] = "agents/skills@old-lock/demo/SKILL.md"
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    manifest.chmod(0o600)
+
+    result = _run(repo, home)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == expected
+    updated = json.loads(manifest.read_text(encoding="utf-8"))
+    current = next(entry for entry in updated["items"] if entry["target"] == str(target))
+    assert current["source_identity"] == "agents/skills/demo/SKILL.md"
+
+
 def test_locally_modified_to_new_expected_bytes_still_conflicts(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"

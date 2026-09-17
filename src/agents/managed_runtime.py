@@ -691,7 +691,15 @@ def compile_owned_plan(
                         **conflict_kw,
                     ))
                 continue
-            if prior.owner != item.owner or prior.source_identity != item.source_identity:
+            if actual.state == "missing":
+                # A missing target has no local bytes to protect. Recreate it
+                # even when a lock update moved our ownership identity, instead
+                # of treating the stale manifest entry as a blocking conflict.
+                operations.append(RuntimeOperation(
+                    "create", "create", item.target, item.source_identity,
+                    item.expected_hash, None, prior.installed_hash, None, item, prior, "missing",
+                ))
+            elif prior.owner != item.owner or prior.source_identity != item.source_identity:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, IDENTITY_MISMATCH, item, prior,
@@ -702,11 +710,6 @@ def compile_owned_plan(
                     item.target, item.source_identity, item.expected_hash, actual,
                     prior.installed_hash, "target path contains a symlink or unsafe type", item, prior,
                     **conflict_kw,
-                ))
-            elif actual.state == "missing":
-                operations.append(RuntimeOperation(
-                    "create", "create", item.target, item.source_identity,
-                    item.expected_hash, None, prior.installed_hash, None, item, prior, "missing",
                 ))
             elif actual.digest != prior.installed_hash:
                 operations.append(_conflict(
