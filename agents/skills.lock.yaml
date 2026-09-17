@@ -5,9 +5,9 @@ kind: third-party-skills-lock
 skills:
   - id: agent-roster
     source: https://github.com/sunzhenkai/agent-roster
-    revision: 5d1d94962848fa396845c2024c596a37421c64c8
+    revision: 5a8e4c97f7ca5363297fe0fab8167eb1918f0a99
     subdirectory: skills/agent-roster
-    content_hash: fbfe76f6c30f3fb17acef1909e2a89f095a2028bc6749c19961e46c981d2d219
+    content_hash: 6f4aa94b27eea97b89203e817f58641f86532f40af9b55f2e322a6ec7ec32f4d
     license:
       spdx: MIT
       file: LICENSE
@@ -16,7 +16,7 @@ skills:
       status: approved
       date: '2026-09-17'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/agent-roster/commit/5d1d94962848fa396845c2024c596a37421c64c8
+      evidence: https://github.com/sunzhenkai/agent-roster/commit/5a8e4c97f7ca5363297fe0fab8167eb1918f0a99
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: 3cca18b368ae95cdbdebbff572ccafa662551015
