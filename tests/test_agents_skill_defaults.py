@@ -441,3 +441,62 @@ def test_lock_digest_change_reowns_equivalent_third_party_bytes(
     identity_after = recorded_identity()
     assert identity_after != identity_before
     assert identity_after.endswith("demo/SKILL.md")
+
+
+def test_relocked_third_party_content_updates_pristine_target(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Re-locking a skill to new upstream bytes must update an untouched target.
+
+    The lock digest and the skill content move together on every `skills-lock-update`,
+    so the identity mismatch and the new content arrive in the same run. A target
+    still byte-identical to what we installed has no local edit to review, so it
+    gets the new bytes instead of being reported as a conflict.
+    """
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    revision = "1" * 40
+
+    def relock(rev: str) -> None:
+        _write_min_repo(
+            repo,
+            _lock_body_for(third_party.tree_hash(skill), license_hash, rev, extra_entry=False),
+            ids=["demo"],
+        )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, lock.skills[0].revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    relock(revision)
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    target = destination / "demo" / "SKILL.md"
+    installed = target.read_bytes()
+
+    # Upstream published a new body; re-locking rewrites content hash and digest.
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo\ndescription: demo\n---\nnew upstream body\n", encoding="utf-8"
+    )
+    relock("2" * 40)
+    capsys.readouterr()
+
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    captured = capsys.readouterr()
+    assert "identity differs" not in captured.err
+    assert target.read_bytes() != installed
+    assert b"new upstream body" in target.read_bytes()

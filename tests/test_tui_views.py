@@ -429,6 +429,7 @@ def test_load_instructions_reports_missing_targets(home):
     rows = load_instructions(ROOT)
     assert {r.target_id: r.drift for r in rows} == {
         "agents": "missing",
+        "claude": "missing",
         "codex": "missing",
         "cursor": "missing",
     }

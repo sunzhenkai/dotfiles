@@ -69,9 +69,10 @@ _REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT})
 
 # Third-party identity embeds the whole-lock digest, so adding or removing one
 # lock entry rewrites the identity of every already-installed third-party skill.
-# A target still owned by us whose bytes already equal the newly locked content
-# is re-recorded under the new identity instead of conflicting: no unverified
-# content is written, and real drift (bytes differ) still fails closed.
+# A target still owned by us is re-recorded under the new identity instead of
+# conflicting when it holds either the newly locked content or exactly the bytes
+# and mode we recorded installing. Real drift (the target no longer matches what
+# we installed) still fails closed.
 IDENTITY_MISMATCH = "manifest ownership identity differs"
 
 # A target we did not install, but whose bytes already match what we would write.
@@ -175,6 +176,11 @@ class SkillsPlan:
     only_ids: frozenset[str] | None = None
     on_conflict: OnConflict = "block"
     on_takeover: OnTakeover = "skip"
+    # Skill-atomic skip: a conflict may quarantine its whole Skill directory and
+    # let the rest of the run succeed. Only plans whose target root holds one
+    # directory per Skill may do that; a flat root (instruction files under HOME)
+    # would read each dotdir as a Skill id and swallow the conflict.
+    isolate_by_skill: bool = False
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -556,10 +562,16 @@ def _conflict(
         and prior is not None
         and expected.owner == prior.owner
         and actual.digest is not None
-        and actual.digest == expected_hash
+        and (
+            # Same owner, same bytes as the newly locked content: only the
+            # attested identity moved (the lock file changed).
+            actual.digest == expected_hash
+            # Or the target is still byte-for-byte what we installed, so the
+            # source moved underneath a pristine target. There is no local
+            # content to review, so write the new bytes and re-record.
+            or (actual.digest == installed_hash and actual.mode == prior.mode)
+        )
     ):
-        # Same owner, same bytes as the newly locked content: only the attested
-        # identity moved (the lock file changed). Re-record it without review.
         return RuntimeOperation(
             "update", "update", target, source_identity, expected_hash,
             actual.digest, installed_hash, reason, expected, prior, actual.state, True,
@@ -636,6 +648,7 @@ def compile_skills_plan(
         on_conflict=on_conflict,
         on_takeover=on_takeover,
         outside_root_message="stale manifest target is outside the skills root",
+        isolate_by_skill=True,
     )
 
 
@@ -654,6 +667,7 @@ def compile_owned_plan(
     on_conflict: OnConflict = "block",
     on_takeover: OnTakeover = "skip",
     outside_root_message: str = "stale manifest target is outside the owned root",
+    isolate_by_skill: bool = False,
 ) -> SkillsPlan:
     """Compile ownership decisions for an explicit set of HOME files."""
     snapshot = _read_manifest(home, state)
@@ -793,6 +807,7 @@ def compile_owned_plan(
         only_ids,
         on_conflict,
         on_takeover,
+        isolate_by_skill,
     )
 
 
@@ -1060,6 +1075,30 @@ def apply_skills_plan(
     return apply_owned_plan(plan, compile_current, run_id=run_id)
 
 
+def _quarantined_skills(
+    plan: SkillsPlan,
+    blocking: list[RuntimeOperation],
+) -> set[str]:
+    """Skill ids to quarantine so the rest of the run can proceed.
+
+    A conflict the plan cannot attribute to one Skill directory has no smaller
+    unit to isolate, so it aborts the whole run instead of being swallowed.
+    """
+    skipped: set[str] = set()
+    for operation in blocking:
+        skill_id = (
+            skill_id_from_target(operation.target, plan.target_root)
+            if plan.isolate_by_skill
+            else None
+        )
+        if skill_id is None:
+            raise AgentRuntimeConflict(
+                f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
+            )
+        skipped.add(skill_id)
+    return skipped
+
+
 def _plan_excluding_skills(plan: SkillsPlan, skip: frozenset[str]) -> SkillsPlan:
     if not skip:
         return plan
@@ -1115,14 +1154,7 @@ def apply_owned_plan(
             for operation in current.conflicts
             if operation.target not in adoptable_targets
         ]
-        skipped: set[str] = set()
-        for operation in blocking:
-            skill_id = skill_id_from_target(operation.target, current.target_root)
-            if skill_id is None:
-                raise AgentRuntimeConflict(
-                    f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
-                )
-            skipped.add(skill_id)
+        skipped = _quarantined_skills(current, blocking)
 
         # Take over unowned targets that already hold the managed bytes, then
         # re-plan so they come back as creates under our ownership. Nothing
@@ -1140,16 +1172,10 @@ def apply_owned_plan(
             current = compile_current()
             # Recompute skip set after replan (adopted creates no longer conflict).
             adoptable_after = {item.target for item in adoptable_equivalent(current)}
-            skipped = set()
-            for operation in current.conflicts:
-                if operation.target in adoptable_after:
-                    continue
-                skill_id = skill_id_from_target(operation.target, current.target_root)
-                if skill_id is None:
-                    raise AgentRuntimeConflict(
-                        f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
-                    )
-                skipped.add(skill_id)
+            skipped = _quarantined_skills(
+                current,
+                [item for item in current.conflicts if item.target not in adoptable_after],
+            )
 
         skipped_frozen = frozenset(skipped)
         skipped_priors = [
