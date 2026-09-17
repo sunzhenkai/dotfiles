@@ -3,6 +3,20 @@
 schema_version: 1
 kind: third-party-skills-lock
 skills:
+  - id: agent-roster
+    source: https://github.com/sunzhenkai/agent-roster
+    revision: 5d1d94962848fa396845c2024c596a37421c64c8
+    subdirectory: skills/agent-roster
+    content_hash: fbfe76f6c30f3fb17acef1909e2a89f095a2028bc6749c19961e46c981d2d219
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-17'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/agent-roster/commit/5d1d94962848fa396845c2024c596a37421c64c8
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: 3cca18b368ae95cdbdebbff572ccafa662551015

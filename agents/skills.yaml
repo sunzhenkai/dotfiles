@@ -57,6 +57,13 @@ groups:
       # - to-tickets
       # - wayfinder
 
+  agent-roster:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/agent-roster
+    skills:
+      - agent-roster
+
   ui-templates:
     type: third-party
     source: github
