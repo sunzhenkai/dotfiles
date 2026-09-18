@@ -17,6 +17,7 @@ groups:
   dotfiles:
     type: first-party
     skills:
+      - agent-roster-flow
       - commit-push
       - dotf-code-explore
       - dotf-code-review

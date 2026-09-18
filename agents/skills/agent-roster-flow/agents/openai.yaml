@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Roster Flow"
+  short_description: "跨 agent 分 Stage 编排：每步确认 Endpoint 与模型，执行才委派"
+  default_prompt: "用 $agent-roster-flow 按理解 → 定方案 → 方案评审 → 实现 → 可选代码评审 → 收尾推进。决策留在本会话，执行委托 $agent-roster。"

@@ -1,0 +1,79 @@
+version: 1
+skill: agent-roster-flow
+cases:
+  - id: decisions-on-surface
+    kind: core
+    judge: deterministic
+    description: 需要人点头的选择只在 Orchestrator 会话收集
+    given: 进入任一 Stage
+    expect:
+      must:
+        - Assignment / Track / 代码评审做不做 / 审查范围在本会话确认
+        - 受派 prompt 只含 Frozen Input
+      must_not:
+        - 让受派方再问用户同一件事
+        - 把确认丢进 acpx exec 的会话
+
+  - id: no-direct-acpx
+    kind: core
+    judge: deterministic
+    description: 派出走 agent-roster，并带上 model
+    given: Assignment 已确认且该 Stage 需要派出
+    expect:
+      must:
+        - 委托 $agent-roster
+        - 契约携带 endpoint 与 model
+      must_not:
+        - 本 skill 直接调用 acpx
+        - 契约无 model 字段时把模型只写进 prompt 继续派出
+
+  - id: assignment-from-script
+    kind: core
+    judge: deterministic
+    description: Assignment 菜单来自 list_assignments.py
+    given: 派出前确认 Endpoint 与 Model
+    expect:
+      must:
+        - 跑 scripts/list_assignments.py --stage <stage-id>
+        - 等人选择后再写 decision.md 并派出
+      must_not:
+        - 手编 Endpoint 列表
+        - 把名册里没有的 Endpoint 当成可用
+
+  - id: resident-understand
+    kind: core
+    judge: deterministic
+    description: 理解 Stage 住在本会话
+    given: Flow 开始
+    expect:
+      must:
+        - grill-with-docs 或 task-explore explore 在 Orchestrator 会话进行
+        - spine 记录 Orchestrator 的 Kind 与 Model
+      must_not:
+        - 把 grill 派给另一个 Endpoint
+
+  - id: optional-code-review
+    kind: core
+    judge: deterministic
+    description: 代码评审可选且绑定 dotf-code-review
+    given: 实现 Stage 完成
+    expect:
+      must:
+        - 在本会话问做不做；Simple 默认跳过
+        - 选做则派出执行 $dotf-code-review
+      must_not:
+        - 代码评审选 human
+        - 用通用 agent 逐文件替代 ocr 审查
+
+  - id: no-third-ledger
+    kind: core
+    judge: deterministic
+    description: 不另造项目内账本
+    given: 一次 Flow
+    expect:
+      must:
+        - spine 写在 ~/.cache/agent-roster/flows/
+        - Medium/Complex 复用 openspec / tasks / docs/reviews 已有路径
+      must_not:
+        - 在项目里建 .agent-roster-flow/
+        - 把 OpenSpec/tasks 产物复制第二份

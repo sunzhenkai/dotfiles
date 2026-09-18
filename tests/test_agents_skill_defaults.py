@@ -56,6 +56,7 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "wizard" not in catalog.default_ids()
     assert "to-questionnaire" not in catalog.default_ids()
     assert "commit-push" in catalog.default_ids()
+    assert "agent-roster-flow" in catalog.default_ids()
     assert "wait-what" in catalog.default_ids()
     assert "writing-for-agents" in catalog.default_ids()
     assert "ask-matt" not in ids
