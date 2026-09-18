@@ -295,6 +295,10 @@ def _skill_catalog_ids(repo_root: Path) -> frozenset[str]:
                 skill_id = member.get("id") if isinstance(member, dict) else member
                 if isinstance(skill_id, str) and skill_id and not skill_id.startswith("openspec-"):
                     ids.add(skill_id)
+                if isinstance(member, dict):
+                    for alias in member.get("aliases") or []:
+                        if isinstance(alias, str) and alias and not alias.startswith("openspec-"):
+                            ids.add(alias)
     return frozenset(ids)
 
 

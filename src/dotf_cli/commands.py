@@ -154,7 +154,7 @@ _SKILLS_HELP = """用法: dotf skills -c|--config [选项...]
   add 通过 npx skills 安装；未指定范围时交互选择用户级或项目级
   -i 通过 npx skills 安装；<package> 一般直接写 skill 名称（兼容语法）
   -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除
-  <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id，
+  <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id 或 alias，
   最后按字面透传给 npx skills 搜索；一手 skill 请用 dotf agents skill apply
   也可写 owner/repo 或 URL 来指定来源仓库
   默认交互式：npx skills 会询问安装位置与目标 agents
@@ -383,7 +383,7 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
     if kind != "skill":
         raise DotfError("usage", f"错误: 未知 agents 制品 '{kind}'")
     if verb not in ("apply", "remove"):
-        print(f"用法: dotf agents {kind} apply|remove <id>")
+        print(f"用法: dotf agents {kind} apply|remove <id|alias>")
         return 1
 
     rest = argv[2:]
@@ -442,7 +442,12 @@ def cmd_agents_artifact(ctx: Ctx, argv: list[str]) -> int:
     if group_ids:
         plan_and_run(ctx, action, modules_csv=",".join(f"skill:{g}" for g in group_ids))
         return 0
-    plan_and_run(ctx, action, modules_csv=f"skill:{skill_id}")
+    canon = skills_map_py("--canonical", skill_id, capture=True)
+    sys.stderr.write(canon.stderr)
+    if canon.returncode != 0:
+        return 1
+    canonical_id = next((line for line in canon.stdout.splitlines() if line.strip()), skill_id)
+    plan_and_run(ctx, action, modules_csv=f"skill:{canonical_id}")
     return 0
 
 

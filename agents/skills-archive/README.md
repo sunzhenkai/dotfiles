@@ -15,3 +15,4 @@
 | 名称 | 下线原因 |
 |------|----------|
 | `task-design` | 设计流程并入 `task-explore` 的 `design` 阶段；文档落在任务目录，不再写 `docs/design/` |
+| `pretty-view-ppt` | 按用户要求从编目下线归档（2026-09-18）；HTML 演示文稿场景可由第三方 `frontend-slides`（别名 `ppt`）承接 |

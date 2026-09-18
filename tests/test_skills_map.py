@@ -47,6 +47,36 @@ def test_third_party_skill_id_resolves_to_its_package() -> None:
     ]
 
 
+def test_skill_alias_resolves_to_canonical_package() -> None:
+    result = run_resolver("ppt")
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "https://github.com/zarazhangrui/frontend-slides",
+        "-s",
+        "frontend-slides",
+    ]
+
+
+def test_canonical_flag_maps_alias_to_id() -> None:
+    result = run_resolver("ppt", "--canonical")
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["frontend-slides"]
+
+
+def test_map_alias_resolves_like_skill_id(tmp_path: Path) -> None:
+    map_file = tmp_path / "skills.yaml"
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  demo:\n    type: third-party\n    source: github\n"
+        "    package: owner/one\n    skills:\n"
+        "      - id: slides\n        optional: true\n        aliases: [ppt]\n",
+    )
+    result = run_resolver("ppt", "--map", str(map_file))
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["owner/one", "-s", "slides"]
+
+
 def test_remove_mode_group_resolves_installed_skill_names() -> None:
     result = run_resolver("ui-templates", "--remove")
     assert result.returncode == 0

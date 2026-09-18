@@ -2,8 +2,9 @@
 """Resolve `dotf skills -i/-r <name>` inputs against the unified skill catalog.
 
 Priority: match a group name (expand to its ids) -> match a catalogued skill id
--> pass the raw name through to `npx skills` (search). A name that is both a
-group and a skill id resolves as the group, with a notice to stderr.
+or alias -> pass the raw name through to `npx skills` (search). A name that is
+both a group and a skill id resolves as the group, with a notice to stderr.
+Aliases resolve to the canonical catalog id before npx / apply.
 """
 
 from __future__ import annotations
@@ -38,14 +39,15 @@ def resolve(
 ) -> tuple[list[str], int]:
     """Resolve one input name to `npx skills add/remove` arguments.
 
-    Order: group -> skill id -> passthrough. A raw npx package spec or an
-    unknown name is passed through unchanged.
+    Order: group -> skill id or alias -> passthrough. A raw npx package spec or
+    an unknown name is passed through unchanged.
     """
     catalog = _load_catalog_file(catalog_path)
     if catalog is None:
         return [name], 0
     packages = {entry.id: (entry.package or "") for entry in catalog.skills}
     groups = {group.name: group.ids for group in catalog.groups}
+    resolved_name = catalog.canonical_id(name) or name
 
     # 1. group (a name expanding to its member ids)
     if name in groups:
@@ -80,17 +82,17 @@ def resolve(
             args += ["-s", skill_id]
         return args, 0
 
-    # 2. skill id (must be third-party to install via npx)
-    if name in packages:
-        pkg = packages[name]
+    # 2. skill id or alias (must be third-party to install via npx)
+    if resolved_name in packages:
+        pkg = packages[resolved_name]
         if not pkg:
             return _fail(
-                f"'{name}' is a first-party skill installed from the repo, not via npx; "
-                f"use `dotf agents skill apply {name}`"
+                f"'{resolved_name}' is a first-party skill installed from the repo, not via npx; "
+                f"use `dotf agents skill apply {resolved_name}`"
             )
         if for_remove:
-            return [name], 0
-        return [pkg, "-s", name], 0
+            return [resolved_name], 0
+        return [pkg, "-s", resolved_name], 0
 
     # 3. passthrough to npx skills (its own search/registry resolution)
     return [name], 0
@@ -118,12 +120,21 @@ def expand_group(catalog_path: Path, name: str) -> tuple[list[str], int]:
     return [], 0
 
 
+def canonical_name(catalog_path: Path, name: str) -> tuple[str | None, int]:
+    """Return the canonical catalog id for a skill id or alias."""
+    catalog = _load_catalog_file(catalog_path)
+    if catalog is None:
+        return None, 0
+    return catalog.canonical_id(name), 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Resolve dotf skills short names")
     parser.add_argument("name", help="skill group, skill id, or raw npx package spec")
     parser.add_argument("--remove", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--map", type=Path, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--expand-group", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--canonical", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     catalog_path = args.map if args.map is not None else repo_root() / CATALOG_REL
     if args.expand_group:
@@ -132,6 +143,13 @@ def main(argv: list[str] | None = None) -> int:
             return rc
         for item in members:
             print(item)
+        return 0
+    if args.canonical:
+        canonical, rc = canonical_name(catalog_path, args.name)
+        if rc != 0:
+            return rc
+        if canonical:
+            print(canonical)
         return 0
     resolved, rc = resolve(catalog_path, args.name, for_remove=args.remove)
     if rc != 0:

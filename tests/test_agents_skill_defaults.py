@@ -52,6 +52,11 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert by_id["en-chat"].optional is True
     assert by_id["wizard"].optional is True
     assert by_id["to-questionnaire"].optional is True
+    assert by_id["frontend-slides"].optional is True
+    assert by_id["frontend-slides"].aliases == ("ppt",)
+    assert catalog.canonical_id("ppt") == "frontend-slides"
+    assert "frontend-slides" in ids
+    assert "frontend-slides" not in catalog.default_ids()
     assert "lark-cli" not in catalog.default_ids()
     assert "wizard" not in catalog.default_ids()
     assert "to-questionnaire" not in catalog.default_ids()
@@ -73,6 +78,8 @@ groups:
       - commit-push
       - id: lark-cli
         optional: true
+        aliases:
+          - lark
 """
 
 
@@ -82,6 +89,10 @@ def test_catalog_optional_member_form() -> None:
     by_id = catalog.by_id()
     assert by_id["commit-push"].optional is False
     assert by_id["lark-cli"].optional is True
+    assert by_id["lark-cli"].aliases == ("lark",)
+    assert catalog.canonical_id("lark") == "lark-cli"
+    assert catalog.canonical_id("commit-push") == "commit-push"
+    assert catalog.canonical_id("missing") is None
     assert catalog.default_ids() == ["commit-push"]
     assert catalog.ids() == ["commit-push", "lark-cli"]
 
@@ -100,6 +111,23 @@ def test_catalog_optional_member_form_rejects_bad_shapes() -> None:
         catalog_mod.parse_catalog(
             yaml.safe_load(_OPTIONAL_CATALOG.replace("- id: lark-cli", "- id: ''"))
         )
+
+
+def test_catalog_alias_collides_with_skill_id() -> None:
+    catalog_mod = _load("skills_catalog")
+    with pytest.raises(catalog_mod.SkillsCatalogError, match="collides with skill id"):
+        catalog_mod.parse_catalog(
+            yaml.safe_load(_OPTIONAL_CATALOG.replace("- lark", "- commit-push"))
+        )
+
+
+def test_catalog_duplicate_alias_is_rejected() -> None:
+    catalog_mod = _load("skills_catalog")
+    body = _OPTIONAL_CATALOG + (
+        "      - id: extra\n        optional: true\n        aliases:\n          - lark\n"
+    )
+    with pytest.raises(catalog_mod.SkillsCatalogError, match="duplicate alias"):
+        catalog_mod.parse_catalog(yaml.safe_load(body))
 
 
 def _write_min_repo(repo: Path, lock_body: str, *, ids: list[str]) -> None:

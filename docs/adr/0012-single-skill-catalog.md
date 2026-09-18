@@ -24,6 +24,8 @@
 
 ## 名字解析
 
-`dotf skills -i/-r <name>` 与 `dotf agents skill apply/remove <name>` 顺序为：**先 group → 再 skill id → 最后透传 npx skills**。group 与 id 同名时按 group，并打印提示。对一手 id 使用 `dotf skills -i` SHALL 拒绝并提示改用 `dotf agents skill apply <id>`。
+> 2026-09-18 修订：成员映射可写 `aliases`，解析顺序变为 group → skill id 或 alias → 透传 npx，详见 ADR-0023。
+
+`dotf skills -i/-r <name>` 与 `dotf agents skill apply/remove <name>` 顺序为：**先 group → 再 skill id 或 alias → 最后透传 npx skills**。group 与 id 同名时按 group，并打印提示。对一手 id 使用 `dotf skills -i` SHALL 拒绝并提示改用 `dotf agents skill apply <id>`。
 
 本 ADR 取代 ADR-0007 关于「默认集合组成来源」的表述；overlay 语义与 prune 绑定仍以 ADR-0003 / 0007 为准。

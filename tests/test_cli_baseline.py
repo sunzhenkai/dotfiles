@@ -149,6 +149,15 @@ def test_skills_add_resolves_catalog_skill_and_project_scope(tmp_home: Path) -> 
     )
 
 
+def test_skills_add_resolves_catalog_alias(tmp_home: Path) -> None:
+    result = run_dotf("skills", "add", "ppt", "--project", "--dry-run")
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add https://github.com/zarazhangrui/frontend-slides"
+        " -s frontend-slides" in result.stdout
+    )
+
+
 def test_skills_add_global_scope_passes_global_flag(tmp_home: Path) -> None:
     result = run_dotf(
         "skills",

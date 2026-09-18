@@ -33,6 +33,7 @@ groups:
       - <skill-id>
       - id: <skill-id>
         optional: true                  # 可选：编目内但默认不装，可经 overlay / apply 启用
+        aliases: [ppt]                  # 可选：CLI 短名，解析为正规 id
 ```
 
 - 组声明来源属性；成员只写 id，**不可能在组内写错来源**。
@@ -48,10 +49,12 @@ groups:
 | `dotfiles` | first-party | — | — | 19 |
 | `mattpocock` | third-party | github | `mattpocock/skills` | 10（含 2 optional） |
 | `ui-templates` | third-party | github | `sunzhenkai/ui-templates-skill` | 3 |
+| `ui-skills` | third-party | github | `ibelick/ui-skills` | 1 optional |
+| `frontend-slides` | third-party | github | `zarazhangrui/frontend-slides` | 1 optional（别名 `ppt`） |
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
 - `ui-template-design` 在编目内 → 会默认安装（其 lock 条目已补，钉在 `446922a`）。
-- `lark-cli` / `en-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id>` 按需启用。
+- `lark-cli` / `en-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` / `frontend-slides` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
 - `taste-skill` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` 会把它当普通名字透传给 npx。
 
 ## 4. 核心决策
@@ -101,7 +104,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 `dotf skills -i/-r <name>` 与 `dotf agents skill apply/remove <name>`：
 
 1. **group 名** → 展开成员（`skills -i` 要求同组同 package，否则要求逐条）
-2. **skill id** → 单个
+2. **skill id 或 alias** → 单个正规 id（别名先收成编目 id）
 3. **透传 npx**（仅 `dotf skills -i`）
 
 - group 与 id 同名 → 优先 group，打印提示。
@@ -115,13 +118,13 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。
 4. 编目里每个 third-party id 必须在 lock 覆盖；一手 id 不得在 lock。
 5. overlay 只能启用/停用编目内 id。
-6. `optional` 只允许写在成员映射上，且必须是布尔；optional 条目与其他条目一样参与 1–5 全部校验。
+6. `optional` 只允许写在成员映射上，且必须是布尔；`aliases` 只允许写在成员映射上，且必须是非空 id 列表。optional / alias 条目与其他条目一样参与 1–5 全部校验。别名不得与 skill id、group 名或其他别名冲突。
 
 ## 6. 对代码的影响
 
 | 模块 | 变更 |
 |---|---|
-| `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺（支持 `optional: true` 映射）；无 default |
+| `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺（支持 `optional: true` 与 `aliases` 映射）；无 default |
 | `src/agents/layouts.py` | 安装目标注册表（shared / kiro / claude）+ owner/identity 前缀派生 |
 | `src/agents/defaults.py` | `catalog_skill_ids` 取代 `selected_default_ids`；lock 校验用组 type；遍历 LAYOUTS |
 | `src/agents/desired_set.py` | Desired Set = 编目非 optional ∪ overlay 启用 − 停用 |

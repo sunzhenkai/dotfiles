@@ -41,6 +41,13 @@ def test_optional_skill_enters_desired_set_via_overlay_enable() -> None:
     desired = resolve_skill_desired_set(ROOT, overlay_agents={"enabled_skills": ["lark-cli"]})
     assert "lark-cli" in desired
     assert "en-chat" not in desired
+    assert "frontend-slides" not in desired
+
+
+def test_optional_skill_alias_in_overlay_canonicalizes_to_id() -> None:
+    desired = resolve_skill_desired_set(ROOT, overlay_agents={"enabled_skills": ["ppt"]})
+    assert "frontend-slides" in desired
+    assert "ppt" not in desired
 
 
 def test_overlay_disable_removes_skill() -> None:

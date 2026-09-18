@@ -19,7 +19,7 @@ excluded_count=0
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    config/multiplexers/tmux/3rd/*|agents/skills/pretty-view-ppt/references/html-ppt/*)
+    config/multiplexers/tmux/3rd/*|agents/skills-archive/pretty-view-ppt/references/html-ppt/*)
       printf '%s\n' "$path" >>"$excluded"
       excluded_count=$((excluded_count + 1))
       ;;

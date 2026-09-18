@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from defaults import load_catalog
-from skills_catalog import SkillsCatalogError, load_skills_catalog
+from skills_catalog import SkillsCatalog, SkillsCatalogError, load_skills_catalog
 from dotf_core.overlays import OverlayError, catalog_from_repo, load_overlays
 from third_party import ThirdPartyLockError
 
@@ -33,6 +33,20 @@ def approved_skill_ids(root: Path) -> frozenset[str]:
     return frozenset(item for item in catalog.ids() if not item.startswith("openspec-"))
 
 
+def _canonical_skill_names(
+    catalog: SkillsCatalog, names: frozenset[str]
+) -> tuple[frozenset[str], list[str]]:
+    resolved: set[str] = set()
+    unknown: list[str] = []
+    for name in names:
+        canonical = catalog.canonical_id(name)
+        if canonical is None:
+            unknown.append(name)
+        else:
+            resolved.add(canonical)
+    return frozenset(resolved), sorted(unknown)
+
+
 def resolve_skill_desired_set(
     root: Path,
     *,
@@ -56,9 +70,13 @@ def resolve_skill_desired_set(
         if not entry.optional and not entry.id.startswith("openspec-")
     )
     agents = dict(overlay_agents) if overlay_agents is not None else _overlay_agents(root, home)
-    enabled = frozenset(agents.get("enabled_skills") or [])
-    disabled = frozenset(agents.get("disabled_skills") or [])
-    unknown = sorted((enabled | disabled) - known)
+    enabled, enabled_unknown = _canonical_skill_names(
+        catalog, frozenset(agents.get("enabled_skills") or [])
+    )
+    disabled, disabled_unknown = _canonical_skill_names(
+        catalog, frozenset(agents.get("disabled_skills") or [])
+    )
+    unknown = sorted(set(enabled_unknown) | set(disabled_unknown) | ((enabled | disabled) - known))
     openspec = sorted(item for item in enabled | disabled if item.startswith("openspec-"))
     if openspec:
         raise DesiredSetError("OpenSpec skills cannot enter Desired Set: " + ", ".join(openspec))

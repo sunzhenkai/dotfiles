@@ -52,11 +52,12 @@ agents 示例:
   dotf agents -d --json       # JSON 报告
   dotf agents -cd             # 先同步再诊断
   dotf agents -ic             # 先装后配
-  dotf agents skill apply <id>
-  dotf agents skill remove <id>   # 写本机 overlay 并 prune
+  dotf agents skill apply <id|alias>
+  dotf agents skill remove <id|alias>   # 写本机 overlay 并 prune
   dotf skills -c --yes
   dotf skills add ui-skills-root
   dotf skills -i frontend-design
+  dotf agents skill apply ppt     # frontend-slides 的别名
 
 示例:
   dotf init                   # OS profile 完整初始化

@@ -33,17 +33,17 @@ dotf -a --dry-run                      # 全量预览
 ```shell
 dotf agents -ic                     # 装 agent CLI 工具包 + 同步 skills/全局指令
 dotf agents -d --json               # 深度诊断（JSON 报告）
-dotf agents skill apply <id>        # 启用一条 Skill（写 overlay 并 sync，含该 id 的来源）
-dotf agents skill remove <id>       # 停用并 prune owned 目标
-dotf agents skill apply <id> --on-conflict=backup  # 先备份本机漂移再覆写
+dotf agents skill apply <id|alias>        # 启用一条 Skill（写 overlay 并 sync，含该 id 的来源）
+dotf agents skill remove <id|alias>       # 停用并 prune owned 目标
+dotf agents skill apply <id|alias> --on-conflict=backup  # 先备份本机漂移再覆写
 dotf skills -c                      # 安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
-dotf skills -i <group|skill>        # 按组装第三方 skill
+dotf skills -i <group|skill|alias>  # 按组装第三方 skill
 make skills-lock-update             # 升级第三方 lock 到各 source HEAD（审计通过才写仓库）
 ```
 
 注意：
 
-- Skill 真相源是编目 `agents/skills.yaml`（按 group 组织，编目内即默认安装，`optional: true` 条目除外——默认不装，可经 overlay 按需启用）；overlay 在 `agents/skills.lock.yaml`。
+- Skill 真相源是编目 `agents/skills.yaml`（按 group 组织，编目内即默认安装，`optional: true` 条目除外——默认不装，可经 overlay 按需启用；成员可写 `aliases` 作 CLI 短名，overlay / lock 仍只认正规 id）；overlay 在 `agents/skills.lock.yaml`。
 - Skill 装到三个 layout：`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`（清单见 `src/agents/layouts.py`）。
 - 安装产物（`~/.agents/AGENTS.md`、`~/.claude/CLAUDE.md`、各 vendor 配置、上述三个目录里由本系统生成的文件）不要手改，改了会被 `dotf agents --doctor` 判漂移。
 - Skill 源仓库位置约定：`.agents/skills/` 项目级、`agents/skills/` 公开共享源，见 `AGENTS.md`。

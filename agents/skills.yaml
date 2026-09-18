@@ -4,6 +4,8 @@
 #   例如 `dotf skills -i mattpocock` 展开为整组。
 # - 编目里的条目 = 默认全量安装（`dotf agents -c`）。条目可写成映射 `- id: <id>` 并加
 #   `optional: true`：仍在编目内（可经 overlay / agents apply 按需启用），但不进默认安装。
+#   同一映射可写 `aliases: [<name>]`：CLI 短名，解析为该条目的安装 id；overlay / lock /
+#   Desired Set 仍只认 id。别名不得与任何 skill id、group 名或其他别名冲突。
 #   不想保留就注释掉该条目：注释掉即不在编目内，于是既不自动装，也不能经 overlay /
 #   agents apply 引用，`dotf skills -i` 只会把它当普通名字透传给 npx。
 # - type 是语义字段：first-party 来源是仓库内 agents/skills/<id>/；
@@ -27,7 +29,6 @@ groups:
         optional: true
       - llm-wiki
       - pretty-view-html
-      - pretty-view-ppt
       - project-init
       - project-spec-mirror
       - repo-manager
@@ -87,6 +88,16 @@ groups:
     skills:
       - id: ui-skills-root
         optional: true
+
+  frontend-slides:
+    type: third-party
+    source: github
+    package: https://github.com/zarazhangrui/frontend-slides
+    skills:
+      - id: frontend-slides
+        optional: true
+        aliases:
+          - ppt
 
   # taste-skill 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
   # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。

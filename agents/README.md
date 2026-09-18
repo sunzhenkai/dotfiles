@@ -11,11 +11,11 @@ dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills → Kiro → Claude Code）+ 全局 AGENTS.md
 dotf skills -c                 # 安装编目 Desired Set 的全部 skill（一手 + 锁定第三方 + OpenSpec CLI）；不含 AGENTS.md
-dotf skills -i <name>          # npx skills 按需安装；先匹配 skills.yaml 的 group，再匹配 skill id，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
+dotf skills -i <name>          # npx skills 按需安装；先匹配 group，再匹配 skill id 或 alias，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
 dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
-dotf agents skill apply <id>   # 写入本机 overlay Desired Set 并 sync（含该 id 的来源）
-dotf agents skill remove <id>  # 停用并 prune owned 且未漂的目标（不改仓库）
-dotf agents skill apply <id> --on-conflict=backup  # 先备份本机漂移再覆写
+dotf agents skill apply <id|alias>   # 写入本机 overlay Desired Set 并 sync（含该 id 的来源）
+dotf agents skill remove <id|alias>  # 停用并 prune owned 且未漂的目标（不改仓库）
+dotf agents skill apply <id|alias> --on-conflict=backup  # 先备份本机漂移再覆写
 dotf agents -d                 # L0 诊断
 dotf agents -d --deep          # L0 + agents L1 深度诊断
 dotf agents -d --deep --json   # 深度诊断 JSON（凭据脱敏）
@@ -95,9 +95,9 @@ skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单�
 
 同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`，以及 Claude Code 的 `~/.claude/CLAUDE.md`（Claude Code 只读该文件名，不读 `AGENTS.md`）。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
 
-本机 Skill Desired Set = `agents/skills.yaml` 编目内非 optional id ∪ overlay `enabled_skills` − `disabled_skills`。**没有 default 字段**：编目内即默认全量安装；成员可写 `- id: <id>` + `optional: true` 映射表示"默认不装、可经 overlay / `agents skill apply` 按需启用"；不想保留就把该条目注释掉（注释即不在编目内，不自动装、也不能经 overlay / `agents skill apply` 引用）。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库编目 / lock。
+本机 Skill Desired Set = `agents/skills.yaml` 编目内非 optional id ∪ overlay `enabled_skills` − `disabled_skills`。**没有 default 字段**：编目内即默认全量安装；成员可写 `- id: <id>` + `optional: true` 映射表示"默认不装、可经 overlay / `agents skill apply` 按需启用"；同一映射可写 `aliases` 作 CLI 短名（overlay 若写别名会收成正规 id）。不想保留就把该条目注释掉（注释即不在编目内，不自动装、也不能经 overlay / `agents skill apply` 引用）。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库编目 / lock。
 
-`agents skill apply/remove <id>` 与 `agents -c` 一样会补齐该 id 所属来源：一手 id 走仓库目录；第三方 id 追加一次锁定获取（`acquire_all` 按 lock 条目逐条 fetch，所以一手 apply 不会走网络）。OpenSpec 的 `openspec-*` 只由 `agents -c` 安装。
+`agents skill apply/remove <id|alias>` 与 `agents -c` 一样会补齐该 id 所属来源：一手 id 走仓库目录；第三方 id 追加一次锁定获取（`acquire_all` 按 lock 条目逐条 fetch，所以一手 apply 不会走网络）。别名先收成正规 id 再写 overlay。OpenSpec 的 `openspec-*` 只由 `agents -c` 安装。
 
 一手 skill 来自 `agents/skills/`，并在 `agents/skills.yaml` 的 `dotfiles` 组编目（`type: first-party`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断一手 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
@@ -142,9 +142,9 @@ scripts/lib/dispatch_config.sh agents
 
 ## 示例条目
 
-仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`pretty-view-ppt`（将已有内容做成 HTML 演示文稿：html-ppt 为默认，点名 reveal.js 时走 html-slides）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-explore`（目标不明或长周期任务的探索/设计/归档）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 由 `dotf agents -c` 默认装到全部 skill layout（`openspec init --tools agents`），不必写入本目录或各项目 `.cursor/skills`；`taskflow` 在已安装时委托它们。
+仓库自带：`commit-push`、`en-chat`、`repo-manager`、`role-based-reviewer`、`service-manager`、`skills-store`、`skill-evolver`（从多次真实执行进化已有 Skill：候选 patch → 验证 → 晋升/拒绝，不直接改生产稿，也不在每次任务后自动改）、`skill-upgrader`（把已有 `SKILL.md` 一次性升级为带 `examples/` `evals/` `experience/` 的自进化结构，不伪造历史、不按单次失败改正文；真正改生产稿仍走 `skill-evolver`）、`pretty-view-html`（将已有内容做成 HTML 阅读页：走 `html-page` + 内嵌 `references/frontend-design`，并判断单页/扁平多页/层级多页）、`lark-cli`（飞书 CLI 薄路由，按需 `lark-cli skills read`）、`task-explore`（目标不明或长周期任务的探索/设计/归档）、`taskflow`（driver change 编排一批子 change，零脚本）。OpenSpec 阶段 skill 由 `dotf agents -c` 默认装到全部 skill layout（`openspec init --tools agents`），不必写入本目录或各项目 `.cursor/skills`；`taskflow` 在已安装时委托它们。
 
-第三方编目（`agents/skills.yaml` + `agents/skills.lock.yaml`）：`mattpocock/skills` 默认装 `setup-matt-pocock-skills`、`grill-with-docs`、`grilling`、`codebase-design`、`diagnosing-bugs`、`domain-modeling`、`wait-what`、`writing-for-agents`；`wizard`、`to-questionnaire` 标 `optional: true`（默认不装，可经 overlay / `dotf agents skill apply` 启用）；注释掉的还有 `to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`research`、`wayfinder`。另有 `sunzhenkai/ui-templates-skill` 的 `ui-template-author`、`ui-template-apply`、`ui-template-design`。由锁定目录安装到全部 skill layout（`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`），并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。`taste-skill` 的 group 已在编目中注释，故不自动装也不能经 overlay/apply 引用（其审计锁保留）；`dotf skills -i taste-skill` 会按字面透传给 npx 搜索安装。
+第三方编目（`agents/skills.yaml` + `agents/skills.lock.yaml`）：`mattpocock/skills` 默认装 `setup-matt-pocock-skills`、`grill-with-docs`、`grilling`、`codebase-design`、`diagnosing-bugs`、`domain-modeling`、`wait-what`、`writing-for-agents`；`wizard`、`to-questionnaire` 标 `optional: true`（默认不装，可经 overlay / `dotf agents skill apply` 启用）；注释掉的还有 `to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`research`、`wayfinder`。另有 `sunzhenkai/ui-templates-skill` 的 `ui-template-author`、`ui-template-apply`、`ui-template-design`，以及 optional 的 `ibelick/ui-skills`（`ui-skills-root`）与 `zarazhangrui/frontend-slides`（id `frontend-slides`，别名 `ppt`）。由锁定目录安装到全部 skill layout（`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`），并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。`taste-skill` 的 group 已在编目中注释，故不自动装也不能经 overlay/apply 引用（其审计锁保留）；`dotf skills -i taste-skill` 会按字面透传给 npx 搜索安装。
 
 ## Managed ownership 与冲突
 

@@ -9,7 +9,7 @@
 #### Scenario: 默认安装非 optional 编目条目
 - **WHEN** overlay 未声明任何 skill 停用或额外启用
 - **THEN** sync SHALL 仍安装全部非 optional 编目条目（一手与默认选中第三方）
-- **THEN** SHALL NOT 安装 optional 编目条目（如 `lark-cli`、`en-chat`）
+- **THEN** SHALL NOT 安装 optional 编目条目（如 `lark-cli`、`en-chat`、`frontend-slides`）
 - **THEN** SHALL NOT 要求用户先写 overlay
 
 #### Scenario: 停用后不再期望
@@ -21,6 +21,11 @@
 - **WHEN** overlay 启用一条编目内、但不在默认 Desired Set 中的 Skill（`optional: true` 条目或未默认选中的 Locked 第三方）
 - **THEN** Desired Set SHALL 包含它
 - **THEN** apply SHALL 能把它装到本机
+
+#### Scenario: 别名 apply 写入正规 id
+- **WHEN** 用户对编目别名（如 `ppt` → `frontend-slides`）请求 apply
+- **THEN** overlay SHALL 记录正规 id，不得把别名写进 Desired Set
+- **THEN** 随后 sync SHALL 按正规 id 安装
 
 #### Scenario: 拒绝未锁定 skill
 - **WHEN** 用户对未锁定的第三方 Skill 请求 apply

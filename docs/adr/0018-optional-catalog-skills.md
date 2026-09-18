@@ -6,6 +6,8 @@
 
 保留 ADR-0012 的其余决策：仍无 per-entry `default` 开关（optional 是唯一例外标记，默认行为仍是"装"）；注释掉条目 = 移出编目，照旧既不自动装也不可受管引用。schema 版本不变（v3，成员字符串形态保持合法，映射仅新增 `id`/`optional` 两键且 fail closed 校验）。
 
+> 2026-09-18 修订：成员映射再增加 `aliases`，见 ADR-0023；`optional` 语义不变。
+
 随之更新：`src/agents/skills_catalog.py`（成员解析 + `default_ids()`）、`src/agents/desired_set.py`（公式）、`src/dotf_core/overlays.py`（编目 id 收集识别映射成员）、spec `agents-desired-set` 的「Desired Set 组成」、`docs/design/skill-catalog.md`。TUI / doctor 只消费 desired_set，自然把 optional 条目显示为 available，无需另改。
 
 后果：已装这两台 skill 的机器在下次 `dotf agents -c` 时会被 prune（这正是目的）；需要时 `dotf agents skill apply lark-cli` 写 overlay 启用并同次 sync 装回。若未来 optional 形态不够用（如按 profile 区分默认集），再评估是否引入更一般的默认集声明。

@@ -37,7 +37,7 @@ def test_shellcheck_inventory_is_git_tracked_and_exclusions_are_visible() -> Non
     assert "git ls-files -z" in script
     assert "selected=$selected_count excluded_third_party=$excluded_count" in script
     assert "config/multiplexers/tmux/3rd/*" in script
-    assert "agents/skills/pretty-view-ppt/references/html-ppt/*" in script
+    assert "agents/skills-archive/pretty-view-ppt/references/html-ppt/*" in script
     assert "shellcheck is required (no silent skip)" in script
 
 

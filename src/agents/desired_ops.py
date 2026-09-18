@@ -109,8 +109,11 @@ def run_desired_op(
         if kind == "skill":
             if action not in {"skill.apply", "skill.remove"}:
                 raise DesiredSetError(f"动作与选择器不匹配: {action} {selector}")
-            if artifact_id not in approved_skill_ids(repo):
+            catalog = load_skills_catalog(repo)
+            canonical_id = catalog.canonical_id(artifact_id)
+            if canonical_id is None or canonical_id not in approved_skill_ids(repo):
                 raise DesiredSetError(f"拒绝未锁定或未知 skill: {artifact_id}")
+            artifact_id = canonical_id
             policy = on_conflict_from_env() if on_conflict is None else parse_on_conflict(on_conflict)
             takeover = on_takeover_from_env() if on_takeover is None else parse_on_takeover(on_takeover)
             if on_takeover is None and takeover == "skip":

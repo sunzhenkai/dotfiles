@@ -51,7 +51,7 @@ def _repo(tmp_path: Path) -> Path:
         "  dotfiles:\n    type: first-party\n    skills:\n      - demo\n"
         "  test:\n    type: third-party\n    source: github\n"
         "    package: https://github.com/example/demo\n"
-        f"    skills:\n      - {THIRD_PARTY}\n",
+        f"    skills:\n      - id: {THIRD_PARTY}\n        aliases: [ext]\n",
         encoding="utf-8",
     )
     (repo / "agents" / "skills.lock.yaml").write_text(
@@ -90,6 +90,19 @@ def test_third_party_apply_installs_the_locked_skill(
     assert rc == 0, capsys.readouterr()
     assert calls == [(repo, "block")]
     assert THIRD_PARTY in _enabled_skills(repo, tmp_home)
+
+
+def test_apply_via_alias_writes_canonical_id(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    repo = _repo(tmp_path)
+    import defaults
+
+    monkeypatch.setattr(defaults, "install_defaults", lambda *a, **k: 0)
+    rc = desired_ops.run_desired_op("skill.apply", "skill:ext", root=repo)
+    assert rc == 0, capsys.readouterr()
+    assert THIRD_PARTY in _enabled_skills(repo, tmp_home)
+    assert "ext" not in _enabled_skills(repo, tmp_home)
 
 
 def test_first_party_apply_stays_offline(

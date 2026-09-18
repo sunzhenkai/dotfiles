@@ -73,6 +73,20 @@ skills:
       date: '2026-09-17'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/mattpocock/skills/commit/74ca5fe077456a0b3b2f5310cf9430999fd0b5fd
+  - id: frontend-slides
+    source: https://github.com/zarazhangrui/frontend-slides
+    revision: 9906a34d640d2111f724544cbc50f7f130569ae1
+    subdirectory: plugins/frontend-slides/skills/frontend-slides
+    content_hash: d883c9a76d34ba943acccc2a28eb53c912d9558aac52f637886e402354936630
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: 62928eb197fe4662d1efc3af0735b3ba5df3c0308badd9a2baf2b619009f5366
+    audit:
+      status: approved
+      date: '2026-09-18'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/zarazhangrui/frontend-slides/commit/9906a34d640d2111f724544cbc50f7f130569ae1
   - id: grill-with-docs
     source: https://github.com/mattpocock/skills
     revision: 74ca5fe077456a0b3b2f5310cf9430999fd0b5fd

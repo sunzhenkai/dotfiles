@@ -432,7 +432,8 @@ cmd_skills() {
     echo "      dotf skills -r|--uninstall [skill-name] [选项...]"
     echo "  -i 通过 npx skills 安装；<package> 一般直接写 skill 名称"
     echo "  -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除"
-    echo "  <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id，"
+    echo "  <name> 解析顺序：先匹配 agents/skills.yaml 的 group，再匹配 skill id 或 alias，"
+
     echo "  最后按字面透传给 npx skills 搜索；一手 skill 请用 dotf agents skill apply"
     echo "  也可写 owner/repo 或 URL 来指定来源仓库"
     echo "  默认交互式：npx skills 会询问安装位置与目标 agents"

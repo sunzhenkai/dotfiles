@@ -15,7 +15,7 @@ _Avoid_: 工具, 包, package, 软件（作为清单行）, 配置项目, 项目
 _Avoid_: 插件, prompt, command（command 是另一种制品）
 
 **Skill Catalog**:
-`agents/skills.yaml`，全部 Skill 的唯一编目，**按 group 组织**。组声明 `type`（一手/第三方）与第三方 `source`/`package`，成员只写 id（或 `- id` + `optional: true` 映射）。**没有 default 字段**：编目内即自动全量安装，`optional: true` 条目是唯一例外（默认不装、可经 overlay 按需启用）；不想保留就注释掉条目。desired_set / lock 校验 / overlay / CLI 都读它。
+`agents/skills.yaml`，全部 Skill 的唯一编目，**按 group 组织**。组声明 `type`（一手/第三方）与第三方 `source`/`package`，成员只写 id（或 `- id` + `optional: true` + 可选 `aliases` 映射）。**没有 default 字段**：编目内即自动全量安装，`optional: true` 条目是唯一例外（默认不装、可经 overlay 按需启用）；不想保留就注释掉条目。`aliases` 是 CLI 短名，overlay / lock / Desired Set 仍只认正规 id。desired_set / lock 校验 / overlay / CLI 都读它。
 _Avoid_: skills-defaults（旧名）, 打平列表, skill 清单（含糊）
 
 **First-Party Skill**:
@@ -31,7 +31,7 @@ _Avoid_: 外部 skill, 上游 skill（作为制品名）
 _Avoid_: 未锁定 skill, 浮动上游
 
 **Skill Group**:
-编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id、最后透传 npx。
+编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id 或 alias、最后透传 npx。
 _Avoid_: type（两者正交）, 包, 命名空间（含糊）
 
 **Skill Layout**:

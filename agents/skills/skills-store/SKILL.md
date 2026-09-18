@@ -97,7 +97,7 @@ bash "$AUDIT" "$AUDIT_DIR/src/<skill-path>"
 
 **复核通道（阻断项）**：脚本靠关键词正则命中，判不出上下文，误报是常态。`exit 2` 时 **MUST** 打开每处命中读原文，逐条给出「真风险 / 误报」的判断与依据，再交用户决定。判为误报也 **不得**自行安装：必须由用户明确豁免该条后才继续。**禁止**为了给某个 skill 放行而删规则或放宽关键词——那只会让下一个 skill 漏检。安装当场不得改脚本。过宽 token、误把纯文本当二进制这类精度修复，走本 Skill 的更新流程。
 
-已知误报（复核时优先对照，见 `pretty-view-ppt/references/UPSTREAM.md` 实例）：
+已知误报（复核时优先对照，见 `agents/skills-archive/pretty-view-ppt/references/UPSTREAM.md` 实例）：
 
 | 命中规则 | 典型误报来源 |
 |----------|--------------|

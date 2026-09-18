@@ -4,11 +4,13 @@
 One file is the single source of truth for every Skill, organised by group.
 Each group declares its source attributes and lists member install ids; the
 group name doubles as a CLI expansion unit. A member is either a plain id
-(string) or a mapping `- id: <id>` with `optional: true`: optional entries
-stay catalogued (overlay / agents apply may enable them on demand) but are
-excluded from the default full install. Everything else catalogued is
-installed by `dotf agents -c`; opting out entirely means commenting the entry
-out of the catalog.
+(string) or a mapping `- id: <id>` with `optional: true` and optional
+`aliases: [<name>]`. Optional entries stay catalogued (overlay / agents apply
+may enable them on demand) but are excluded from the default full install.
+Aliases are extra CLI names for the same catalog id; overlay / lock / Desired
+Set still store the canonical id. Everything else catalogued is installed by
+`dotf agents -c`; opting out entirely means commenting the entry out of the
+catalog.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ THIRD_PARTY = "third-party"
 SOURCE_REGISTRY = "registry"
 SOURCE_GITHUB = "github"
 _GROUP_KEYS = {"type", "source", "package", "skills"}
-_MEMBER_KEYS = {"id", "optional"}
+_MEMBER_KEYS = {"id", "optional", "aliases"}
 _THIRD_PARTY_SOURCES = {SOURCE_REGISTRY, SOURCE_GITHUB}
 
 
@@ -44,6 +46,7 @@ class SkillEntry:
     package: Optional[str] = None
     source: Optional[str] = None
     optional: bool = False
+    aliases: tuple[str, ...] = ()
 
     @property
     def is_first_party(self) -> bool:
@@ -58,6 +61,7 @@ class SkillGroup:
     package: Optional[str] = None
     source: Optional[str] = None
     optional_ids: tuple[str, ...] = ()
+    aliases_by_id: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def is_first_party(self) -> bool:
@@ -94,31 +98,67 @@ class SkillsCatalog:
         group = self.group_by_name().get(name)
         return group.ids if group is not None else None
 
+    def alias_to_id(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for entry in self.skills:
+            for alias in entry.aliases:
+                mapping[alias] = entry.id
+        return mapping
+
+    def canonical_id(self, name: str) -> Optional[str]:
+        """Return the catalog id for a skill id or alias; None if unknown."""
+        if name in self.by_id():
+            return name
+        return self.alias_to_id().get(name)
+
 
 def _fail(message: str) -> SkillsCatalogError:
     return SkillsCatalogError(f"skills catalog: {message}")
 
 
-def _parse_member(group: str, index: int, member: object) -> tuple[str, bool]:
-    """One skills list entry: a plain id string or an {id, optional} mapping."""
+def _parse_id_token(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise _fail(f"{label} must be a non-empty skill id")
+    if "/" in value:
+        raise _fail(f"{label} must not contain '/'")
+    return value
+
+
+def _parse_aliases(raw: object, label: str) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise _fail(f"{label} must be a list of skill ids")
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        alias = _parse_id_token(item, f"{label}[{index}]")
+        if alias in seen:
+            raise _fail(f"{label} has duplicate alias {alias!r}")
+        seen.add(alias)
+        aliases.append(alias)
+    return tuple(aliases)
+
+
+def _parse_member(group: str, index: int, member: object) -> tuple[str, bool, tuple[str, ...]]:
+    """One skills list entry: a plain id string or an {id, optional, aliases} mapping."""
     label = f"group {group!r}.skills[{index}]"
     if isinstance(member, str):
-        skill_id, optional = member, False
-    elif isinstance(member, dict):
+        return _parse_id_token(member, f"{label} id"), False, ()
+    if isinstance(member, dict):
         unknown = set(member) - _MEMBER_KEYS
         if unknown:
             raise _fail(f"{label} has unknown keys: {', '.join(sorted(unknown))}")
-        skill_id = member.get("id")
+        skill_id = _parse_id_token(member.get("id"), f"{label} id")
         optional = member.get("optional", False)
         if not isinstance(optional, bool):
             raise _fail(f"{label}.optional must be a boolean")
-    else:
-        raise _fail(f"{label} must be a non-empty skill id or a mapping with id/optional")
-    if not isinstance(skill_id, str) or not skill_id:
-        raise _fail(f"{label} id must be a non-empty skill id")
-    if "/" in skill_id:
-        raise _fail(f"{label} id must not contain '/'")
-    return skill_id, optional
+        aliases = _parse_aliases(member.get("aliases"), f"{label}.aliases")
+        if skill_id in aliases:
+            raise _fail(f"{label}.aliases must not repeat the skill id {skill_id!r}")
+        return skill_id, optional, aliases
+    raise _fail(f"{label} must be a non-empty skill id or a mapping with id/optional/aliases")
+
 
 
 def _parse_group(name: str, raw: object) -> SkillGroup:
@@ -157,11 +197,14 @@ def _parse_group(name: str, raw: object) -> SkillGroup:
         raise _fail(f"group {name!r} requires a skills list")
     ids: list[str] = []
     optionals: list[str] = []
+    aliases_by_id: list[tuple[str, tuple[str, ...]]] = []
     for index, member in enumerate(members):
-        skill_id, optional = _parse_member(name, index, member)
+        skill_id, optional, aliases = _parse_member(name, index, member)
         ids.append(skill_id)
         if optional:
             optionals.append(skill_id)
+        if aliases:
+            aliases_by_id.append((skill_id, aliases))
     duplicates = sorted({item for item in ids if ids.count(item) > 1})
     if duplicates:
         raise _fail(f"group {name!r} has duplicate skill ids: " + ", ".join(duplicates))
@@ -173,6 +216,7 @@ def _parse_group(name: str, raw: object) -> SkillGroup:
         package=package,
         source=source,
         optional_ids=tuple(optionals),
+        aliases_by_id=tuple(aliases_by_id),
     )
 
 
@@ -196,8 +240,10 @@ def parse_catalog(data: object) -> SkillsCatalog:
 
     entries: list[SkillEntry] = []
     seen: set[str] = set()
+    reserved = {group.name for group in groups}
     for group in groups:
         optional_set = set(group.optional_ids)
+        aliases_for = dict(group.aliases_by_id)
         for skill_id in group.ids:
             if skill_id in seen:
                 raise _fail(f"duplicate skill id across groups: {skill_id}")
@@ -210,8 +256,21 @@ def parse_catalog(data: object) -> SkillsCatalog:
                     package=group.package,
                     source=group.source,
                     optional=skill_id in optional_set,
+                    aliases=aliases_for.get(skill_id, ()),
                 )
             )
+
+    alias_owner: dict[str, str] = {}
+    for entry in entries:
+        for alias in entry.aliases:
+            if alias in seen:
+                raise _fail(f"alias {alias!r} collides with skill id {alias!r}")
+            if alias in reserved:
+                raise _fail(f"alias {alias!r} collides with group name {alias!r}")
+            owner = alias_owner.get(alias)
+            if owner is not None:
+                raise _fail(f"duplicate alias {alias!r} for {owner} and {entry.id}")
+            alias_owner[alias] = entry.id
 
     return SkillsCatalog(version=data["version"], lock=data["lock"], skills=tuple(entries), groups=groups)
 
