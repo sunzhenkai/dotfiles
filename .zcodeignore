@@ -1,0 +1,71 @@
+.DS_Store
+*.zwc
+# agent 运行时目录（由 sync 生成到本机 / 仓库内可再生）
+.cursor
+.opencode
+# .codex 例外：仓库内 openspec-* skills 为项目真相源（非 sync 生成），继续跟踪
+openspec/changes
+scripts/assets
+/agents/vendors/opencode/package-lock.json
+/agents/vendors/codex/config.local.toml
+__pycache__
+
+# agents/env 本机覆盖与浏览器产物（勿提交密钥/路径/状态）
+/agents/env/local.yaml
+/agents/env/local/
+**/browser-profile/
+**/playwright-report/
+**/*screenshot*.png
+# Playwright MCP 自动命名；自定义 filename 仍可能漏进仓库根目录
+**/page-*.png
+**/page-*.jpeg
+**/page-*.jpg
+**/trace.zip
+
+.zcode
+.pytest_cache
+
+docs/pretty-view-html
+
+# 应用运行时，禁止进仓（即使误用整目录软链）
+config/tools/logseq/graphs/
+config/tools/logseq/graphs.edn
+config/tools/logseq/plugins/
+config/multiplexers/tmux/plugins/
+config/multiplexers/tmux/resurrect/
+config/tools/k9s/screen-dumps/
+config/tools/k9s/snapshots/
+config/tools/k9s/clusters/
+
+.kiro
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+node_modules/
+bower_components/
+jspm_packages/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

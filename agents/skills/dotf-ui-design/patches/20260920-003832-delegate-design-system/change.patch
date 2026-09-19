@@ -1,0 +1,39 @@
+diff --git a/agents/skills/dotf-ui-design/SKILL.md b/agents/skills/dotf-ui-design/SKILL.md
+index a236fe7..4a707ea 100644
+--- a/agents/skills/dotf-ui-design/SKILL.md
++++ b/agents/skills/dotf-ui-design/SKILL.md
+@@ -24,7 +24,7 @@ description: UI 设计三模式工作流：design 模式为新建或重塑界面
+ - 要"review、优化、收敛、一致性"，且不替换产品身份 → audit。
+ - 要"动画、动效、过渡、手感" → motion。
+ - 既想换方向又想保身份、或范围含糊时，先问用户选哪个模式、哪个 surface；不要合并成一次全仓库大扫除。
+-- 项目已有治理当前界面的设计系统（如 design-system Active Instance、DESIGN.md、token 体系）时，实现遵循它；本 skill 提供设计与审计判断，不另造一套组件体系。
++- 项目已有治理当前界面的设计系统（如 design-system Active Instance、DESIGN.md、token 体系）时，实现遵循它；本 skill 提供设计与审计判断，不另造一套组件体系。需要新建或治理设计系统时，明确转交 ui-template-design。
+ - 只要对一次 UI 改动 / PR 出验收 verdict（不改代码、不做整 surface 审计）→ review 可选阶段（[references/review.md](references/review.md)）。
+ 
+ 选定模式后**先加载对应流程文件再动手**。流程文件与 vendor 参考冲突时，以流程文件为准。
+diff --git a/agents/skills/dotf-ui-design/references/modes/audit.md b/agents/skills/dotf-ui-design/references/modes/audit.md
+index 9984888..895c98b 100644
+--- a/agents/skills/dotf-ui-design/references/modes/audit.md
++++ b/agents/skills/dotf-ui-design/references/modes/audit.md
+@@ -23,7 +23,7 @@
+ 
+ ## 设计系统缺位
+ 
+-反复因缺少契约证据（无 DESIGN.md / token 体系 / 文档化决策）证不成 finding 时，停止审计而不是放宽证明标准：把证不成的候选记录为"待契约"清单交给用户，并建议先沉淀项目设计系统（DESIGN.md、token 与 primitive 体系；若环境中有设计系统治理类 skill 如 ui-template-design，转介给它），契约就位后再恢复审计。
++反复因缺少契约证据（无 DESIGN.md / token 体系 / 文档化决策）证不成 finding 时，停止审计而不是放宽证明标准：把证不成的候选记录为"待契约"清单交给用户，并将设计系统沉淀明确转交 ui-template-design（创建 / 领养 / 迭代项目的 design-system Active Instance）；契约就位后再恢复审计。
+ 
+ ## 品味判断
+ 
+diff --git a/agents/skills/dotf-ui-design/references/modes/design.md b/agents/skills/dotf-ui-design/references/modes/design.md
+index 9b43fdd..a52853c 100644
+--- a/agents/skills/dotf-ui-design/references/modes/design.md
++++ b/agents/skills/dotf-ui-design/references/modes/design.md
+@@ -14,7 +14,7 @@
+ - 定位目标 surface：路由、页面入口、组件层级，确认改的是哪份代码。
+ - 识别既有约束：项目的设计系统（DESIGN.md、token 体系、组件库）、样式组织方式（CSS Modules / Tailwind / 全局 CSS）、可复用 primitive 及其 owner。
+ - 确认验证方式：能否运行、能否截图、typecheck / lint / build 命令是什么。
+-- 项目已有治理当前界面的设计系统时，所有决策落在它的 token 与组件上；不另造平行体系。
++- 项目已有治理当前界面的设计系统时，所有决策落在它的 token 与组件上；不另造平行体系。需要新建或治理设计系统时，明确转交 ui-template-design，不在本模式内造体系。
+ 
+ ## 1. 定题
+ 

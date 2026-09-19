@@ -1,0 +1,70 @@
+diff --git a/agents/skills/dotf-ui-design/SKILL.md b/agents/skills/dotf-ui-design/SKILL.md
+index 56b2c40..5d3f2d7 100644
+--- a/agents/skills/dotf-ui-design/SKILL.md
++++ b/agents/skills/dotf-ui-design/SKILL.md
+@@ -36,6 +36,11 @@ description: UI 设计三模式工作流：design 模式为新建或重塑界面
+ 3. audit 与 motion 只读产品源码；计划落盘、状态生命周期、执行承接与 reconcile 见 [references/plans.md](references/plans.md)。
+ 4. design 模式写界面代码，但只写用户指定范围内的界面。
+ 
++## 配套能力
++
++- 视觉取证（截图、慢放、reduced-motion 对比）：visual-evidence（若环境中可用）。
++- diff 级独立验收（计划执行结果、UI PR 评审）：dotf-ui-review（若环境中可用）。
++
+ ## 参考来源与更新
+ 
+ `references/` 下三个上游 skill 为**原样 vendor**（字节一致，正文永不手改，保持英文），版本与来源记录在 [references/sources.yaml](references/sources.yaml)：
+diff --git a/agents/skills/dotf-ui-design/references/modes/design.md b/agents/skills/dotf-ui-design/references/modes/design.md
+index ad6b08d..7d3c23a 100644
+--- a/agents/skills/dotf-ui-design/references/modes/design.md
++++ b/agents/skills/dotf-ui-design/references/modes/design.md
+@@ -31,7 +31,7 @@ brief 没写清产品或主题时，先自己钉死一个具体主题、受众
+ 
+ ## 4. 自评与闭环出口
+ 
+-- 环境支持就截图复查——一张图值 1000 token；按"出门前摘掉一件配饰"做删减。
++- 截图复查按 visual-evidence 流程采集（若环境中可用）——一张图值 1000 token；按"出门前摘掉一件配饰"做删减。
+ - 守住质量底线（移动端响应式、可见键盘焦点、prefers-reduced-motion、视觉可访问），但不宣传它。
+ - 交付时说明关键决策的出处、验证方式与结果。
+-- 闭环出口：实现被接受后，可建议用 audit 模式对照设计系统验收，把偏差沉淀为 design-plans/ 计划（见 [../plans.md](../plans.md)）。
++- 闭环出口：实现被接受后，可建议用 audit 模式对照设计系统验收，把偏差沉淀为 design-plans/ 计划（见 [../plans.md](../plans.md)）；也可委托 dotf-ui-review 做 diff 级独立验收（若环境中可用）。
+diff --git a/agents/skills/dotf-ui-design/references/modes/audit.md b/agents/skills/dotf-ui-design/references/modes/audit.md
+index f76907a..e9bbcd0 100644
+--- a/agents/skills/dotf-ui-design/references/modes/audit.md
++++ b/agents/skills/dotf-ui-design/references/modes/audit.md
+@@ -19,6 +19,11 @@
+ | 计划索引 | 未规定 | `design-plans/README.md` 台账，字段见 plans.md |
+ | 严重度 | 只有 Confidence | 台账统一用 priority（P0/P1/P2），推导规则见 plans.md |
+ | 深度档位 | 未规定 | `quick`（只查高频组件，仍最多 3 条）/ `standard`（默认，全部交互 UI）/ `deep`（含营销页） |
++| 取证方式 | 用户自带或明确要求视觉检查时才用 rendered evidence | 触发面不变；需要采集时按 visual-evidence 流程（若环境中可用），证据带采集条件 |
++
++## 设计系统缺位
++
++反复因缺少契约证据（无 DESIGN.md / token 体系 / 文档化决策）证不成 finding 时，停止审计而不是放宽证明标准：把证不成的候选记录为"待契约"清单交给用户，并建议先沉淀项目设计系统（DESIGN.md、token 与 primitive 体系；若环境中有设计系统治理类 skill 如 ui-template-design，转介给它），契约就位后再恢复审计。
+ 
+ ## 品味判断
+ 
+diff --git a/agents/skills/dotf-ui-design/references/modes/motion.md b/agents/skills/dotf-ui-design/references/modes/motion.md
+index 38dc2c2..9b7e60c 100644
+--- a/agents/skills/dotf-ui-design/references/modes/motion.md
++++ b/agents/skills/dotf-ui-design/references/modes/motion.md
+@@ -18,6 +18,7 @@
+ | `execute <plan>` | 支持派发 executor 子代理 | 不支持；执行统一走 plans.md 的承接协议 |
+ | 计划索引 | `plans/README.md` | `design-plans/README.md`，字段见 plans.md |
+ | 深度档位 | quick ≈5 条 HIGH | 保持 vendor：`quick`（只查高频组件，约 5 条，只留 HIGH）/ `standard`（默认）/ `deep`（含营销页，加 LOW 打磨项） |
++| feel check 取证 | 计划内写明验证方式 | 执行 feel check 时按 visual-evidence 采集慢放与 reduced-motion 对比（若环境中可用） |
+ 
+ ## 品味判断
+ 
+diff --git a/agents/skills/dotf-ui-design/references/plans.md b/agents/skills/dotf-ui-design/references/plans.md
+index 49a5854..293ed66 100644
+--- a/agents/skills/dotf-ui-design/references/plans.md
++++ b/agents/skills/dotf-ui-design/references/plans.md
+@@ -34,6 +34,7 @@ Priority 推导：
+ - 被要求执行某份计划时可以承接（本 skill 或任何其他 agent），但**以计划文本为唯一规格**；执行者不享有审计时的对话上下文。
+ - 执行者发现现场与 commit 戳或计划引用不符时：停下报告，不即兴发挥；回到 reconcile。
+ - 执行完成后先过验证再置状态：机械检查（typecheck / lint / build，以计划内命令为准）+ 计划内的 feel check；全部通过才标 DONE，验证未过标 BLOCKED 并写明原因。
++- feel check 的现场取证按 visual-evidence 流程（若环境中可用）；独立验收可委托 dotf-ui-review（若环境中可用），其 verdict 报告作为回执附件引用。
+ - 回执写入 `design-plans/README.md`，不改写计划原文。
+ 
+ ## Reconcile（闭环）

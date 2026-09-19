@@ -1,0 +1,44 @@
+# dotf-ui-design references/ 的 vendored 上游版本清单（唯一真相源）。
+#
+# 这些文件按字节原样分发（sync 不做渲染/替换），正文永远不手改；
+# 需要本土化或裁剪时改 SKILL.md 的路由与摘要，不碰 vendor 文件。
+#
+# 更新流程：
+#   1. 按 repo + upstream_path 拉上游最新内容，覆盖对应本地文件；
+#   2. `git diff` 审阅上游变更（上游可能改了流程或精确值）；
+#   3. 用 GitHub API 查最后改动该文件的 commit（见各 file 的 revision 字段），
+#      把新 SHA 与 fetched 日期写回本文件；
+#   4. 若上游语义变化，同步调整 SKILL.md 的对应段落。
+version: 1
+fetched: 2026-09-20
+sources:
+  - id: frontend-design
+    repo: https://github.com/anthropics/skills
+    upstream_path: skills/frontend-design
+    license: 见目录内 LICENSE.txt（Anthropic 自有条款，非 MIT）
+    note: 与 anthropics/claude-code 仓库 plugins/frontend-design/skills/frontend-design 的 SKILL.md 字节一致（2026-09-20 核对）。
+    files:
+      - path: SKILL.md
+        revision: 41bbe19d1a1a
+      - path: LICENSE.txt
+        revision: 41bbe19d1a1a
+  - id: improve-ui
+    repo: https://github.com/ibelick/ui-skills
+    upstream_path: skills/improve-ui
+    license: MIT
+    files:
+      - path: SKILL.md
+        revision: b7a88e737bc0
+      - path: references/plan-template.md
+        revision: b7a88e737bc0
+  - id: improve-animations
+    repo: https://github.com/emilkowalski/skills
+    upstream_path: skills/improve-animations
+    license: MIT
+    files:
+      - path: SKILL.md
+        revision: 85e8e2363b71
+      - path: AUDIT.md
+        revision: 86cf9f7d91c6
+      - path: PLAN-TEMPLATE.md
+        revision: 86cf9f7d91c6
