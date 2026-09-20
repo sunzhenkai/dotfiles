@@ -120,6 +120,33 @@ def test_pull_conflict_reports_conflict_code(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
+def test_update_prints_next_steps(tmp_path: Path) -> None:
+    remote, clone = _make_remote_repo(tmp_path)
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(remote), str(other))
+    (other / "new.txt").write_text("new\n", encoding="utf-8")
+    _git(other, "add", ".")
+    _git(other, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "add")
+    _git(other, "push", "-q", "origin", "HEAD:main")
+
+    result = _run_cli(clone, "update")
+    assert result.returncode == 0, result.stderr
+    assert "✓ dotfiles 已更新" in result.stdout
+    assert "本次拉入 1 个提交" in result.stdout
+    assert "下一步" in result.stdout
+    assert "dotf agents -c" in result.stdout
+    assert (clone / "new.txt").exists()
+
+
+@pytest.mark.slow
+def test_update_up_to_date(tmp_path: Path) -> None:
+    _, clone = _make_remote_repo(tmp_path)
+    result = _run_cli(clone, "update")
+    assert result.returncode == 0, result.stderr
+    assert "✓ dotfiles 已是最新，无需后续操作" in result.stdout
+
+
+@pytest.mark.slow
 def test_init_list_profiles(tmp_path: Path) -> None:
     _, clone = _make_remote_repo(tmp_path)
     result = _run_cli(clone, "init", "--list")

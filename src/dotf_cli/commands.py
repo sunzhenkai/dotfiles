@@ -540,7 +540,14 @@ def _git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=REPO_ROOT)
 
 
-def cmd_pull() -> int:
+def _head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _protective_pull() -> str:
+    """stash → pull → pop。返回拉取前的 HEAD（用于比对是否有新提交）。"""
     def dirty() -> bool:
         return (
             _git("diff", "--quiet").returncode != 0
@@ -555,6 +562,7 @@ def cmd_pull() -> int:
             )
         )
 
+    before = _head()
     stashed = False
     if dirty():
         print("检测到未提交的改动，执行 stash...")
@@ -577,5 +585,49 @@ def cmd_pull() -> int:
             print("   1. 查看冲突文件: git status")
             print("   2. 解决冲突后: git stash drop")
             raise DotfError("conflict", "stash pop 冲突，请手动解决")
+    return before
+
+
+def cmd_pull() -> int:
+    _protective_pull()
     print("✓ dotfiles 已更新")
+    return 0
+
+
+_UPDATE_NEXT_STEPS = (
+    ("dotf agents -c", "同步 agent skills + 全局指令"),
+    ("dotf skills -c", "安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）"),
+    ("dotf -c -a", "重新配置全部模块（当前 OS）"),
+    ("dotf status", "只读检查环境状态"),
+)
+
+
+def cmd_update() -> int:
+    before = _protective_pull()
+    after = _head()
+    if before == after:
+        print("✓ dotfiles 已是最新，无需后续操作")
+        return 0
+    print("✓ dotfiles 已更新")
+
+    log = subprocess.run(
+        ["git", "log", "--oneline", f"{before}..{after}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    commits = [line for line in log.stdout.splitlines() if line.strip()]
+    if commits:
+        print()
+        print(f"本次拉入 {len(commits)} 个提交:")
+        for line in commits[:10]:
+            print(f"  {line}")
+        if len(commits) > 10:
+            print(f"  ... 其余 {len(commits) - 10} 个略")
+
+    print()
+    print("下一步（按需同步到本机）:")
+    width = max(len(cmd) for cmd, _ in _UPDATE_NEXT_STEPS)
+    for cmd, desc in _UPDATE_NEXT_STEPS:
+        print(f"  {cmd:<{width}}  # {desc}")
     return 0

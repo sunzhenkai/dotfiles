@@ -18,12 +18,13 @@ dotf <module...> --uninstall|--deconfig  # 卸载 / 撤回 owned 配置
 dotf init [--os <id>] [--profile <name>] [--dry-run] [--yes]  # 新机初始化
 dotf status [--profile <name>]         # 只读 L0 状态
 dotf retry                             # 重试最近 failed 动作
+dotf update                            # 拉取仓库最新代码并提示后续同步命令（agents/skills 等）
 dotf -a --dry-run                      # 全量预览
 ```
 
 关键语义：
 
-- 没有 update 动词；对已有动作再跑一次即 re-apply。
+- 模块没有 update 动作；对已有动作再跑一次即 re-apply。`dotf update` 是独立命令：拉取仓库更新并提示后续同步（如 `dotf agents -c`）。
 - `--uninstall` 只适用于 `modules.yaml` 声明且带 `uninstall.sh` 的模块。
 - 默认计划确认；非 TTY 且无 `--yes`/`--dry-run` 会快速失败——agent 场景用 `--dry-run` 预览后 `--yes` 执行。
 - 模块清单、分组与依赖见仓库根 `modules.yaml`；profile 见 `profiles.yaml`。

@@ -17,6 +17,7 @@ from .commands import (
     cmd_skills,
     cmd_status,
     cmd_tui,
+    cmd_update,
 )
 from .errors import DotfError, exit_code, render
 from .help_text import HELP_TEXT
@@ -123,6 +124,9 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
         if a == "pull":
             _guard_independent("pull", modules, acting())
             return cmd_pull()
+        if a == "update":
+            _guard_independent("update", modules, acting())
+            return cmd_update()
         if a == "init":
             _guard_independent("init", modules, acting())
             return cmd_init(ctx, args[i + 1 :])

@@ -17,6 +17,7 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
   retry                       重试最近报告中的 failed 动作
   tui                         两区 TUI（需 TTY；无参数 dotf 仍是帮助）
   pull                        拉取 dotfiles 最新更新（保护性 pull）
+  update                      拉取最新代码，并提示后续同步命令（agents/skills 等）
   cd                          跳转到 dotfiles 目录（需 zsh wrapper）
   skills -c                   安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
   skills add                  通过 npx skills 安装第三方 skill（交互选择范围）
@@ -32,7 +33,7 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
   -id                         先安装后诊断
   -cd                         先配置后诊断
   -icd                        安装 → 配置 → 诊断
-  没有独立 update 动词；再跑已有动作即 re-apply
+  模块动作没有 update；再跑已有动作即 re-apply（update 是独立命令）
   -a, --all                   全量（配合 -i/-c/-d；单独 -a = 装+配，不含 doctor）
   --dry-run                   只展示执行计划，不执行（允许跨 OS 预览）
   --continue-on-error         失败后仅继续依赖无关动作；最终仍非零
@@ -63,6 +64,7 @@ agents 示例:
   dotf init                   # OS profile 完整初始化
   dotf init --list            # 列出 profile
   dotf pull                   # 拉取更新
+  dotf update                 # 拉取更新并提示后续同步命令
   dotf sdk -i                 # 安装 SDK
   dotf nvim -c                # 配置 nvim
   dotf nvim -d                # 诊断 nvim（L0）
