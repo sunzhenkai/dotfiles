@@ -243,9 +243,9 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: ui-template-apply
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: 1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+    revision: 421ef77aa886a19eeb24386e156c190bbd36dfb3
     subdirectory: skills/ui-template-apply
-    content_hash: ad8055bb257fc030140605d292383c27a8e1451481f94cb8233dbcbd706cf656
+    content_hash: b7074b0b3fc84f42fd0a575b6ceb58e3107d5c5e5ce8ca2f32fdee69ab9daee5
     license:
       spdx: MIT
       file: LICENSE
@@ -254,12 +254,12 @@ skills:
       status: approved
       date: '2026-09-20'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/421ef77aa886a19eeb24386e156c190bbd36dfb3
   - id: ui-template-author
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: 1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+    revision: 421ef77aa886a19eeb24386e156c190bbd36dfb3
     subdirectory: skills/ui-template-author
-    content_hash: 842369b8ac2d340fb46ca2305171e07a84ae0b04f3e3967d66ac63d26d9733ea
+    content_hash: 96932076345feda83dfe0f6623057fe27486df442ec704beee8b4283a9a8ef9b
     license:
       spdx: MIT
       file: LICENSE
@@ -268,7 +268,7 @@ skills:
       status: approved
       date: '2026-09-20'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/421ef77aa886a19eeb24386e156c190bbd36dfb3
   - id: wait-what
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -327,7 +327,7 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: ui-template-design
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: 1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+    revision: 421ef77aa886a19eeb24386e156c190bbd36dfb3
     subdirectory: skills/ui-template-design
     content_hash: 2d11f5f10b214e1efbbd9e8f31425ecc3389b059656914a52d21c548a635cc11
     license:
@@ -338,7 +338,7 @@ skills:
       status: approved
       date: '2026-09-20'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/1bc7e0a78461c80d0ae9eaa178c1958c3403e8bf
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/421ef77aa886a19eeb24386e156c190bbd36dfb3
   - id: ui-skills-root
     source: https://github.com/ibelick/ui-skills
     revision: aaddae727e243b4f7a7095a8b165a1534deba2ef
