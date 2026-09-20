@@ -39,6 +39,7 @@ groups:
       - skill-upgrader
       - skills-store
       - task-explore
+      - task-wizard
       - taskflow
 
   mattpocock:
