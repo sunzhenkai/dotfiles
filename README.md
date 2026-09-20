@@ -136,6 +136,7 @@ scripts/modules/agents/sync.sh all --dry-run
 - 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（一手 skills + skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）
 - 脚本：Python 包 `src/agents/`（`doctor.py` / `sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
+- 对外安装：本仓库可直接作 `npx skills` 源，`npx skills add sunzhenkai/dotfiles` 可装 `agents/skills/` 下全部一手 skill（装原样字节，`{{slash:x}}` 占位符不渲染）
 
 详见 `agents/README.md`、`agents/env/README.md`。
 

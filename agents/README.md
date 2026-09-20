@@ -43,6 +43,22 @@ agents/
 工具专属 settings、OpenCode 人格等放在 `agents/vendors/<tool>/`。  
 env / security 真相源在 `agents/env/`，由单一脚本包 `src/agents/` 编排，不要手写多源漂移。
 
+## 对外安装（npx skills 源）
+
+本仓库可直接作为 `npx skills` 的安装源。实现方式：根目录 `skills` 符号链接指向 `agents/skills/`（CLI 按容器扫描并跟随目录符号链接）；根目录不能放 `SKILL.md`，否则 CLI 会短路、只认根这一个 skill——仓库入口文档因此在 `.agents/skills/dotf-repo/`。
+
+```shell
+npx skills add sunzhenkai/dotfiles                  # 交互选择：agents/skills 一手 skill + .agents/skills 项目级 skill（dotf-repo 等）
+npx skills add sunzhenkai/dotfiles -s commit-push   # 定向安装
+npx skills add sunzhenkai/dotfiles --list           # 只看清单
+```
+
+- 装的是源码原样字节：正文里的 `{{slash:x}}` 占位符不经本仓库 sync 渲染，消费侧会看到原文，属已知限制，不预渲染（避免第二真相源）。
+- `.agents/skills/` 是 npx 的标准容器：项目级 skill（迭代本项目用，装到别的机器无用但无害）也会出现在清单里，属预期行为。
+- `agents/skills-archive/` 与各 skill `references/` 内嵌的第三方 skill 不会被暴露（超出 CLI 的扫描深度/路径）。
+- Windows clone 下 `skills` 符号链接不可用，裸仓库名发现失效；本仓库面向 *nix。
+- 一手 skill 改动无需额外发布步骤，push 即对外生效。
+
 ## Frontmatter（源）
 
 **Skill** 至少包含：
