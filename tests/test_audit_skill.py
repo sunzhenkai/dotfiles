@@ -86,6 +86,27 @@ def test_source_env_and_ssh_still_block(tmp_path: Path) -> None:
     assert "credential_paths" in proc.stdout
 
 
+def test_ssh_senv_and_config_mentions_are_not_credential_paths(tmp_path: Path) -> None:
+    skill = _skill(
+        tmp_path,
+        "维护 `~/.ssh/senv/`（`groups/<组>.conf` + `keys/`），"
+        "并幂等注册 `~/.ssh/config` 顶部一行 `Include ~/.ssh/senv/groups/*.conf`。\n",
+    )
+    proc = _audit(skill)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "credential_paths" not in proc.stdout
+
+
+def test_other_ssh_paths_still_block(tmp_path: Path) -> None:
+    skill = _skill(
+        tmp_path,
+        "读取 `~/.ssh/authorized_keys` 与 `~/.ssh/known_hosts`。\n",
+    )
+    proc = _audit(skill)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "credential_paths" in proc.stdout
+
+
 def test_eval_markdown_backtick_is_not_eval_external(tmp_path: Path) -> None:
     skill = _skill(
         tmp_path,

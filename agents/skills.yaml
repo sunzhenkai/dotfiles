@@ -101,6 +101,14 @@ groups:
         aliases:
           - ppt
 
+  senv:
+    type: third-party
+    source: github
+    package: https://github.com/solo-kingdom/senv
+    skills:
+      - id: senv-cli
+        optional: true
+
   # taste-skill 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
   # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。
   # taste:

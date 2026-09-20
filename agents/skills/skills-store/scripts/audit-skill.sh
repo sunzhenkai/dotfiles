@@ -24,7 +24,9 @@ PATTERNS=(
   "pipe_to_shell|critical|(?i)(curl|wget).{0,120}\|\s*(ba)?sh"
   "destructive_rm_root|critical|rm\s+-rf\s+(/|\~|\*|\$HOME\b|\$\{HOME\})"
   "destructive_mkfs|critical|(?i)\bmkfs\.|\bdd\s+if=.*of=/dev/"
-  "credential_paths|critical|(?i)(~/?\.ssh|/\.ssh/id_|~/?\.aws/credentials|~/?\.gnupg|~/?\.config/gcloud|\.netrc\b|\.env\b.*\b(read|cat|source|export)\b|\b(cat|source)\b.{0,80}\.env\b)"
+  # credential_paths 的 ~/.ssh 分支排除 ~/.ssh/config（非密钥配置）与 ~/.ssh/senv/
+  # （senv 自管理 SSH 片段树，其 skill 文档必然提及）；私钥路径仍由 /\.ssh/id_ 兜底。
+  "credential_paths|critical|(?i)(~/?\.ssh(?!/(?:senv\b|config\b))|/\.ssh/id_|~/?\.aws/credentials|~/?\.gnupg|~/?\.config/gcloud|\.netrc\b|\.env\b.*\b(read|cat|source|export)\b|\b(cat|source)\b.{0,80}\.env\b)"
   "exfil_env_secret|critical|(?i)(curl|wget|fetch|post|upload|send).{0,80}(\$(API|TOKEN|KEY|SECRET|PASSWORD|ENV|HOME)|process\.env|getenv|os\.environ)"
   "hardcoded_secret|critical|(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{20,}"
   "bearer_literal|critical|(?i)Bearer\s+[A-Za-z0-9\-._~+/]{20,}=*"

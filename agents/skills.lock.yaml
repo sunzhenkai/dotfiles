@@ -143,6 +143,20 @@ skills:
       date: '2026-09-20'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
+  - id: senv-cli
+    source: https://github.com/solo-kingdom/senv
+    revision: f550023db6edc7b82f44c594400b1778f2201c1f
+    subdirectory: .agents/skills/senv-cli
+    content_hash: 1f59928102c9de4dd3cba7f91831b105560861e31f527816c44d76e9736aecea
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-20'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/solo-kingdom/senv/commit/f550023db6edc7b82f44c594400b1778f2201c1f
   - id: setup-matt-pocock-skills
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7

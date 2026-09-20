@@ -103,7 +103,7 @@ bash "$AUDIT" "$AUDIT_DIR/src/<skill-path>"
 |----------|--------------|
 | `jailbreak_role` | MIT LICENSE 正文的 `without limitation` |
 | `browser_session` | 前端代码里的 `localStorage`、`document.cookie`。文档写「不记录 cookie」应跳过 |
-| `credential_paths` | 清单里的 `.env` + `README` 曾因 `README` 命中 `read`；现要求独立单词 `read`/`cat`/`source` |
+| `credential_paths` | 清单里的 `.env` + `README` 曾因 `README` 命中 `read`；现要求独立单词 `read`/`cat`/`source`。`~/.ssh` 分支现排除 `~/.ssh/config`（非密钥配置）与 `~/.ssh/senv/`（senv 自管理 SSH 片段树）；私钥路径仍由 `/\.ssh/id_` 兜底 |
 | `eval_external` | Markdown 反引号 + 单词 Eval 不是 `eval $(curl …)` |
 | `internal_url` | JSON Schema `$id` 的 `https://*.local/schemas/…`、文档里的 `localhost` 开发地址不是内网主机 |
 | `binary_in_skill` | 真正的 ELF / Mach-O / PE32 / shared object。带 shebang 的纯文本脚本不再报 |
