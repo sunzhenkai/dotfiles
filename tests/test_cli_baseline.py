@@ -211,21 +211,22 @@ def test_skills_install_rejects_project_global_conflict(tmp_home: Path) -> None:
 
 def test_skills_install_resolves_third_party_skill_id(tmp_home: Path) -> None:
     # catalogued third-party id resolves to its package with a -s selector.
-    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
+    result = run_dotf("skills", "-i", "codebase-design", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
-        " -s ui-template-apply" in result.stdout
+        "==> npx skills add https://github.com/mattpocock/skills"
+        " -s codebase-design" in result.stdout
     )
 
 
 def test_skills_install_commented_out_skill_passes_through(tmp_home: Path) -> None:
-    # taste-skill is commented out of the catalog -> treated as a plain name.
-    result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
+    # taste-skill / ui-template-* are commented out of the catalog -> plain names.
+    for name in ("taste-skill", "ui-template-apply"):
+        result = run_dotf("skills", "-i", name, "--dry-run")
 
-    assert result.returncode == 0
-    assert "==> npx skills add taste-skill" in result.stdout
+        assert result.returncode == 0
+        assert f"==> npx skills add {name}" in result.stdout
 
 
 def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:
@@ -244,30 +245,33 @@ def test_skills_install_rejects_first_party_skill_id(tmp_home: Path) -> None:
 
 
 def test_skills_install_resolves_group(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-i", "ui-templates", "--dry-run")
+    result = run_dotf("skills", "-i", "mattpocock", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
-        " -s ui-template-author -s ui-template-apply"
-        " -s ui-template-design" in result.stdout
+        "==> npx skills add https://github.com/mattpocock/skills"
+        " -s codebase-design -s diagnosing-bugs -s domain-modeling"
+        " -s grill-with-docs -s grilling -s setup-matt-pocock-skills"
+        " -s to-questionnaire -s wait-what -s wizard"
+        " -s writing-for-agents" in result.stdout
     )
 
 
 def test_skills_uninstall_resolves_third_party_skill_id(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-r", "ui-template-apply", "--dry-run")
+    result = run_dotf("skills", "-r", "codebase-design", "--dry-run")
 
     assert result.returncode == 0
-    assert "==> npx skills remove ui-template-apply" in result.stdout
+    assert "==> npx skills remove codebase-design" in result.stdout
 
 
 def test_skills_uninstall_resolves_multiple_mapped_skills(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-r", "ui-templates", "--dry-run")
+    result = run_dotf("skills", "-r", "mattpocock", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills remove ui-template-author"
-        " ui-template-apply ui-template-design" in result.stdout
+        "==> npx skills remove codebase-design diagnosing-bugs domain-modeling"
+        " grill-with-docs grilling setup-matt-pocock-skills to-questionnaire"
+        " wait-what wizard writing-for-agents" in result.stdout
     )
 
 

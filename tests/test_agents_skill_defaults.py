@@ -35,9 +35,6 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert third_party <= set(ids)
     # ...and no first-party id leaks into the lock (no source confusion).
     assert first_party.isdisjoint(ids)
-    assert "ui-template-apply" in ids
-    assert "ui-template-author" in ids
-    assert "ui-template-design" in ids
     assert "setup-matt-pocock-skills" in ids
     assert "wait-what" in ids
     assert "writing-for-agents" in ids
@@ -46,6 +43,13 @@ def test_repository_catalog_matches_strict_lock() -> None:
     # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
     assert "taste-skill" not in set(catalog.ids())
+    # ui-template-* 同样：审计锁保留，编目已注释。
+    assert "ui-template-apply" in ids
+    assert "ui-template-author" in ids
+    assert "ui-template-design" in ids
+    assert "ui-template-apply" not in set(catalog.ids())
+    assert "ui-template-author" not in set(catalog.ids())
+    assert "ui-template-design" not in set(catalog.ids())
     # lark-cli / en-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
     by_id = catalog.by_id()
     assert by_id["lark-cli"].optional is True

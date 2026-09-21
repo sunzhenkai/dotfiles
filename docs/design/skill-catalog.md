@@ -48,14 +48,13 @@ groups:
 |---|---|---|---|---|
 | `dotfiles` | first-party | — | — | 19 |
 | `mattpocock` | third-party | github | `mattpocock/skills` | 10（含 2 optional） |
-| `ui-templates` | third-party | github | `sunzhenkai/ui-templates-skill` | 3 |
+| `ui-templates`（注释掉） | third-party | github | `sunzhenkai/ui-templates-skill` | 0 |
 | `ui-skills` | third-party | github | `ibelick/ui-skills` | 1 optional |
 | `frontend-slides` | third-party | github | `zarazhangrui/frontend-slides` | 1 optional（别名 `ppt`） |
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
-- `ui-template-design` 在编目内 → 会默认安装（其 lock 条目已补，钉在 `446922a`）。
 - `lark-cli` / `en-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` / `frontend-slides` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
-- `taste-skill` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` 会把它当普通名字透传给 npx。
+- `taste` 与 `ui-templates` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` / `dotf skills -i ui-template-apply` 会把它们当普通名字透传给 npx。
 
 ## 4. 核心决策
 
@@ -138,7 +137,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 ## 7. 已实现状态
 
-- 编目重写完成；`taste` 组注释、`ui-template-design` 编目内。
+- 编目重写完成；`taste` 与 `ui-templates` 组注释。
 - `dotf skills -i <group>`、`dotf agents skill apply <group>` 组展开可用。
 - 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
 - 全量测试 606 passed。

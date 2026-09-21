@@ -24,26 +24,40 @@ def _write_catalog(path: Path, body: str) -> None:
 
 
 def test_group_expands_to_its_third_party_skills() -> None:
-    result = run_resolver("ui-templates")
+    result = run_resolver("mattpocock")
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        "https://github.com/sunzhenkai/ui-templates-skill",
+        "https://github.com/mattpocock/skills",
         "-s",
-        "ui-template-author",
+        "codebase-design",
         "-s",
-        "ui-template-apply",
+        "diagnosing-bugs",
         "-s",
-        "ui-template-design",
+        "domain-modeling",
+        "-s",
+        "grill-with-docs",
+        "-s",
+        "grilling",
+        "-s",
+        "setup-matt-pocock-skills",
+        "-s",
+        "to-questionnaire",
+        "-s",
+        "wait-what",
+        "-s",
+        "wizard",
+        "-s",
+        "writing-for-agents",
     ]
 
 
 def test_third_party_skill_id_resolves_to_its_package() -> None:
-    result = run_resolver("ui-template-apply")
+    result = run_resolver("codebase-design")
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        "https://github.com/sunzhenkai/ui-templates-skill",
+        "https://github.com/mattpocock/skills",
         "-s",
-        "ui-template-apply",
+        "codebase-design",
     ]
 
 
@@ -78,12 +92,19 @@ def test_map_alias_resolves_like_skill_id(tmp_path: Path) -> None:
 
 
 def test_remove_mode_group_resolves_installed_skill_names() -> None:
-    result = run_resolver("ui-templates", "--remove")
+    result = run_resolver("mattpocock", "--remove")
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        "ui-template-author",
-        "ui-template-apply",
-        "ui-template-design",
+        "codebase-design",
+        "diagnosing-bugs",
+        "domain-modeling",
+        "grill-with-docs",
+        "grilling",
+        "setup-matt-pocock-skills",
+        "to-questionnaire",
+        "wait-what",
+        "wizard",
+        "writing-for-agents",
     ]
 
 
