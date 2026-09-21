@@ -62,7 +62,7 @@ class ContractTest(unittest.TestCase):
 
     def test_index_sync_on_mutating_phases(self) -> None:
         self.assertIn(
-            "`new` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
+            "`new` / `split` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
             self.skill,
         )
 
@@ -119,6 +119,48 @@ class ContractTest(unittest.TestCase):
         self.assertGreater(dest, -1)
         self.assertGreater(status, dest)
         self.assertGreater(move, status)
+
+    def test_split_phase_is_routed_and_gated(self) -> None:
+        self.assertIn("## `split`", self.skill)
+        split = self.skill.split("## `split`", 1)[1].split("## ", 1)[0]
+        self.assertIn("必须已绑定", split)
+        self.assertIn("全局唯一", split)
+        self.assertIn("只一层", split)
+        self.assertIn("`parent:`", split)
+
+    def test_subtask_terms_are_named(self) -> None:
+        self.assertIn("**子任务**", self.skill)
+        self.assertIn("**父任务**", self.skill)
+        self.assertIn("**原地归档**", self.skill)
+        self.assertIn("子 change", self.skill)
+
+    def test_parent_forbidden_handoff(self) -> None:
+        handoff_sec = self.skill.split("## `handoff`", 1)[1].split("## ", 1)[0]
+        self.assertIn("禁止 `handoff`", handoff_sec)
+        self.assertIn("禁止 handoff", self.handoff)
+
+    def test_subtask_archive_and_reopen_in_place(self) -> None:
+        archive = self.skill.split("## `archive`", 1)[1].split("## ", 1)[0]
+        self.assertIn("子任务原地归档", archive)
+        self.assertIn("不搬目录", archive)
+        self.assertIn("未结子任务", archive)
+        reopen = self.skill.split("## `reopen`", 1)[1].split("---", 1)[0]
+        self.assertIn("不自动复活", reopen)
+
+    def test_nested_layout_and_index_rows(self) -> None:
+        self.assertIn("`{parent}/{sub}`", self.skill)
+        tpl = (ROOT / "references" / "task-template.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("parent:", tpl)
+        index = (ROOT / "references" / "index-template.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("{parent}/{sub}", index)
+
+    def test_explore_hints_split_once(self) -> None:
+        self.assertIn("提示一次", self.explore)
+        self.assertIn("`split`", self.explore)
 
 
 if __name__ == "__main__":

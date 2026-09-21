@@ -1,0 +1,318 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index 8046e49..c754873 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: task-explore
+ name: task-explore
+-description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / decide / save / handoff / archive / reopen 阶段推进。explore 委托 grilling；decide 冻结方案；handoff 把探索任务交给 taskflow 的 {task}-driver 后归档。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/交接/归档/重新打开任务时使用。已有探索任务要交付时用 handoff，不要绕开另起无关 driver。
++description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / decide / save / handoff / archive / reopen / split 阶段推进；split 把当前任务的一个方向拆成子任务。explore 委托 grilling；decide 冻结方案；handoff 把探索任务交给 taskflow 的 {task}-driver 后归档。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/交接/归档/重新打开任务时使用。已有探索任务要交付时用 handoff，不要绕开另起无关 driver。
+ ---
+ 
+ # 任务探索
+@@ -12,6 +12,8 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ 
+ **探索任务** = `tasks/ongoing|archive/.../{task-name}/`。**taskflow 任务** = `{task-name}-driver`。两套账；唯一桥是 `handoff`。交付进度只认 taskflow checkbox。
+ 
++**子任务** = 探索期从父任务拆出的完整探索任务，承接一个可独立推进的方向：目录嵌套为 `ongoing/{parent}/{sub}/`，`TASK.md` 带 `parent:`，生命周期（explore / decide / handoff 等）与顶层任务相同。**父任务** = 拥有 ≥1 个子任务的探索任务；纯伞，只聚合与登记，**禁止 `handoff`**。**原地归档** = 子任务专属归档形态：只改 `status: archived`，不搬目录。子任务与交付期的 taskflow 子 change 互不隶属。
++
+ ## 阶段
+ 
+ | 阶段 | 何时 | 写入 |
+@@ -26,6 +28,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `handoff` | 交接给 taskflow 后归档 | driver + 归档探索任务 |
+ | `archive` | 归档已结束、不交接的探索任务 | `tasks/archive/{yyyy-mm-dd}/{task-name}` |
+ | `reopen` | 把归档探索任务搬回 ongoing | `ongoing/` + `INDEX.md` |
++| `split` | 把当前任务的一个方向拆成子任务 | `ongoing/{parent}/{sub}/` + 父 TASK.md 登记表 + `INDEX.md` |
+ 
+ 用户点名 `{{slash:task-explore}}` 且首词命中上表阶段名时走该阶段；否则走 `chat`。用户要看任务列表或检索任务时，打印 `INDEX.md`（先 Ongoing，需要时再 Archived），不另造阶段。
+ 
+@@ -40,6 +43,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `decide` | [references/phase-decide.md](references/phase-decide.md) |
+ | `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
+ | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
++| `split` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+ | `chat` / `resume` / `archive` / `reopen` | 本文件已够 |
+ 
+ ## 布局
+@@ -52,11 +56,14 @@ tasks/
+ ├── ongoing/{task-name}/
+ │   ├── TASK.md          # 主文档：目标、进展、未决、决策、交接
+ │   ├── glossary.md      # 任务内术语（惰性）
+-│   └── design/          # 方案、ADR
++│   ├── design/          # 方案、ADR
++│   └── {sub}/           # 子任务：含 TASK.md 的子目录（split 创建，只一层）
+ └── archive/{yyyy-mm-dd}/{task-name}/
+ ```
+ 
+ - `{task-name}`：kebab-case，由输入推断，不追问；描述为空才问「要探索什么？」
++- 子任务目录 = 含 `TASK.md` 的子目录（`design/`、`glossary.md` 不算）；只一层，子任务不得再有子任务。
++- `{sub}` 全局唯一（跨所有父任务），`split` 时扫全树校验；driver 名规则不变（`{sub}-driver`）。
+ - 没有 `tasks/` 目录时 **必须先获得确认再创建**。已有 `tasks/` 则可直接建 `ongoing/`、任务目录与缺失的 `INDEX.md`。
+ - 单任务产物只写当前任务目录。`tasks/INDEX.md` 是唯一允许的根级任务文件。禁止写到仓库 `docs/design/`、`docs/adr/`、根 `CONTEXT.md`。
+ - 是否把 `tasks/` 纳入 git 由项目决定，不要擅自改 `.gitignore`。
+@@ -67,15 +74,16 @@ tasks/
+ 
+ - 单任务真相只在 `{taskRoot}/TASK.md`
+ - 列出、选择、搜索任务时 **先读 INDEX.md**
+-- `new` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行：任务名、标题、日期、一句话目标、相对 `tasks/` 的路径
++- `new` / `split` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行：任务名、标题、日期、一句话目标、相对 `tasks/` 的路径
+ - 不要把进展日志或对话抄进索引
+-- 发现漂移（目录有、索引无，或索引指向不存在的路径）：按 `ongoing/` 与 `archive/` 下的 `TASK.md` **重建** INDEX，再继续
++- 子任务行的任务列写 `{parent}/{sub}`、路径列写嵌套路径；子任务原地归档后路径照写原地，父归档整树搬家后把子行路径批量更新为新位置
++- 发现漂移（目录有、索引无，或索引指向不存在的路径）：按 `ongoing/` 与 `archive/` 下的 `TASK.md`（含 `ongoing/{parent}/{sub}/` 一层子目录）**重建** INDEX，再继续
+ - 已有 `tasks/` 但没有 INDEX：在需要列表或下一次会写 INDEX 的阶段重建，不必再问
+ - `handoff` 归档行的一句话以 `→ {task-name}-driver` 结尾
+ 
+ ## 绑定（强制）
+ 
+-会话绑定 `{task-name}` + `{taskRoot}` = `tasks/ongoing/{task-name}`（`reopen` 完成前 `{taskRoot}` 仍在 archive）。
++会话绑定 `{task-name}` + `{taskRoot}` = `tasks/ongoing/{task-name}`（`reopen` 完成前 `{taskRoot}` 仍在 archive）。绑定子任务时任务名显示为 `{parent}/{sub}`，`{taskRoot}` = `tasks/ongoing/{parent}/{sub}/`。
+ 
+ **无 task 上下文时，应提示创建或者恢复（给出 ongoing 列表选择），在确认后进行 new/resume 阶段。** 归档要拉回则走 `reopen`。不得猜测任务、不得先聊后补目录。
+ 
+@@ -100,7 +108,7 @@ tasks/
+ ## `new`
+ 
+ 1. 若没有 `tasks/`：**询问是否在当前位置创建 `tasks/`**。未确认则停止。
+-2. 推断 `{task-name}`。冲突则列出已有任务并问 resume 还是换名。
++2. 推断 `{task-name}`。冲突则列出已有任务并问 resume 还是换名。在已有任务下拆子方向不属于 `new`，走 `split`。
+ 3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。
+ 4. 在 `tasks/INDEX.md` 的 Ongoing 表追加一行（无 INDEX 则按模板创建或按目录重建）。
+ 5. 绑定该任务。报告路径，询问下一步：`explore`（默认建议）还是 `chat`。不要自动开始 grill。
+@@ -116,6 +124,7 @@ tasks/
+ - 可只读查代码与资料；不要开始实现。
+ - 不要把 `chat` 默认为 `explore`（不自动 grill）或 `design`（不写方案稿）。
+ - 用户要把方案写下来 → 转 `design`。目标仍糊 → 建议 `explore`。路径已清、要交付 → `decide` 然后 `handoff`，不要直接开一个无关名字的 driver。
++- 发现任务含多个可独立推进的方向 → 提示一次可 `split` 拆子任务，不阻断，用户确认才建。
+ - 用户要看有哪些任务 → 打印 INDEX，不进入 `new`。
+ - 有进展则提示是否更新任务文档。
+ 
+@@ -125,7 +134,7 @@ tasks/
+ 
+ 1. 未指定名字：用 INDEX 的 Ongoing 表列出请用户选。指定了则用该名字。
+ 2. 任务不在 `ongoing/`：先查 INDEX 的 Archived 表，再扫 `tasks/archive/`。告知已归档路径；**不要自动恢复**，拉回走 `reopen`。找不到则说明，改走 `new`。
+-3. 读 `TASK.md`、`glossary.md`、`design/`（有则读索引与最新稿）。
++3. 读 `TASK.md`、`glossary.md`、`design/`（有则读索引与最新稿）。恢复子任务时先只读父 `TASK.md` 的目标/决策节防方向漂移，再读子任务全套；父文档不被修改。
+ 4. 用短摘要恢复：**目标 / 当前进展 / 未决 / 建议下一步**（`explore` / `chat` / `design` / `decide` / `save` / `handoff` / `archive`）。然后等用户。
+ 
+ ## `design`
+@@ -148,19 +157,22 @@ tasks/
+ 
+ ## `handoff`
+ 
+-把探索任务交给 taskflow（`{task-name}-driver`），成功后归档。进入本阶段后 **先读** [references/phase-handoff.md](references/phase-handoff.md)。无决策则先 `decide`。driver 未就绪则 **不归档**。
++把探索任务交给 taskflow（`{task-name}-driver`），成功后归档。进入本阶段后 **先读** [references/phase-handoff.md](references/phase-handoff.md)。无决策则先 `decide`。driver 未就绪则 **不归档**。存在子任务目录（含 `TASK.md` 的子目录）的探索任务 **禁止 `handoff`**：父是纯伞，要交付的内容去子任务或另起任务；子任务的 handoff 规则不变，成功后按原地归档处理。
+ 
+ ## `archive`
+ 
+-对不交接的探索任务归档，放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。要交付请用 `handoff`，不要用本阶段代替交接。
++对不交接的探索任务归档，放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。要交付请用 `handoff`，不要用本阶段代替交接。子任务不搬目录，见本节末尾「子任务原地归档」。
+ 
+ 1. 必须已绑定或用户给出名字。先确认；未确认不搬。
+-2. 计算目标路径 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
+-3. 建议先 `save` 再搬；用户拒绝则按现状归档。
+-4. 把 `TASK.md` 的 `status` 改为 `archived`，写入归档日期。
+-5. `mkdir -p tasks/archive/{yyyy-mm-dd}`，再把整个 `{taskRoot}` **移动**过去。
+-6. 把 INDEX 中该行从 Ongoing 移到 Archived（归档日与新路径）；无 INDEX 则重建。
+-7. 清除会话绑定。报告新路径。
++2. 存在子任务目录时：所有子任务必须已归档（原地 archived 或已 handoff），否则打断并列出未结子任务。
++3. 计算目标路径 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
++4. 建议先 `save` 再搬；用户拒绝则按现状归档。
++5. 把 `TASK.md` 的 `status` 改为 `archived`，写入归档日期。
++6. `mkdir -p tasks/archive/{yyyy-mm-dd}`，再把整个 `{taskRoot}`（含子任务树）**移动**过去。
++7. 把 INDEX 中该行从 Ongoing 移到 Archived（归档日与新路径）；子任务的 Archived 行路径批量更新为 `archive/{yyyy-mm-dd}/{parent}/{sub}/`；无 INDEX 则重建。
++8. 清除会话绑定。报告新路径。
++
++**子任务原地归档**：绑定对象是子任务时不搬目录——确认后把子 `TASK.md` 的 `status` 改为 `archived`、写入归档日期，INDEX 该行从 Ongoing 移到 Archived（路径仍写 `ongoing/{parent}/{sub}/`，handoff 行以 `→ {sub}-driver` 结尾），清除绑定。
+ 
+ 不要把任务内容晋升到 `docs/design/` 或其它项目文档，除非用户另说。
+ 
+@@ -172,10 +184,26 @@ tasks/
+ 2. 在 `tasks/archive/` 定位目录。找不到则停止。
+ 3. 计算目标 `tasks/ongoing/{task-name}`。**目标已存在则停止并询问；此时不得改 `TASK.md`、不得移动目录。**
+ 4. 先确认；未确认不搬。
+-5. 把 `TASK.md` 的 `status` 改回 `ongoing`，保留已有决策/交接记录。若曾 `handoff`，警告 `{task-name}-driver` 可能仍在，不要删 driver。
+-6. 移动目录到 `ongoing/`。把 INDEX 该行从 Archived 移回 Ongoing。绑定该探索任务。
++5. 把 `TASK.md` 的 `status` 改回 `ongoing`，保留已有决策/交接记录。若曾 `handoff`，警告 `{task-name}-driver` 可能仍在，不要删 driver。父任务整树搬回时，其中已归档 / 已 handoff 的子任务保持 `archived`，不自动复活，同样警告其 driver 可能仍在。
++6. 移动目录到 `ongoing/`（父任务为整树）。把 INDEX 该行从 Archived 移回 Ongoing；子任务行路径批量改回 `ongoing/{parent}/{sub}/`。绑定该探索任务。
+ 7. 用短摘要恢复上下文，等用户选下一步。
+ 
++**子任务原地 reopen**：子任务不搬目录——确认后把 `status` 改回 `ongoing`，INDEX 该行从 Archived 移回 Ongoing（路径不变），绑定；已 handoff 过的子任务 reopen 时同样警告 `{sub}-driver` 可能仍在。
++
++---
++
++## `split`
++
++从当前绑定的探索任务拆出子任务，承接一个可独立推进的方向。子任务是完整探索任务，只是目录嵌套、`TASK.md` 带 `parent:`。
++
++1. 必须已绑定，绑定任务即父任务。绑定任务本身是子任务（`TASK.md` 已有 `parent:`）则停止：子任务只一层，提示改用 `decide` / `handoff` 收敛。
++2. 缺 `{sub}` 名或一句话方向则询问；`explore` / `chat` 中发现可拆方向时只提示一次，不自动创建。
++3. `{sub}` 用 kebab-case，且 **全局唯一**：扫 `ongoing/` 全树（含各父目录的子目录）无同名，冲突则换名。
++4. 创建 `ongoing/{parent}/{sub}/TASK.md`（用模板）：填 `parent: {parent}`，目标节写该方向的子目标，现状节链接父 `TASK.md` 相关段落。
++5. 父 `TASK.md` 的 **子任务** 小节登记一行（无该小节则新建）：`{sub}`、一句话方向、状态、创建日期。
++6. `INDEX.md` Ongoing 表追加一行：任务列 `{parent}/{sub}`，路径列 `ongoing/{parent}/{sub}/`。
++7. 绑定切换到子任务，报告路径，询问下一步（默认建议 `explore`）。父任务随时可 `resume` 回来。
++
+ ---
+ 
+ ## 何时不用
+diff --git a/agents/skills/task-explore/references/index-template.md b/agents/skills/task-explore/references/index-template.md
+index 2986cb1..05c77d4 100644
+--- a/agents/skills/task-explore/references/index-template.md
++++ b/agents/skills/task-explore/references/index-template.md
+@@ -2,7 +2,7 @@
+ 
+ `tasks/INDEX.md` 是派生目录。单任务真相在各 `TASK.md`。`new` / `save` / `decide` / `handoff` / `archive` / `reopen` 时改对应行；漂移则按目录重建。
+ 
+-Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取目标首条，不要抄进展日志。`handoff` 归档行以 `→ {task-name}-driver` 结尾。
++Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取目标首条，不要抄进展日志。`handoff` 归档行以 `→ {task-name}-driver` 结尾。子任务的任务列写 `{parent}/{sub}`、路径列写嵌套路径；子任务原地归档时 Archived 行路径照写 `ongoing/{parent}/{sub}/` 原地路径，父归档整树搬家后批量更新为新位置。
+ 
+ ```markdown
+ # Tasks
+@@ -14,6 +14,7 @@ Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取
+ | 任务 | 标题 | 更新 | 一句话 | 路径 |
+ |------|------|------|--------|------|
+ | gateway-timeout | 网关超时排查 | 2026-09-15 | 查清 5xx 来源 | `ongoing/gateway-timeout/` |
++| big-quest/api-style | 接口风格子任务 | 2026-09-20 | 定 REST 还是 RPC | `ongoing/big-quest/api-style/` |
+ 
+ ## Archived
+ 
+@@ -21,6 +22,7 @@ Ongoing 按 `updated` 新到旧；Archived 按归档日新到旧。一句话取
+ |------|--------|------|--------|------|
+ | quota-alert | 2026-09-01 | 配额告警误报 | 确认阈值与静默窗口 | `archive/2026-09-01/quota-alert/` |
+ | session-auth | 2026-09-15 | 会话方案 | 已决：服务端 session → session-auth-driver | `archive/2026-09-15/session-auth/` |
++| big-quest/auth | 2026-09-21 | 认证子任务 | 已决：服务端 session → auth-driver | `ongoing/big-quest/auth/` |
+ ```
+ 
+ 没有进行中或已归档任务时，保留表头，表体不写占位行。
+diff --git a/agents/skills/task-explore/references/phase-explore.md b/agents/skills/task-explore/references/phase-explore.md
+index 97aa425..0f073c4 100644
+--- a/agents/skills/task-explore/references/phase-explore.md
++++ b/agents/skills/task-explore/references/phase-explore.md
+@@ -8,7 +8,8 @@
+ 2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
+ 3. 读取并遵循 `grilling`。不可用则用它的轮次格式当面问；**不要发明等价命令**，也不要改调 `grill-with-docs`。
+ 4. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
+-5. 术语结晶时由本 skill 写入 `{taskRoot}/glossary.md`；独立决策写入 `{taskRoot}/design/adr-<slug>.md`。禁止写仓库根 `CONTEXT.md`、`docs/adr/`。
+-6. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
++5. 发现任务含多个可独立推进的方向时，**提示一次**可 `split` 拆子任务，不阻断、不自动创建；用户确认后走 `split`。
++6. 术语结晶时由本 skill 写入 `{taskRoot}/glossary.md`；独立决策写入 `{taskRoot}/design/adr-<slug>.md`。禁止写仓库根 `CONTEXT.md`、`docs/adr/`。
++7. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
+ 
+ 术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要按主文件提示是否更新任务文档。
+diff --git a/agents/skills/task-explore/references/phase-handoff.md b/agents/skills/task-explore/references/phase-handoff.md
+index 3b4e411..db587cf 100644
+--- a/agents/skills/task-explore/references/phase-handoff.md
++++ b/agents/skills/task-explore/references/phase-handoff.md
+@@ -7,7 +7,8 @@
+ ## 门禁
+ 
+ 1. `TASK.md` **决策** 小节已写明采纳方案。没有则打断，先 `decide`。例外：用户本轮明确「按推荐冻结并交接」→ 先做完 `decide` 再继续，不必再问。
+-2. 计算归档目标 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问；此时不得改 TASK.md、不得跑 taskflow-new、不得移动目录。**
++2. 存在子任务目录（含 `TASK.md` 的子目录）的探索任务 **禁止 handoff**：父是纯伞，要交付的内容去子任务或另起任务。
++3. 计算归档目标 `tasks/archive/{yyyy-mm-dd}/{task-name}`（子任务原地归档，跳过本项）。**目标已存在则停止并询问；此时不得改 TASK.md、不得跑 taskflow-new、不得移动目录。**
+ 
+ ## 步骤
+ 
+@@ -17,7 +18,7 @@
+ 4. 按 taskflow 写入 `{task-name}-driver` 的 `.openspec.yaml`（`skip_specs: true`）和 `proposal.md`（含逐字 Driver 协议）。**不要写 `tasks.md`。**
+ 5. taskflow / openspec 不可用，或无法确定 planning root：停下报告可选项（`dotf agents -c` / `openspec init --tools agents` / 用户指定 root），**保持探索任务在 `ongoing/`**，已写的交接段可保留。
+ 6. `{task-name}-driver` 已存在：不要新建；把现有路径写入交接段，视为脚手架已就绪。
+-7. **仅当 driver 已存在**（本轮新建或已有）：再按 `archive` 搬家（先确认目标仍不存在 → 改 `status` 为 `archived` 并记下 `handed-off` 与 `driver` → 移动 → 更新 INDEX → 清除探索任务绑定）。
++7. **仅当 driver 已存在**（本轮新建或已有）：再按 `archive` 处理——子任务原地归档（不搬目录：改 `status` 为 `archived`、记下 `handed-off` 与 `driver`、INDEX 移行且路径照写原地、清除绑定）；顶层任务搬家（先确认目标仍不存在 → 改 `status` 为 `archived` 并记下 `handed-off` 与 `driver` → 移动 → 更新 INDEX → 清除探索任务绑定）。
+ 8. 报告：归档路径、`{task-name}-driver` 的 `proposal.md`。桥接 stock `openspec-propose`（方案已定时选继续已有 change；未定时先 `openspec-explore`）。之后不要再在 `tasks/` 里勾交付进度。
+ 
+ INDEX 归档行的一句话以 `→ {task-name}-driver` 结尾，便于检索。
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+index f3cff31..e7d538b 100644
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -8,6 +8,7 @@
+ # <Title>
+ 
+ - slug: <task-name>
++- parent: <父任务 slug；仅子任务保留此行，顶层任务删除>
+ - status: ongoing
+ - created: YYYY-MM-DD
+ - updated: YYYY-MM-DD
+@@ -40,6 +41,10 @@
+ - driver: `{task-name}-driver`（handoff 后填写）
+ - 归档路径：[handoff / archive 后填写]
+ 
++## 子任务
++
++- [仅父任务保留本小节，子任务删除] `{sub}` — [一句话方向]（状态，YYYY-MM-DD 创建）
++
+ ## 未决问题
+ 
+ - [ ] [还不知道的]
+@@ -49,4 +54,4 @@
+ - [explore / chat / design / decide / handoff / archive / 其它]
+ ```
+ 
+-归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。
++归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。子任务为原地归档：只改状态与归档日期，不搬目录。
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+index e88c717..179802b 100644
+--- a/agents/skills/task-explore/tests/test_task_explore_contract.py
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -62,7 +62,7 @@ class ContractTest(unittest.TestCase):
+ 
+     def test_index_sync_on_mutating_phases(self) -> None:
+         self.assertIn(
+-            "`new` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
++            "`new` / `split` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
+             self.skill,
+         )
+ 
+@@ -120,6 +120,48 @@ class ContractTest(unittest.TestCase):
+         self.assertGreater(status, dest)
+         self.assertGreater(move, status)
+ 
++    def test_split_phase_is_routed_and_gated(self) -> None:
++        self.assertIn("## `split`", self.skill)
++        split = self.skill.split("## `split`", 1)[1].split("## ", 1)[0]
++        self.assertIn("必须已绑定", split)
++        self.assertIn("全局唯一", split)
++        self.assertIn("只一层", split)
++        self.assertIn("`parent:`", split)
++
++    def test_subtask_terms_are_named(self) -> None:
++        self.assertIn("**子任务**", self.skill)
++        self.assertIn("**父任务**", self.skill)
++        self.assertIn("**原地归档**", self.skill)
++        self.assertIn("子 change", self.skill)
++
++    def test_parent_forbidden_handoff(self) -> None:
++        handoff_sec = self.skill.split("## `handoff`", 1)[1].split("## ", 1)[0]
++        self.assertIn("禁止 `handoff`", handoff_sec)
++        self.assertIn("禁止 handoff", self.handoff)
++
++    def test_subtask_archive_and_reopen_in_place(self) -> None:
++        archive = self.skill.split("## `archive`", 1)[1].split("## ", 1)[0]
++        self.assertIn("子任务原地归档", archive)
++        self.assertIn("不搬目录", archive)
++        self.assertIn("未结子任务", archive)
++        reopen = self.skill.split("## `reopen`", 1)[1].split("---", 1)[0]
++        self.assertIn("不自动复活", reopen)
++
++    def test_nested_layout_and_index_rows(self) -> None:
++        self.assertIn("`{parent}/{sub}`", self.skill)
++        tpl = (ROOT / "references" / "task-template.md").read_text(
++            encoding="utf-8"
++        )
++        self.assertIn("parent:", tpl)
++        index = (ROOT / "references" / "index-template.md").read_text(
++            encoding="utf-8"
++        )
++        self.assertIn("{parent}/{sub}", index)
++
++    def test_explore_hints_split_once(self) -> None:
++        self.assertIn("提示一次", self.explore)
++        self.assertIn("`split`", self.explore)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

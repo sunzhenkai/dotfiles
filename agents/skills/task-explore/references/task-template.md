@@ -8,6 +8,7 @@
 # <Title>
 
 - slug: <task-name>
+- parent: <父任务 slug；仅子任务保留此行，顶层任务删除>
 - status: ongoing
 - created: YYYY-MM-DD
 - updated: YYYY-MM-DD
@@ -40,6 +41,10 @@
 - driver: `{task-name}-driver`（handoff 后填写）
 - 归档路径：[handoff / archive 后填写]
 
+## 子任务
+
+- [仅父任务保留本小节，子任务删除] `{sub}` — [一句话方向]（状态，YYYY-MM-DD 创建）
+
 ## 未决问题
 
 - [ ] [还不知道的]
@@ -49,4 +54,4 @@
 - [explore / chat / design / decide / handoff / archive / 其它]
 ```
 
-归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。
+归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。子任务为原地归档：只改状态与归档日期，不搬目录。
