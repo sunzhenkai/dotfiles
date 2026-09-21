@@ -1,0 +1,13 @@
+diff --git a/agents/skills/service-manager/SKILL.md b/agents/skills/service-manager/SKILL.md
+index 5b1463c..2f6d511 100644
+--- a/agents/skills/service-manager/SKILL.md
++++ b/agents/skills/service-manager/SKILL.md
+@@ -147,7 +147,7 @@ Skill 的统一职责不变：把 `start` 包进新进程组和项目隔离日
+ 
+ ## 开发/测试启动约定
+ 
+-适用于本地 **开发 / 测试** 原生服务（`source` 为 Makefile / package.json / 语言入口等，或 notes 标明 dev/test）。**不**强制改写：人工标注或用户本会话指定的 command、生产向无 watch 的 `start`/`serve`（且无热更新候选时）、compose 依赖类服务（db/redis 等）。
++适用于本地 **开发 / 测试** 原生服务。判定信号（任一即可）：`source` 为 Makefile / package.json / 语言入口等；notes 标明 dev/test；服务名或 command 含 `dev` / `develop` / `serve:dev` 等开发语义；用户明确说是开发环境 / 开发栈。**不**强制改写：人工标注或用户本会话指定的 command、生产向无 watch 的 `start`/`serve`（且无热更新候选时）、compose 依赖类服务（db/redis 等）。
+ 
+ ### 优先热更新方式
+ 
