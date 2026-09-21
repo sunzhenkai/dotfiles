@@ -1,7 +1,7 @@
 ---
 id: taskflow
 name: taskflow
-description: "用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。"
+description: "用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。"
 ---
 
 # taskflow
@@ -59,7 +59,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 ## 涉及面
 | 仓库 | 角色 | 说明 |
 |------|------|------|
-| . | 必须 | 会修改，实施前切任务分支 |
+| . | 必须 | 会修改 |
 
 ## 验收标准
 - [ ] <...>
@@ -68,7 +68,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 - 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
 - 子 change 一律命名 `{task}-<slice>`，与本 change 同一 planning root；跨 root 时在涉及面表显式记录 root 或 store id
 - 实现进度只认子 change 自己的 `tasks.md`；本文件的 checkbox 只在对应子 change 全勾且 `validate --strict` 通过后才勾
-- 涉及面里角色为 `必须` 的仓在实施前切任务分支：没有则 `git switch -c`，已有则 `git switch`。不许 stash / reset / 强制切换。工作树 dirty 时：未提交路径仅含当前 task 的 OpenSpec change（`openspec/changes/{task}-*`）则直接切；否则列出路径并确认是否继续 checkout。用户不同意、git 拒绝或切错仓时停下
+- 切任务分支只针对涉及面里角色为 `必须` 的修改仓，且本身可选；task 所在仓不是修改仓时不切。修改仓干净：先 fetch 默认分支，再从其最新提交 `git switch -c`（分支已存在则 `git switch`）。修改仓 dirty：列出未提交路径，由用户三选一——不切直接在当前分支修改 / 携带改动 `git switch` / `git worktree add` 从默认分支最新提交建独立工作树。不得 stash / reset / 强制切换。用户未选择、git 拒绝或切错仓时停下
 - 只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了就保持未勾，在验证记录写一行原因后继续下一项
 - 结束时逐条列出未勾项与原因，不按 change 汇总
 
@@ -89,7 +89,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 ````markdown
 ## 1. 准备
-- [ ] 1.1 把涉及面里角色为必须的仓切到任务分支
+- [ ] 1.1 （可选）把涉及面里角色为必须的修改仓切到任务分支：干净则从默认分支最新代码切；dirty 则列出路径，由用户在不切直接改 / 带脏切换 / git worktree 独立工作树中三选一
 
 ## 2. 实施
 - [ ] 2.1 完成子 change `{task}-api`：apply 至全部 checkbox 勾选且 validate --strict 通过
@@ -115,15 +115,15 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 ### 涉及面与交付分支
 
-- 角色只有三个取值：`必须`（会修改，实施前切任务分支）、`建议`（只读参考）、`排除`。
-- 分支准备是 driver `tasks.md` 里的 checkbox，只处理 `必须` 仓；`建议` 与 `排除` 仓保持只读。
-- fail closed：**禁止**自动 stash、reset 或强制切换。目标分支不存在则 `git switch -c`，已存在则 `git switch`。工作树 dirty 时先看未提交路径：全部落在 `openspec/changes/{task}-*`（当前 task 的 driver 与子 change）则直接 checkout，不提问；否则列出路径，只确认是否继续 checkout（改动随普通 switch 带到目标分支）。不要展开成提交、留在当前分支或其它处理方式的选项。用户未确认、git 拒绝或切到非必须仓时停下。已准备成功的仓保留现状以便重试。
+- 角色只有三个取值：`必须`（会修改）、`建议`（只读参考）、`排除`。`建议` 与 `排除` 仓保持只读。
+- 切分支规则的唯一真相是上方 Driver 协议模板（逐字写入每个 driver proposal）：只针对 `必须` 修改仓且本身可选，task 所在仓不是修改仓时不切；干净从默认分支最新提交切；dirty 由用户三选一；禁止 stash / reset / 强制切换，用户未选择或 git 拒绝时停下。
+- 模板之外的增量：部分仓已准备成功、其它仓停下时，已准备成功的仓保留现状以便重试。
 
 ### 一轮结束
 
-只有三种情况允许结束一轮：**checkbox 全勾**、**需要用户决策**、**本轮预算耗尽**。
+规则的唯一真相是上方 Driver 协议模板：只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了保持未勾、在验证记录写一行原因后继续其余条目；结束时逐条列出未勾项与原因。
 
-单项做不了（依赖、环境或授权）就保持未勾，在验证记录写一行原因，继续处理不依赖它的其余条目——不要因为一项卡住就整轮停下，也不要把未完成项勾成完成。结束时逐条列出未勾条目与原因，不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
+模板之外的增量：不因一项卡住就整轮停下；不把未完成项勾成完成；不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
 
 ### 并行执行
 

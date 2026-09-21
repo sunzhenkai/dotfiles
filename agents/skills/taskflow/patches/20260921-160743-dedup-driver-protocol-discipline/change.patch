@@ -1,0 +1,34 @@
+--- a/agents/skills/taskflow/SKILL.md
++++ b/agents/skills/taskflow/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: taskflow
+ name: taskflow
+-description: "用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。独立子 change 与独立 task 在有多 agent 时并行 apply。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。"
++description: "用一个 driver change 编排一批子 change 的任务生命周期：`taskflow-new` 建 `{task}-driver`（`skip_specs: true` + 协议写进 proposal），explore / propose / apply / archive 全部委托 stock `openspec-*` skill，进度只认 OpenSpec checkbox，零脚本、无第二份任务账本。在用户点名 taskflow、执行 `taskflow-new`、跟进 `{task}-driver`、要把一个任务拆成多个 OpenSpec change 时使用。"
+ ---
+ 
+ # taskflow
+@@ -115,17 +115,15 @@
+ 
+ ### 涉及面与交付分支
+ 
+-- 角色只有三个取值：`必须`（会修改）、`建议`（只读参考）、`排除`。
+-- 切任务分支只针对 `必须` 修改仓，且本身可选；task 所在仓不是修改仓时不切。`建议` 与 `排除` 仓保持只读。
+-- 修改仓工作树干净：先 `git fetch` 同步默认分支，再从其最新提交 `git switch -c` 创建任务分支（分支已存在则 `git switch`）。
+-- 修改仓工作树 dirty：列出未提交路径，给三个选择——不切分支直接在当前分支修改；携带未提交改动 `git switch`；`git worktree add` 从默认分支最新提交建独立工作树。用户选定后执行。
+-- fail closed：**禁止**自动 stash、reset 或强制切换。用户未选择、git 拒绝或切到非必须仓时停下。已准备成功的仓保留现状以便重试。
++- 角色只有三个取值：`必须`（会修改）、`建议`（只读参考）、`排除`。`建议` 与 `排除` 仓保持只读。
++- 切分支规则的唯一真相是上方 Driver 协议模板（逐字写入每个 driver proposal）：只针对 `必须` 修改仓且本身可选，task 所在仓不是修改仓时不切；干净从默认分支最新提交切；dirty 由用户三选一；禁止 stash / reset / 强制切换，用户未选择或 git 拒绝时停下。
++- 模板之外的增量：部分仓已准备成功、其它仓停下时，已准备成功的仓保留现状以便重试。
+ 
+ ### 一轮结束
+ 
+-只有三种情况允许结束一轮：**checkbox 全勾**、**需要用户决策**、**本轮预算耗尽**。
++规则的唯一真相是上方 Driver 协议模板：只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了保持未勾、在验证记录写一行原因后继续其余条目；结束时逐条列出未勾项与原因。
+ 
+-单项做不了（依赖、环境或授权）就保持未勾，在验证记录写一行原因，继续处理不依赖它的其余条目——不要因为一项卡住就整轮停下，也不要把未完成项勾成完成。结束时逐条列出未勾条目与原因，不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
++模板之外的增量：不因一项卡住就整轮停下；不把未完成项勾成完成；不用「某 change 还剩 3 项」这类按 change 汇总的数量代替逐条说明。
+ 
+ ### 并行执行
+ 

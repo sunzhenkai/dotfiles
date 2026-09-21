@@ -94,7 +94,6 @@ tasks/
 - 提示一次即可，不阻断继续问答。
 - 用户同意 → 按 `save` 写回（含 INDEX）。
 - 用户点名 `save` → 直接写，不必再问。
-- 不要把整段对话粘进 `TASK.md`。
 
 ---
 
@@ -188,18 +187,3 @@ tasks/
 | 只要读代码、不需要任务台账 | `dotf-code-explore` |
 | 只要一次 grill、不需要 `tasks/` | `grill-with-docs` / `grilling` |
 | 已在 OpenSpec change 里交付 | `taskflow` + `openspec-*` |
-
-## 相关
-
-进入对应阶段再读，不要一次性打开：
-
-- [references/phase-explore.md](references/phase-explore.md) — `explore`
-- [references/phase-design.md](references/phase-design.md) — `design`
-- [references/phase-decide.md](references/phase-decide.md) — `decide`
-- [references/phase-handoff.md](references/phase-handoff.md) — `handoff`
-- [references/design-template.md](references/design-template.md) — design 落盘
-- [references/task-template.md](references/task-template.md) — `new` / `save` / `decide`
-- [references/index-template.md](references/index-template.md) — 建或重建 INDEX
-- `grilling` — `explore` 委托
-- `taskflow` — `handoff` 委托的交付生命周期
-- `dotf-code-explore` — 只读代码理解

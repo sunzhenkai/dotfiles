@@ -41,6 +41,7 @@ groups:
       - task-explore
       - task-wizard
       - taskflow
+      - trouble-grill
 
   mattpocock:
     type: third-party

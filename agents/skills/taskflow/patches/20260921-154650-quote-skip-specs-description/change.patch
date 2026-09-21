@@ -1,0 +1,12 @@
+diff --git a/agents/skills/taskflow/evals/cases.yaml b/agents/skills/taskflow/evals/cases.yaml
+--- a/agents/skills/taskflow/evals/cases.yaml
++++ b/agents/skills/taskflow/evals/cases.yaml
+@@ -27,7 +27,7 @@
+   - id: skip-specs-required
+     kind: basic
+     judge: deterministic
+-    description: driver 必须显式 skip_specs: true
++    description: "driver 必须显式 skip_specs: true"
+     given: taskflow-new 脚手架
+     expect:
+       must:

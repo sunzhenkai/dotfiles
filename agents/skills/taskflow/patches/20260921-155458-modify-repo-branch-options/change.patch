@@ -1,0 +1,63 @@
+diff --git a/agents/skills/taskflow/SKILL.md b/agents/skills/taskflow/SKILL.md
+--- a/agents/skills/taskflow/SKILL.md
++++ b/agents/skills/taskflow/SKILL.md
+@@ -68,7 +68,7 @@
+ - 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
+ - 子 change 一律命名 `{task}-<slice>`，与本 change 同一 planning root；跨 root 时在涉及面表显式记录 root 或 store id
+ - 实现进度只认子 change 自己的 `tasks.md`；本文件的 checkbox 只在对应子 change 全勾且 `validate --strict` 通过后才勾
+-- 涉及面里角色为 `必须` 的仓可选切任务分支，不切则直接在当前分支实施。要切时：工作树干净先 fetch 默认分支，再从其最新提交 `git switch -c`（分支已存在则 `git switch`）；工作树 dirty 则列出未提交路径并提示用户先处理，不得 stash / reset / 强制切换，也不得携带未提交改动直接 checkout。用户不同意、git 拒绝或切错仓时停下
++- 切任务分支只针对涉及面里角色为 `必须` 的修改仓，且本身可选；task 所在仓不是修改仓时不切。修改仓干净：先 fetch 默认分支，再从其最新提交 `git switch -c`（分支已存在则 `git switch`）。修改仓 dirty：列出未提交路径，由用户三选一——不切直接在当前分支修改 / 携带改动 `git switch` / `git worktree add` 从默认分支最新提交建独立工作树。不得 stash / reset / 强制切换。用户未选择、git 拒绝或切错仓时停下
+ - 只有「checkbox 全勾」「需要用户决策」「本轮预算耗尽」三种情况允许结束一轮；单项做不了就保持未勾，在验证记录写一行原因后继续下一项
+ - 结束时逐条列出未勾项与原因，不按 change 汇总
+ 
+@@ -89,7 +89,7 @@
+ 
+ ````markdown
+ ## 1. 准备
+-- [ ] 1.1 （可选）把涉及面里角色为必须的仓切到任务分支：干净则从默认分支最新代码切，dirty 则提示用户先处理
++- [ ] 1.1 （可选）把涉及面里角色为必须的修改仓切到任务分支：干净则从默认分支最新代码切；dirty 则列出路径，由用户在不切直接改 / 带脏切换 / git worktree 独立工作树中三选一
+ 
+ ## 2. 实施
+ - [ ] 2.1 完成子 change `{task}-api`：apply 至全部 checkbox 勾选且 validate --strict 通过
+@@ -116,10 +116,11 @@
+ 
+ ### 涉及面与交付分支
+ 
+ - 角色只有三个取值：`必须`（会修改）、`建议`（只读参考）、`排除`。
+-- 切任务分支是**可选项**，只对 `必须` 仓有意义；不切则直接在当前分支实施。`建议` 与 `排除` 仓保持只读。
+-- 选择切分支时按工作树状态分档：干净则先 `git fetch` 同步默认分支，再从其最新提交 `git switch -c` 创建任务分支（分支已存在则 `git switch`）；dirty 则列出未提交路径并提示用户先处理（提交、stash 或清理），处理完再重试。
+-- fail closed：**禁止**自动 stash、reset、强制切换，或携带未提交改动直接 checkout。用户拒绝、git 拒绝或切到非必须仓时停下。已准备成功的仓保留现状以便重试。
++- 切任务分支只针对 `必须` 修改仓，且本身可选；task 所在仓不是修改仓时不切。`建议` 与 `排除` 仓保持只读。
++- 修改仓工作树干净：先 `git fetch` 同步默认分支，再从其最新提交 `git switch -c` 创建任务分支（分支已存在则 `git switch`）。
++- 修改仓工作树 dirty：列出未提交路径，给三个选择——不切分支直接在当前分支修改；携带未提交改动 `git switch`；`git worktree add` 从默认分支最新提交建独立工作树。用户选定后执行。
++- fail closed：**禁止**自动 stash、reset 或强制切换。用户未选择、git 拒绝或切到非必须仓时停下。已准备成功的仓保留现状以便重试。
+ 
+ ### 一轮结束
+ 
+diff --git a/agents/skills/taskflow/evals/cases.yaml b/agents/skills/taskflow/evals/cases.yaml
+--- a/agents/skills/taskflow/evals/cases.yaml
++++ b/agents/skills/taskflow/evals/cases.yaml
+@@ -91,17 +91,18 @@
+   - id: fail-closed-must-repos
+     kind: core
+     judge: deterministic
+-    description: 切分支可选；干净仓从默认分支最新代码切，dirty 仓提示用户处理，禁止 stash/reset/强制切换
+-    given: 准备涉及面角色为必须的仓并选择切任务分支
++    description: 切分支只针对修改仓且可选；干净从默认分支最新代码切，dirty 三选一（不切直接改/带脏切换/git worktree），禁止 stash/reset/强制切换
++    given: 准备涉及面角色为必须的修改仓并考虑切任务分支
+     expect:
+       must:
++        - task 所在仓不是修改仓时不切分支
+         - 工作树干净时先同步默认分支，再从其最新提交 git switch -c；分支已存在则 git switch
+-        - 工作树 dirty 时列出未提交路径并提示用户先处理，处理完再重试
+-        - 用户拒绝或 git 拒绝时报告该仓并等用户处理；已准备成功的仓保留现状
++        - 工作树 dirty 时列出未提交路径，给出不切直接改、带脏切换、git worktree 三个选择，用户选定后执行
++        - 用户未选择或 git 拒绝时报告该仓并等用户处理；已准备成功的仓保留现状
+       must_not:
+         - 自动 stash、reset 或强制切换
+-        - dirty 时携带未提交改动直接 checkout
+-        - 对建议/排除仓切分支
++        - 对建议/排除仓或非修改的 task 所在仓切分支
+         - 把切分支当作必须仓的强制前置
+ 
+   - id: round-end-three-only

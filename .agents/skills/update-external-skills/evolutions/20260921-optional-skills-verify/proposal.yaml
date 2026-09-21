@@ -1,0 +1,42 @@
+skill: update-external-skills
+
+problem: |
+  Step 4 假定 content_hash 有变的 skill 必然在三个 layout 之一有安装副本（`~/.agents/skills/<id>`、
+  `~/.claude/skills/<id>`、`~/.kiro/skills/<id>`），并强制要求 `diff -r`。但编目里两类条目会出现
+  「锁里有、未安装」的状态：
+    - `agents/skills.yaml` 中 `optional: true` 的成员：仍属编目（受 audit / overlay / agents apply
+      引用），但 `defaults` 不装。
+    - 编目 group 被整段注释掉的 skill：lock 仍保留审计条目（注释本身不删 lock），`defaults` 不装。
+  这两类 skill 的 content_hash 真变时，跑 `diff -r` 会得到「目录不存在」错误，runner 必须靠经验判断
+  「跳过 diff -r、只信字节级 tree_hash」。Skill 没把这条规则写明，每位 runner 都要现场推一次。
+
+evidence:
+  - 2026-09-21 第二轮重锁：`solo-kingdom/senv` 的 `senv-cli`（`optional: true`）content_hash 真变
+    `1f599281... → ec144f38...`。三轮 `diff -r` 全部报 `No such file or directory`。runner 靠读
+    `agents/skills.yaml` 发现 `optional: true`，人工判定 N/A，仅信 tree_hash。
+  - 同一轮 `Leonxlnx/taste-skill`：编目 group 被注释（"暂时下掉"），但 lock 仍审计。每次重锁都会
+    refresh revision/audit。`defaults` 不装，与上一条属同一根因。
+  - 单一来源两次出现，构成稳定模式（不只一次性事件）。
+
+pattern: |
+  锁内 skill 不一定在 `defaults` 安装范围。三轮 `diff -r` 全报「不存在」等价于「无落地副本可比」，
+  应当视为该 skill 不在默认 Desired Set，结论退化为「只信字节级 tree_hash」。这是设计内的语义
+  （编目用 `optional: true` / 注释 group 表达「不自动装但仍审计」），不是 deploy 失败。
+
+proposed_change: |
+  在 step 4 段落插入一条分支规则，紧接 `diff -r` 命令之后：
+
+    > **未安装怎么办**。若 `agents/skills.yaml` 中该 skill 标 `optional: true`，或其所在
+    > group 被注释掉，则 `defaults` 不会部署；`diff -r` 三个 layout 必然报
+    > `No such file or directory`。这种情况下只信字节级 `tree_hash` 与 lock 一致即可，
+    > `diff -r` 视为 N/A，不要当成 deploy 失败。
+
+  不新增步骤、不改风险级别、不动脚本。
+
+expected_improvement: |
+  - 减少下一位 runner 现场判断的成本（不必读 `skills.yaml` 找 `optional: true`）。
+  - 把「锁内但未安装」明确为合法状态，避免误诊 deploy 失败而回查 `defaults` 段。
+  - 与已有「允许 diff = authoring 目录」并列形成 step 4 的完整语义：上游侧允许差异 + 本地侧允许
+    「不存在」是正常的。
+
+risk: low
