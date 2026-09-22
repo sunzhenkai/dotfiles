@@ -39,6 +39,7 @@ dotf pi -c
 | 文件 | 行为 |
 |------|------|
 | `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管键（telemetry 等布尔、`powerline`）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
+| `extensions/exit.ts` | 本地扩展：注册 `/exit` 命令退出 pi（`ctx.shutdown()`） |
 | 其余文件 | 按源逐字同步 |
 
 运行时目录（`npm/`、`sessions/`、`auth.json`、`mcp*.json`、`models*.json`、`trust.json` 等）在 `modules.yaml` 的 `preserve` 中，**不被接管也不被清理**。
