@@ -73,11 +73,11 @@ owned 目标的内容或 mode 已不等于上次受管 hash。默认 fail closed
 _Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖, 用 Conflict 指无所有权文件
 
 **Unowned Target**:
-计划要写的路径上已有常规文件，但 managed manifest 没有对应 agents ownership。字节已等于将写入内容时可静默登记 ownership（adopt）；字节不等价时默认留下，不得经 `--on-conflict` 解除。
+计划要写的路径上已有常规文件，但 managed manifest 没有对应 ownership（agents sync 的 agent owner 或 config 部署的 `config:<module>`）。字节已等于将写入内容时可静默登记 ownership（adopt）；字节不等价时默认留下，不得经 `--on-conflict` 解除。
 _Avoid_: Conflict（那是已 owned 的漂移）, 外来文件（含糊）, 无主（口语）
 
 **Takeover**:
-把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的显式动作。与 Conflict 的 `--on-conflict=backup` 分家；CLI 为 `--takeover=backup`（环境变量 `DOTF_TAKEOVER`）。TTY 在计划确认之外对可接管项做一次汇总二次确认（写到控制终端 `/dev/tty`，不依赖 Handler stdout 是否被 Executor 捕获）；非 TTY 必须带显式 flag，默认跳过。一次确认覆盖整次 agents sync（一手 / defaults / OpenSpec）。
+把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的显式动作。与 Conflict 的 `--on-conflict=backup` 分家；CLI 为 `--takeover=backup`（环境变量 `DOTF_TAKEOVER`）。TTY 在计划确认之外对可接管项做一次汇总二次确认（写到控制终端 `/dev/tty`，不依赖 Handler stdout 是否被 Executor 捕获）；非 TTY 必须带显式 flag，默认跳过。一次确认覆盖整次 agents sync（一手 / defaults / OpenSpec）；config 部署（`dotf <module> -c`）同语义，确认覆盖该模块本次计划的全部可接管项（见 ADR-0024）。symlink、类型不符、foreign owner 等其余冲突不可接管，带 flag 也保持 fail closed。
 _Avoid_: on-conflict（管 owned 漂移）, adopt（只用于字节已等价）, 强制覆盖
 
 ### Scope

@@ -47,6 +47,8 @@ CONFIG_MANIFEST_NAME = "config-manifest.json"
 CONFIG_LOCK_NAME = "config-manifest.lock"
 _OWNER_PREFIX = "config:"
 
+OnTakeover = Literal["skip", "backup"]
+
 
 class ConfigDeployError(RuntimeError):
     """A config plan cannot be safely produced or applied."""
@@ -130,6 +132,7 @@ class ConfigOperation:
     proven_owned_link: bool = False
     accepted_actual_hash: str | None = None
     metadata_only: bool = False
+    takeover: bool = False
 
     def public_dict(self) -> dict[str, Any]:
         value = self.item.to_dict()
@@ -137,6 +140,7 @@ class ConfigOperation:
             operation=self.operation,
             relative_path=self.relative_path,
             metadata_only=self.metadata_only,
+            takeover=self.takeover,
         )
         return value
 
@@ -1025,8 +1029,13 @@ def compile_config_plan(
     home: os.PathLike[str] | str,
     state_home: os.PathLike[str] | str | None = None,
     producer: ContentProducer | None = None,
+    on_takeover: OnTakeover = "skip",
 ) -> ConfigPlan:
     """Compile a plan without creating directories, locks, backups, or files."""
+    if on_takeover not in ("skip", "backup"):
+        raise ConfigDeployError(
+            f"unknown on-takeover policy: {on_takeover!r} (expected skip or backup)"
+        )
     repo = Path(repo_root).absolute()
     home_path = Path(home).absolute()
     declaration = declaration_from_registry(module, repo_root=repo, home=home_path)
@@ -1221,6 +1230,7 @@ def compile_config_plan(
         reason: str | None = None
         metadata_only = False
         accepted_actual_hash: str | None = None
+        takeover = False
         if target_kind == "symlink":
             state, action, reason = "conflict", "block", "unexpected-target-symlink"
         elif target_kind == "other":
@@ -1234,6 +1244,12 @@ def compile_config_plan(
                     # Adopt byte-identical real files without replacing their
                     # inode. Apply records ownership and narrows mode if needed.
                     state, action, metadata_only = "update", "update", True
+                elif on_takeover == "backup":
+                    # Takeover: apply routes this through the existing
+                    # atomic_write(backup_root=...) write path, so the foreign
+                    # bytes are backed up and ownership is recorded for the
+                    # first time in the same plan/apply transaction.
+                    state, action, takeover = "update", "update", True
                 else:
                     state, action, reason = "conflict", "block", "unowned-real-target"
             elif prior.owner != declaration.owner:
@@ -1279,6 +1295,7 @@ def compile_config_plan(
                 mode=expected_file.mode,
                 accepted_actual_hash=accepted_actual_hash,
                 metadata_only=metadata_only,
+                takeover=takeover,
             )
         )
 
@@ -1344,6 +1361,11 @@ def compile_config_plan(
         target_root_mode=declaration.target_mode,
         sensitive=declaration.sensitive,
     )
+
+
+def takeover_targets(plan: ConfigPlan) -> tuple[str, ...]:
+    """Paths a backup Takeover would convert (divergent unowned regular files)."""
+    return tuple(op.item.target for op in plan.operations if op.takeover)
 
 
 def _manifest_equivalent(left: ManagedManifest, right: ManagedManifest) -> bool:
@@ -1474,6 +1496,13 @@ def _assert_operation_fresh(
             raise ConfigConflictError(f"managed target changed type or ownership: {target}")
         actual_hash = _sha256(content)
         if prior is None:
+            if operation.takeover:
+                if (
+                    operation.accepted_actual_hash is None
+                    or actual_hash != operation.accepted_actual_hash
+                ):
+                    raise ConfigConflictError(f"takeover target changed after planning: {target}")
+                return
             if not operation.metadata_only or actual_hash != item.expected_hash:
                 raise ConfigConflictError(f"managed target changed type or ownership: {target}")
             return
@@ -1694,6 +1723,7 @@ def deploy_config(
     state_home: os.PathLike[str] | str | None = None,
     producer: ContentProducer | None = None,
     run_id: str | None = None,
+    on_takeover: OnTakeover = "skip",
 ) -> ConfigApplyResult:
     plan = compile_config_plan(
         module,
@@ -1701,6 +1731,7 @@ def deploy_config(
         home=home,
         state_home=state_home,
         producer=producer,
+        on_takeover=on_takeover,
     )
     return apply_config_plan(
         plan,

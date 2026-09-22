@@ -27,6 +27,7 @@ dotf -a --dry-run                      # 全量预览
 - 模块没有 update 动作；对已有动作再跑一次即 re-apply。`dotf update` 是独立命令：拉取仓库更新并提示后续同步（如 `dotf agents -c`）。
 - `--uninstall` 只适用于 `modules.yaml` 声明且带 `uninstall.sh` 的模块。
 - 默认计划确认；非 TTY 且无 `--yes`/`--dry-run` 会快速失败——agent 场景用 `--dry-run` 预览后 `--yes` 执行。
+- 配置目标已是无主文件且内容不等价（Unowned Target）时 config 默认拒绝写入；TTY 下会汇总确认是否备份接管，或显式 `dotf <module> -c --takeover=backup`（非 TTY 必须带 flag；symlink 等不安全目标不可接管）。见 ADR-0024。
 - 模块清单、分组与依赖见仓库根 `modules.yaml`；profile 见 `profiles.yaml`。
 
 ## Agent 运行时同步
