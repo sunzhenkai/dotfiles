@@ -1,0 +1,61 @@
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+index e7d538b..9a697e9 100644
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -1,6 +1,6 @@
+ # 任务文档骨架
+ 
+-`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。
++`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。**输入含现成方案时（含上游 task-wizard 的步骤级方案、他人设计稿），把目标、步骤、阻塞点、坑逐条登记进「方案」小节**，不要只填目标。
+ 
+ `save` 时更新同一文件：改 `updated` 与有变化的章节，不要整文件重写后丢掉仍有效的内容。同时同步 `tasks/INDEX.md` 对应行（标题、日期、一句话目标），不要把进展抄进索引。
+ 
+@@ -25,6 +25,14 @@
+ 
+ [已知事实、已读材料、约束。链到代码或文档路径。]
+ 
++## 方案
++
++[上游或已有方案；无则留空。已定则写全，未定则写下当前候选与缺口。]
++
++- 步骤：[每步动作 — 要点 / 验证]
++- 阻塞点：[会卡住整个方案的事，或「无」]
++- 坑：[易踩的坑、隐性依赖、顺序敏感点，或「无」]
++
+ ## 进展
+ 
+ - YYYY-MM-DD：[本轮结论，一条一事]
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index c754873..75a3e9c 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -109,7 +109,7 @@ tasks/
+ 
+ 1. 若没有 `tasks/`：**询问是否在当前位置创建 `tasks/`**。未确认则停止。
+ 2. 推断 `{task-name}`。冲突则列出已有任务并问 resume 还是换名。在已有任务下拆子方向不属于 `new`，走 `split`。
+-3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。
++3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。输入含现成方案（含上游 task-wizard 的步骤级方案）时，把步骤、阻塞点、坑一并登记进「方案」小节，不丢上游产物。
+ 4. 在 `tasks/INDEX.md` 的 Ongoing 表追加一行（无 INDEX 则按模板创建或按目录重建）。
+ 5. 绑定该任务。报告路径，询问下一步：`explore`（默认建议）还是 `chat`。不要自动开始 grill。
+ 
+diff --git a/agents/skills/task-explore/references/phase-explore.md b/agents/skills/task-explore/references/phase-explore.md
+index 0f073c4..6791af5 100644
+--- a/agents/skills/task-explore/references/phase-explore.md
++++ b/agents/skills/task-explore/references/phase-explore.md
+@@ -6,10 +6,11 @@
+ 
+ 1. 必须已绑定任务；否则先走绑定。
+ 2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
+-3. 读取并遵循 `grilling`。不可用则用它的轮次格式当面问；**不要发明等价命令**，也不要改调 `grill-with-docs`。
+-4. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
+-5. 发现任务含多个可独立推进的方向时，**提示一次**可 `split` 拆子任务，不阻断、不自动创建；用户确认后走 `split`。
+-6. 术语结晶时由本 skill 写入 `{taskRoot}/glossary.md`；独立决策写入 `{taskRoot}/design/adr-<slug>.md`。禁止写仓库根 `CONTEXT.md`、`docs/adr/`。
+-7. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
++3. `TASK.md` **方案** 小节已有上游方案（含 task-wizard 的步骤级方案）时，先把它当既有事实复核，不重问已知步骤；grill 只针对未覆盖的预期目标、成功标准、范围、约束与未知。方案随后按 explore / design 结论更新回该小节。
++4. 读取并遵循 `grilling`。不可用则用它的轮次格式当面问；**不要发明等价命令**，也不要改调 `grill-with-docs`。
++5. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
++6. 发现任务含多个可独立推进的方向时，**提示一次**可 `split` 拆子任务，不阻断、不自动创建；用户确认后走 `split`。
++7. 术语结晶时由本 skill 写入 `{taskRoot}/glossary.md`；独立决策写入 `{taskRoot}/design/adr-<slug>.md`。禁止写仓库根 `CONTEXT.md`、`docs/adr/`。
++8. 结束本轮时列出已澄清目标与仍开放的 frontier，并提示是否 `save`。
+ 
+ 术语/ADR 可当时写入任务目录；那不是对 `TASK.md` 的替代，进展仍要按主文件提示是否更新任务文档。

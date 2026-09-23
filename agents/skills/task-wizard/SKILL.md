@@ -59,13 +59,14 @@ description: "理解用户意图并生成任务完成方案：只做步骤级拆
 |--------|------|------|
 | 简单 | 步骤少、单仓单模块、无契约/schema 变化、可逆 | 本方案即 plan，先走 grill-with-docs 拷问方案、梳理清楚，再按步骤直接实现，不再产其他工件 |
 | 中等 | 在简单之上，需 spec 契约或正式验收 | 先走 grill-with-docs 拷问梳理，再走 OpenSpec：委托 `openspec-propose`，经 `openspec-apply-change` 实施 |
-| 复杂 | 多阶段/多子任务、跨仓跨模块、需编排或并行 | 走 task-explore → taskflow：先 task-explore 建探索任务，目标/方案/细节经 `explore`/`design`/`decide` 梳理清楚后 `handoff`，由 taskflow 建 `{task}-driver` 并委托 stock `openspec-*` 实施 |
+| 复杂 | 多阶段/多子任务、跨仓跨模块、需编排或并行 | 走 task-explore → taskflow：先 task-explore，把本方案正文登记进 `TASK.md` 的「方案」小节（步骤 / 阻塞点 / 坑），再经 `explore`/`design`/`decide` 梳理清楚后 `handoff`，由 taskflow 建 `{task}-driver` 并委托 stock `openspec-*` 实施 |
 
 - 路由是**衔接不是执行**：task-wizard 只把方案与结论交给对应流程，不代替它们做提案或编排。
 - **先拷问后实现**：简单 / 中等两档实现前一律走 grill-with-docs，把方案里没想清的分支拷问掉再动手，不跳步。
 - 委托 `grill-with-docs` / `openspec-*` / task-explore / taskflow 前确认当前环境能读到对应 skill；不可用时停下报告并给出安装选项（如 `dotf agents -c`），不自行发明等价命令。
 - 路由到 grill-with-docs 时，逐字保留其两跳调用（`grilling` + `domain-modeling`），不简写、不替换。
-- 路由到 task-explore / OpenSpec / taskflow 时，把方案正文（目标、步骤、阻塞点、坑）作为任务描述原文带入，不让下游重新猜意图。
+- 路由到 task-explore 时，**逐字带上方案正文**（目标 / 事实 / 假设 / 步骤 / 阻塞点 / 坑 / 不做的事），并点名落点：`new` 时登记进 `TASK.md` 的「方案」小节；只作输入，不下新任务名、不重演探索。
+- 路由到 OpenSpec / taskflow 时，把方案正文（目标、步骤、阻塞点、坑）作为任务描述原文带入，不让下游重新猜意图。
 
 ## 边界
 
