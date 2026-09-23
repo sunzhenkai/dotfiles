@@ -22,6 +22,8 @@ from managed_runtime import (
     SkillsPlan,
     apply_owned_plan,
     compile_owned_plan,
+    on_conflict_from_env,
+    on_takeover_from_env,
     resolve_state_home,
 )
 from dotf_core.paths import assert_path_confined
@@ -141,12 +143,16 @@ def compile_instructions_plan(
     *,
     home: Path | None = None,
     state_home: Path | None = None,
+    on_conflict: str | None = None,
+    on_takeover: str | None = None,
 ) -> SkillsPlan:
     repo = root.expanduser().absolute()
     base_home = (home or Path.home()).expanduser().absolute()
     source_root = repo / "agents" / "instructions"
     expected = collect_instruction_files(repo, base_home)
     state = resolve_state_home(base_home, state_home)
+    policy = on_conflict if on_conflict is not None else on_conflict_from_env()
+    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
     return compile_owned_plan(
         repo,
         expected,
@@ -156,6 +162,8 @@ def compile_instructions_plan(
         source_root=source_root,
         owner_prefix=OWNER_PREFIX,
         identity_prefix=IDENTITY_PREFIX,
+        on_conflict=policy,
+        on_takeover=takeover,
     )
 
 
@@ -211,11 +219,28 @@ def main(argv: Optional[list[str]] = None) -> int:
         description="Sync global AGENTS.md to user-level Agent instruction targets"
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--on-conflict",
+        choices=("block", "backup"),
+        default=None,
+        help="block（默认）遇到本机改动即跳过；backup 先备份再覆写已受管目标的漂移",
+    )
+    parser.add_argument(
+        "--takeover",
+        choices=("skip", "backup"),
+        default=None,
+        dest="on_takeover",
+        help="skip（默认）跳过无所有权目标；backup 先备份再接管并登记 ownership",
+    )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
     root = args.root.resolve() if args.root else repo_root()
     try:
-        plan = compile_instructions_plan(root)
+        plan = compile_instructions_plan(
+            root,
+            on_conflict=args.on_conflict,
+            on_takeover=args.on_takeover,
+        )
     except AgentRuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -123,6 +123,13 @@ instructions_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then
   instructions_args+=(--dry-run)
 fi
+# 把 on-conflict / takeover 透传给 instructions 段，行为与 skill 段一致。
+if [ -n "$ON_CONFLICT" ]; then
+  instructions_args+=(--on-conflict "$ON_CONFLICT")
+fi
+if [ -n "$ON_TAKEOVER" ]; then
+  instructions_args+=(--takeover "$ON_TAKEOVER")
+fi
 python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
 
 skills_args=(--root "$ROOT")

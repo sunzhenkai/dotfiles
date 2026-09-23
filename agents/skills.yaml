@@ -41,6 +41,7 @@ groups:
       - task-wizard
       - taskflow
       - trouble-grill
+      - web-ui-ux
 
   mattpocock:
     type: third-party
