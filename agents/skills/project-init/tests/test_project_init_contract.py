@@ -103,6 +103,31 @@ class ContractTest(unittest.TestCase):
         self.assertIn("vitest", fe.lower())
         self.assertIn("react-hook-form", fe)
 
+    def test_nextjs_path(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
+        # SKILL.md 声明两条前端路径，且 Next 不再只是单行备注
+        self.assertIn("Next.js 路径", skill)
+        self.assertIn("Vite 与 Next 并存", skill)
+        self.assertIn("create-next-app", skill)
+        # reference 有完整 Next.js 路径：官方命令、shadcn 接入、目录、冒烟、align
+        self.assertIn("## Next.js 路径", fe)
+        self.assertIn("create-next-app", fe)
+        self.assertIn('--import-alias "@/*"', fe)
+        self.assertIn("shadcn", fe)
+        self.assertIn("App Router", fe)
+        self.assertIn("use client", fe)
+        self.assertIn("route.ts", fe)
+        self.assertIn("next-env.d.ts", fe)
+        self.assertIn("pnpm build", fe)
+        self.assertIn("align 对照（Next.js 路径）", fe)
+
+    def test_nextjs_not_in_frontmatter(self) -> None:
+        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        fm = _frontmatter(text)
+        self.assertNotIn("Next.js", fm)
+        self.assertNotIn("create-next-app", fm)
+
     def test_plan_confirm_and_tool_cli(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")

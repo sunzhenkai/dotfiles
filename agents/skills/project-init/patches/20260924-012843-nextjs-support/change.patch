@@ -1,0 +1,310 @@
+diff --git a/agents/skills/project-init/SKILL.md b/agents/skills/project-init/SKILL.md
+--- a/agents/skills/project-init/SKILL.md
++++ b/agents/skills/project-init/SKILL.md
+@@ -2,7 +2,7 @@
+ id: project-init
+ name: project-init
+ description: >-
+-  按约定脚手架创建或对齐项目（v1：Python API 与前端）。
++  按约定脚手架创建或对齐项目（v1：Python API 与前端；前端含默认与特定场景两条路径）。
+   仅在用户显式要求初始化项目、创建项目脚手架、scaffold，或要求把已有项目架构向本 skill 对齐时使用。
+   不要用于日常写功能、装机、克隆仓库或启动服务。
+ ---
+@@ -47,7 +47,7 @@
+ | `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 方案确认后用官方工具命令创建，再套本 skill 约定 |
+ | `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
+ 
+-目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
++目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 按前端 Next 路径对照（见 reference 的 Next.js 段），不要强改回 Vite；反之已是 Vite 也不要强改成 Next。
+ 
+ 一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
+ 
+@@ -60,7 +60,9 @@
+ | 栈 id | 默认 | 先读 |
+ |-------|------|------|
+ | `python-api` | 分层见下表；纯 API 默认 FastAPI | [python-api.md](references/python-api.md) |
+-| `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
++| `frontend` | 分层见下表；默认 Vite 路径，按需走 Next.js 路径 | [frontend.md](references/frontend.md) |
++
++前端两条路径共用同一份分层表与 reference，只换 Build 与项目骨架：**默认 Vite**（无特殊需求时）；需求明确指向服务端渲染 / RSC / SEO / App Router / 全栈路由等，或用户点名 Next.js 时走 **Next.js 路径**。两条路径都在 [frontend.md](references/frontend.md)；一次只选一条，禁止 Vite 与 Next 并存。
+ 
+ ### Python 分层
+ 
+@@ -94,7 +96,8 @@
+ |----|------|-------------|------|
+ | Language | TypeScript | ⭐⭐⭐⭐⭐ | 必选 |
+ | UI Framework | React | ⭐⭐⭐⭐⭐ | 必选 |
+-| Build | Vite | ⭐⭐⭐⭐⭐ | 默认 |
++| Build | Vite | ⭐⭐⭐⭐⭐ | 默认（Vite 路径） |
++| Build | Next.js | ⭐⭐⭐⭐ | 特定场景再用（Next 路径；承担构建与服务端） |
+ | CSS | Tailwind CSS | ⭐⭐⭐⭐⭐ | 默认 |
+ | UI | shadcn/ui | ⭐⭐⭐⭐⭐ | 强烈推荐 |
+ | Server State | TanStack Query | ⭐⭐⭐⭐⭐ | 推荐 |
+@@ -104,7 +107,7 @@
+ | API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
+ | E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
+ | Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
+-| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
++| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用（SSR / RSC / SEO / App Router / 全栈路由） |
+ 
+ 包管理器：用户指定优先；否则 Python 默认 `uv`，前端默认 `pnpm`。工具或包管理器缺失时列入依赖缺口，**询问是否补齐**（安装该工具，或改用已说明的回退：Python 为 venv + pip，前端为 npm）。未确认不得自行切换，也不得为脚手架擅自全局安装。
+ 
+@@ -114,14 +117,14 @@
+ 2. **收集输入**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。需求特征会影响选层时（Admin、后台任务、模型与 schema 一体、浏览器 E2E、SSR 等）缺则问，不猜。
+ 3. **形成最终方案并确认**：只加载对应 reference，按需求选层，列出最终方案（模式、目标路径、各层选择与原因、拟用官方工具命令、将写入的约定、冒烟命令）。**展示给用户并等待明确确认**。未确认不得创建目录、改依赖或改文件。用户改需求则回到选层，不要边做边改方案。
+ 4. **检查依赖**：方案选定并确认之后、动手之前，检查该方案所需的工具命令是否可用（如 `uv`、`python3`、`pnpm`/`npm`、`node`，以及该栈官方 create/init CLI）。列出缺失项，**询问是否补齐**。用户同意后再安装或启用已确认的回退；用户拒绝则停止或改用其指定替代。不得默默全局安装，不得未经询问切换包管理器。项目框架包跟随官方 CLI / `uv add` / 包管理器安装，不要预先手搓 lockfile。
+-5. **执行**：`init` **优先借助该栈官方工具命令**（见各 reference，如 `uv init`、`django-admin startproject`、`pnpm create vite`、`shadcn init`），再用本 skill 约定补配置、空布局、健康检查、`.env.example`、`.gitignore`、README。官方 CLI 可用时禁止手搓完整项目树。CLI 缺失：先按步骤 4 问是否补齐；仍不可用且用户明确同意后，才写最小可运行壳。`align`：只改已确认项，补齐同样走官方工具命令；不重写业务代码来「看起来更像模板」。不要启动长期 dev server。冒烟见各 reference。
++5. **执行**：`init` **优先借助该栈官方工具命令**（见各 reference，如 `uv init`、`django-admin startproject`、`pnpm create vite`、`create-next-app`、`shadcn init`），再用本 skill 约定补配置、空布局、健康检查、`.env.example`、`.gitignore`、README。官方 CLI 可用时禁止手搓完整项目树。CLI 缺失：先按步骤 4 问是否补齐；仍不可用且用户明确同意后，才写最小可运行壳。`align`：只改已确认项，补齐同样走官方工具命令；不重写业务代码来「看起来更像模板」。不要启动长期 dev server。冒烟见各 reference。
+ 6. **交付摘要**（见下）。不 commit。
+ 
+ ## 安全
+ 
+ - 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
+ - `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
+-- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`shadcn init`）。初始化应优先跑这些命令，而不是先手写同等文件。
++- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`create-next-app`、`shadcn init`）。初始化应优先跑这些命令，而不是先手写同等文件。
+ - `.env.example` 只放变量名与无害示例值；真实密钥不入库。
+ 
+ ## 交付摘要
+@@ -139,3 +142,5 @@
+ ## 扩展
+ 
+ 新增栈：增加 `references/<stack-id>.md`，并在上表加一行。reference 必须写清官方脚手架命令、目录约定、默认依赖、冒烟命令、align 对照清单。无 reference 的栈 = 未支持。
++
++同一个 reference 内可有多条路径（如 `frontend` 的 Vite / Next.js）：新增同类变体时优先在该 reference 内加一节，而不是另立栈 id；仅当需要换掉分层概念时才新开栈。
+diff --git a/agents/skills/project-init/references/frontend.md b/agents/skills/project-init/references/frontend.md
+--- a/agents/skills/project-init/references/frontend.md
++++ b/agents/skills/project-init/references/frontend.md
+@@ -2,7 +2,14 @@
+ 
+ 本 reference 只在栈为 `frontend` 时读取。分层与建议以 `SKILL.md` 前端表为准；这里只写怎么落地。用户点名 Vue / CRA 等则不要套本文件。
+ 
+-**工具命令优先**：先跑 `pnpm create vite` / `create-next-app` / `shadcn init`。官方 CLI 可用时不要手写 `package.json`、Vite 或 Tailwind 配置来「等价生成」。CLI 缺失时先按 `SKILL.md` 询问是否补齐。
++本 reference 有两条路径，**一次只走一条**：
++
++- **Vite 路径（默认）**：无特殊需求时的前端 SPA / 站点。
++- **Next.js 路径**：需求明确指向 SSR / RSC / SEO / App Router / 全栈路由，或用户点名 Next.js 时。
++
++两条路径共用同一分层与包管理器约定，只换项目骨架、Build 与服务端承担者。**禁止 Vite 与 Next 并存**（例如在 Next 项目里再塞一份 Vite 配置）。
++
++**工具命令优先**：先跑 `pnpm create vite` / `create-next-app` / `shadcn init`。官方 CLI 可用时不要手写 `package.json`、Vite / Next 或 Tailwind 配置来「等价生成」。CLI 缺失时先按 `SKILL.md` 询问是否补齐。
+ 
+ ## 建议 → init 行为
+ 
+@@ -15,9 +22,11 @@
+ | 需要表单再用 | **不预装** | 仅当项目已有表单、或用户要加表单时才提议 |
+ | 特定场景再用 | **不作为默认**；仅用户点名该场景 | 已采用则按该场景对照，不改回默认 |
+ 
+-Next.js 属于「特定场景再用」：仅当用户明确要 SSR / RSC / SEO / App Router 等时用官方 `create-next-app`（TypeScript），再按 shadcn 的 Next 指南接入。不要与 Vite 并存。其余层（TS、React、Tailwind、shadcn、Query、Zustand、Zod、Playwright、Vitest）仍然适用，Build 改由 Next 承担。
++Next.js 属于「特定场景再用」：仅当用户明确要 SSR / RSC / SEO / App Router 等、或点名 Next.js 时走下方 **Next.js 路径**（官方 `create-next-app`，TypeScript），再按 shadcn 的 Next 指南接入。不要与 Vite 并存。其余层（TS、React、Tailwind、shadcn、Query、Zustand、Zod、Playwright、Vitest）仍然适用，Build 改由 Next 承担；具体落地见 Next.js 路径一节。
+ 
+-## 官方入口（默认：Vite）
++## Vite 路径（默认）
++
++### 官方入口
+ 
+ 包管理器：`pnpm` > `npm`（用户指定优先）。无 `pnpm` 时列入缺失，**询问是否补齐**（安装 `pnpm`，或改用 npm）；未确认不得自行切换。在**最终方案已确认、依赖已检查**的空目标（或仅 git 占位）下：
+ 
+@@ -43,7 +52,7 @@
+ 
+ 空壳：极简占位（标题 + 一个 shadcn `Button`）即可，不要一次装整套组件。
+ 
+-## 各层落地（默认 Vite 路径）
++### 各层落地（Vite 路径）
+ 
+ 在 Vite + shadcn 之上按表补齐。包名用当时官方包，不在本文件钉死次版本。
+ 
+@@ -62,7 +71,7 @@
+ 
+ 不要默认再加 React Router、MUI、Ant Design 等。用户点名则加，并在摘要标明偏离。
+ 
+-## 目录约定
++### 目录约定（Vite 路径）
+ 
+ 以 Vite + shadcn 官方结果为底，再加本表目录（不要另造 `features/` 分层，除非用户要求）：
+ 
+@@ -102,7 +111,7 @@
+ 
+ README 写清：`dev`、`build`、`vitest`、Playwright（含先 `playwright install`）。不要写虚构部署环境。
+ 
+-## 冒烟（init 必做）
++### 冒烟（Vite 路径，init 必做）
+ 
+ ```bash
+ pnpm build
+@@ -111,9 +120,9 @@
+ 
+ 无 `pnpm` 且方案已确认改用 npm 时：`npm run build` 与 `npx vitest run`。失败则修复后再结束。不要后台挂起 `dev`，也不要默认跑 Playwright（缺浏览器）。
+ 
+-## align 对照
++### align 对照（Vite 路径）
+ 
+-已是 Vite + React + TS，或用户确认保留的 Next.js 时，按分层表逐项看，确认后再补：
++已是 Vite + React + TS 时，按分层表逐项看，确认后再补；已是 Next.js 见下方 Next.js 路径的 align 对照：
+ 
+ | 层 | 期望 |
+ |----|------|
+@@ -131,3 +140,128 @@
+ | Unit | Vitest 可运行 |
+ 
+ Vue / CRA / Svelte / 无打包静态页：报告「栈不兼容」，**不改代码**，除非用户明确要求迁移并确认计划。仅缺 shadcn/Tailwind、其余已是 Vite+React+TS 时，确认后按官方 `shadcn init` 补齐。
++
++## Next.js 路径
++
++需求指向 SSR / RSC / SEO / App Router / 全栈路由（Route Handlers、Server Actions），或用户点名 Next.js 时走本路径。仍是 React + TypeScript，仅换骨架与构建；**不要回退成 Vite**，也不要在已有 Vite 项目里另塞 Next。
++
++### 官方入口
++
++包管理器：`pnpm` > `npm`（用户指定优先）。无 `pnpm` 时列入缺失，**询问是否补齐**（安装 `pnpm`，或改用 npm）；未确认不得自行切换。在**最终方案已确认、依赖已检查**的空目标（或仅 git 占位）下：
++
++```bash
++pnpm create next-app@latest . --ts --tailwind --app --src-dir --import-alias "@/*" --eslint --use-pnpm
++# 或：npx create-next-app@latest . --ts --tailwind --app --src-dir --import-alias "@/*" --eslint --use-npm
++```
++
++- 标志以**当时** `create-next-app --help` 为准；上面的组合对应「TypeScript + Tailwind + App Router + `src/` + `@/*` 别名 + ESLint」的推荐默认。若标志改名或语义变化，改用官方文档的等价非交互参数，不要手搓 `next.config`/Tailwind 配置。
++- 需要 JavaScript、Pages Router 或非 `src/` 布局时**按用户点名**调整标志（如 `--js`、去 `--app`、去 `--src-dir`），并在摘要标明偏离；默认不偏离。
++- CLI 拒绝非空目录时：先确认里面只有安全占位文件（`README` / `.gitignore` / `.git`），再按官方文档处理（临时空目录生成后移入）。禁止覆盖已有 `src/` / `app/`。
++- 不要 `--example` 拉取未经审查的远程模板；需要时单独确认来源。
++
++然后按 **shadcn/ui 当前 Next.js 指南**初始化（`create-next-app` 已装 Tailwind，`shadcn init` 只补 `components.json` 与主题）。优先非交互：
++
++```bash
++pnpm dlx shadcn@latest init -d
++# 或：npx shadcn@latest init -d
++```
++
++```bash
++pnpm dlx shadcn@latest add button
++```
++
++`-d` / `--defaults` 以当时 CLI 为准；标志变更时用官方非交互等价参数，不要手搓与 shadcn 漂移的配置。空壳：把一个 Server Component 页面（`app/page.tsx`）换成极简占位（标题 + 一个 shadcn `Button`），不要一次装整套组件。
++
++### 各层落地（Next.js 路径）
++
++在 Next + shadcn 之上按表补齐。包名用当时官方包，不在本文件钉死次版本。凡是需要浏览器 API / 客户端交互的层（Query Provider、Zustand、表单）都要注意 Server / Client 边界——Provider 与仅客户端的 Provider 组件用 `"use client"` 标记，Zustand store 在客户端组件中消费；Server Component 默认不用 `"use client"`。
++
++| 层 | 做什么 |
++|----|--------|
++| Language / UI Framework | TypeScript + React；禁止改回 JavaScript |
++| Build | 保留 Next（App Router）；用户未点名时不要换成 Vite，也不要并存 |
++| Router | 用 App Router（`app/`）；默认 Server Component，按需在文件首行 `"use client"` |
++| CSS / UI | 跟随 `create-next-app` 的 Tailwind 与 `shadcn init`；`src/components/ui/` 只放 shadcn 生成物 |
++| Server State | 安装 `@tanstack/react-query`；用一个 `"use client"` 的 Provider 组件（如 `src/app/providers.tsx`）在根 `layout.tsx` 中包裹（空配置，不写业务 query） |
++| Client State | 安装 `zustand`；`src/stores/` 只放可扩展的空 store 骨架，不放领域字段；在客户端组件中消费 |
++| Validation | 安装 `zod`；与 API Contract 共用 |
++| Form | 不安装 `react-hook-form`，除非用户要表单；表单组件按需 `"use client"` |
++| API Contract | 安装 `zod`。有 OpenAPI 文档（本地 `openapi.json` / 用户给出的 spec）时用官方 codegen（如 `openapi-typescript`）生成客户端，Zod 做运行时校验；**没有 spec 时不要虚构一整份 OpenAPI**。建 `src/lib/api/`：`client.ts` 薄封装 + 一个与健康检查对应的 Zod schema 作为合同示例 |
++| Health | 用一个 Route Handler（如 `app/api/health/route.ts`）返回 `{ "status": "ok" }`，schema 与 `src/lib/api/` 的 Zod 对齐；**不要**为此引入数据库依赖 |
++| E2E | 安装 `@playwright/test`，写 `playwright.config.ts` 与一条访问根路径的 smoke spec。init **不**默认下载浏览器二进制；README 写明 `playwright install` 后再跑 E2E |
++| Unit | 安装 `vitest`（及官方 React 测试搭档，如 jsdom + Testing Library）；能跑通一条渲染占位的测试即可 |
++
++不要默认再加 React Router（Next 自带路由）、MUI、Ant Design 等。用户点名则加，并在摘要标明偏离。
++
++### 目录约定（Next.js 路径）
++
++以 `create-next-app --src-dir` + shadcn 官方结果为底，再加本表目录（不要另造 `features/` 分层，除非用户要求）：
++
++```text
++<project-root>/
++  package.json
++  tsconfig.json               # paths 含 "@/*" -> "./src/*"（用 --src-dir 时）
++  next.config.ts              # 以 CLI 实际产出为准
++  vitest.config.ts            # 或并入现有配置，以官方推荐为准
++  playwright.config.ts
++  components.json
++  README.md
++  .gitignore
++  e2e/
++    smoke.spec.ts
++  src/
++    app/
++      layout.tsx              # 根布局；挂 Providers
++      page.tsx                # 极简占位（标题 + 一个 shadcn Button）
++      providers.tsx           # "use client"：QueryClientProvider
++      api/
++        health/
++          route.ts            # GET 返回 { "status": "ok" }
++    lib/
++      utils.ts
++      api/
++        client.ts
++        health.ts             # Zod schema 示例
++    stores/
++      app-store.ts
++    components/ui/
++  test/                       # 若 Vitest 需要 setup，可放此处或 src/test/
++```
++
++- 路径别名 `@/*` 必须在 tsc 与 Next 中都有效（`create-next-app --import-alias "@/*"` 已配好；`--src-dir` 时指向 `./src/*`）。
++- 业务组件放 `src/components/`（`ui/` 留给 shadcn）。
++- 不要提交 `node_modules/`、`.next/`。`.gitignore` 含 `.env`、`.env.local`、Playwright 产物、`next-env.d.ts` 按官方模板处理。
++
++README 写清：`dev`、`build`、`start`、`vitest`、Playwright（含先 `playwright install`）、health URL。不要写虚构部署环境。
++
++### 冒烟（Next.js 路径，init 必做）
++
++```bash
++pnpm build
++pnpm exec vitest run
++```
++
++无 `pnpm` 且方案已确认改用 npm 时：`npm run build` 与 `npx vitest run`。失败则修复后再结束。不要后台挂起 `dev`，也不要默认跑 Playwright（缺浏览器）。
++
++### align 对照（Next.js 路径）
++
++已是 Next.js + React + TS 时，按分层表逐项看，确认后再补：**不要**把 App Router 改回 Pages Router，也不要把 Next 换成 Vite。
++
++| 层 | 期望 |
++|----|------|
++| Language | TypeScript |
++| UI Framework | React |
++| Build | Next（App Router；不改回 Vite） |
++| Router | App Router（`app/`）；Server / Client 边界清晰（仅必要处 `"use client"`） |
++| CSS | Tailwind，且与 shadcn 一致 |
++| UI | `components.json` + `src/components/ui/`（或 CLI 实际产出的等价位置） |
++| Server State | TanStack Query 通过 `"use client"` Provider 接入根布局 |
++| Client State | Zustand 已有 stores 约定，且在客户端组件消费 |
++| Validation | Zod 已用于契约或表单 |
++| Form | 有表单才需要 React Hook Form；无表单不装 |
++| API Contract | OpenAPI codegen 或等价 Zod schema；禁止手写无校验的散落 `fetch` 作为唯一合同 |
++| Health | 有 Route Handler 健康检查，或用户明确不要 |
++| E2E | Playwright 配置 + 至少一条 smoke |
++| Unit | Vitest 可运行 |
++
++仅缺 shadcn/Tailwind、其余已是 Next+React+TS 时，确认后按官方 `shadcn` Next 指南补齐。用户点名 Pages Router 或 JavaScript：按用户要求对照，并在摘要标明偏离，不要强改。
+diff --git a/agents/skills/project-init/tests/test_project_init_contract.py b/agents/skills/project-init/tests/test_project_init_contract.py
+--- a/agents/skills/project-init/tests/test_project_init_contract.py
++++ b/agents/skills/project-init/tests/test_project_init_contract.py
+@@ -103,6 +103,31 @@
+         self.assertIn("vitest", fe.lower())
+         self.assertIn("react-hook-form", fe)
+ 
++    def test_nextjs_path(self) -> None:
++        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fe = (ROOT / "references/frontend.md").read_text(encoding="utf-8")
++        # SKILL.md 声明两条前端路径，且 Next 不再只是单行备注
++        self.assertIn("Next.js 路径", skill)
++        self.assertIn("Vite 与 Next 并存", skill)
++        self.assertIn("create-next-app", skill)
++        # reference 有完整 Next.js 路径：官方命令、shadcn 接入、目录、冒烟、align
++        self.assertIn("## Next.js 路径", fe)
++        self.assertIn("create-next-app", fe)
++        self.assertIn('--import-alias "@/*"', fe)
++        self.assertIn("shadcn", fe)
++        self.assertIn("App Router", fe)
++        self.assertIn("use client", fe)
++        self.assertIn("route.ts", fe)
++        self.assertIn("next-env.d.ts", fe)
++        self.assertIn("pnpm build", fe)
++        self.assertIn("align 对照（Next.js 路径）", fe)
++
++    def test_nextjs_not_in_frontmatter(self) -> None:
++        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
++        fm = _frontmatter(text)
++        self.assertNotIn("Next.js", fm)
++        self.assertNotIn("create-next-app", fm)
++
+     def test_plan_confirm_and_tool_cli(self) -> None:
+         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+         py = (ROOT / "references/python-api.md").read_text(encoding="utf-8")

@@ -2,7 +2,7 @@
 id: project-init
 name: project-init
 description: >-
-  按约定脚手架创建或对齐项目（v1：Python API 与前端）。
+  按约定脚手架创建或对齐项目（v1：Python API 与前端；前端含默认与特定场景两条路径）。
   仅在用户显式要求初始化项目、创建项目脚手架、scaffold，或要求把已有项目架构向本 skill 对齐时使用。
   不要用于日常写功能、装机、克隆仓库或启动服务。
 ---
@@ -47,7 +47,7 @@ description: >-
 | `init` | 目标目录不存在、为空，或只有 git 占位（如 `README` / `.gitignore` / `.git`） | 方案确认后用官方工具命令创建，再套本 skill 约定 |
 | `align` | 目标已有实质源码或依赖清单 | 对照约定出缺口报告，**确认后再改** |
 
-目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 视为前端「特定场景」变体：按 Next 对照，不要强改回 Vite。
+目录已有另一套框架（如 Flask、Vue、CRA）时：**禁止**在 align 里偷偷换成默认栈。先报告不兼容，只有用户明确要求迁移才进入迁移（仍先给计划再改）。已有 Django 且用户未要求迁移：按 Django 路径对照，不要强改 FastAPI。已有 Next.js 按前端 Next 路径对照（见 reference 的 Next.js 段），不要强改回 Vite；反之已是 Vite 也不要强改成 Next。
 
 一次会话只服务**一个**目标根。前后端都要时，先问清是两个根还是 monorepo 子目录，再分别套对应 reference。
 
@@ -60,7 +60,9 @@ description: >-
 | 栈 id | 默认 | 先读 |
 |-------|------|------|
 | `python-api` | 分层见下表；纯 API 默认 FastAPI | [python-api.md](references/python-api.md) |
-| `frontend` | 分层见下表；命令与目录见 [frontend.md](references/frontend.md) | [frontend.md](references/frontend.md) |
+| `frontend` | 分层见下表；默认 Vite 路径，按需走 Next.js 路径 | [frontend.md](references/frontend.md) |
+
+前端两条路径共用同一份分层表与 reference，只换 Build 与项目骨架：**默认 Vite**（无特殊需求时）；需求明确指向服务端渲染 / RSC / SEO / App Router / 全栈路由等，或用户点名 Next.js 时走 **Next.js 路径**。两条路径都在 [frontend.md](references/frontend.md)；一次只选一条，禁止 Vite 与 Next 并存。
 
 ### Python 分层
 
@@ -94,7 +96,8 @@ description: >-
 |----|------|-------------|------|
 | Language | TypeScript | ⭐⭐⭐⭐⭐ | 必选 |
 | UI Framework | React | ⭐⭐⭐⭐⭐ | 必选 |
-| Build | Vite | ⭐⭐⭐⭐⭐ | 默认 |
+| Build | Vite | ⭐⭐⭐⭐⭐ | 默认（Vite 路径） |
+| Build | Next.js | ⭐⭐⭐⭐ | 特定场景再用（Next 路径；承担构建与服务端） |
 | CSS | Tailwind CSS | ⭐⭐⭐⭐⭐ | 默认 |
 | UI | shadcn/ui | ⭐⭐⭐⭐⭐ | 强烈推荐 |
 | Server State | TanStack Query | ⭐⭐⭐⭐⭐ | 推荐 |
@@ -104,7 +107,7 @@ description: >-
 | API Contract | OpenAPI / Zod | ⭐⭐⭐⭐⭐ | 强烈推荐 |
 | E2E | Playwright | ⭐⭐⭐⭐⭐ | 必选 |
 | Unit | Vitest | ⭐⭐⭐⭐⭐ | 推荐 |
-| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用 |
+| Framework | Next.js | ⭐⭐⭐⭐ | 特定场景再用（SSR / RSC / SEO / App Router / 全栈路由） |
 
 包管理器：用户指定优先；否则 Python 默认 `uv`，前端默认 `pnpm`。工具或包管理器缺失时列入依赖缺口，**询问是否补齐**（安装该工具，或改用已说明的回退：Python 为 venv + pip，前端为 npm）。未确认不得自行切换，也不得为脚手架擅自全局安装。
 
@@ -114,14 +117,14 @@ description: >-
 2. **收集输入**（缺一则问，不猜）：目标路径、栈、项目名、包管理器（若会写进锁文件）。`init` 还要确认目标可写且不会覆盖已有工程。需求特征会影响选层时（Admin、后台任务、模型与 schema 一体、浏览器 E2E、SSR 等）缺则问，不猜。
 3. **形成最终方案并确认**：只加载对应 reference，按需求选层，列出最终方案（模式、目标路径、各层选择与原因、拟用官方工具命令、将写入的约定、冒烟命令）。**展示给用户并等待明确确认**。未确认不得创建目录、改依赖或改文件。用户改需求则回到选层，不要边做边改方案。
 4. **检查依赖**：方案选定并确认之后、动手之前，检查该方案所需的工具命令是否可用（如 `uv`、`python3`、`pnpm`/`npm`、`node`，以及该栈官方 create/init CLI）。列出缺失项，**询问是否补齐**。用户同意后再安装或启用已确认的回退；用户拒绝则停止或改用其指定替代。不得默默全局安装，不得未经询问切换包管理器。项目框架包跟随官方 CLI / `uv add` / 包管理器安装，不要预先手搓 lockfile。
-5. **执行**：`init` **优先借助该栈官方工具命令**（见各 reference，如 `uv init`、`django-admin startproject`、`pnpm create vite`、`shadcn init`），再用本 skill 约定补配置、空布局、健康检查、`.env.example`、`.gitignore`、README。官方 CLI 可用时禁止手搓完整项目树。CLI 缺失：先按步骤 4 问是否补齐；仍不可用且用户明确同意后，才写最小可运行壳。`align`：只改已确认项，补齐同样走官方工具命令；不重写业务代码来「看起来更像模板」。不要启动长期 dev server。冒烟见各 reference。
+5. **执行**：`init` **优先借助该栈官方工具命令**（见各 reference，如 `uv init`、`django-admin startproject`、`pnpm create vite`、`create-next-app`、`shadcn init`），再用本 skill 约定补配置、空布局、健康检查、`.env.example`、`.gitignore`、README。官方 CLI 可用时禁止手搓完整项目树。CLI 缺失：先按步骤 4 问是否补齐；仍不可用且用户明确同意后，才写最小可运行壳。`align`：只改已确认项，补齐同样走官方工具命令；不重写业务代码来「看起来更像模板」。不要启动长期 dev server。冒烟见各 reference。
 6. **交付摘要**（见下）。不 commit。
 
 ## 安全
 
 - 目标必须是用户指定或确认过的路径；禁止写到家目录根、系统目录或其他仓库。
 - `init` 遇到已有源码：改为 `align` 或停止，禁止覆盖。
-- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`shadcn init`）。初始化应优先跑这些命令，而不是先手写同等文件。
+- 不执行未审查的远程脚本；只用该栈官方文档中的 create/init CLI（如 `uv init`、`django-admin startproject`、`create vite`、`create-next-app`、`shadcn init`）。初始化应优先跑这些命令，而不是先手写同等文件。
 - `.env.example` 只放变量名与无害示例值；真实密钥不入库。
 
 ## 交付摘要
@@ -139,3 +142,5 @@ description: >-
 ## 扩展
 
 新增栈：增加 `references/<stack-id>.md`，并在上表加一行。reference 必须写清官方脚手架命令、目录约定、默认依赖、冒烟命令、align 对照清单。无 reference 的栈 = 未支持。
+
+同一个 reference 内可有多条路径（如 `frontend` 的 Vite / Next.js）：新增同类变体时优先在该 reference 内加一节，而不是另立栈 id；仅当需要换掉分层概念时才新开栈。
