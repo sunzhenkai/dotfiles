@@ -1,0 +1,28 @@
+skill: skill-evolver
+
+problem:
+  进化产物（proposal.yaml / eval.md / commit message）曾写入内部项目代号与私有
+  trace 文件名，事后被退回清除。现有「过拟合禁止」规则只覆盖路径、文件名、
+  密钥、机器专属环境，未覆盖项目代号，也未约束 commit message，
+  更没有「抽象为通用描述」的正向做法。
+
+evidence:
+  - 2026-09-23 一轮真实进化中，proposal.yaml、eval.md、commit message 均含内部项目代号与私有 trace 文件名，需人工清除并改写为「2026-09-23 两次真实委派」类通用描述
+  - 现有 SKILL.md「过拟合禁止」仅列举路径、文件名、密钥、机器专属环境
+
+pattern:
+  记录证据时默认照抄原始任务细节（项目名、trace 文件名），
+  缺少「先抽象、后落盘」的步骤；清除只能靠事后人工发现
+
+proposed_change:
+  1. 扩写「4. Patch Skill」第 4 条（过拟合禁止）：禁止写入内部项目代号、
+     私有 trace/日志文件名；适用范围显式覆盖 proposal.yaml、eval.md、
+     decision.md 及关联 commit message
+  2. 增加正向规则：证据一律用通用化表述（时间 + 次数 + 事件类型，
+     如「2026-09-23 两次真实委派」），把特例细节提取为可复用的特性/功能描述
+  3. 「安全约束」一节同步补上「内部项目代号、私有 trace 文件名」
+
+expected_improvement:
+  进化产物可直接进公开仓库，无需事后清除；证据仍保留可验证性（时间/次数/类型）
+
+risk: low
