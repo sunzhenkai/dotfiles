@@ -17,6 +17,20 @@ skills:
       date: '2026-09-23'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/sunzhenkai/agent-roster/commit/671fcc19306fa9193cad9e55fce3eba53df4c395
+  - id: archify
+    source: https://github.com/tt-a1i/archify
+    revision: 1bb61c69538e37d80793b25843f620e55469f3a2
+    subdirectory: archify
+    content_hash: 6b393eb730afbf6b38eb0d0149609c15f942d145f0f923fc014a7551b5c966f7
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: b799ab081703e7821ae5096d2c1abdf14bbdc75e8ea1c4045998c36ed6db9706
+    audit:
+      status: approved
+      date: '2026-09-23'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/tt-a1i/archify/commit/1bb61c69538e37d80793b25843f620e55469f3a2
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -171,6 +185,20 @@ skills:
       date: '2026-09-20'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
+  - id: show-me
+    source: https://github.com/humanlayer/skills
+    revision: ca7c8088db69e315a8b2deea43820270457f8f3c
+    subdirectory: plugins/show-me/skills/show-me
+    content_hash: 3dd60ed962365f1f6b9f84fddd00957c1d89cb0359aaf29eff83c29c556aa49c
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: 5f13c18ea00ea5c1384f41745feeca774079164f7f59a92e4ac0899ad217b26f
+    audit:
+      status: approved
+      date: '2026-09-23'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/humanlayer/skills/commit/ca7c8088db69e315a8b2deea43820270457f8f3c
   - id: taste-skill
     source: https://github.com/Leonxlnx/taste-skill
     revision: a6153b39e495b8d62666f33f6a7019fcba3b777f

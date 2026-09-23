@@ -74,6 +74,16 @@ groups:
     skills:
       - agent-roster
 
+  archify:
+    type: third-party
+    source: github
+    package: https://github.com/tt-a1i/archify
+    skills:
+      # 审计 2026-09-23：audit-skill.sh 命中 1 BLOCK（LICENSE 正文 without limitation，
+      # 已知误报，用户豁免）+ 1 WARN（文档示例 URL git.internal，误报）。
+      - id: archify
+        optional: true
+
   # ui-templates 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
   # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。
   # ui-templates:
@@ -109,6 +119,14 @@ groups:
     package: https://github.com/solo-kingdom/senv
     skills:
       - id: senv-cli
+        optional: true
+
+  show-me:
+    type: third-party
+    source: github
+    package: https://github.com/humanlayer/skills
+    skills:
+      - id: show-me
         optional: true
 
   # taste-skill 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
