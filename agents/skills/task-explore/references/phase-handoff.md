@@ -4,6 +4,8 @@
 
 把 **探索任务**（`tasks/ongoing/{task-name}`）交接给 **taskflow 任务**（`{task-name}-driver`）。交付进度之后只认 taskflow checkbox。本阶段 **不写实现代码**，不发明 openspec 等价命令。交接后探索任务转入 `handed-off`：**不归档、不搬目录、不清绑定**。`handed-off` 只表示账本已换，不表示 goal 或交付完成。
 
+处在 goal 里时，不询问是否交接。`decide` 的审阅已包含交接且已收敛时，本阶段直接执行。批量失败不向用户列选项，停并报告。
+
 ## 目标推断（自动）
 
 按绑定对象确定交接目标，无需用户逐项指定：

@@ -310,6 +310,19 @@ class ContractTest(unittest.TestCase):
         self.assertIn("phase-archive.md", self.ledger)
         self.assertIn("phase-reopen.md", self.ledger)
 
+    def test_goal_confirmations_go_to_review(self) -> None:
+        section = self._section(self.skill, "## Goal 里的确认")
+        self.assertIn("走 task-wizard 的「审阅」", section)
+        self.assertIn("不列选项", section)
+        self.assertIn("不在 goal 里时，下面的确认规则不变", section)
+        self.assertIn("不交给审阅放行", section)
+        self.assertIn("处在 goal 里时不逐条问用户", self.skill)
+        self.assertIn("## Goal 里", self.decide)
+        self.assertIn("全部按默认冻结", self.decide)
+        self.assertIn("不在 goal 里时执行本节", self.decide)
+        self.assertIn("逐条请用户确认", self.decide)
+        self.assertIn("处在 goal 里时，不询问是否交接", self.handoff)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,7 @@
 ---
 id: task-explore
 name: task-explore
-description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / decide / save / handoff / archive / reopen / split 阶段推进；split 把当前任务的一个方向拆成子任务。explore 委托 grilling；decide 冻结方案；handoff 把探索任务交给 taskflow 的 {task}-driver，任务转入 handed-off（不归档、留在 ongoing 可见，后续可点名 archive 关闭）。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/交接/归档/重新打开任务时使用。已有探索任务要交付时用 handoff，不要绕开另起无关 driver。
+description: 针对任务不明确、周期可能很长或需要复杂问题排查的工作，在当前目录维护 tasks/INDEX.md、tasks/ongoing 与 tasks/archive，按 new / explore / chat / resume / design / decide / save / handoff / archive / reopen / split 阶段推进；split 把当前任务的一个方向拆成子任务。explore 委托 grilling；decide 冻结方案；handoff 把探索任务交给 taskflow 的 {task}-driver，任务转入 handed-off（不归档、留在 ongoing 可见，后续可点名 archive 关闭）。处在 goal 里时，向用户确认的决定改走 task-wizard 审阅，不列选项。在用户点名 task-explore、任务目标不清、长周期探索、复杂排查，或要求恢复/交接/归档/重新打开任务时使用。已有探索任务要交付时用 handoff，不要绕开另起无关 driver。
 ---
 
 # 任务探索
@@ -13,6 +13,16 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排�
 **探索任务** = `tasks/ongoing|archive/.../{task-name}/`。**taskflow 任务** = `{task-name}-driver`。两套账；唯一桥是 `handoff`。交付进度只认 taskflow checkbox。
 
 **子任务** = 探索期从父任务拆出的完整探索任务，承接一个可独立推进的方向：目录嵌套为 `ongoing/{parent}/{sub}/`，`TASK.md` 带 `parent:`，生命周期（explore / decide / handoff 等）与顶层任务相同。**父任务** = 拥有 ≥1 个子任务的探索任务；纯伞，只聚合与登记，`status` 恒 `ongoing`，**禁止 `handoff`、不建 driver**，`decide` 仅限范围/非目标/拆分原则。**handed-off** = 已交接 taskflow 的状态：任务留在 `ongoing/`，INDEX 可见、可 `resume`，不是归档。子任务与交付期的 taskflow 子 change 互不隶属。
+
+## Goal 里的确认
+
+处在 goal 里（消息里有 `/goal`，或当前有进行中的 goal，或本任务由 Goal 方案交接且方案里带完成判据）时，下文和 `references/` 里每一处要向用户确认、选择或询问的决定，都改为走 task-wizard 的「审阅」。不列选项，不用向用户提问的选择界面。
+
+推荐默认是该处已经写出的默认建议。没有写出默认时，取能让完成判据成立、且不覆盖已有目录、不泄密、不做未点名危险操作的那一条，只审这一条。
+
+派审贴上完成判据、「不做的事」、这条推荐默认，以及在审什么：采纳它能否让完成判据成立。完成程度为高且没有未消失的 P0 或 P1：视为已确认，采纳推荐默认，同一轮继续。冻结未决并交接时，审阅收敛即「按推荐冻结并交接」：本轮 `decide` 完立刻 `handoff`。有 P0 或 P1：写入后再审，不向用户要答复。审阅不通过、派不出或没有结论：停，不列选项。task-wizard 读不到：停并给出安装选项，不改回问用户。
+
+不在 goal 里时，下面的确认规则不变。目标已存在则仍禁止覆盖，不交给审阅放行。
 
 ## 阶段
 
@@ -158,9 +168,9 @@ tasks/
 
 ## `decide`
 
-冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。方案未经 `plan-review` 不阻断；想先评审则走 `plan-review`。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
+冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。方案未经 `plan-review` 不阻断；想先评审则走 `plan-review`。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。处在 goal 里时不逐条问用户，按「Goal 里的确认」走审阅；审阅收敛则同样本轮 `decide` 完立刻 `handoff`。
 
-同一任务可多次 `decide`：新决策追加编号写入决策小节，被取代的旧决策标注「被 D-n 取代」而非删除。带默认值的未决问题须逐条经用户确认后才算冻结，未确认项保持开放。父任务的 `decide` 仅限范围、非目标与拆分原则，具体方案属各子任务。
+同一任务可多次 `decide`：新决策追加编号写入决策小节，被取代的旧决策标注「被 D-n 取代」而非删除。带默认值的未决问题须逐条经用户确认后才算冻结；处在 goal 里时这一确认改为审阅。未确认项保持开放。父任务的 `decide` 仅限范围、非目标与拆分原则，具体方案属各子任务。
 
 ## `save`
 
