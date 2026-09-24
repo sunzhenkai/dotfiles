@@ -5,18 +5,18 @@ kind: third-party-skills-lock
 skills:
   - id: agent-roster
     source: https://github.com/sunzhenkai/agent-roster
-    revision: 671fcc19306fa9193cad9e55fce3eba53df4c395
+    revision: e10f21f58a7e652151274a1cc6199b7802743b33
     subdirectory: skills/agent-roster
-    content_hash: a8bfdc5a283a8b4c8a2721301a0303eacdaafde8bc2fe93ba9973077bedeceb2
+    content_hash: 8358d5d819d56e9919696980729eddb8d0ba906cfc246b03abb10682fa240747
     license:
       spdx: MIT
       file: LICENSE
       hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
     audit:
       status: approved
-      date: '2026-09-23'
+      date: '2026-09-24'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/agent-roster/commit/671fcc19306fa9193cad9e55fce3eba53df4c395
+      evidence: https://github.com/sunzhenkai/agent-roster/commit/e10f21f58a7e652151274a1cc6199b7802743b33
   - id: archify
     source: https://github.com/tt-a1i/archify
     revision: 1bb61c69538e37d80793b25843f620e55469f3a2
@@ -201,7 +201,7 @@ skills:
       evidence: https://github.com/humanlayer/skills/commit/ca7c8088db69e315a8b2deea43820270457f8f3c
   - id: taste-skill
     source: https://github.com/Leonxlnx/taste-skill
-    revision: a6153b39e495b8d62666f33f6a7019fcba3b777f
+    revision: c184364c58658b2f131b4ae8bd3d206cabb3deee
     subdirectory: skills/taste-skill
     content_hash: 7cd7bc7086b74e25028d0757cdc1bd1fe240bed6660549f5a517ad22016abef2
     license:
@@ -210,9 +210,9 @@ skills:
       hash: 4575a543ab88dad12ccea7d97e563d0bce5b448b06072e65d3264497dad326df
     audit:
       status: approved
-      date: '2026-09-23'
+      date: '2026-09-24'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/Leonxlnx/taste-skill/commit/a6153b39e495b8d62666f33f6a7019fcba3b777f
+      evidence: https://github.com/Leonxlnx/taste-skill/commit/c184364c58658b2f131b4ae8bd3d206cabb3deee
   - id: tdd
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
