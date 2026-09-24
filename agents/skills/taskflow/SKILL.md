@@ -46,6 +46,8 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 `Driver 协议` 小节是固定文本，逐字写入，不要改写或精简；其余小节按任务填写。
 
+填写「验收标准」时：任务描述含完成判据，第一条 checkbox 使用该判据原文。任务描述没有完成判据时按任务填写，不另造一条判据。这条验收标准不代替 driver `tasks.md` 的编排进度；进度仍只认 checkbox。脚手架仍不要写 `tasks.md`。
+
 ````markdown
 ## Why
 <任务描述>

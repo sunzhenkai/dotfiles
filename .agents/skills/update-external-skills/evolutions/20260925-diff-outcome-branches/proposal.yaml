@@ -1,0 +1,34 @@
+skill: update-external-skills
+
+problem: |
+  第 4 步验证对 `diff -r` 结果只定义了「authoring 目录」和「kiro $ARGUMENTS」两类预期差异，
+  其余一律回查 defaults 段。但有两类合法情形没有对应的结论分支，runner 每次都要现场推断：
+    1. optional 条目未安装 → diff -r 报 No such file or directory（2026-09-21 已提案，
+       当时只落成坑 9 的事实陈述，step 4 的操作分支一直没补，本次再次踩到）
+    2. 安装目录里的本机运行残留（如 __pycache__）→ 被「其余任何差异都说明下发没到位」
+       误伤成漂移信号
+
+evidence:
+  - 2026-09-25 一次完整验证：某 optional 锁内条目内容有变，按 step 4 对三个 layout 跑
+    diff -r 全部报「目录不存在」，需回读编目 + 坑 9 才判定为预期；同轮另一条目 diff 输出
+    含本机 __pycache__，按字面规则会被误判为下发未到位。
+  - 2026-09-21 同类误判已发生一次，且未闭环的提案文件仍在 evolutions/ 里（两轮会话踩同一坑）。
+
+pattern: |
+  diff -r 的差异输出存在三个合法类别，而现有规则只覆盖两个；把「差异类型 → 结论」做成
+  穷举分支，验证步骤即可机械执行，无需每轮现场推断。
+
+proposed_change: |
+  只改 step 4 末尾的段落：把差异枚举改写为三条预期类别的结论分支——
+    a) authoring 目录「Only in 上游」→ 预期（剥除设计）
+    b) kiro 副本末尾 $ARGUMENTS → 预期（固定渲染）
+    c) 仅本机侧多出的运行残留目录（__pycache__ 等）→ 非内容漂移，忽略
+  并新增一句：optional / 编目注释条目无安装副本，diff -r 报「不存在」属预期，
+  此类条目只验 tree_hash == content_hash（呼应坑 9，给出操作结论）。
+  其余差异仍回查 defaults 段（原文保留）。不改脚本、不动其他步骤。
+
+expected_improvement: |
+  - step 4 从「规则 + 现场判断」变成可机械执行的穷举分支。
+  - 关闭 2026-09-21 未晋升提案留下缺口，避免第三轮再踩。
+
+risk: low

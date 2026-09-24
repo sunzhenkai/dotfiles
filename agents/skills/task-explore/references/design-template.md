@@ -22,6 +22,10 @@
 
 现状简述。链到已有文档、ADR、代码路径。标出必须契合的既有模式。
 
+## 外部参照
+
+这一轮追的做法。每条写一句话做法和公开出处，并写明采信了哪一条。未找到则写明缺什么。同一问题已有仍对得上的出处时，摘录已有条目。
+
 ## Options Considered
 
 | Option | Cost | Risk | Reversibility | Time | Complexity |

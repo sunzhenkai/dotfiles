@@ -1,7 +1,7 @@
 ---
 id: role-based-reviewer
 name: role-based-reviewer
-description: "可组合的角色化只读评审：engineer、algo、data、sre、ops、biz、product、design、qa。仅在用户显式点名（/role-based-reviewer）、指定 roles=、或明确要求按岗位/多角色视角时使用。普通「看看代码」「帮我 review」不要自动加载。"
+description: "可组合的角色化只读评审：engineer、algo、data、sre、ops、biz、product、design（别名 uiux）、qa。仅在用户显式点名（/role-based-reviewer）、指定 roles=、或明确要求按岗位/多角色视角时使用。普通「看看代码」「帮我 review」不要自动加载。"
 ---
 
 # 角色化评审
@@ -29,7 +29,7 @@ description: "可组合的角色化只读评审：engineer、algo、data、sre�
 
 ## 输入
 
-- `roles=<逗号分隔角色>`：可选。合法值：`engineer`、`algo`、`data`、`sre`、`ops`、`biz`、`product`、`design`、`qa`。
+- `roles=<逗号分隔角色>`：可选。合法值：`engineer`、`algo`、`data`、`sre`、`ops`、`biz`、`product`、`design`（别名 `uiux`）、`qa`。
 - `mode=<ask|review>`：可选，默认 `ask`。已过门 1 且用户说评审 / review / 审查时视为 `review`。
 - `<问题或变更范围>`：可选。`mode=review` 且未给范围时，默认当前工作区 `git diff`（仍受门 2：不要因此自动加角色）。
 
@@ -50,7 +50,7 @@ description: "可组合的角色化只读评审：engineer、algo、data、sre�
 - **默认只 engineer**。不要默认带 qa / product / design。
 - 额外角色要有问题或 diff **主体**上的强信号，不是「文件列表里出现过」：
   - 审查目标就是测试/可测性 → + **qa**
-  - 目标就是 UI 视觉/交互/无障碍（不是顺便改了样式）→ + **design**
+  - 目标就是 UI 视觉/交互/无障碍（不是顺便改了样式）→ + **design**（即 uiux）
   - 目标就是需求/方案文档 → + **product**
   - 目标就是部署/CI/集群/密钥（不是应用代码里读了环境变量）→ + **sre**
   - 目标就是模型/策略/实验效果 → + **algo**
@@ -72,7 +72,7 @@ description: "可组合的角色化只读评审：engineer、algo、data、sre�
 ## 流程
 
 1. 过三道门禁。未过门 1 则不要按本 skill 执行。解析 `mode` 与 `roles`；未指定角色时按上节推断，受门 2 约束。
-2. 对每个生效角色，按 [preload-protocol](references/preload-protocol.md) 加载上下文。跨角色复用同一文件，合计默认 ≤6 个文件；超出时说明原因。`mode=review` 另遵循耗时优化。
+2. 对每个生效角色，按 [preload-protocol](references/preload-protocol.md) 加载上下文（含生效角色的 `references/roles/<role>.md`，计入文件预算）。跨角色复用同一文件，合计默认 ≤6 个文件；超出时说明原因。`mode=review` 另遵循耗时优化。
 3. `mode=ask`：按角色输出独立结论、证据、边界与下游建议。
 4. `mode=review`：按角色输出独立 findings，标注严重级别与 `path:line`；共享对象上标主责 / 协作 / 冲突。本 skill **自己完成审查**。
 5. 合并时只去重「同一证据支持的同一风险」；不得把不同角色的结论混写成无归属意见。

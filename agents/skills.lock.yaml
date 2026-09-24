@@ -5,18 +5,18 @@ kind: third-party-skills-lock
 skills:
   - id: agent-roster
     source: https://github.com/sunzhenkai/agent-roster
-    revision: fb32647a6361f7a5d46c5c50d0a105cd69678b65
+    revision: d42624456c362e60c15d44e115307ac62a47a390
     subdirectory: skills/agent-roster
-    content_hash: bf53ca89f0ceaeb73e5b49bdfbe9f105214ac3626a4969c295f516c3faea615b
+    content_hash: 7742ea1e8b7cbc6d6178ad4eb8bc0b612be929733b201c510fa63279ee50259d
     license:
       spdx: MIT
       file: LICENSE
       hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
     audit:
       status: approved
-      date: '2026-09-24'
+      date: '2026-09-25'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/agent-roster/commit/fb32647a6361f7a5d46c5c50d0a105cd69678b65
+      evidence: https://github.com/sunzhenkai/agent-roster/commit/d42624456c362e60c15d44e115307ac62a47a390
   - id: archify
     source: https://github.com/tt-a1i/archify
     revision: 9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993
@@ -159,18 +159,18 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: senv-cli
     source: https://github.com/solo-kingdom/senv
-    revision: a52b4b4025b07476ae0a5fbf1195c841bfab05aa
+    revision: 17098173e33e9e0e184aaa134e962a8ec0386b7c
     subdirectory: .agents/skills/senv-cli
-    content_hash: 6555ce029a2c05af2a3aa6da7292dc1183c8f7b84583e58860b7a96f2015f33e
+    content_hash: 6dcc84a5587cf625da1dd2ec23758900f35f68e61fd9bcdbc04c055a77c0955c
     license:
       spdx: MIT
       file: LICENSE
       hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
     audit:
       status: approved
-      date: '2026-09-24'
+      date: '2026-09-25'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/solo-kingdom/senv/commit/a52b4b4025b07476ae0a5fbf1195c841bfab05aa
+      evidence: https://github.com/solo-kingdom/senv/commit/17098173e33e9e0e184aaa134e962a8ec0386b7c
   - id: setup-matt-pocock-skills
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7

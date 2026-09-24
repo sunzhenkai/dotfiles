@@ -210,3 +210,48 @@
 - **WHEN** 任务 `reopen` 后再次 `archive`
 - **THEN** 原 `SUMMARY.md` 保留，按 archive 规则续写新增时间线并更新结局，不整篇重写
 
+### Requirement: 上游完成判据登记进方案
+
+`new` 的输入含完成判据时，`TASK.md` 的「方案」小节 MUST 登记该完成判据，并一并登记步骤、阻塞点、坑。系统 MUST NOT 只保留目标而丢掉完成判据。没有完成判据的输入保持现有登记方式。
+
+#### Scenario: Goal 方案进入 new
+
+- **WHEN** `new` 的输入含完成判据、步骤、阻塞点与坑
+- **THEN** `TASK.md`「方案」含该完成判据原文
+- **THEN** 步骤、阻塞点、坑也在「方案」中
+
+#### Scenario: 没有完成判据时不发明判据
+
+- **WHEN** `new` 的输入没有完成判据
+- **THEN** 「方案」不新增一条编造的完成判据
+
+### Requirement: decide 用已登记的完成判据作为成功标准
+
+「方案」已有完成判据时，`decide` 的成功标准 MUST 使用该判据。判据写不出可检验标准时，`decide` MUST 停下，不得冻结。没有完成判据的任务，成功标准门禁保持现状。父任务的 `decide` 仍只冻结范围、非目标与拆分原则。
+
+#### Scenario: 有判据才允许冻结
+
+- **WHEN** 任务「方案」含一条可检验的完成判据，且其余 `decide` 门禁已满足
+- **THEN** 决策小节把该判据当作成功标准
+
+#### Scenario: 判据不可检验则不冻结
+
+- **WHEN** 「方案」中的完成判据无法检验是否成立
+- **THEN** `decide` 停下，不写入采纳方案
+
+### Requirement: handoff 的 goal 带上完成判据
+
+存在已登记的完成判据时，`handoff` 交给 taskflow 的 `--goal` MUST 同时包含目标、该完成判据、已采纳方案。`handed-off` MUST NOT 被当作 goal 或交付完成。没有完成判据时，`--goal` 仍为目标加已采纳方案。
+
+#### Scenario: 交接文本含判据
+
+- **WHEN** 任务已 `decide`，且「方案」含完成判据，用户确认后执行 `handoff`
+- **THEN** `--goal` 含目标、完成判据与采纳方案
+- **THEN** `status` 改为 `handed-off`，任务仍留在 `ongoing/`
+
+#### Scenario: 未 decide 不带判据去建 driver
+
+- **WHEN** 「方案」含完成判据，但决策小节还没有采纳方案
+- **THEN** `handoff` 停下并要求先 `decide`
+- **THEN** 不创建 driver
+

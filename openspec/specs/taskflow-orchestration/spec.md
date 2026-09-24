@@ -133,3 +133,23 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 - **THEN** 其中没有可执行脚本目录
 - **THEN** `src/agents/sync.py` 的 `SHIMS` 未新增条目
 
+### Requirement: 完成判据写入验收标准第一条
+
+`taskflow-new` 收到的任务描述含完成判据时，driver `proposal.md` 的验收标准第一条 MUST 是该判据，且为 checkbox。任务描述没有完成判据时，验收标准按原方式填写，MUST NOT 编造判据。Driver 协议小节的固定文本 MUST 保持逐字不变。进度仍只认 checkbox：该条验收标准不得单独代替 driver `tasks.md` 的编排完成。
+
+#### Scenario: 交接带入判据
+
+- **WHEN** `taskflow-new` 的任务描述含一条完成判据
+- **THEN** driver `proposal.md` 验收标准的第一条 checkbox 为该判据原文
+- **THEN** Driver 协议小节与固定模板逐字一致
+
+#### Scenario: 没有判据时不新增第一条
+
+- **WHEN** `taskflow-new` 的任务描述没有完成判据
+- **THEN** 验收标准中不出现编造的完成判据条目
+
+#### Scenario: 验收标准不代替编排进度
+
+- **WHEN** 验收标准第一条已写下，但 driver `tasks.md` 仍有未勾项
+- **THEN** 编排进度仍以未勾的 `tasks.md` 为准
+

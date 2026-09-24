@@ -2,7 +2,7 @@
 
 进入本阶段后执行。未绑定则先回到 `SKILL.md` 的绑定规则。
 
-把 **探索任务**（`tasks/ongoing/{task-name}`）交接给 **taskflow 任务**（`{task-name}-driver`）。交付进度之后只认 taskflow checkbox。本阶段 **不写实现代码**，不发明 openspec 等价命令。交接后探索任务转入 `handed-off`：**不归档、不搬目录、不清绑定**。
+把 **探索任务**（`tasks/ongoing/{task-name}`）交接给 **taskflow 任务**（`{task-name}-driver`）。交付进度之后只认 taskflow checkbox。本阶段 **不写实现代码**，不发明 openspec 等价命令。交接后探索任务转入 `handed-off`：**不归档、不搬目录、不清绑定**。`handed-off` 只表示账本已换，不表示 goal 或交付完成。
 
 ## 目标推断（自动）
 
@@ -23,7 +23,7 @@
 
 1. 有未写入进展则先按 `save` 写回。
 2. 在 `TASK.md` 写 **交接** 小节：driver 名、采纳方案、`design/` 指针、可带进实现的未决。
-3. 读取并遵循 `taskflow` 的脚手架（`taskflow-new`）。`--goal` 用目标 + 已采纳方案，不要只丢一句含糊摘要。
+3. 读取并遵循 `taskflow` 的脚手架（`taskflow-new`）。「方案」含完成判据时，`--goal` 用目标 + 该完成判据原文 + 已采纳方案。没有完成判据时，`--goal` 用目标 + 已采纳方案。不要只丢一句含糊摘要。决策小节没有采纳方案时停在门禁 1，不创建 driver。
 4. 按 taskflow 写入 driver 的 `.openspec.yaml`（`skip_specs: true`）和 `proposal.md`（含逐字 Driver 协议）。**不要写 `tasks.md`。**
 5. taskflow / openspec 不可用，或无法确定 planning root：停下报告可选项，**保持探索任务在 `ongoing/`、状态不变**，已写的交接段可保留。
 6. 收尾：`TASK.md` 的 `status` 改为 `handed-off`，写入 `handed-off` 日期与 `driver` 名；INDEX 行一句话更新为 `已交接：… → {task-name}-driver`（**行留在 Ongoing 表**）；保留会话绑定。

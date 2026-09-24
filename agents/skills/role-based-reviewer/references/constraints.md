@@ -15,7 +15,7 @@
 
 | | engineer | algo | data | sre | ops | biz | product | design | qa |
 |---|---|---|---|---|---|---|---|---|---|
-| 视角 | 在线实现、性能、调用链 | 模型/策略/实验 | 管道、数仓、口径 | 集群、监控、发布 | 业务配置、灰度、运营流程 | 对外对接、多租户 | 需求与 spec | 视觉与交互 | 可测性与回归 |
+| 视角 | 在线实现、性能、调用链 | 模型/策略/实验 | 管道、数仓、口径 | 集群、监控、发布 | 业务配置、灰度、运营流程 | 对外对接、多租户 | 需求与 spec | 交互流程、可用性、无障碍、状态覆盖、微文案、视觉一致性 | 可测性与回归 |
 | 典型下游 | `task-explore`、`taskflow`、`service-manager` | `task-explore`、`taskflow` | `task-explore`、`taskflow` | `service-manager`、部署/CI 相关约定 | 运营手册 / 配置变更流程 | 协议/对接文档 | `task-explore`、`taskflow`、OpenSpec（若项目有） | `ui-template-design` | 测试与回归计划 |
 | 运行态上下文 | 按需 | 否 | 否 | 按需 | 按需 | 否 | 否 | 否 | 否 |
 | 输出 | RoleBrief / 审查报告 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 | 同左 |

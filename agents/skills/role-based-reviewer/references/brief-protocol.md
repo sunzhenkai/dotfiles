@@ -7,7 +7,7 @@
 ```markdown
 ## RoleBrief
 
-**角色**：<engineer / algo / data / sre / ops / biz / product / design / qa>
+**角色**：<engineer / algo / data / sre / ops / biz / product / design（别名 uiux） / qa>
 **问题视角**：<用户问题的角色化重述，一句话>
 
 ### 领域上下文

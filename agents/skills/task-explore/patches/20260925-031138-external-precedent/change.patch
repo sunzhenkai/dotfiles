@@ -1,0 +1,130 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -116,19 +116,19 @@ tasks/
+ 
+ 1. 若没有 `tasks/`：**询问是否在当前位置创建 `tasks/`**。未确认则停止。
+ 2. 推断 `{task-name}`。冲突则列出已有任务并问 resume 还是换名。在已有任务下拆子方向不属于 `new`，走 `split`。
+-3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。输入含现成方案（含上游 task-wizard 的步骤级方案）时，把完成判据、步骤、阻塞点、坑一并登记进「方案」小节，不丢上游产物。输入里没有完成判据时不要编造。
++3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。输入含现成方案（含上游 task-wizard 的步骤级方案）时，把完成判据、事实、假设、步骤、阻塞点、坑一并登记进「方案」小节，不丢上游产物。输入里没有完成判据时不要编造。
+ 4. 在 `tasks/INDEX.md` 的 Ongoing 表追加一行（无 INDEX 则按模板创建或按目录重建）。
+ 5. 绑定该任务。报告路径，询问下一步：`explore`（默认建议）还是 `chat`。不要自动开始 grill。
+ 
+ ## `explore`
+ 
+-不断探索预期目标，委托 `grilling`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。禁止调用 `grill-with-docs` / `domain-modeling`。
++不断探索预期目标，委托 `grilling`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。禁止调用 `grill-with-docs` / `domain-modeling`。会改方案走向的未知，按该阶段详情做完外部参照再问。
+ 
+ ## `chat`（默认）
+ 
+ 对任务进行问答：解释、排查、对照代码与已有笔记。先读任务文档再答。
+ 
+-- 可只读查代码与资料；不要开始实现。
++- 只读本仓代码与任务里已有笔记，不做外部参照；不要开始实现。
+ - 不要把 `chat` 默认为 `explore`（不自动 grill）或 `design`（不写方案稿）。
+ - 用户要把方案写下来 → 转 `design`。目标仍糊 → 建议 `explore`。路径已清、要交付 → `decide` 然后 `handoff`，不要直接开一个无关名字的 driver。
+ - 发现任务含多个可独立推进的方向 → 提示一次可 `split` 拆子任务，不阻断，用户确认才建。
+@@ -146,7 +146,7 @@ tasks/
+ 
+ ## `design`
+ 
+-方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
++方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。写对比表之前按阶段详情做一次外部参照。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
+ 
+ ## `plan-review`（可选）
+ 
+diff --git a/agents/skills/task-explore/references/phase-explore.md b/agents/skills/task-explore/references/phase-explore.md
+--- a/agents/skills/task-explore/references/phase-explore.md
++++ b/agents/skills/task-explore/references/phase-explore.md
+@@ -6,7 +6,7 @@
+ 
+ 1. 必须已绑定任务；否则先走绑定。
+ 2. 先读 `TASK.md`、已有 `glossary.md` 与 `design/`。
+-3. `TASK.md` **方案** 小节已有上游方案（含 task-wizard 的步骤级方案）时，先把它当既有事实复核，不重问已知步骤；grill 只针对未覆盖的预期目标、成功标准、范围、约束与未知。方案随后按 explore / design 结论更新回该小节。
++3. `TASK.md` **方案** 小节已有上游方案（含 task-wizard 的步骤级方案）时，已对上出处的事实与已知步骤照原样复核，不重问。方案里的假设仍是假设。grill 只针对未覆盖的预期目标、成功标准、范围、约束与未知。会改方案走向的未知，先读并做完 [external-precedent.md](external-precedent.md)，再问剩下的决策。方案随后按 explore / design 结论更新回该小节。
+ 4. 读取并遵循 `grilling`。不可用则用它的轮次格式当面问；**不要发明等价命令**，也不要改调 `grill-with-docs`。
+ 5. 问的是**预期目标、成功标准、范围、约束、未知**。事实自己查，决策交给用户。
+ 6. 发现任务含多个可独立推进的方向时，**提示一次**可 `split` 拆子任务，不阻断、不自动创建；用户确认后走 `split`。
+diff --git a/agents/skills/task-explore/references/phase-design.md b/agents/skills/task-explore/references/phase-design.md
+--- a/agents/skills/task-explore/references/phase-design.md
++++ b/agents/skills/task-explore/references/phase-design.md
+@@ -21,7 +21,7 @@
+ 
+ 停在实现边界。只写入 `{taskRoot}/design/`。
+ 
+-1. **探索（对话，可不落盘）**：干系人与成功标准；现状（读代码与已有文档）；约束；未知与风险（写明「还不知道 X」）。问题仍模糊时给 2–3 种问题框架让用户选。
++1. **探索（对话，可不落盘）**：干系人与成功标准；现状（读代码与已有文档）；约束；未知与风险（写明「还不知道 X」）。写对比表之前读并做完 [external-precedent.md](external-precedent.md)。问题仍模糊时给 2–3 种问题框架让用户选。
+ 2. **设计**：至少两个可行方案再推荐。选项 + 对比表（成本、风险、复杂度、可逆性、工期）。产物见 [design-template.md](design-template.md)。多用 ASCII / Mermaid。
+ 3. **写入当前任务**（不晋升到仓库文档）：
+ 
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -1,6 +1,6 @@
+ # 任务文档骨架
+ 
+-`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。**输入含现成方案时（含上游 task-wizard 的步骤级方案、他人设计稿），把目标、完成判据、步骤、阻塞点、坑逐条登记进「方案」小节**，不要只填目标。输入里没有完成判据时不要编造。
++`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。**输入含现成方案时（含上游 task-wizard 的步骤级方案、他人设计稿），把目标、完成判据、事实、假设、步骤、阻塞点、坑逐条登记进「方案」小节**，不要只填目标。输入里没有完成判据时不要编造。
+ 
+ `save` 时更新同一文件：改 `updated` 与有变化的章节，不要整文件重写后丢掉仍有效的内容。同时同步 `tasks/INDEX.md` 对应行（标题、日期、一句话目标），不要把进展抄进索引。
+ 
+@@ -30,6 +30,8 @@
+ [上游或已有方案；无则留空。已定则写全，未定则写下当前候选与缺口。]
+ 
+ - 完成判据：[输入里的那一条可检查的话；没有则删去本行，不要编造]
++- 事实：[对上出处的现状或外部参照；没有则删去本行]
++- 假设：[未对上出处的，含未找到的外部参照；没有则删去本行]
+ - 步骤：[每步动作 — 要点 / 验证]
+ - 阻塞点：[会卡住整个方案的事，或「无」]
+ - 坑：[易踩的坑、隐性依赖、顺序敏感点，或「无」]
+diff --git a/agents/skills/task-explore/references/design-template.md b/agents/skills/task-explore/references/design-template.md
+--- a/agents/skills/task-explore/references/design-template.md
++++ b/agents/skills/task-explore/references/design-template.md
+@@ -22,6 +22,10 @@
+ 
+ 现状简述。链到已有文档、ADR、代码路径。标出必须契合的既有模式。
+ 
++## 外部参照
++
++这一轮追的做法。每条写一句话做法和公开出处，并写明采信了哪一条。未找到则写明缺什么。同一问题已有仍对得上的出处时，摘录已有条目。
++
+ ## Options Considered
+ 
+ | Option | Cost | Risk | Reversibility | Time | Complexity |
+diff --git a/agents/skills/task-explore/references/external-precedent.md b/agents/skills/task-explore/references/external-precedent.md
+new file mode 100644
+--- /dev/null
++++ b/agents/skills/task-explore/references/external-precedent.md
+@@ -0,0 +1,32 @@
++# 外部参照
++
++为补方案读到的一条公开做法。对上公开原文的是事实，对不上的是假设。复杂问题里会改方案走向的做法，比较方案之前没有这次尝试，就是闭门造车。
++
++`explore` 与 `design` 在阶段详情指向本文件时读取。`chat` 只读本仓代码与任务里已有笔记。
++
++## 何时做
++
++- `design`：写对比表之前做一次。
++- `explore`：只有这个未知会改方案走向时做。其余问题照常问。
++- 同一问题、已记下的出处仍对得上：沿用已有条目。
++- 问题变了、出处对不上、或当时记的是未找到：再做一次。
++
++## 一次尝试
++
++只追最会影响方案走向的那一个做法。两个做法分不出主次时，追更没把握的那个，另一个记为假设。
++
++用当前宿主已有的能力检索公开资料，并阅读最多两处公开原文。原文是公开仓库或上游文档里写下该做法的那一处。
++
++当前仓库的代码和文档是摸底。本机其他仓库，仅当该项目本身公开时才算外部参照。
++
++## 写入
++
++- 对上原文：记为事实。一句话做法，加上公开出处。
++- 打不开、没有检索或阅读能力、没有命中、或只有转述：记为假设，写明缺的是什么。方案照常往下写。
++- 两处原文都对上、做法相反：两条都是事实，各自带公开出处。对比表可以把这两条当作两个方案。
++
++落盘时写入设计稿的「外部参照」一节。更新 `TASK.md` 方案时，事实和假设分列，假设保持为假设。
++
++## 做完
++
++笔记里写明这一轮追的是哪一个做法，以及结果是事实、假设，还是两条相反的事实。然后继续本阶段原来的下一步。

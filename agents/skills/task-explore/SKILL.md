@@ -116,19 +116,19 @@ tasks/
 
 1. 若没有 `tasks/`：**询问是否在当前位置创建 `tasks/`**。未确认则停止。
 2. 推断 `{task-name}`。冲突则列出已有任务并问 resume 还是换名。在已有任务下拆子方向不属于 `new`，走 `split`。
-3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。输入含现成方案（含上游 task-wizard 的步骤级方案）时，把步骤、阻塞点、坑一并登记进「方案」小节，不丢上游产物。
+3. 创建 `tasks/ongoing/{task-name}/TASK.md`（用模板，填已知目标）。输入含现成方案（含上游 task-wizard 的步骤级方案）时，把完成判据、事实、假设、步骤、阻塞点、坑一并登记进「方案」小节，不丢上游产物。输入里没有完成判据时不要编造。
 4. 在 `tasks/INDEX.md` 的 Ongoing 表追加一行（无 INDEX 则按模板创建或按目录重建）。
 5. 绑定该任务。报告路径，询问下一步：`explore`（默认建议）还是 `chat`。不要自动开始 grill。
 
 ## `explore`
 
-不断探索预期目标，委托 `grilling`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。禁止调用 `grill-with-docs` / `domain-modeling`。
+不断探索预期目标，委托 `grilling`。进入本阶段后 **先读** [references/phase-explore.md](references/phase-explore.md)，再开始提问。未读完不要 grill。禁止调用 `grill-with-docs` / `domain-modeling`。会改方案走向的未知，按该阶段详情做完外部参照再问。
 
 ## `chat`（默认）
 
 对任务进行问答：解释、排查、对照代码与已有笔记。先读任务文档再答。
 
-- 可只读查代码与资料；不要开始实现。
+- 只读本仓代码与任务里已有笔记，不做外部参照；不要开始实现。
 - 不要把 `chat` 默认为 `explore`（不自动 grill）或 `design`（不写方案稿）。
 - 用户要把方案写下来 → 转 `design`。目标仍糊 → 建议 `explore`。路径已清、要交付 → `decide` 然后 `handoff`，不要直接开一个无关名字的 driver。
 - 发现任务含多个可独立推进的方向 → 提示一次可 `split` 拆子任务，不阻断，用户确认才建。
@@ -146,7 +146,7 @@ tasks/
 
 ## `design`
 
-方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
+方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。写对比表之前按阶段详情做一次外部参照。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
 
 ## `plan-review`（可选）
 

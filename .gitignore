@@ -38,3 +38,4 @@ config/tools/k9s/snapshots/
 config/tools/k9s/clusters/
 
 .kiro
+.qoder
