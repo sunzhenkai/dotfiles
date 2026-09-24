@@ -1,0 +1,46 @@
+--- tests/test_task_explore_contract.py	2026-09-24 17:38:31.013463331 +0800
++++ evolutions/20260925-ledger-write-discipline/test_task_explore_contract.py.candidate	2026-09-25 01:48:28.943429379 +0800
+@@ -30,6 +30,9 @@
+         cls.reopen = (ROOT / "references" / "phase-reopen.md").read_text(
+             encoding="utf-8"
+         )
++        cls.ledger = (
++            ROOT / "references" / "ledger-write-discipline.md"
++        ).read_text(encoding="utf-8")
+ 
+     @staticmethod
+     def _section(text: str, head: str) -> str:
+@@ -50,6 +53,7 @@
+             "references/design-template.md",
+             "references/task-template.md",
+             "references/index-template.md",
++            "references/ledger-write-discipline.md",
+         ):
+             self.assertTrue((ROOT / rel).is_file(), rel)
+ 
+@@ -287,6 +291,25 @@
+         self.assertIn("提示一次", self.explore)
+         self.assertIn("`split`", self.explore)
+ 
++    def test_ledger_write_discipline_is_gated(self) -> None:
++        self.assertIn("references/ledger-write-discipline.md", self.skill)
++        self.assertIn("写台账", self.skill)
++        for phrase in (
++            "锚点串",
++            "恰为 1",
++            "整行替换",
++            "列数与表头一致",
++            "精确整行等值",
++            "最大编号",
++            "不静默改写",
++        ):
++            self.assertIn(phrase, self.ledger)
++
++    def test_ledger_discipline_carves_out_batch_path_update(self) -> None:
++        self.assertIn("父路径前缀", self.ledger)
++        self.assertIn("phase-archive.md", self.ledger)
++        self.assertIn("phase-reopen.md", self.ledger)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
