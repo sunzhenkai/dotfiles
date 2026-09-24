@@ -1,6 +1,6 @@
 # Goal 方案只在高置信度下把审阅者的建议当作决定
 
-中、低档位停下来等人授权的那一条，由 [0027](0027-low-medium-review-continues-refinement.md) 取代。开工门改为改进意见「已达到预期」，见 [0028](0028-review-loop-until-expected-or-honest-stop.md)。
+中、低档位停下来等人授权的那一条，由 [0027](0027-low-medium-review-continues-refinement.md) 取代。开工门曾改为改进意见「已达到预期」，见 [0028](0028-review-loop-until-expected-or-honest-stop.md)。该开工门再由 [0029](0029-review-scope-and-completion-level.md) 改为完成程度为高。
 
 处在 goal 里时没有人盯着。审阅者若只给参考，执行会停在每一个决策点；若中、低把握也继续改，执行者会把一份站不住的计划自己修到能开工。因此审阅者只属于 Goal 方案：方案置信度为高时，建议写入步骤并继续；中停在「方案置信度不足」，低停在「理解不够」，都不改步骤。「仍按此方案执行」只放行原步骤。中等档由这次审阅代替 grill，直接进入 OpenSpec。复杂档仍等用户说走 task-explore。
 
