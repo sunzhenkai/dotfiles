@@ -1,0 +1,162 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index bacb832..a8558b4 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -45,9 +45,10 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `decide` | [references/phase-decide.md](references/phase-decide.md) |
+ | `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
+ | `archive` | [references/phase-archive.md](references/phase-archive.md) |
++| `reopen` | [references/phase-reopen.md](references/phase-reopen.md) |
+ | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+ | `split` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+-| `chat` / `resume` / `reopen` | 本文件已够 |
++| `chat` / `resume` | 本文件已够 |
+ 
+ ## 布局
+ 
+@@ -195,15 +196,14 @@ tasks/
+ 
+ ## `reopen`
+ 
+-把已 `archive` 的探索任务搬回 `tasks/ongoing/{task-name}`；或对 `handed-off` 任务撤回交接（目录不动，只改状态）。
++把已 `archive` 的探索任务搬回 `tasks/ongoing/{task-name}`；或对 `handed-off` 任务撤回交接（目录不动，只改状态）。进入本阶段后 **先读** [references/phase-reopen.md](references/phase-reopen.md)，未读完不得搬目录。
+ 
+-1. 未指定名字：用 INDEX 的 Archived 表列出请用户选（`handed-off` 任务在 Ongoing 表中指定）。指定了则用该名字。
+-2. `status: archived` → 在 `tasks/archive/` 定位目录；`status: handed-off` → 在 `ongoing/` 直接定位。找不到则停止。
+-3. `archived` 任务计算目标 `tasks/ongoing/{task-name}`。**目标已存在则停止并询问；此时不得改 `TASK.md`、不得移动目录。**
+-4. 先确认；未确认不动。
+-5. `status: archived` → 改回 `ongoing`，保留已有决策/交接记录；移动目录回 `ongoing/`（父任务为整树），其中已 `handed-off` / 已 `archived` 的子任务保持原状态不自动复活，曾交接的任务警告对应 driver 可能仍在，不要删 driver。`status: handed-off` → 警告 `{task-name}-driver` 可能已在执行，确认后只把 `status` 改回 `ongoing` 并记「撤回交接」，**不搬目录**。
+-6. `archived` 任务把 INDEX 该行从 Archived 移回 Ongoing（子任务行路径批量改回 `ongoing/{parent}/{sub}/`）；`handed-off` 任务 INDEX 行不动。绑定该探索任务。
+-7. 用短摘要恢复上下文，等用户选下一步。
++定位分支与步骤在 reference，下列四条门禁不可跳过：
++
++- 必须拿到用户「确认 reopen」的明确答复；只给任务名不算确认。
++- **目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
++- 状态以 `TASK.md` 的 `status` 为准，不按目录位置猜；已 `handed-off` / 已 `archived` 的子任务不自动复活，driver 一律不删。
++- 撤回 `handed-off` 后，INDEX 行留在 Ongoing 但去掉 `→ {task-name}-driver` 尾注。
+ 
+ ---
+ 
+diff --git a/agents/skills/task-explore/references/phase-reopen.md b/agents/skills/task-explore/references/phase-reopen.md
+new file mode 100644
+index 0000000..541746b
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-reopen.md
+@@ -0,0 +1,29 @@
++# reopen 阶段
++
++进入本阶段后执行；未读完不得搬动任何目录。
++
++把已归档的探索任务搬回 `tasks/ongoing/{task-name}`，或对 `handed-off` 任务撤回交接。两种形态动作不同：前者搬整树，后者只改状态，目录不动。
++
++## 定位
++
++1. 未指定名字：`archived` 任务用 INDEX 的 Archived 表列出请用户选；`handed-off` 任务在 Ongoing 表中点名。指定了则用该名字。
++2. `status: archived` → 在 `tasks/archive/` 下按任务名定位，含 `archive/{yyyy-mm-dd}/{parent}/{sub}` 的嵌套位置；`status: handed-off` → 在 `ongoing/` 定位。找不到就报告并停止，不猜路径。
++3. 状态以 `TASK.md` 的 `status` 为准，不按目录位置猜。INDEX 与目录不一致时先按 `SKILL.md` 索引规则重建 INDEX，再定位。
++
++## 门禁（按序；任一不过即停）
++
++1. **目标路径**（仅 `archived`）：计算 `tasks/ongoing/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。** 冲突时由用户定夺改走 `resume` 还是换名。
++2. **子任务名撞车**：整树搬回前扫 `ongoing/` 全树，若某个 `{sub}` 与别的父任务的子任务重名（driver 名 `{sub}-driver` 会撞），列出冲突双方，问用户改子任务名还是换父任务名；未定不搬。
++3. **driver 现状**：曾 `handed-off` 的任务先报告 `{task-name}-driver` 是否仍在、openspec 侧进度或已归档状态，读不到写「进度未知」，不得当作已完成。撤回交接时提醒：driver 已产出的 change 不自动删除，保留或走 openspec 归档由用户定。
++4. **确认**：拿到用户「确认 reopen」的明确答复才动，只给任务名不算确认。多条门禁同时命中时合并成一次确认，不逐条往返。
++
++## 步骤
++
++1. `archived` 任务：`status` 改回 `ongoing`，保留 `archived: YYYY-MM-DD` 作为历史，加 `reopened: YYYY-MM-DD`，更新 `updated`。已有决策、交接、归档记录一律不删不改写。
++2. `archived` 任务：`mkdir -p tasks/ongoing`，把整个 `{taskRoot}`（含子任务树）**移动**回 `tasks/ongoing/{task-name}`。树内已 `handed-off` 或已 `archived` 的子任务保持原状态，不自动复活。
++3. `handed-off` 任务：**不搬目录**，只把 `status` 改回 `ongoing`，加 `reopened: YYYY-MM-DD`，并在交接小节追加「撤回交接：[原因]（YYYY-MM-DD）」。driver 及其 change 不删。
++4. 更新 INDEX：`archived` 任务把该行从 Archived 移回 Ongoing（更新日取 reopen 日，路径改回 `ongoing/{task-name}/`，子任务行批量改回 `ongoing/{parent}/{sub}/`）；`handed-off` 任务的行留在 Ongoing，但**去掉 `→ {task-name}-driver` 尾注** —— 它已不是 handed-off，留着会让索引谎报。父行聚合描述改回与子任务当前状态一致。无 INDEX 则按目录重建。
++5. 搬完自证：旧路径已不存在、`tasks/ongoing/{task-name}/TASK.md` 可读、INDEX 该行路径实际存在。不一致即报告漂移，按 `SKILL.md` 索引规则重建。
++6. 绑定该探索任务（`reopen` 完成前 `{taskRoot}` 仍在 archive），用短摘要恢复上下文：**目标 / 当时结论 / 归档原因 / 撤回交接原因 / 建议下一步**，然后等用户。
++
++`SUMMARY.md` 随树搬回，作为历史叙述原样保留、不改写；下次归档按 `references/phase-archive.md` 续写新增时间线。批量 reopen 不在本阶段范围：逐个走完整门禁。
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+index 99dfa22..6c8b9a1 100644
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -62,4 +62,4 @@
+ - [explore / chat / design / decide / handoff / archive / 其它]
+ ```
+ 
+-归档前把 `status` 改为 `archived`，元信息加上 `archived: YYYY-MM-DD`，并按 `references/phase-archive.md` 写 **归档** 小节（本次结论、关闭原因、未决清点、交付侧现状、入链结果），并在同目录写 `SUMMARY.md`（给人读的时间线总结，骨架见 `references/phase-archive.md`）。handoff 成功后把 `status` 改为 `handed-off`，加上 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`（任务留在 `ongoing/`，不搬目录）。status 取值：`ongoing` / `handed-off` / `archived`。
++归档前把 `status` 改为 `archived`，元信息加上 `archived: YYYY-MM-DD`，并按 `references/phase-archive.md` 写 **归档** 小节（本次结论、关闭原因、未决清点、交付侧现状、入链结果），并在同目录写 `SUMMARY.md`（给人读的时间线总结，骨架见 `references/phase-archive.md`）。handoff 成功后把 `status` 改为 `handed-off`，加上 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`（任务留在 `ongoing/`，不搬目录）。status 取值：`ongoing` / `handed-off` / `archived`。`reopen` 后 `status` 回 `ongoing`，保留 `archived: YYYY-MM-DD` 作历史并加 `reopened: YYYY-MM-DD`。
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+index 13280ab..7b5a315 100644
+--- a/agents/skills/task-explore/tests/test_task_explore_contract.py
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -27,6 +27,9 @@ class ContractTest(unittest.TestCase):
+         cls.archive = (ROOT / "references" / "phase-archive.md").read_text(
+             encoding="utf-8"
+         )
++        cls.reopen = (ROOT / "references" / "phase-reopen.md").read_text(
++            encoding="utf-8"
++        )
+ 
+     @staticmethod
+     def _section(text: str, head: str) -> str:
+@@ -43,6 +46,7 @@ class ContractTest(unittest.TestCase):
+             "references/phase-decide.md",
+             "references/phase-handoff.md",
+             "references/phase-archive.md",
++            "references/phase-reopen.md",
+             "references/design-template.md",
+             "references/task-template.md",
+             "references/index-template.md",
+@@ -161,6 +165,7 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("references/phase-decide.md", self.skill)
+         self.assertIn("references/phase-handoff.md", self.skill)
+         self.assertIn("references/phase-archive.md", self.skill)
++        self.assertIn("references/phase-reopen.md", self.skill)
+         self.assertNotIn("| 方案 | 成本 |", self.skill)
+ 
+     def test_explore_does_not_write_repo_glossary(self) -> None:
+@@ -205,14 +210,43 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("不归档、不搬目录、不清绑定", self.handoff)
+ 
+     def test_reopen_checks_dest_before_move(self) -> None:
+-        reopen = self._section(self.skill, "## `reopen`")
+-        dest = reopen.find("目标已存在则停止")
+-        status = reopen.find("→ 改回 `ongoing`")
+-        move = reopen.find("移动目录回 `ongoing/`")
++        dest = self.reopen.find("目标已存在则停止")
++        status = self.reopen.find("`status` 改回 `ongoing`")
++        move = self.reopen.find("**移动**回 `tasks/ongoing/{task-name}`")
+         self.assertGreater(dest, -1)
+         self.assertGreater(status, dest)
+         self.assertGreater(move, status)
+ 
++    def test_reopen_gate_zero_side_effects_on_conflict(self) -> None:
++        section = self._section(self.skill, "## `reopen`")
++        self.assertIn("禁止覆盖", section)
++        self.assertIn("不得改 `TASK.md`、不得移动目录、不得改 INDEX", section)
++        self.assertIn("「确认 reopen」的明确答复", section)
++
++    def test_reopen_preserves_history_and_driver(self) -> None:
++        self.assertIn("保留 `archived: YYYY-MM-DD` 作为历史", self.reopen)
++        self.assertIn("加 `reopened: YYYY-MM-DD`", self.reopen)
++        self.assertIn("一律不删不改写", self.reopen)
++        self.assertIn("driver 及其 change 不删", self.reopen)
++
++    def test_reopen_clears_handoff_tailnote_in_index(self) -> None:
++        self.assertIn("去掉 `→ {task-name}-driver` 尾注", self.reopen)
++        self.assertIn("去掉 `→ {task-name}-driver` 尾注", self._section(self.skill, "## `reopen`"))  # noqa: E501
++
++    def test_reopen_checks_subtask_name_collision(self) -> None:
++        self.assertIn("**子任务名撞车**", self.reopen)
++        self.assertIn("`{sub}-driver` 会撞", self.reopen)
++
++    def test_reopen_reports_driver_side_without_assuming(self) -> None:
++        self.assertIn("以 `TASK.md` 的 `status` 为准", self.reopen)
++        self.assertIn("进度未知", self.reopen)
++
++    def test_reopen_keeps_summary_as_history(self) -> None:
++        self.assertIn("`SUMMARY.md` 随树搬回", self.reopen)
++        self.assertIn("不改写", self.reopen)
++        tpl = (ROOT / "references" / "task-template.md").read_text(encoding="utf-8")
++        self.assertIn("reopened: YYYY-MM-DD", tpl)
++
+     def test_split_phase_is_routed_and_gated(self) -> None:
+         self.assertIn("## `split`", self.skill)
+         split = self._section(self.skill, "## `split`")

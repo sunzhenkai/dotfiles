@@ -62,4 +62,4 @@
 - [explore / chat / design / decide / handoff / archive / 其它]
 ```
 
-归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后再加 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`。子任务为原地归档：只改状态与归档日期，不搬目录。
+归档前把 `status` 改为 `archived`，元信息加上 `archived: YYYY-MM-DD`，并按 `references/phase-archive.md` 写 **归档** 小节（本次结论、关闭原因、未决清点、交付侧现状、入链结果），并在同目录写 `SUMMARY.md`（给人读的时间线总结，骨架见 `references/phase-archive.md`）。handoff 成功后把 `status` 改为 `handed-off`，加上 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`（任务留在 `ongoing/`，不搬目录）。status 取值：`ongoing` / `handed-off` / `archived`。`reopen` 后 `status` 回 `ongoing`，保留 `archived: YYYY-MM-DD` 作历史并加 `reopened: YYYY-MM-DD`。

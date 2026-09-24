@@ -1,0 +1,376 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index 1c5bfcc..bacb832 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -44,9 +44,10 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `plan-review` | [references/phase-plan-review.md](references/phase-plan-review.md) |
+ | `decide` | [references/phase-decide.md](references/phase-decide.md) |
+ | `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
++| `archive` | [references/phase-archive.md](references/phase-archive.md) |
+ | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+ | `split` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+-| `chat` / `resume` / `archive` / `reopen` | 本文件已够 |
++| `chat` / `resume` / `reopen` | 本文件已够 |
+ 
+ ## 布局
+ 
+@@ -57,6 +58,7 @@ tasks/
+ ├── INDEX.md             # 派生索引：快速检索/查看
+ ├── ongoing/{task-name}/
+ │   ├── TASK.md          # 主文档：目标、进展、未决、决策、交接
++│   ├── SUMMARY.md       # 归档时生成的人读时间线总结
+ │   ├── glossary.md      # 任务内术语（惰性）
+ │   ├── design/          # 方案、ADR
+ │   └── {sub}/           # 子任务：含 TASK.md 的子目录（split 创建，只一层）
+@@ -179,16 +181,15 @@ tasks/
+ 
+ ## `archive`
+ 
+-对确认关闭的探索任务归档（不交接而结束、或 `handed-off` 后确认无需回溯），放到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。要交付请用 `handoff`，不要用本阶段代替交接。
++对确认关闭的探索任务归档（不交接而结束、或 `handed-off` 后确认无需回溯），整树搬到 `tasks/archive/{yyyy-mm-dd}/{task-name}`。要交付请用 `handoff`，不要用本阶段代替交接。进入本阶段后 **先读** [references/phase-archive.md](references/phase-archive.md)，未读完不得搬目录。
+ 
+-1. 必须已绑定或用户给出名字。先确认；未确认不搬。
+-2. 存在子任务目录时：所有子任务 `status` 必须为 `handed-off` 或 `archived`，否则打断并列出未结子任务。父任务自身恒 `ongoing`，归档父任务即整树关闭。
+-3. 计算目标路径 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
+-4. 建议先 `save` 再搬；用户拒绝则按现状归档。
+-5. 把 `TASK.md` 的 `status` 改为 `archived`，写入归档日期。
+-6. `mkdir -p tasks/archive/{yyyy-mm-dd}`，再把整个 `{taskRoot}`（含子任务树）**移动**过去。
+-7. 把 INDEX 中该行从 Ongoing 移到 Archived（归档日与新路径）；子任务的行路径批量更新为 `archive/{yyyy-mm-dd}/{parent}/{sub}/`；无 INDEX 则重建。
+-8. 清除会话绑定。报告新路径。任务曾 `handed-off` 的，警告 `{task-name}-driver` 可能仍在运行，提示确认后再关闭。
++门禁按序执行、任一不过即停；步骤与细则在 reference，下列五条不可跳过：
++
++- 必须已绑定或用户给出名字，且拿到用户「确认关闭」的明确答复；只给名字不算确认，未确认不搬。
++- **目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
++- 存在子任务目录时：所有子任务 `status` 必须为 `handed-off` 或 `archived`，否则打断并列出未结子任务。父任务归档即整树关闭。
++- 未决问题、曾 `handed-off` 的 driver 交付进度、指向旧路径的入链，三项必须清点并合并成一次确认后才搬。
++- 必须在 `TASK.md` 留下本次结论与关闭原因，并写 `{taskRoot}/SUMMARY.md`（给人读的时间线总结）；曾 `handed-off` 的任务必须先按 `save` 落盘才搬。`archived` 日期在元信息、目录名、INDEX 三处一致。
+ 
+ 不要把任务内容晋升到 `docs/design/` 或其它项目文档，除非用户另说。
+ 
+diff --git a/agents/skills/task-explore/references/phase-archive.md b/agents/skills/task-explore/references/phase-archive.md
+new file mode 100644
+index 0000000..730cbf0
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-archive.md
+@@ -0,0 +1,78 @@
++# archive 阶段
++
++进入本阶段后执行；未读完不得搬动任何目录。未绑定且用户没给任务名时，先回到 `SKILL.md` 的绑定规则。
++
++把确认关闭的探索任务整树移入 `tasks/archive/{yyyy-mm-dd}/{task-name}`。归档是生命周期终点：`handoff` 不归档，`archive` 不交付。父任务归档即关闭整棵子任务树，子任务随父一起搬，不单独处理。
++
++## 门禁（按序；任一不过即停）
++
++1. **子任务结清**：存在子任务目录时，所有子任务 `status` ∈ {`handed-off`, `archived`}。否则打断，列出每个未结子任务的 `{sub}`、状态与建议下一步。父任务自身恒 `ongoing`，不参与本条判定。
++2. **未决清点**：读 `TASK.md` 的未决问题与下一步。有未勾项就报告条数与首条，问用户「随任务关闭」还是「先补结论」。选关闭则原样带走，并在归档记录写「N 条未决随归档关闭」。**不要求清零** —— 带着未决关闭是合法结局，静默关闭才是问题。
++3. **交付侧核对**（仅曾 `handed-off`）：读 `{task-name}-driver` 在 openspec 侧的进度（`tasks.md` checkbox 与 change 归档状态），报告「已完成 X/Y、driver 是否已归档」。读不到就报「进度未知」，不得当作已完成。仍有未完成项时明确警告并等确认。进度只报告，**不回写**进 `TASK.md`，也不勾 taskflow 的框。
++4. **入链检查**：在 `tasks/` 全树搜索指向 `{taskRoot}` 旧路径的链接（父↔子互链、`design/` 与评审稿互链）。命中就列出，问是否一并改指新归档路径；拒绝则保留断链并在归档记录写一句。
++5. **目标路径**：计算 `tasks/archive/{yyyy-mm-dd}/{task-name}`。**目标已存在则停止并询问，禁止覆盖；此时不得改 `TASK.md`、不得移动目录、不得改 INDEX。**
++6. **进展落盘**：目标路径确认无冲突后，`TASK.md` 有未写回的进展或结论就先按 `save` 写回。曾 `handed-off` 的任务**必须按 `save` 写回**，不接受按现状归档 —— 两份账要能对上。纯 `ongoing` 任务用户坚持可跳过，并在归档记录注明。
++
++多条门禁同时命中时，合并成一次确认列给用户，不逐条往返。清点完仍要拿到用户「确认关闭」的明确答复才搬；只给任务名不算确认。
++
++## 步骤
++
++1. `TASK.md` 元信息：`status` 改为 `archived`，加 `archived: YYYY-MM-DD`。三处日期必须同一个 `{yyyy-mm-dd}`：元信息、归档目录名、INDEX 归档日。
++2. 在 `TASK.md` 写 **归档** 小节（无则新建），五项齐全：
++   - 本次结论：一句话写清探索得出了什么；确实没结论就写 `未得出结论`，不留空；详述见同目录 `SUMMARY.md`。
++   - 关闭原因：`已交付` / `放弃` / `被 {task-name} 取代` / `其它` + 一句话。原因取自用户回答，不替他猜。
++   - 未决清点结果：`N 条未决随归档关闭` 或 `已全部补结论`。
++   - 交付侧现状：driver 进度与是否已归档；未曾交接则写 `无`。
++   - 入链处理结果：`已改指新路径` 或 `保留断链`。
++3. 按下方「任务总结」写 `{taskRoot}/SUMMARY.md`，给用户过眼后继续。
++4. `mkdir -p tasks/archive/{yyyy-mm-dd}`，把整个 `{taskRoot}`（含子任务树）**移动**过去。
++5. 更新 INDEX：该任务行从 Ongoing 移入 Archived（归档日 + 新路径）；子任务行路径批量更新为 `archive/{yyyy-mm-dd}/{parent}/{sub}/`。一句话沿用原描述：曾 `handed-off` 的行（含子任务）保留 `→ {task-name}-driver` 结尾；父任务行把聚合描述改成闭合态（如「2 子任务：均已交接」），不留「设计中」这类进行时。无 INDEX 则按目录重建。
++6. 搬完自证：旧路径已不存在、新路径下 `TASK.md` 与 `SUMMARY.md` 可读、INDEX 每条归档路径都实际存在。不一致即报告漂移，按 `SKILL.md` 索引规则重建 INDEX，不要静默放过。
++7. 清除会话绑定，报告新路径与归档记录。曾 `handed-off` 的重申 `{task-name}-driver` 可能仍在运行，等用户确认后再决定是否关闭 driver。
++
++## 任务总结（`{taskRoot}/SUMMARY.md`）
++
++归档时在任务目录写一份**给人读**的总结，随整树一起进档案。档案里的叙述只有一份：`TASK.md` 留台账字段与结论指针，过程看 `SUMMARY.md`。
++
++- 篇幅：一屏内，不超过约 40 行。串脉络，不抄 `TASK.md` 小节原文，不贴聊天记录。
++- 主干是时间线：一条一行 `YYYY-MM-DD — 做了什么 → 得到什么结论`，同类合并，一天多事折成一条。
++- 素材：`TASK.md` 的进展 / 决策 / 交接、`design/` 各稿与评审意见、driver 侧进度。读不到的写「未记录」，**不编造**。
++- 曾 `handed-off` 必写「交付」段：driver 名、子 change 或 checkbox 进度、主要落地位置（模块或文件路径）。进度读不到就写「交付进度未记录」。
++- 父任务只写整体脉络与各子任务指针，不复述子任务内容。
++- 写完先给用户过一眼再搬目录；要改就改，改完才进步骤 4。
++- `SUMMARY.md` 已存在（`reopen` 后再归档）则续写新增时间线并更新结局，不整篇重写。
++
++骨架：
++
++```markdown
++# <task-name> 总结
++
++**一句话**：[要解决什么问题]　**结局**：[已交付 / 放弃 / 被 X 取代 / 未得出结论]
++
++## 时间线
++
++- YYYY-MM-DD — 明确目标是 X，排除 Y → 范围冻结
++- YYYY-MM-DD — 定位到瓶颈在 Z → 采纳方案 B
++
++## 关键决策
++
++- 采纳 B（主因…）；放弃 A（…）。
++
++## 交付
++
++- driver：`{task-name}-driver`，进度 X/Y
++- 落地：`<模块或文件路径>`
++
++## 遗留
++
++- [随归档关闭的未决，或「无」]
++```
++
++## 批量归档
++
++一次点名多个任务时，逐个跑完整门禁，但门禁结果先全部列完再**合并成一次确认**：每个任务一行，含未结子任务、未决条数、driver 进度、目标路径冲突。答复后依次搬。
++
++- 目标路径冲突或子任务未结的任务先剔除并单独报告，不阻塞其余。
++- 搬运中途失败即停：已搬的不回滚，报告已归档与未归档清单，剩下的点名重跑。
++
++不要把任务内容晋升到 `docs/design/` 或其它项目文档，除非用户另说。
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+index 39922f9..99dfa22 100644
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -62,4 +62,4 @@
+ - [explore / chat / design / decide / handoff / archive / 其它]
+ ```
+ 
+-归档前把 `status` 改为 `archived`，并在元信息中加上 `archived: YYYY-MM-DD`。handoff 成功后把 `status` 改为 `handed-off`，加上 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`（任务留在 `ongoing/`，不搬目录）。status 取值：`ongoing` / `handed-off` / `archived`。
++归档前把 `status` 改为 `archived`，元信息加上 `archived: YYYY-MM-DD`，并按 `references/phase-archive.md` 写 **归档** 小节（本次结论、关闭原因、未决清点、交付侧现状、入链结果），并在同目录写 `SUMMARY.md`（给人读的时间线总结，骨架见 `references/phase-archive.md`）。handoff 成功后把 `status` 改为 `handed-off`，加上 `handed-off: YYYY-MM-DD` 与 `driver: {task-name}-driver`（任务留在 `ongoing/`，不搬目录）。status 取值：`ongoing` / `handed-off` / `archived`。
+diff --git a/agents/skills/task-explore/tests/test_task_explore_contract.py b/agents/skills/task-explore/tests/test_task_explore_contract.py
+index 179802b..13280ab 100644
+--- a/agents/skills/task-explore/tests/test_task_explore_contract.py
++++ b/agents/skills/task-explore/tests/test_task_explore_contract.py
+@@ -24,6 +24,13 @@ class ContractTest(unittest.TestCase):
+         cls.handoff = (ROOT / "references" / "phase-handoff.md").read_text(
+             encoding="utf-8"
+         )
++        cls.archive = (ROOT / "references" / "phase-archive.md").read_text(
++            encoding="utf-8"
++        )
++
++    @staticmethod
++    def _section(text: str, head: str) -> str:
++        return text.split(head, 1)[1].split("## ", 1)[0]
+ 
+     def test_frontmatter_name_matches_directory(self) -> None:
+         self.assertIn("name: task-explore", self.skill)
+@@ -35,6 +42,7 @@ class ContractTest(unittest.TestCase):
+             "references/phase-design.md",
+             "references/phase-decide.md",
+             "references/phase-handoff.md",
++            "references/phase-archive.md",
+             "references/design-template.md",
+             "references/task-template.md",
+             "references/index-template.md",
+@@ -52,14 +60,93 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("用户确认前不进入", self.skill)
+ 
+     def test_archive_checks_dest_before_mutating_task_md(self) -> None:
+-        archive = self.skill.split("## `archive`", 1)[1].split("## ", 1)[0]
+-        dest = archive.find("目标已存在则停止")
+-        status = archive.find("`status` 改为 `archived`")
+-        move = archive.find("**移动**过去")
++        dest = self.archive.find("目标已存在则停止")
++        save = self.archive.find("目标路径确认无冲突后")
++        status = self.archive.find("`status` 改为 `archived`")
++        move = self.archive.find("**移动**过去")
+         self.assertGreater(dest, -1)
+-        self.assertGreater(status, dest)
++        self.assertGreater(save, dest)
++        self.assertGreater(status, save)
+         self.assertGreater(move, status)
+ 
++    def test_archive_gate_keeps_zero_side_effects_on_conflict(self) -> None:
++        section = self._section(self.skill, "## `archive`")
++        self.assertIn("目标已存在则停止并询问，禁止覆盖", section)
++        self.assertIn("不得改 `TASK.md`、不得移动目录、不得改 INDEX", section)
++        self.assertIn("未结子任务", section)
++
++    def test_archive_requires_closing_reason(self) -> None:
++        self.assertIn("留下本次结论与关闭原因", self.skill)
++        self.assertIn("关闭原因", self.archive)
++        self.assertIn("本次结论", self.archive)
++        self.assertIn("取自用户回答", self.archive)
++        tpl = (ROOT / "references" / "task-template.md").read_text(encoding="utf-8")
++        self.assertIn("**归档** 小节", tpl)
++        self.assertIn("本次结论", tpl)
++        self.assertIn("SUMMARY.md", tpl)
++
++    def test_archive_counts_open_items_without_forcing_clearance(self) -> None:
++        section = self._section(self.skill, "## `archive`")
++        self.assertIn("未决问题", section)
++        self.assertIn("不要求清零", self.archive)
++        self.assertIn("随归档关闭", self.archive)
++
++    def test_archive_reads_driver_progress_without_writeback(self) -> None:
++        self.assertIn("已完成 X/Y", self.archive)
++        self.assertIn("进度未知", self.archive)
++        self.assertIn("**不回写**", self.archive)
++
++    def test_archive_checks_inbound_links(self) -> None:
++        self.assertIn("旧路径的链接", self.archive)
++        self.assertIn("保留断链", self.archive)
++
++    def test_archive_updates_index_wording(self) -> None:
++        self.assertIn("保留 `→ {task-name}-driver` 结尾", self.archive)
++        self.assertIn("不留「设计中」这类进行时", self.archive)
++
++    def test_archive_writes_human_summary(self) -> None:
++        self.assertIn("## 任务总结（`{taskRoot}/SUMMARY.md`）", self.archive)
++        self.assertIn("主干是时间线", self.archive)
++        self.assertIn("不超过约 40 行", self.archive)
++        self.assertIn("交付进度未记录", self.archive)
++        self.assertIn("给用户过一眼", self.archive)
++        self.assertIn("`{taskRoot}/SUMMARY.md`（给人读的时间线总结）", self.skill)
++        self.assertIn("│   ├── SUMMARY.md", self.skill)
++
++    def test_archive_summary_written_after_dest_check(self) -> None:
++        dest = self.archive.find("目标已存在则停止")
++        summary = self.archive.find("给用户过眼后继续")
++        move = self.archive.find("**移动**过去")
++        self.assertGreater(summary, dest)
++        self.assertGreater(move, summary)
++
++    def test_archive_requires_save_before_move(self) -> None:
++        self.assertIn("必须按 `save` 写回", self.archive)
++        self.assertIn("不接受按现状归档", self.archive)
++        self.assertIn("必须先按 `save` 落盘", self._section(self.skill, "## `archive`"))
++
++    def test_batch_archive_reuses_full_gates(self) -> None:
++        self.assertIn("逐个跑完整门禁", self.archive)
++        self.assertIn("合并成一次确认", self.archive)
++        self.assertIn("已搬的不回滚", self.archive)
++        self.assertNotIn("不在本阶段范围", self.archive)
++
++    def test_archive_single_confirmation_for_multiple_gates(self) -> None:
++        self.assertIn("合并成一次确认", self.archive)
++        self.assertIn("「确认关闭」的明确答复才搬", self.archive)
++        skill_sec = self._section(self.skill, "## `archive`")
++        self.assertIn("合并成一次确认", skill_sec)
++        self.assertIn("未确认不搬", skill_sec)
++
++    def test_archive_verifies_move_afterwards(self) -> None:
++        self.assertIn("旧路径已不存在", self.archive)
++        self.assertIn("`TASK.md` 与 `SUMMARY.md` 可读", self.archive)
++        self.assertIn("INDEX 每条归档路径都实际存在", self.archive)
++
++    def test_archive_date_is_consistent(self) -> None:
++        self.assertIn("三处日期必须同一个 `{yyyy-mm-dd}`", self.archive)
++        self.assertIn("三处", self._section(self.skill, "## `archive`"))
++
+     def test_index_sync_on_mutating_phases(self) -> None:
+         self.assertIn(
+             "`new` / `split` / `save` / `decide` / `handoff` / `archive` / `reopen` 必须同步对应行",
+@@ -73,6 +160,7 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("references/phase-design.md", self.skill)
+         self.assertIn("references/phase-decide.md", self.skill)
+         self.assertIn("references/phase-handoff.md", self.skill)
++        self.assertIn("references/phase-archive.md", self.skill)
+         self.assertNotIn("| 方案 | 成本 |", self.skill)
+ 
+     def test_explore_does_not_write_repo_glossary(self) -> None:
+@@ -80,14 +168,14 @@ class ContractTest(unittest.TestCase):
+         self.assertIn("禁止调用 `grill-with-docs` 或 `domain-modeling`", self.explore)
+         self.assertIn("禁止写仓库根 `CONTEXT.md`、`docs/adr/`", self.explore)
+         self.assertNotIn("使用 `grill-with-docs` 进行", self.explore)
+-        explore_sec = self.skill.split("## `explore`", 1)[1].split("## ", 1)[0]
++        explore_sec = self._section(self.skill, "## `explore`")
+         self.assertIn("禁止调用 `grill-with-docs`", explore_sec)
+         self.assertNotIn("委托 `grill-with-docs`", explore_sec)
+ 
+     def test_resume_task_docs_readonly_index_repair_allowed(self) -> None:
+         self.assertIn("任务文档只读", self.skill)
+         self.assertIn("INDEX 漂移可重建", self.skill)
+-        resume = self.skill.split("## `resume`", 1)[1].split("## ", 1)[0]
++        resume = self._section(self.skill, "## `resume`")
+         self.assertIn("任务文档只读", resume)
+         self.assertIn("INDEX", resume)
+         self.assertIn("reopen", resume)
+@@ -100,29 +188,34 @@ class ContractTest(unittest.TestCase):
+     def test_decide_is_required_before_handoff(self) -> None:
+         self.assertIn("决策** 小节已写明采纳方案", self.handoff)
+         self.assertIn("没有则打断，先 `decide`", self.handoff)
+-        handoff_sec = self.skill.split("## `handoff`", 1)[1].split("## ", 1)[0]
+-        self.assertIn("无决策则先 `decide`", handoff_sec)
++        handoff_sec = self._section(self.skill, "## `handoff`")
++        self.assertIn("已 `decide` 未交接", handoff_sec)
+ 
+     def test_handoff_delegates_taskflow_same_slug(self) -> None:
+         self.assertIn("taskflow-new", self.handoff)
+-        self.assertIn("必须等于探索任务 slug", self.handoff)
++        self.assertIn("driver change 名 = 任务 slug + `-driver`", self.handoff)
+         self.assertIn("不发明", self.handoff)
+         self.assertIn("不要写 `tasks.md`", self.handoff)
+         self.assertIn("保持探索任务在 `ongoing/`", self.handoff)
+-        self.assertIn("仅当 driver 已存在", self.handoff)
++        self.assertIn("已存在则不要新建", self.handoff)
++
++    def test_handoff_does_not_archive(self) -> None:
++        handoff_sec = self._section(self.skill, "## `handoff`")
++        self.assertIn("不归档、不搬目录、不清绑定", handoff_sec)
++        self.assertIn("不归档、不搬目录、不清绑定", self.handoff)
+ 
+     def test_reopen_checks_dest_before_move(self) -> None:
+-        reopen = self.skill.split("## `reopen`", 1)[1].split("---", 1)[0]
++        reopen = self._section(self.skill, "## `reopen`")
+         dest = reopen.find("目标已存在则停止")
+-        status = reopen.find("`status` 改回 `ongoing`")
+-        move = reopen.find("移动目录到 `ongoing/`")
++        status = reopen.find("→ 改回 `ongoing`")
++        move = reopen.find("移动目录回 `ongoing/`")
+         self.assertGreater(dest, -1)
+         self.assertGreater(status, dest)
+         self.assertGreater(move, status)
+ 
+     def test_split_phase_is_routed_and_gated(self) -> None:
+         self.assertIn("## `split`", self.skill)
+-        split = self.skill.split("## `split`", 1)[1].split("## ", 1)[0]
++        split = self._section(self.skill, "## `split`")
+         self.assertIn("必须已绑定", split)
+         self.assertIn("全局唯一", split)
+         self.assertIn("只一层", split)
+@@ -131,27 +224,25 @@ class ContractTest(unittest.TestCase):
+     def test_subtask_terms_are_named(self) -> None:
+         self.assertIn("**子任务**", self.skill)
+         self.assertIn("**父任务**", self.skill)
+-        self.assertIn("**原地归档**", self.skill)
++        self.assertIn("**handed-off**", self.skill)
+         self.assertIn("子 change", self.skill)
+ 
+     def test_parent_forbidden_handoff(self) -> None:
+-        handoff_sec = self.skill.split("## `handoff`", 1)[1].split("## ", 1)[0]
+-        self.assertIn("禁止 `handoff`", handoff_sec)
+-        self.assertIn("禁止 handoff", self.handoff)
+-
+-    def test_subtask_archive_and_reopen_in_place(self) -> None:
+-        archive = self.skill.split("## `archive`", 1)[1].split("## ", 1)[0]
+-        self.assertIn("子任务原地归档", archive)
+-        self.assertIn("不搬目录", archive)
+-        self.assertIn("未结子任务", archive)
+-        reopen = self.skill.split("## `reopen`", 1)[1].split("---", 1)[0]
++        handoff_sec = self._section(self.skill, "## `handoff`")
++        self.assertIn("父是纯伞不可交接", handoff_sec)
++        self.assertIn("不建 `{parent}-driver`", handoff_sec)
++        self.assertIn("不得建 `{parent}-driver`", self.handoff)
++
++    def test_parent_archive_closes_whole_tree(self) -> None:
++        self.assertIn("未结子任务", self._section(self.skill, "## `archive`"))
++        self.assertIn("含子任务树", self.archive)
++        self.assertIn("父任务归档即关闭整棵子任务树", self.archive)
++        reopen = self._section(self.skill, "## `reopen`")
+         self.assertIn("不自动复活", reopen)
+ 
+     def test_nested_layout_and_index_rows(self) -> None:
+         self.assertIn("`{parent}/{sub}`", self.skill)
+-        tpl = (ROOT / "references" / "task-template.md").read_text(
+-            encoding="utf-8"
+-        )
++        tpl = (ROOT / "references" / "task-template.md").read_text(encoding="utf-8")
+         self.assertIn("parent:", tpl)
+         index = (ROOT / "references" / "index-template.md").read_text(
+             encoding="utf-8"
