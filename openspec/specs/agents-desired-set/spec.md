@@ -9,7 +9,7 @@
 #### Scenario: 默认安装非 optional 编目条目
 - **WHEN** overlay 未声明任何 skill 停用或额外启用
 - **THEN** sync SHALL 仍安装全部非 optional 编目条目（一手与默认选中第三方）
-- **THEN** SHALL NOT 安装 optional 编目条目（如 `lark-cli`、`en-chat`、`frontend-slides`）
+- **THEN** SHALL NOT 安装 optional 编目条目（如 `lark-cli`、`role-chat`、`frontend-slides`）
 - **THEN** SHALL NOT 要求用户先写 overlay
 
 #### Scenario: 停用后不再期望

@@ -40,7 +40,7 @@ def test_default_desired_set_is_the_non_optional_catalog() -> None:
 def test_optional_skill_enters_desired_set_via_overlay_enable() -> None:
     desired = resolve_skill_desired_set(ROOT, overlay_agents={"enabled_skills": ["lark-cli"]})
     assert "lark-cli" in desired
-    assert "en-chat" not in desired
+    assert "role-chat" not in desired
     assert "frontend-slides" not in desired
 
 

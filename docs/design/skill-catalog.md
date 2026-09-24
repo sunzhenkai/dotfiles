@@ -53,7 +53,7 @@ groups:
 | `frontend-slides` | third-party | github | `zarazhangrui/frontend-slides` | 1 optional（别名 `ppt`） |
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
-- `lark-cli` / `en-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` / `frontend-slides` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
+- `lark-cli` / `role-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` / `frontend-slides` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
 - `taste` 与 `ui-templates` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` / `dotf skills -i ui-template-apply` 会把它们当普通名字透传给 npx。
 
 ## 4. 核心决策

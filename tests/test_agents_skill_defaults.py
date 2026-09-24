@@ -50,10 +50,10 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "ui-template-apply" not in set(catalog.ids())
     assert "ui-template-author" not in set(catalog.ids())
     assert "ui-template-design" not in set(catalog.ids())
-    # lark-cli / en-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
+    # lark-cli / role-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
     by_id = catalog.by_id()
     assert by_id["lark-cli"].optional is True
-    assert by_id["en-chat"].optional is True
+    assert by_id["role-chat"].optional is True
     assert by_id["wizard"].optional is True
     assert by_id["to-questionnaire"].optional is True
     assert by_id["frontend-slides"].optional is True

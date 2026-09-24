@@ -23,8 +23,6 @@ groups:
       - commit-push
       - dotf-code-explore
       - dotf-code-review
-      - id: en-chat
-        optional: true
       - id: lark-cli
         optional: true
       - llm-wiki
@@ -33,6 +31,8 @@ groups:
       - project-spec-mirror
       - repo-manager
       - role-based-reviewer
+      - id: role-chat
+        optional: true
       - service-manager
       - skill-evolver
       - skill-upgrader
@@ -79,8 +79,9 @@ groups:
     source: github
     package: https://github.com/tt-a1i/archify
     skills:
-      # 审计 2026-09-23：audit-skill.sh 命中 1 BLOCK（LICENSE 正文 without limitation，
-      # 已知误报，用户豁免）+ 1 WARN（文档示例 URL git.internal，误报）。
+      # 审计 2026-09-24：audit-skill.sh 命中 1 WARN（文档示例 URL git.internal，误报）。
+      # 此前每次重锁都命中的 1 BLOCK（LICENSE 正文 without limitation）已由审计脚本豁免
+      # 套话后缀修掉，见 agents/skills/skills-store/patches/20260924-175847-jailbreak-license-boilerplate。
       - id: archify
         optional: true
 
