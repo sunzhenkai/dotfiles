@@ -23,6 +23,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排�
 | `chat` | **默认阶段**：对任务问答 | 默认不写盘 |
 | `resume` | 恢复进行中的探索任务 | 任务文档只读；INDEX 漂移可重建 |
 | `design` | 针对任务方案设计 | `{taskRoot}/design/` |
+| `plan-review` | **可选**：decide 前请名册里的 agent 评审方案 | `{taskRoot}/design/`（评审意见） |
 | `decide` | 冻结采纳方案 | `TASK.md` 决策；INDEX |
 | `save` | 保存任务最新进展到任务文档 | 更新 `TASK.md` 与 `INDEX.md` |
 | `handoff` | 交接给 taskflow 后归档 | driver + 归档探索任务 |
@@ -40,6 +41,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排�
 |------|------------|
 | `explore` | [references/phase-explore.md](references/phase-explore.md) |
 | `design` | [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md) |
+| `plan-review` | [references/phase-plan-review.md](references/phase-plan-review.md) |
 | `decide` | [references/phase-decide.md](references/phase-decide.md) |
 | `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
 | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
@@ -139,11 +141,19 @@ tasks/
 
 ## `design`
 
-方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。
+方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
+
+## `plan-review`（可选）
+
+在 `design` 与 `decide` 之间：把成形方案交给名册里的 agent 评审，回收意见后回 `design` 修正。**可选**——用户不要求则跳过，直接 `decide`；用户/同事已评审也算完成。
+
+评审是**只读**委派，直接委托 `$agent-roster`（单次评审，不走 `$agent-roster-flow`）。进入本阶段后 **先读** [references/phase-plan-review.md](references/phase-plan-review.md)。
+
+候选收成编号表（Endpoint / Model / 擅长方向 / 依据）供用户圈选；名册里没有合适候选时直接问用户，**不要凭 CLI 名假设可用**。名册查询、`decision.md`、acpx 门禁、失败分类与留痕一律按 `$agent-roster`，本阶段不复制其契约。
 
 ## `decide`
 
-冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
+冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。方案未经 `plan-review` 不阻断；想先评审则走 `plan-review`。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
 
 ## `save`
 

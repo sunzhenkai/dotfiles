@@ -1,0 +1,89 @@
+diff --git a/agents/skills/task-explore/SKILL.md b/agents/skills/task-explore/SKILL.md
+index 75a3e9c..d006bcb 100644
+--- a/agents/skills/task-explore/SKILL.md
++++ b/agents/skills/task-explore/SKILL.md
+@@ -23,6 +23,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ | `chat` | **默认阶段**：对任务问答 | 默认不写盘 |
+ | `resume` | 恢复进行中的探索任务 | 任务文档只读；INDEX 漂移可重建 |
+ | `design` | 针对任务方案设计 | `{taskRoot}/design/` |
++| `plan-review` | **可选**：decide 前请名册里的 agent 评审方案 | `{taskRoot}/design/`（评审意见） |
+ | `decide` | 冻结采纳方案 | `TASK.md` 决策；INDEX |
+ | `save` | 保存任务最新进展到任务文档 | 更新 `TASK.md` 与 `INDEX.md` |
+ | `handoff` | 交接给 taskflow 后归档 | driver + 归档探索任务 |
+@@ -40,6 +41,7 @@ description: 针对任务不明确、周期可能很长或需要复杂问题排
+ |------|------------|
+ | `explore` | [references/phase-explore.md](references/phase-explore.md) |
+ | `design` | [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md) |
++| `plan-review` | [references/phase-plan-review.md](references/phase-plan-review.md) |
+ | `decide` | [references/phase-decide.md](references/phase-decide.md) |
+ | `handoff` | [references/phase-handoff.md](references/phase-handoff.md)；委托时再读 `taskflow` |
+ | `new` / `save` | 本文件步骤；写文件时再读 [references/task-template.md](references/task-template.md)、[references/index-template.md](references/index-template.md) |
+@@ -139,11 +141,19 @@ tasks/
+ 
+ ## `design`
+ 
+-方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。
++方案写入 `{taskRoot}/design/`，不写 `docs/design/`。**方案不明朗时主动打断，提示缺口。** 进入本阶段后 **先读** [references/phase-design.md](references/phase-design.md)；落盘时再读 [references/design-template.md](references/design-template.md)。方案成形后可走 `plan-review` 找名册里的 agent 评审，再 `decide`。
++
++## `plan-review`（可选）
++
++在 `design` 与 `decide` 之间：把成形方案交给名册里的 agent 评审，回收意见后回 `design` 修正。**可选**——用户不要求则跳过，直接 `decide`；用户/同事已评审也算完成。
++
++评审是**只读**委派，直接委托 `$agent-roster`（单次评审，不走 `$agent-roster-flow`）。进入本阶段后 **先读** [references/phase-plan-review.md](references/phase-plan-review.md)。
++
++候选收成编号表（Endpoint / Model / 擅长方向 / 依据）供用户圈选；名册里没有合适候选时直接问用户，**不要凭 CLI 名假设可用**。名册查询、`decision.md`、acpx 门禁、失败分类与留痕一律按 `$agent-roster`，本阶段不复制其契约。
+ 
+ ## `decide`
+ 
+-冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
++冻结采纳方案。进入本阶段后 **先读** [references/phase-decide.md](references/phase-decide.md)。没有可冻结的方案就打断。方案未经 `plan-review` 不阻断；想先评审则走 `plan-review`。用户说「按推荐冻结并交接」时，本轮 `decide` 完立刻 `handoff`。
+ 
+ ## `save`
+ 
+diff --git a/agents/skills/task-explore/references/phase-plan-review.md b/agents/skills/task-explore/references/phase-plan-review.md
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/agents/skills/task-explore/references/phase-plan-review.md
+@@ -0,0 +1,47 @@
++# plan-review 阶段（可选）
++
++进入本阶段后执行。未绑定则先回到 `SKILL.md` 的绑定规则。
++
++`design` 与 `decide` 之间的一步：把已成形的方案交给名册里的另一个 agent 评审，回收意见后回到 `design` 修正。**可选**——用户不要求则跳过，直接 `decide`。本阶段 **不写实现代码**，不改方案本身，只产出评审意见。
++
++方案评审是**只读**委派：受派方不许改工作目录里的任何文件，产出由编排者落盘。
++
++## 门禁
++
++1. `{taskRoot}/design/` 已有可被评审的方案稿。没有则打断，先 `design`。
++2. 委派前工作目录干净。脏工作树先停下问用户。
++
++## 步骤
++
++1. 读 `TASK.md` 与 `design/`，把「评审什么」压成一句话 + 一段边界（改什么、不改什么、已知约束）。说不清就是 `design` 没做完，回去补。
++2. 按 `$agent-roster` 路由：读 `routing.md`、相关 Endpoint 画像与 Trace，先建 Run 目录并写 `decision.md`（候选、选了谁、为什么、依据），**顺序不可颠倒**。规则为空就跳过，证据不足就说「无推荐」。
++3. 把候选收成编号表供用户选：Endpoint / Model / 一句话擅长方向 / 依据（读了哪几条 Trace）。用户圈定前不发出委派。名册里没有合适候选就直接问用户。**名册里没有的 Endpoint 就是不存在，不要凭 CLI 名假设可用。**
++4. 按 `$agent-roster` 契约委派：`permission: read-only`，`endpoint` + `model` 带上，prompt 只含方案路径与评审要求（改什么、不改什么、看哪几类风险），不塞完整历史；`handoff` 指向 `{taskRoot}/design/review-<yyyy-mm-dd>.md`。
++5. `acpx` 未装：**停下这件事**，按 `$agent-roster` 提议安装并等回答；未获明确拒绝不得降级，等待期间编排者不得自己顶上。
++6. 回收：评审意见落到 `handoff` 路径。结论与方案问题分开列——评审结论、必须改的、可选的、被驳回的并写明理由。
++7. 按评审结果修正 `design/`：接受的写回方案稿并留变更记录；不接受的当面说明理由。**修正动作回到 `design`，不在本阶段改方案。**
++8. 失败 / 超时 / 返工按 `$agent-roster` 分类处理；只在有教训时写 Trace。收尾报告：评审意见路径、方案改了哪几处、下一站 `decide`。
++
++## 边界
++
++- 不委派实施，只评审；不改方案本身。
++- 用户自己或同事已评审也算本阶段完成，不必为凑流程委派 agent；把结论写进 `design/`。
++- 评审意见不等于是决策；采纳与否仍走 `decide`。
++
++## 交接
++
++```
++## 交接
++
++**已评审**：[一句话结论]
++**评审意见**：`{taskRoot}/design/review-<yyyy-mm-dd>.md`
++**方案改动**：[列表]
++**未决问题**：[列表，或无]
++**下一步**：decide
++```
