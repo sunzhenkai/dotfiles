@@ -5,9 +5,9 @@ kind: third-party-skills-lock
 skills:
   - id: agent-roster
     source: https://github.com/sunzhenkai/agent-roster
-    revision: c1ab61bb215e342ef8a7ed7d5a05b170bd37e073
+    revision: fb32647a6361f7a5d46c5c50d0a105cd69678b65
     subdirectory: skills/agent-roster
-    content_hash: 16c730aebdb42e0917657ea783c868d03bc0bda9c64b757d9d349a7beb50eb64
+    content_hash: bf53ca89f0ceaeb73e5b49bdfbe9f105214ac3626a4969c295f516c3faea615b
     license:
       spdx: MIT
       file: LICENSE
@@ -16,21 +16,21 @@ skills:
       status: approved
       date: '2026-09-24'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/agent-roster/commit/c1ab61bb215e342ef8a7ed7d5a05b170bd37e073
+      evidence: https://github.com/sunzhenkai/agent-roster/commit/fb32647a6361f7a5d46c5c50d0a105cd69678b65
   - id: archify
     source: https://github.com/tt-a1i/archify
-    revision: 1bb61c69538e37d80793b25843f620e55469f3a2
+    revision: 9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993
     subdirectory: archify
-    content_hash: 6b393eb730afbf6b38eb0d0149609c15f942d145f0f923fc014a7551b5c966f7
+    content_hash: 6a4d2d3c63613f92876cfbfd17d3fba79a6d6e24b54d3bede66e5a17c34922af
     license:
       spdx: MIT
       file: LICENSE
       hash: b799ab081703e7821ae5096d2c1abdf14bbdc75e8ea1c4045998c36ed6db9706
     audit:
       status: approved
-      date: '2026-09-23'
+      date: '2026-09-24'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/tt-a1i/archify/commit/1bb61c69538e37d80793b25843f620e55469f3a2
+      evidence: https://github.com/tt-a1i/archify/commit/9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -159,18 +159,18 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: senv-cli
     source: https://github.com/solo-kingdom/senv
-    revision: d2e32883748efa4ba2ead623fa8295ad2e0a13e6
+    revision: a52b4b4025b07476ae0a5fbf1195c841bfab05aa
     subdirectory: .agents/skills/senv-cli
-    content_hash: 228c3dc8a4715e83d7d39bc600da9587d583bfc9aa8f9c913fdbfa07cb299de7
+    content_hash: 6555ce029a2c05af2a3aa6da7292dc1183c8f7b84583e58860b7a96f2015f33e
     license:
       spdx: MIT
       file: LICENSE
       hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
     audit:
       status: approved
-      date: '2026-09-23'
+      date: '2026-09-24'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/solo-kingdom/senv/commit/d2e32883748efa4ba2ead623fa8295ad2e0a13e6
+      evidence: https://github.com/solo-kingdom/senv/commit/a52b4b4025b07476ae0a5fbf1195c841bfab05aa
   - id: setup-matt-pocock-skills
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7

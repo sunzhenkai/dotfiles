@@ -60,7 +60,7 @@ print(tree_hash(Path('/tmp/verify-skill/<subdirectory>')))"
 diff -r /tmp/verify-skill/<subdirectory> ~/.agents/skills/<id>
 ```
 
-`diff -r` 允许的差异只有「Only in /tmp/verify-skill/...」的 authoring 目录：`patches/`、`evals/`、`experience/`、`evolutions/`、`authoring/`（见坑 5）。其余任何差异都说明下发没到位，回查 `defaults` 段输出。
+`diff -r` 允许的差异只有两处：「Only in /tmp/verify-skill/...」的 authoring 目录 `patches/`、`evals/`、`experience/`、`evolutions/`、`authoring/`（见坑 5）；以及 `~/.kiro` 副本正文末尾多出的 `$ARGUMENTS`（kiro layout 的固定渲染，`src/agents/sync.py`）。其余任何差异都说明下发没到位，回查 `defaults` 段输出。
 
 ## 坑实录（2026-09-20 实战沉淀）
 
@@ -72,6 +72,8 @@ diff -r /tmp/verify-skill/<subdirectory> ~/.agents/skills/<id>
 6. **`/tmp/dotf-lock-update-*` 里的 checkout 别默认是新 HEAD**：临时目录里新旧 revision 的 checkout 都可能出现（本次拿旧基线当新上游，差点误诊）。比对一律自己 clone 并 checkout 到 lock 里写的 revision。
 7. **`dotf agents -d`（doctor）是 L0 浅检**：只确认 managed manifest 就位，不验证 lock 内容一致性。真验证靠第 4 步，doctor 不能替代。
 8. **mattpocock 重钉常是纯 revision 前进**：上游提交往往只动锁外路径（in-progress/、README），17 个锁内 skill 内容零变化。重锁后 diff 里只有 revision 行在动属正常，别当成失败。
+9. **`optional: true` 的锁内条目本机没有副本，不是下发失败**：编目里标 optional 的第三方条目不进默认安装，`defaults` 段也不部署（本机经 overlay / `agents apply` 启用过的才会有，如 ui-skills-root）。第 4 步对它们只验上游 checkout 的 tree_hash == lock content_hash，`diff -r` 会报 MISSING，属预期。
+10. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复补 `tests/test_audit_skill.py`（误报 + 真风险各一条），并在 `agents/skills/skills-store/patches/` 留 proposal/change/result 三件套；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。
 
 ## 边界
 

@@ -19,7 +19,10 @@ SKILL_DIR="$(cd "$SKILL_DIR" && pwd)"
 PATTERNS=(
   # --- critical: 阻断安装 ---
   "prompt_injection_override|critical|(?i)(ignore|disregard|forget|override).{0,40}(previous|prior|system|safety|security).{0,20}(instruction|rule|guideline|constraint)"
-  "jailbreak_role|critical|(?i)(you are now|act as|pretend to be|DAN mode|jailbreak|no restrictions|without (any )?limit)"
+  # jailbreak_role 的 without limit 分支豁免 "without limitation"：MIT/BSD 授权套话
+  # （"including without limitation the rights"）必然误报；"without any limits" 等
+  # 真实越狱措辞仍命中，no restrictions 分支不受影响。
+  "jailbreak_role|critical|(?i)(you are now|act as|pretend to be|DAN mode|jailbreak|no restrictions|without (any )?limit(?!ation))"
   "bypass_approval|critical|(?i)(disable|bypass|skip|turn off).{0,30}(approval|sandbox|security|guardrail|confirmation|human.{0,10}review)"
   "pipe_to_shell|critical|(?i)(curl|wget).{0,120}\|\s*(ba)?sh"
   "destructive_rm_root|critical|rm\s+-rf\s+(/|\~|\*|\$HOME\b|\$\{HOME\})"
