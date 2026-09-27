@@ -1,9 +1,10 @@
 # Agent 交付质量门缺失（task-manager 复盘）
 
 - slug: agent-delivery-quality
-- status: ongoing
+- status: handed-off
 - created: 2026-09-25
-- updated: 2026-09-25
+- updated: 2026-09-27
+- handed-off: 2026-09-27
 
 ## 目标
 
@@ -44,17 +45,28 @@
 - 2026-09-25：立项。根因初判 R1–R4（判据缺质量维度 / 交付标准只含工程卫生 / 审阅不带角色 / 缺前置正向设计）。第一轮 8 问按推荐确定。下一步 explore。
 - 2026-09-25：explore 第二轮 8 问按推荐确定（Q9–Q16）：质量画像为 Goal 方案内结构化小节（受众/规模/生效角色/各角色底线，角色词表借 role-based-reviewer 的 9 角色）；只复杂档强制画像；改 role-based-reviewer 门 1 承认「task-wizard 复杂档调用」为正当触发；降级项交审阅者判「理由是否正当」；UI 规格 = 页面清单 + 三条角色底线，截图存 /tmp；回归案例同时落任务目录与 skill-evolver examples 格式；改动面 = task-wizard + task-explore（taskflow/openspec 不动）；本仓同步 spec + ADR + patches + CONTEXT.md 术语。
 - 2026-09-25：explore 第三轮 4 问按推荐确定（Q17–Q20），frontier 已空。**Q17 修正了第一轮的一处事实错误**：`ui-skills-root` 是路由层（`npx ui-skills start/categories/list/get`，vercel-labs），`frontend-design` 是本仓 `pretty-view-html/references/` 下的参考文档，两者不同层——挂法改为先 `frontend-design` 定方向、再 `ui-skills-root` 按方向选窄 skill，`npx` 不可用时退回 `frontend-design` 单走。Q18：taskflow proposal 模板加一行引用质量画像。Q19：回溯验证取「读新 skill 文本 + 对照失败点清单」，不实跑。Q20：本任务走完整 design → decide → handoff → taskflow 流程。
+- 2026-09-27：driver 规划完成并交接。wizard、explore/taskflow/reviewer 传播链、静态回归包均已落地；`make registry validate`、secret-scan、`pytest` 1041 passed，OpenSpec strict 校验通过。
+- 2026-09-27：样例完成 final polish 并通过最终三角色验收：260/260 tests OK，五维 3.0，UI/UX 3.0，明暗对比 62/62 达标，无 P0/P1；生产部署 checklist 已写入 README/降级表。
+- 2026-09-27：样例窄切片已由 qodercn 实现并返修。首轮 100/100 tests；三角色审阅后修复安全、事务、会话身份、force 审计与 500 泄漏；复核 142/142 tests OK，无 P0。剩余 UI/UX 1.92 未达 2、3 个共享部署前 P1、全链路功能扩展未做。采纳 ISO/IEC 25010 的结构化质量维度思路，并压缩为六字段质量画像；定义复杂档硬指标、pending 降级用户确认门、原文快照传递、三角色评分与小切片回归。第一轮审阅 4 个 Major；修订后逐条复核全部消失，无新 P0/P1，完成程度高。
 
 ## 决策
 
-- 采纳：待 decide。
-- 取舍：待 decide。
-- 带进实现的未决：待探索轮补充。
-- 回退：待 decide。
+- D1 采纳：方案 B「结构化质量画像 + 固定三角色审阅 + 全链路验收引用」——它是最小通用闭环，能改变方案、审阅与实现行为，而不把流程优化变成全量评估平台。
+- D1 取舍：接受复杂 Goal 方案多一节质量画像和三角色审阅成本；接受先不做自动质量评分器。放弃「只加高质量形容词」与每轮全量端到端验证。
+- D1 带进实现的未决：
+  - 窄切片回归包第一轮选「登录/任务列表 + 看板拖拽 + 任务详情评论」；如样例能力边界不同，可在实现期按同一原则换 3 个核心闭环，但需在 proposal 说明。
+  - qoder 与 qwen 3.8 flash 的具体 Endpoint 用 `agent-roster` 查询；名册不可用则停，不假名。
+- D1 回退：按各目标 skill 的 patch 目录回退生效行；保留本任务台账与 `/tmp` 回归证据作审计。
 
 ## 交接
 
-- driver: 待 handoff。
+- driver: `agent-delivery-quality-driver`
+- 采纳方案: D1 方案 B「结构化质量画像 + 固定三角色审阅 + 全链路验收引用」
+- design: `design/delivery-quality-loop.md`；契约见 `design/adr-quality-profile.md`
+- 可带进实现的未决:
+  - 窄切片首选「登录/任务列表 + 看板拖拽 + 任务详情评论」；能力边界不同时可换 3 个核心闭环，但须在 proposal 说明。
+  - qoder 与 qwen 3.8 flash 的 Endpoint 由 `agent-roster` 查询；名册不可用则停，不假名。
+- proposal: `openspec/changes/agent-delivery-quality-driver/proposal.md`
 
 ## 未决问题
 
@@ -69,4 +81,4 @@
 
 ## 下一步
 
-- design（frontier 已空，方案成形后 decide → handoff）
+- driver 与子 change 已归档，交付验收通过；如需把探索任务移入 archive，再点名 `archive agent-delivery-quality`。
