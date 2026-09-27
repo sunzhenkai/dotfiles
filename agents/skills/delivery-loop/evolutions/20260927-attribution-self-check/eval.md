@@ -2,6 +2,10 @@
 
 对照现有行为验证，非文案完整性检查。
 
+> 本记录中的 `SKILL.md` / `loop-protocol.md` 均指生产稿路径
+> `agents/skills/delivery-loop/SKILL.md` 与 `references/loop-protocol.md`。
+> promote 后本目录的候选正文副本已删除（见 decision.md），评估对象即已晋升的生产内容。
+
 ## 回归（现有成功路径是否被打断）
 
 | 检查 | 结果 |
