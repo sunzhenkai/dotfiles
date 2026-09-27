@@ -21,6 +21,7 @@ groups:
     skills:
       - agent-roster-flow
       - commit-push
+      - delivery-loop
       - dotf-code-explore
       - dotf-code-review
       - id: lark-cli

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delivery Loop"
+  short_description: "短目标自动编排、小步验证与质量闭环"
+  default_prompt: "delivery-loop normal: "
