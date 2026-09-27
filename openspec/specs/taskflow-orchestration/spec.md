@@ -175,3 +175,46 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 - **WHEN** 任务描述没有质量画像
 - **THEN** proposal 与验收标准不新增画像条目
 - **THEN** 完成判据与编排进度规则保持不变
+
+### Requirement: 交付质量闭环与验收 rubric
+
+复杂交付的收尾段 MUST 按三层验证执行：静态门、窄切片、全链路；窄切片 MUST 先行，全链路 MUST 只在收尾跑一次。窄切片或全链路失败时，系统 MUST 先归因为 skill gap、implementation bug 或 acceptance gap 之一，再分别处置：skill gap 走对应 skill 的 `patches/` 出可审计 patch，implementation bug 在交付仓修复并补回归测试，acceptance gap 补 rubric 或验收标准。修复后 MUST 先重跑受影响切片，再跑全链路，MUST NOT 与改动无关地全量重跑。
+
+最终验收 MUST 按五维评分：功能闭环、UI/UX、工程质量、画像一致性、证据；UI/UX MUST 拆为信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项。通过线为五维均 ≥2 且 UI/UX 六子项均值 ≥2.5，任一 UI/UX 子项为 0 时 MUST NOT 通过。评分 MUST 先收证据再打分，评分主体按岗位分工；实现者自评 MUST NOT 代替岗位评分。缺分或缺证据时 MUST NOT 勾验收标准 checkbox。
+
+派发实现者时 MUST 隔离验收期望：实现者只接收样例或需求原文与运行约束，MUST NOT 接收质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric；复跑 MUST 使用同一份原文，MUST NOT 追加事后提示。评分与证据 MUST NOT 构成 checkbox 之外的第二份完成度；进度仍只认 checkbox。
+
+#### Scenario: 窄切片先行且失败先归因
+
+- **WHEN** 复杂交付首次实现或大改之后需要回归
+- **THEN** 先跑静态门与窄切片，不先铺全量功能
+- **THEN** 失败先归因为 skill gap、implementation bug 或 acceptance gap，再分别处置
+
+#### Scenario: 修复后只重跑受影响切片
+
+- **WHEN** skill gap 或 implementation bug 已修复
+- **THEN** 先重跑受影响的那一层
+- **THEN** 通过后再跑一次全链路，不做无关全量重跑
+
+#### Scenario: 五维与 UI 六子项通过线
+
+- **WHEN** driver 收尾准备回填验收标准
+- **THEN** 按功能闭环、UI/UX、工程质量、画像一致性、证据五维出分
+- **THEN** 五维均 ≥2 且 UI/UX 六子项均值 ≥2.5 才通过，任一子项为 0 不通过
+
+#### Scenario: 缺分或缺证据不勾验收
+
+- **WHEN** 五维存在缺分，或证据不齐
+- **THEN** 不勾验收标准 checkbox
+- **THEN** 不用实现者自评代替对应岗位评分
+
+#### Scenario: 实现者输入隔离
+
+- **WHEN** 派发复杂交付的实现者
+- **THEN** 实现者只收到样例或需求原文与运行约束
+- **THEN** 质量画像、验收 rubric、期望页面清单与审阅意见只由审阅者持有
+
+#### Scenario: rubric 不成为第二份账本
+
+- **WHEN** 已给出五维分数与证据
+- **THEN** 进度仍只认 checkbox，分数与证据不构成第二份完成度
