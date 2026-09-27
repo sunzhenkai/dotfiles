@@ -153,3 +153,25 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 - **WHEN** 验收标准第一条已写下，但 driver `tasks.md` 仍有未勾项
 - **THEN** 编排进度仍以未勾的 `tasks.md` 为准
 
+
+### Requirement: 质量画像与降级进入 proposal 与验收
+
+任务描述含质量画像或显式降级原文时，driver `proposal.md` 的 `Why` MUST 逐字保留原文快照，不摘要、不改写、不用路径替代。验收标准 MUST 在完成判据之外检查：画像快照已进入 proposal；每条角色底线有运行时行为、截图或测试证据；`pending` 降级数为 0；`confirmed` 降级在验证记录中逐项可追踪。任务描述没有画像时 MUST NOT 编造。子 change 实施中发现新的生产性降级时 MUST 标 `pending`，写入验证记录，并作为「需要用户决策」停下；用户点名接受或明确全部确认后才改为 `confirmed`，才允许勾相关验收。执行者、子代理、审阅收敛都 MUST NOT 代用户确认。Driver 协议固定文本 MUST 保持逐字不变。
+
+#### Scenario: 上游画像进入 proposal 与验收
+
+- **WHEN** taskflow 收到含质量画像与显式降级原文的任务描述
+- **THEN** `Why` 保留原文快照
+- **THEN** 验收标准包含画像快照、角色底线证据、pending=0 与 confirmed 追踪
+
+#### Scenario: 新降级需要用户决策
+
+- **WHEN** 子 change 实施中发现比默认期望少交付的新约束
+- **THEN** 该项标 `pending` 并写入验证记录
+- **THEN** 相关验收保持未勾，直到用户确认后改 `confirmed`
+
+#### Scenario: 无画像不编造
+
+- **WHEN** 任务描述没有质量画像
+- **THEN** proposal 与验收标准不新增画像条目
+- **THEN** 完成判据与编排进度规则保持不变
