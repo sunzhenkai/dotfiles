@@ -318,6 +318,14 @@ modules:
       preserve: [npm, auth.json, sessions, archived_sessions, log, mcp.json, mcp-cache.json, mcp-npx-cache.json, models.json, models-store.json, trust.json]
       exclude: [README.md]
 
+  - name: omp
+    kind: binary
+    desc: oh-my-pi (omp) coding agent CLI
+    group: agents
+    install: true
+    doctor: true
+    bin: omp
+
   - name: zcode
     kind: binary
     desc: ZCode CLI

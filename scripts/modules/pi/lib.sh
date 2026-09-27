@@ -5,9 +5,10 @@
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
-# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + powerline footer 等）
+# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + powerline footer + 上下文压缩
+# + 可观测性 + todo + 代码反馈 + 权限护栏 + plan 评审 + skills + 模糊搜索等）
 PI_DEFAULT_PACKAGES=(
-  "npm:@ogulcancelik/pi-goal"
+  "npm:pi-goal-x"
   "npm:pi-subagents"
   "npm:pi-mcp-adapter"
   "npm:pi-powerline-footer"
@@ -15,6 +16,14 @@ PI_DEFAULT_PACKAGES=(
   "npm:@juicesharp/rpiv-ask-user-question"
   "npm:pi-background-tasks"
   "npm:pi-simplify"
+  "npm:billion-context"
+  "npm:@langfuse/pi-observability-plugin"
+  "npm:@juicesharp/rpiv-todo"
+  "npm:pi-lens"
+  "npm:@gotgenes/pi-permission-system"
+  "npm:@plannotator/pi-extension"
+  "npm:@dietrichgebert/ponytail"
+  "npm:@ff-labs/pi-fff"
 )
 
 # 常见 npm 全局 bin（mise / ~/.local）临时加入 PATH

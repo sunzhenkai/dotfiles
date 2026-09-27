@@ -35,6 +35,17 @@ def test_vendor_packages_are_declared_defaults() -> None:
     assert "npm:pi-agent-extensions" not in packages
     assert "npm:pi-subagents" in packages
     assert "npm:@virdis/subagents" not in packages
+    # 2026-09-27 扩容：目标管理换 pi-goal-x，新增上下文/可观测/todo/护栏等
+    assert "npm:pi-goal-x" in packages
+    assert "npm:@ogulcancelik/pi-goal" not in packages
+    assert "npm:billion-context" in packages
+    assert "npm:@langfuse/pi-observability-plugin" in packages
+    assert "npm:@juicesharp/rpiv-todo" in packages
+    assert "npm:pi-lens" in packages
+    assert "npm:@gotgenes/pi-permission-system" in packages
+    assert "npm:@plannotator/pi-extension" in packages
+    assert "npm:@dietrichgebert/ponytail" in packages
+    assert "npm:@ff-labs/pi-fff" in packages
 
 
 def test_vendor_powerline_shows_tokens_and_cache_hit_rate() -> None:
@@ -73,26 +84,32 @@ def test_merge_drops_retired_package_from_existing_machine() -> None:
             "npm:pi-mcp-adapter",
             "npm:@virdis/subagents",
             "npm:pi-agent-extensions",
+            "npm:@ogulcancelik/pi-goal",
             "npm:someone-local-only",
         ],
     }
     out = merge(existing, _vendor())
     assert "npm:@virdis/subagents" not in out["packages"]
     assert "npm:pi-agent-extensions" not in out["packages"]
+    # pi-goal 换代：旧包从本机剔除，由 pi-goal-x 接替
+    assert "npm:@ogulcancelik/pi-goal" not in out["packages"]
+    assert "npm:pi-goal-x" in out["packages"]
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-subagents" in out["packages"]
     assert "npm:pi-powerline-footer" in out["packages"]
 
 
-def test_rpiv_todo_is_not_a_default_and_is_retired() -> None:
-    # 曾与 pi-agent-extensions 的 todos 重名冲突；合集退役后仍保持剔除。
-    assert "npm:@juicesharp/rpiv-todo" not in _vendor()["packages"]
+def test_rpiv_todo_readopted_but_pi_agent_extensions_still_retired() -> None:
+    # rpiv-todo 曾因与 pi-agent-extensions 的 todos 冲突退役；后者退役后
+    # 于 2026-09-27 重新收编为默认包。pi-agent-extensions 保持剔除。
+    assert "npm:@juicesharp/rpiv-todo" in _vendor()["packages"]
     existing = {
-        "packages": ["npm:@juicesharp/rpiv-todo", "npm:pi-agent-extensions"],
+        "packages": ["npm:pi-agent-extensions", "npm:@virdis/subagents"],
     }
     out = merge(existing, _vendor())
-    assert "npm:@juicesharp/rpiv-todo" not in out["packages"]
     assert "npm:pi-agent-extensions" not in out["packages"]
+    assert "npm:@virdis/subagents" not in out["packages"]
+    assert "npm:@juicesharp/rpiv-todo" in out["packages"]
 
 
 def test_merge_uses_vendor_doc_when_no_existing() -> None:

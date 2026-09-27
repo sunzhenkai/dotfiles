@@ -153,3 +153,74 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 - **WHEN** 验收标准第一条已写下，但 driver `tasks.md` 仍有未勾项
 - **THEN** 编排进度仍以未勾的 `tasks.md` 为准
 
+
+### Requirement: 质量画像与降级进入 proposal 与验收
+
+任务描述含质量画像或显式降级原文时，driver `proposal.md` 的 `Why` MUST 逐字保留原文快照，不摘要、不改写、不用路径替代。验收标准 MUST 在完成判据之外检查：画像快照已进入 proposal；每条角色底线有运行时行为、截图或测试证据；`pending` 降级数为 0；`confirmed` 降级在验证记录中逐项可追踪。任务描述没有画像时 MUST NOT 编造。子 change 实施中发现新的生产性降级时 MUST 标 `pending`，写入验证记录，并作为「需要用户决策」停下；用户点名接受或明确全部确认后才改为 `confirmed`，才允许勾相关验收。执行者、子代理、审阅收敛都 MUST NOT 代用户确认。Driver 协议固定文本 MUST 保持逐字不变。
+
+#### Scenario: 上游画像进入 proposal 与验收
+
+- **WHEN** taskflow 收到含质量画像与显式降级原文的任务描述
+- **THEN** `Why` 保留原文快照
+- **THEN** 验收标准包含画像快照、角色底线证据、pending=0 与 confirmed 追踪
+
+#### Scenario: 新降级需要用户决策
+
+- **WHEN** 子 change 实施中发现比默认期望少交付的新约束
+- **THEN** 该项标 `pending` 并写入验证记录
+- **THEN** 相关验收保持未勾，直到用户确认后改 `confirmed`
+
+#### Scenario: 无画像不编造
+
+- **WHEN** 任务描述没有质量画像
+- **THEN** proposal 与验收标准不新增画像条目
+- **THEN** 完成判据与编排进度规则保持不变
+
+### Requirement: 交付质量闭环与验收 rubric
+
+复杂交付的收尾段 MUST 按三层验证执行：静态门、窄切片、全链路；窄切片 MUST 先行，全链路 MUST 只在收尾跑一次。窄切片或全链路失败时，系统 MUST 先归因为 skill gap、implementation bug 或 acceptance gap 之一，再分别处置：skill gap 走对应 skill 的 `patches/` 出可审计 patch，implementation bug 在交付仓修复并补回归测试，acceptance gap 补 rubric 或验收标准。修复后 MUST 先重跑受影响切片，再跑全链路，MUST NOT 与改动无关地全量重跑。
+
+最终验收 MUST 按五维评分：功能闭环、UI/UX、工程质量、画像一致性、证据；UI/UX MUST 拆为信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项。通过线为五维均 ≥2 且 UI/UX 六子项均值 ≥2.5，任一 UI/UX 子项为 0 时 MUST NOT 通过。评分 MUST 先收证据再打分，评分主体按岗位分工；实现者自评 MUST NOT 代替岗位评分。缺分或缺证据时 MUST NOT 勾验收标准 checkbox。
+
+普通复杂交付派发实现者时 MUST 提供质量画像原文或保留语义的子范围裁剪、相关验收要求与运行约束；完整评分 rubric 与跨范围审阅意见可由审阅者持有。普通任务 MUST NOT 默认盲派。只有任务显式标记 benchmark / regression 复跑时，实现者才只接收同一份样例或需求原文与运行约束，MUST NOT 接收质量画像、验收 rubric、期望页面清单或审阅意见；复跑 MUST NOT 追加事后提示。评分与证据 MUST NOT 构成 checkbox 之外的第二份完成度；进度仍只认 checkbox。
+
+#### Scenario: 窄切片先行且失败先归因
+
+- **WHEN** 复杂交付首次实现或大改之后需要回归
+- **THEN** 先跑静态门与窄切片，不先铺全量功能
+- **THEN** 失败先归因为 skill gap、implementation bug 或 acceptance gap，再分别处置
+
+#### Scenario: 修复后只重跑受影响切片
+
+- **WHEN** skill gap 或 implementation bug 已修复
+- **THEN** 先重跑受影响的那一层
+- **THEN** 通过后再跑一次全链路，不做无关全量重跑
+
+#### Scenario: 五维与 UI 六子项通过线
+
+- **WHEN** driver 收尾准备回填验收标准
+- **THEN** 按功能闭环、UI/UX、工程质量、画像一致性、证据五维出分
+- **THEN** 五维均 ≥2 且 UI/UX 六子项均值 ≥2.5 才通过，任一子项为 0 不通过
+
+#### Scenario: 缺分或缺证据不勾验收
+
+- **WHEN** 五维存在缺分，或证据不齐
+- **THEN** 不勾验收标准 checkbox
+- **THEN** 不用实现者自评代替对应岗位评分
+
+#### Scenario: 正常交付提供质量上下文
+
+- **WHEN** 派发普通复杂交付的实现者
+- **THEN** 实现者收到质量画像或保留语义的子范围裁剪、相关验收要求与运行约束
+- **THEN** 不默认盲派，也不隐藏并发、无障碍、错误边界或运行假设
+
+#### Scenario: 盲测复跑才隔离期望
+
+- **WHEN** 任务显式标记 benchmark / regression 并派发盲测实现者
+- **THEN** 实现者只收到同一份样例或需求原文与运行约束
+- **THEN** 质量画像、验收 rubric、期望页面清单与审阅意见只由审阅者持有
+
+#### Scenario: rubric 不成为第二份账本
+
+- **WHEN** 已给出五维分数与证据
+- **THEN** 进度仍只认 checkbox，分数与证据不构成第二份完成度

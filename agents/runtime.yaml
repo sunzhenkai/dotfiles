@@ -2,6 +2,7 @@ version: 1
 skills:
   files:
     - SKILL.md
+    - CONTEXT.md
   sidecars:
     - references
     - scripts

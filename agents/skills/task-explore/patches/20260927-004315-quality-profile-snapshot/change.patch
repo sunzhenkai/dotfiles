@@ -1,0 +1,102 @@
+diff --git a/agents/skills/task-explore/references/task-template.md b/agents/skills/task-explore/references/task-template.md
+--- a/agents/skills/task-explore/references/task-template.md
++++ b/agents/skills/task-explore/references/task-template.md
+@@ -1,6 +1,6 @@
+ # 任务文档骨架
+
+-`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。**输入含现成方案时（含上游 task-wizard 的步骤级方案、他人设计稿），把目标、完成判据、事实、假设、步骤、阻塞点、坑逐条登记进「方案」小节**，不要只填目标。输入里没有完成判据时不要编造。
++`new` 时按此创建 `{taskRoot}/TASK.md`。按已知信息填写，未知留空，不要编造。**输入含现成方案时（含上游 task-wizard 的步骤级方案、他人设计稿），把目标、完成判据、事实、假设、步骤、阻塞点、坑逐条登记进「方案」小节**，不要只填目标。输入里没有完成判据时不要编造。**输入含质量画像或显式降级时（上游 task-wizard 复杂档），在同一小节逐字登记原文快照**，不概括、不改写、不换成路径或小节指针；输入里没有画像或降级时删去对应行，不要编造。
+
+ `save` 时更新同一文件：改 `updated` 与有变化的章节，不要整文件重写后丢掉仍有效的内容。同时同步 `tasks/INDEX.md` 对应行（标题、日期、一句话目标），不要把进展抄进索引。
+
+@@ -30,6 +30,8 @@
+ [上游或已有方案；无则留空。已定则写全，未定则写下当前候选与缺口。]
+
+ - 完成判据：[输入里的那一条可检查的话；没有则删去本行，不要编造]
++- 质量画像原文快照：[上游含画像时逐字登记，`角色底线` 三条一并带上；没有则删去本行，不要编造]
++- 显式降级原文快照：[逐字登记每条「维度 / 默认期望 / 实际选择 / 原因 / 确认状态」，`pending` 原样保留；没有则删去本行]
+ - 事实：[对上出处的现状或外部参照；没有则删去本行]
+ - 假设：[未对上出处的，含未找到的外部参照；没有则删去本行]
+ - 步骤：[每步动作 — 要点 / 验证]
+@@ -50,6 +52,7 @@
+ ## 交接
+
+ - driver: `{task-name}-driver`（handoff 后填写）
++- 质量画像 / 显式降级原文快照：[handoff 时从「方案」小节逐字复制；输入里没有则删去本行]
+ - 归档路径：[handoff / archive 后填写]
+
+ ## 子任务
+diff --git a/agents/skills/task-explore/references/phase-decide.md b/agents/skills/task-explore/references/phase-decide.md
+--- a/agents/skills/task-explore/references/phase-decide.md
++++ b/agents/skills/task-explore/references/phase-decide.md
+@@ -11,11 +11,13 @@
+ - `TASK.md` 目标能一句话说清
+ - 有可推荐方案（通常来自 `design/`；无设计稿则用户必须当面确认选项）
+ - 成功标准可检验。「方案」已有完成判据时，成功标准用该判据原文；判据无法检验是否成立则停下，不写入采纳方案。没有完成判据时不编造，仍按本条判断成功标准是否可检验
++- 「方案」里的质量画像与显式降级原文快照属于成功标准输入（上游 task-wizard 复杂档传入时）：采纳方案连同该原文一起冻结，不得只留 `TASK.md` 路径或小节指针。快照缺失或与上游不一致时先 `save` 补回再冻结；输入里没有画像时不编造一份
++- 存在确认状态为 `pending` 的显式降级时**不得冻结**：停下，把阻塞原因写成「降级未确认」并列出 pending 条目。只有用户点名接受该项、或明确说按降级表全部确认，才改为 `confirmed` 再 `decide`；审阅收敛、单独的「继续」、执行者或评审者的判断都不算确认
+ - 父任务只冻结范围、非目标与拆分原则；具体方案是各子任务的 `decide`，父不得代决
+
+ ## Goal 里
+
+-处在 goal 里时，不逐条问用户，也不列出「全部按默认冻结 / 先改某条 / 暂不冻结」。推荐默认是 design 里已经写出的默认。没有设计稿、也没有可推荐方案时不编造选项，停下并说明缺方案。把全部推荐默认连同「冻结并交接」作为一条候选，按 `SKILL.md` 的「Goal 里的确认」走审阅。审阅收敛则视为已逐条确认，写入决策小节，并立刻 `handoff`。
++处在 goal 里时，不逐条问用户，也不列出「全部按默认冻结 / 先改某条 / 暂不冻结」。推荐默认是 design 里已经写出的默认。没有设计稿、也没有可推荐方案时不编造选项，停下并说明缺方案。把全部推荐默认连同「冻结并交接」作为一条候选，按 `SKILL.md` 的「Goal 里的确认」走审阅。审阅收敛则视为已逐条确认，写入决策小节，并立刻 `handoff`。「降级未确认」不在此列：`pending` 降级的确认只来自用户，审阅收敛不放行。
+
+ ## 未决默认值逐条确认
+
+@@ -44,4 +46,4 @@
+
+ ## 压缩路径
+
+-用户明确说「按 design 里的推荐冻结并交接」：视为已确认全部推荐默认值；本轮先完成本阶段，再立刻进入 `handoff`，不必再问一次是否 decide。
++用户明确说「按 design 里的推荐冻结并交接」：视为已确认全部推荐默认值，但不含 `pending` 降级的确认；本轮先完成本阶段，再立刻进入 `handoff`，不必再问一次是否 decide。命中「降级未确认」仍停在门禁。
+diff --git a/agents/skills/task-explore/references/phase-design.md b/agents/skills/task-explore/references/phase-design.md
+--- a/agents/skills/task-explore/references/phase-design.md
++++ b/agents/skills/task-explore/references/phase-design.md
+@@ -12,10 +12,18 @@
+
+ - 目标能一句话说清
+ - 成功标准可检验
++- 「方案」含质量画像与显式降级原文快照时，先按「画像展开」把它落进设计稿再落盘；快照缺失则按缺口停下报告，不自己补一份画像
+ - 约束（技术 / 时间 / 范围）已知或已标明未知
+ - 能形成至少两个可行方案；否则说明还缺哪些信息
+
+ 推荐若依赖未决项，把未决单独列出，不要写成已定。
++
++## 画像展开（上游含质量画像时）
++
++- 设计稿正文**逐字复制** `TASK.md`「方案」里的质量画像与显式降级原文快照，再在其下展开；`TASK.md` 路径或小节指针不能替代原文。
++- 每条 `角色底线` 至少展开到三个可检查面：UI（哪个页面、哪些交互与状态）、数据（一致性、并发、持久化假设）、验收（怎么验：运行、截图、测试、启动步骤）。写成可检查的话，「高质量」「体验好」「足够健壮」不算。
++- 展开只细化画像已有字段，不改档位与范围，也不新增架构 / 接口 / schema / 代码骨架设计。某条展不下去：列入未决并提示缺口，不默默省掉。
++- 输入里没有质量画像时本节不适用，不要为设计稿编造一份。
+
+ ## 三阶段：探索 → 设计 → 写入任务
+
+diff --git a/agents/skills/task-explore/references/phase-handoff.md b/agents/skills/task-explore/references/phase-handoff.md
+--- a/agents/skills/task-explore/references/phase-handoff.md
++++ b/agents/skills/task-explore/references/phase-handoff.md
+@@ -4,7 +4,7 @@
+
+ 把 **探索任务**（`tasks/ongoing/{task-name}`）交接给 **taskflow 任务**（`{task-name}-driver`）。交付进度之后只认 taskflow checkbox。本阶段 **不写实现代码**，不发明 openspec 等价命令。交接后探索任务转入 `handed-off`：**不归档、不搬目录、不清绑定**。`handed-off` 只表示账本已换，不表示 goal 或交付完成。
+
+-处在 goal 里时，不询问是否交接。`decide` 的审阅已包含交接且已收敛时，本阶段直接执行。批量失败不向用户列选项，停并报告。
++处在 goal 里时，不询问是否交接。`decide` 的审阅已包含交接且已收敛时，本阶段直接执行。批量失败不向用户列选项，停并报告。「降级未确认」除外：门禁 4 要的是用户确认，审阅收敛不放行。
+
+ ## 目标推断（自动）
+
+@@ -20,12 +20,13 @@
+ 1. 该任务 `TASK.md` **决策** 小节已写明采纳方案。没有则打断，先 `decide`。（父任务批量交接时逐个子任务检查；不满足的子任务按「跳过」处理并列入报告，不整体打断。）
+ 2. driver change 名 = 任务 slug + `-driver`（子任务为 `{sub}-driver`），不得从描述重新归纳成别的名字。在同一 planning root 下检查 driver 是否已存在：已存在则不要新建，把现有路径写入交接段，视为脚手架已就绪。
+ 3. 任务已是 `handed-off` 且 driver 已存在：报告 driver 路径并保持状态不变，不重复交接。
++4. 显式降级原文快照里确认状态为 `pending` 的条目为 0。仍有 `pending` 就停在本门禁，**不创建 driver**，把阻塞原因写成「降级未确认」并列出条目；只有用户点名接受该项、或明确说按降级表全部确认后才继续。上游没给降级表时本条视为满足，不编造降级。
+
+ ## 步骤
+
+ 1. 有未写入进展则先按 `save` 写回。
+-2. 在 `TASK.md` 写 **交接** 小节：driver 名、采纳方案、`design/` 指针、可带进实现的未决。
+-3. 读取并遵循 `taskflow` 的脚手架（`taskflow-new`）。「方案」含完成判据时，`--goal` 用目标 + 该完成判据原文 + 已采纳方案。没有完成判据时，`--goal` 用目标 + 已采纳方案。不要只丢一句含糊摘要。决策小节没有采纳方案时停在门禁 1，不创建 driver。
++2. 在 `TASK.md` 写 **交接** 小节：driver 名、采纳方案、`design/` 指针、可带进实现的未决；上游含质量画像时，把「方案」小节的质量画像与显式降级原文快照**逐字复制**进交接段，不是引用路径。
++3. 读取并遵循 `taskflow` 的脚手架（`taskflow-new`）。「方案」含完成判据时，`--goal` 用目标 + 该完成判据原文 + 已采纳方案。没有完成判据时，`--goal` 用目标 + 已采纳方案。上游含质量画像与显式降级时，`--goal` 再逐字附上这两份原文快照，driver 的 `proposal.md` 保留同一份原文，不换成指向 `tasks/` 的路径或小节指针。不要只丢一句含糊摘要。决策小节没有采纳方案时停在门禁 1，不创建 driver。
+ 4. 按 taskflow 写入 driver 的 `.openspec.yaml`（`skip_specs: true`）和 `proposal.md`（含逐字 Driver 协议）。**不要写 `tasks.md`。**
+ 5. taskflow / openspec 不可用，或无法确定 planning root：停下报告可选项，**保持探索任务在 `ongoing/`、状态不变**，已写的交接段可保留。
+ 6. 收尾：`TASK.md` 的 `status` 改为 `handed-off`，写入 `handed-off` 日期与 `driver` 名；INDEX 行一句话更新为 `已交接：… → {task-name}-driver`（**行留在 Ongoing 表**）；保留会话绑定。

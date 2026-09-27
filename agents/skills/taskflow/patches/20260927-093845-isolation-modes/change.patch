@@ -1,0 +1,146 @@
+diff --git a/agents/skills/taskflow/SKILL.md b/agents/skills/taskflow/SKILL.md
+index d778cef..1d8ff01 100644
+--- a/agents/skills/taskflow/SKILL.md
++++ b/agents/skills/taskflow/SKILL.md
+@@ -162,9 +162,11 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
+ 
+ 主会话负责派发、汇总、处理冲突与未勾原因。子代理失败或超时不是整轮结束理由，按「一轮结束」继续其余独立项。
+ 
+-### 实现者隔离
++### 实现者输入
+ 
+-派发实现时按 [references/implementer-isolation.md](references/implementer-isolation.md) 隔离输入：实现者只拿样例/需求原文与运行约束，不拿质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric，两边不共享这两份内容；复跑用同一份原文，不追加事后提示。
++默认正常交付：按 [references/implementer-isolation.md](references/implementer-isolation.md)，实现者必须拿到质量画像或保留语义的子范围裁剪、相关验收要求与运行约束；完整 rubric 和跨范围审阅意见仍由审阅者持有。普通任务不得盲派。
++
++只有任务显式标记 benchmark / regression 时才盲测复跑：实现者只拿同一份样例/需求原文与运行约束，不拿画像、rubric、期望清单或审阅意见；复跑不追加事后提示。
+ 
+ ---
+ 
+diff --git a/agents/skills/taskflow/evals/cases.yaml b/agents/skills/taskflow/evals/cases.yaml
+index a5d8ea7..1bb8bf3 100644
+--- a/agents/skills/taskflow/evals/cases.yaml
++++ b/agents/skills/taskflow/evals/cases.yaml
+@@ -220,17 +220,32 @@ cases:
+         - 缺分或缺证据仍勾验收标准 checkbox
+         - 用实现者自评代替对应岗位评分
+ 
+-  - id: implementer-input-isolation
++  - id: normal-delivery-input-context
+     kind: core
+     judge: deterministic
+-    description: 派发实现时隔离验收期望
+-    given: 派发复杂交付的实现者
++    description: 正常交付实现者必须拿到画像或保留语义的子范围上下文
++    given: 派发普通复杂交付的实现者
+     expect:
+       must:
+-        - 实现者只收到样例/需求原文与运行约束
++        - 实现者收到质量画像，或保留语义的子范围裁剪
++        - 实现者收到本人范围的相关验收要求与运行约束
++        - 完整 rubric 与跨范围审阅意见仍由审阅者持有
++      must_not:
++        - 普通任务默认盲派
++        - 隐藏并发、无障碍、错误边界或运行假设等质量约束
++
++  - id: blind-regression-input-isolation
++    kind: core
++    judge: deterministic
++    description: 仅显式 benchmark/regression 复跑隔离验收期望
++    given: 任务显式标记 benchmark 或 regression 并派发盲测实现者
++    expect:
++      must:
++        - 实现者只收到同一份样例/需求原文与运行约束
+         - 审阅者持有质量画像与 rubric，两边不共享
+-        - 复跑使用同一份原文，不追加事后提示
++        - 复跑不追加事后提示
+       must_not:
++        - 未标记 benchmark/regression 就盲派
+         - 把质量画像、验收 rubric 或期望页面清单写进实现者 prompt
+         - 靠私聊提示词传递未写进需求原文的期望
+ 
+diff --git a/agents/skills/taskflow/references/implementer-isolation.md b/agents/skills/taskflow/references/implementer-isolation.md
+index 9a6e30b..a5c26e3 100644
+--- a/agents/skills/taskflow/references/implementer-isolation.md
++++ b/agents/skills/taskflow/references/implementer-isolation.md
+@@ -1,36 +1,61 @@
+-# 实现者隔离
++# 实现者输入模式
+ 
+-复杂交付容易因为「实现者早知道验收期望」而得出虚高结论。派发实现时按本文件隔离输入，让验证测的是流程能力，不是复述能力。
++实现者输入分两种：正常交付与盲测复跑。默认是正常交付；盲测复跑必须由任务显式标记为 benchmark / regression，不得把普通交付默认盲派。
+ 
+-## 实现者只收到
++## 正常交付
+ 
+-- 需求或样例原文（保持原样，不改写、不补充期望）。
+-- 工作目录、允许写入的范围与不得提交/不得外发的约束。
++目标：让实现者有足够上下文满足已确认的质量约束。
++
++实现者必须收到：
++
++- 需求原文与本人负责范围的边界。
++- 质量画像原文，或按子 change 裁剪后仍保留语义的相关部分。
++- 该范围的验收要求：页面或状态、并发与数据假设、错误边界、测试与启动证据。
++- 运行约束：工作目录、依赖边界、时间预算、不得提交 / 不得外发。
++- 必要的既有契约或构建方式。
++
++实现者不必须收到：
++
++- 完整评分 rubric 与其它子 change 的验收细节。
++- 跨角色审阅意见全文。
++- 与本人范围无关的历史失败细节。
++
++审阅者仍按 [acceptance-rubric.md](acceptance-rubric.md) 独立评分；实现者自评只作输入。
++
++## 盲测 / 基准复跑
++
++目标：衡量流程或 agent 在未被提示时的理解与实现能力。仅当任务显式标记 benchmark / regression 时使用。
++
++实现者只收到：
++
++- 样例或需求原文，保持原样，不改写、不补充期望。
++- 工作目录、允许写入范围与不得提交 / 不得外发约束。
+ - 运行约束：语言与依赖边界、本地启动要求、时间预算。
+ - 交付要求：可运行、有测试、有说明、留证据。
+ 
+-## 实现者不收到
++实现者不收到：
+ 
+ - 质量画像、角色底线清单。
+ - 验收 rubric、评分维度与通过线。
+-- 期望的页面清单、功能清单或「必须包含」的隐藏清单。
+-- 审阅者的具体意见与历史失败细节。
+-
+-需要实现者知道的信息，必须已经写在需求原文或运行约束里；写不进去的期望，说明画像或需求还没定清，回去补，不靠私聊提示词传递。
++- 期望页面清单、功能清单或「必须包含」的隐藏清单。
++- 审阅者具体意见与历史失败细节。
+ 
+-## 派发方式
++复跑规则：
+ 
+-1. 记录本次派发的样例/需求原文，作为可复跑的输入。
+-2. 由审阅者持有画像与 rubric；实现者与审阅者不共享这两份内容。
+-3. 同一输入需要复跑时，用同一份原文，不追加事后提示；否则结果不可比。
+-4. 实现者产出直接进交付仓与证据目录，编排者只做审计与应用，不改写实现者结论。
++1. 记录本次派发的原文与运行约束，作为可复现输入。
++2. 审阅者持有画像与 rubric，不与实现者共享。
++3. 复跑使用同一份原文，不追加事后提示；否则结果不可比。
++4. 盲测结果只评价当次能力，不改变该任务已确认的质量画像与降级表。
+ 
+-## 并行时
++## 派发检查
+ 
+-- 多个实现者并行时，每个只拿自己那一块的原文与约束，不给别人的期望。
+-- 子代理产出按 [delivery-quality-loop.md](delivery-quality-loop.md) 归因与复验。
++- 普通交付发现实现者没有画像或相关验收要求：先补上下文，不继续盲派。
++- 盲测未显式标记 benchmark / regression：按普通交付补上下文。
++- 需要实现者知道的期望没有写进画像或验收要求：先补上游文档，不靠私聊提示词传递。
++- 多实现者并行时，正常交付按子范围裁剪上下文；盲测复跑使用同一原文。
+ 
+ ## 边界
+ 
+-- 隔离的是「验收期望」，不是必要上下文；构建方式、环境、依赖这些属于运行约束，要照常给。
+-- 隔离不降低实现要求：画像与 rubric 仍然生效，只是由审阅者而非实现者持有。
++- 隔离是受控评测手段，不是默认交付策略。
++- 盲测不降低验收：画像与 rubric 仍生效，只是由审阅者持有。
++- 正常交付不得把完整仓库无关上下文全部塞给实现者；按负责范围裁剪，但不得丢失质量语义。

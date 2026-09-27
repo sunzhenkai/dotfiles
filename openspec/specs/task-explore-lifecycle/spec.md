@@ -255,3 +255,31 @@
 - **THEN** `handoff` 停下并要求先 `decide`
 - **THEN** 不创建 driver
 
+
+### Requirement: 质量画像与降级快照贯穿探索生命周期
+
+上游传入质量画像或显式降级原文时，`new` / `save` MUST 在「方案」小节逐字登记原文快照；`design` MUST 先逐字复制快照，再展开成 UI、数据与验收的可检查细节；`decide` 与 `handoff` MUST 保留同一原文。路径或小节指针 MUST NOT 替代原文。上游没有画像时 MUST NOT 编造。显式降级的确认状态为 `pending` 时，`decide` MUST NOT 冻结，`handoff` MUST NOT 创建 driver；阻塞原因 MUST 写「降级未确认」并列出条目。只有用户点名接受该项、或明确说按降级表全部确认，才能改为 `confirmed`；审阅收敛、执行者/审阅者判断、单独「继续」都 MUST NOT 算确认。实现中新发现的降级 MUST 补入同一降级表并回到该确认门。
+
+#### Scenario: 上游画像进入方案与设计
+
+- **WHEN** task-wizard 复杂档传入质量画像与显式降级原文
+- **THEN** `TASK.md`「方案」、design 正文与交接段保留同一原文快照
+- **THEN** 设计在其下展开页面/状态、数据假设与验证方式
+
+#### Scenario: pending 降级阻止冻结与交接
+
+- **WHEN** 显式降级仍有一条 `pending`
+- **THEN** `decide` 不写采纳方案，`handoff` 不创建 driver
+- **THEN** 台账写明「降级未确认」和待确认条目
+
+#### Scenario: 用户确认后继续
+
+- **WHEN** 用户点名接受该降级或明确确认整张降级表
+- **THEN** 对应项改为 `confirmed`
+- **THEN** `decide` / `handoff` 可在其它门禁满足时继续
+
+#### Scenario: 没有画像时不编造
+
+- **WHEN** 上游输入没有质量画像或降级表
+- **THEN** 探索任务不新增画像字段
+- **THEN** 原有成功标准门禁保持不变

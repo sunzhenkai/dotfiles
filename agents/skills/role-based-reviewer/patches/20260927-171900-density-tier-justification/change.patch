@@ -1,0 +1,11 @@
+--- a/agents/skills/role-based-reviewer/references/roles/design.md
++++ b/agents/skills/role-based-reviewer/references/roles/design.md
+@@ -100,6 +100,8 @@
+ 58. 🟡 [代码] 独立功能性 icon（工具按钮、输入框装饰、占位图形）只从单一 icon primitive 产出：固定方盒（尺寸走 token）+ inline SVG，几何居中交给 flex/grid；不用裸字符，更不用 emoji 码点当 icon——字体度量与彩色 emoji 字体的渲染都不受控，跨环境必坏
+ 59. 🟡 [代码] icon 尺寸分档走 token（常规 / 密集两档起步），宿主（按钮、头像、输入框）只摆位，不重复定义 icon 尺寸
+ 60. ⚪ [运行态] icon 在其宿主内光学居中，与相邻文本基线协调；小尺寸下字形假影（全角问号、上标符号）优先换 SVG
++61. 🟡 [代码] 控件高度分档默认单档；出现第二档必须有与正文字号、整体密度的比例依据（写在 token 注释或设计文档里），「有的页面历来是这样」不算依据
++62. 🟡 [代码] 禁止把遗留默认值 / 框架默认值直接升格为设计档位；引入或保留任何尺寸档位时 diff 中应能找到推导（字号倍数、密度基准或可读注释），而非只有取值
+ 
+ ## 下游建议
+ 
