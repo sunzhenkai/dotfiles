@@ -1,0 +1,46 @@
+--- a/agents/skills/role-based-reviewer/SKILL.md
++++ b/agents/skills/role-based-reviewer/SKILL.md
+@@ -24,7 +24,9 @@
+    - 用户写出 `roles=` / 岗位短名（如「用 algo 看」「engineer+sre review」）
+    - 用户明确要求按岗位、多角色、跨职能视角看问题
+    **不算触发**：单独的「看看这段」「帮我 review」「有没有 bug」「审查一下 diff」——没有岗位意图时不要自动进来。
++   - 上游编排型工作流以结构化参数调用，且三样齐备：`mode=review`、完整合法的角色集 `roles=`、审阅边界输入（完成判据、质量画像 / 角色底线、显式降级清单、本环节「审」与「不审」的范围）。齐备时承认其为正当调用方，按传入角色执行；这类流程固定 3 个角色属预期，不算角色膨胀。
+ 2. **门 2 · 角色确认**：未指定 `roles` 时默认只开 **engineer**。其它角色必须有**强信号**才加（见下节）；一次推断将超过 2 个角色时，先列出候选问用户，禁止静默堆视角。文件名/目录沾边（有 CSS、有 Dockerfile、有 `model` 字样）不够。
++   - 调用方传入完整 `roles=` 属「已指定」而非推断：照单执行，不列候选、不反问，即使角色数超过 2 个。用户当轮显式点名的 `roles` 优先于传入值；两者都不增删。
+ 3. **门 3 · 发现克制**：`mode=review` 默认只报 **Blocker** 与 **Major**。Minor / Suggestion 仅在用户要求「仔细 / 全面 / 含风格」时输出。不确定的不当 Blocker；没有问题就说没有，不为每个角色凑一条。
+
+ ## 输入
+@@ -32,6 +34,7 @@
+ - `roles=<逗号分隔角色>`：可选。合法值：`engineer`、`algo`、`data`、`sre`、`ops`、`biz`、`product`、`design`（别名 `uiux`）、`qa`。
+ - `mode=<ask|review>`：可选，默认 `ask`。已过门 1 且用户说评审 / review / 审查时视为 `review`。
+ - `<问题或变更范围>`：可选。`mode=review` 且未给范围时，默认当前工作区 `git diff`（仍受门 2：不要因此自动加角色）。
++- `审阅边界输入`：仅工作流调用方需要。随附完成判据原文、质量画像 / 角色底线、显式降级清单、本环节「审」与「不审」的范围。缺项时只按已有判据审查，并在报告开头写明缺哪一块，不擅自扩大到「不审」列里的内容。
+
+ 示例：
+
+@@ -39,13 +42,15 @@
+ - `{{slash:role-based-reviewer}} roles=engineer,sre mode=review 服务与部署变更`
+ - `{{slash:role-based-reviewer}} mode=review`：未指定 `roles` 时默认 engineer（受门 2）
+
++- 工作流调用：`roles=product,design,engineer mode=review` 并随附完成判据 / 质量画像 / 显式降级 / 审与不审范围（不增删角色、不反问）
++
+ ## MUST 先读取
+
+ [constraints](references/constraints.md) + [preload-protocol](references/preload-protocol.md) + [brief-protocol](references/brief-protocol.md) + [role-vocabulary](references/role-vocabulary.md)。
+
+ ## 视角推断（受门 2 约束）
+
+-用户显式指定的 `roles` 优先，不再增删。未指定时：
++用户显式指定的 `roles` 优先，不再增删；调用方按自身规则传入的固定 `roles` 等同显式指定，同样不增删。下列推断只在既无用户点名、也无调用方传入时进行：
+
+ - **默认只 engineer**。不要默认带 qa / product / design。
+ - 额外角色要有问题或 diff **主体**上的强信号，不是「文件列表里出现过」：
+@@ -57,7 +62,7 @@
+   - 目标就是管道/数仓/口径 → + **data**
+   - 目标就是运营配置/灰度节奏 → + **ops**
+   - 目标就是对外协议/多租户对接 → + **biz**
+-- 将超过 2 个角色：停下来问，不猜。
++- 推断结果将超过 2 个角色：停下来问，不猜。已传入的 `roles` 属指定而非推断，不在「先问」之列。
+ - 项目里没有对应域（无模型、无数仓、无对外对接）时，对应角色直接不加。
+
+ 推断结果写在报告开头（启用了哪些、为什么）；用户纠正后以用户为准。
