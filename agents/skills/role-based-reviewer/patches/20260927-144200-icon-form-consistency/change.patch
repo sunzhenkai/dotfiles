@@ -1,0 +1,17 @@
+--- a/agents/skills/role-based-reviewer/references/roles/design.md
++++ b/agents/skills/role-based-reviewer/references/roles/design.md
+@@ -93,6 +93,14 @@
+ 54. ⚪ [代码] hydration 安全：日期/客户端值渲染有守卫，无 SSR mismatch
+ 55. ⚪ [运行态] 各状态实际渲染、dark mode 实测
+ 
++### 9. 控件基线与 icon 形态
++
++56. 🟡 [代码] 同一表单上下文里的 input / select / button 共用同一高度 token；不允许按控件类型（取色器、日期框等）单独定高——类型特例是同表单高度不一致的常见根因
++57. 🟡 [代码] 表单主体与底部操作行、字段之间的间距来自 token，不写 magic number；间距类评审意见（「太挤」「不协调」）应能落到一条 token 判定
++58. 🟡 [代码] 独立功能性 icon（工具按钮、输入框装饰、占位图形）只从单一 icon primitive 产出：固定方盒（尺寸走 token）+ inline SVG，几何居中交给 flex/grid；不用裸字符，更不用 emoji 码点当 icon——字体度量与彩色 emoji 字体的渲染都不受控，跨环境必坏
++59. 🟡 [代码] icon 尺寸分档走 token（常规 / 密集两档起步），宿主（按钮、头像、输入框）只摆位，不重复定义 icon 尺寸
++60. ⚪ [运行态] icon 在其宿主内光学居中，与相邻文本基线协调；小尺寸下字形假影（全角问号、上标符号）优先换 SVG
++
+ ## 下游建议
+ 
+ `ui-template-design` → UI 模板与设计规格生成；修复类结论交回常规实现流程。

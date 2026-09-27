@@ -109,3 +109,30 @@ cases:
       must_not:
         - 只凭实现者自评通过
         - 缺证据仍勾验收
+
+  - id: incremental-verification-reuses-evidence
+    kind: boundary
+    judge: deterministic
+    description: 局部修复只重跑受影响门禁，未受影响证据键复用 manifest
+    given: 一轮修复只改动了某 UI surface 的样式 primitive，其余 surface 与状态未动
+    expect:
+      must:
+        - 变更到门禁的映射写进 evidence manifest
+        - 未受影响的截图键直接引用既有产物，不重新生成
+        - 受影响键重新生成并在 manifest 更新
+      must_not:
+        - 为局部修复重跑全量测试或全量截图矩阵
+        - 用旧截图充当受影响键的新证据
+
+  - id: bydesign-rejection-requires-derivation
+    kind: boundary
+    judge: deterministic
+    description: 驳回 finding 为「设计内」必须附决策推导，全绿验证不算设计证据
+    given: 评审者想以「这是有意的设计」驳回一条用户或角色 finding，且拿不出可追溯推导
+    expect:
+      must:
+        - 按 acceptance gap 处理，补验收标准后复验
+        - 追问该约定本身的来源与依据
+      must_not:
+        - 以「一致性验证全绿」作为设计正确性证据维持驳回
+        - 把「设计内 / not a bug」当作免检出口

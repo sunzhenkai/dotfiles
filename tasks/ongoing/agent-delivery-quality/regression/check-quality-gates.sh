@@ -57,10 +57,32 @@ check 'taskflow spec quality loop' openspec/specs/taskflow-orchestration/spec.md
 check 'taskflow spec input modes' openspec/specs/taskflow-orchestration/spec.md '普通复杂交付派发实现者时 MUST 提供|benchmark / regression' || fail=1
 check 'reviewer description gate' agents/skills/role-based-reviewer/SKILL.md '上游工作流以 mode=review \+ 完整 roles \+ 审阅边界结构化调用' || fail=1
 check 'reviewer ADR' docs/adr/0032-role-reviewer-accepts-structured-workflows.md '结构化工作流' || fail=1
-check_cmd 'taskflow yaml parse' "python3 -c \"import yaml; yaml.safe_load(open('agents/skills/taskflow/evals/cases.yaml'))\""
-check_cmd 'taskflow bundle reverse' "git apply --check --recount --reverse agents/skills/taskflow/patches/20260927-093845-isolation-modes/bundle.patch"
-check_cmd 'taskflow patch reverse' "git apply --check --recount --reverse agents/skills/taskflow/patches/20260927-093845-isolation-modes/change.patch"
-check_cmd 'reviewer patch reverse' "git apply --check --recount --reverse agents/skills/role-based-reviewer/patches/20260927-094200-structured-workflow-description/change.patch"
+check 'reviewer icon form consistency' agents/skills/role-based-reviewer/references/roles/design.md 'icon primitive|裸字符|emoji 码点' || fail=1
+check 'reviewer density tier rule' agents/skills/role-based-reviewer/references/roles/design.md '分档默认单档|遗留默认值|比例依据' || fail=1
+check 'wizard ui contract fields' agents/skills/task-wizard/references/quality-profile.md '控件密度|icon 形态|表单间距|证据分工' || fail=1
+check 'wizard ui contract spec' openspec/specs/task-wizard-goal/spec.md 'UI 交付的 design 底线契约' || fail=1
+check 'loop incremental protocol' agents/skills/delivery-loop/references/loop-protocol.md '增量验证协议' || fail=1
+check 'loop incremental eval' agents/skills/delivery-loop/evals/cases.yaml 'incremental-verification-reuses-evidence' || fail=1
+check 'loop bydesign gate' agents/skills/delivery-loop/references/loop-protocol.md '驳回门|设计正确性证据' || fail=1
+check 'loop bydesign eval' agents/skills/delivery-loop/evals/cases.yaml 'bydesign-rejection-requires-derivation' || fail=1
+check_cmd 'taskflow yaml parse' "python3 -c \"import yaml; yaml.safe_load(open('agents/skills/taskflow/evals/cases.yaml'))\"" || fail=1
+check_cmd 'taskflow bundle reverse' "git apply --check --recount --reverse agents/skills/taskflow/patches/20260927-093845-isolation-modes/bundle.patch" || fail=1
+check_cmd 'taskflow patch reverse' "git apply --check --recount --reverse agents/skills/taskflow/patches/20260927-093845-isolation-modes/change.patch" || fail=1
+check_cmd 'reviewer patch reverse' "git apply --check --recount --reverse agents/skills/role-based-reviewer/patches/20260927-094200-structured-workflow-description/change.patch" || fail=1
+# 同文件叠加 patch 时 git apply 无法一次合并逆放（逐个对磁盘状态校验），
+# 因此每个文件只对最新 patch 做活体 reverse；更早的同文件 patch 在各自应用时
+# 已通过 reverse check（见各 patch 的 result.md），历史可由 git 追溯。
+check_cmd 'reviewer density patch reverse' "git apply --check --recount --reverse agents/skills/role-based-reviewer/patches/20260927-171900-density-tier-justification/change.patch" || fail=1
+check_cmd 'wizard ui patch reverse' "git apply --check --recount --reverse agents/skills/task-wizard/patches/20260927-144300-ui-contract-fields/change.patch" || fail=1
+# 144400 / 172800 / 归因自检 三轮叠加同两份文件。patch 只能在「它是该文件最新一层」时
+# 单独逆放；promote 之后旧 patch 不再满足该条件。改为校验当前生产稿确实含各轮规则
+# （正向断言），逆放校验留给「patch 刚应用、尚未被后续改动覆盖」的时刻。
+check 'loop incremental rule present' agents/skills/delivery-loop/references/loop-protocol.md '增量验证协议|证据复用' || fail=1
+check 'loop bydesign rule present' agents/skills/delivery-loop/references/loop-protocol.md '驳回门|设计正确性证据' || fail=1
+check 'loop attribution self-check present' agents/skills/delivery-loop/references/loop-protocol.md '归因自检|第二种解释|追问一次泛化性' || fail=1
+check 'loop self-check entry point' agents/skills/delivery-loop/SKILL.md '归因自检' || fail=1
+check_cmd 'delivery loop yaml parse' "python3 -c \"import yaml; yaml.safe_load(open('agents/skills/delivery-loop/evals/cases.yaml'))\"" || fail=1
+
 
 printf '\nsummary: ' | tee -a "$out"
 if (( fail == 0)); then echo 'PASS' | tee -a "$out"; else echo "FAIL($fail)" | tee -a "$out"; fi

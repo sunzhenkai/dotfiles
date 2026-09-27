@@ -1,0 +1,37 @@
+diff --git a/agents/skills/delivery-loop/references/loop-protocol.md b/agents/skills/delivery-loop/references/loop-protocol.md
+index 8c71ecf..5595e80 100644
+--- a/agents/skills/delivery-loop/references/loop-protocol.md
++++ b/agents/skills/delivery-loop/references/loop-protocol.md
+@@ -117,6 +117,11 @@ role-based-reviewer mode=review roles=product,design,engineer
+ 
+ 一类失败可有多条归因，但必须逐条写清，不合并。
+ 
++驳回门：把 finding 驳回为「设计内 / not a bug」MUST 附决策推导——设计文档、token 注释、
++比例依据等可追溯记录；拿不出推导时 MUST 按 acceptance gap 处理（补验收标准再复验），
++MUST NOT 维持驳回。验证全绿 MUST NOT 构成设计正确性证据：一致性契约只能证明
++「实现符合约定」，评审驳回任何 finding 前必须先问「这个约定本身怎么来的」。
++
+ ## Stage 9 — Repair loop
+ 
+ 每个窄切片最多两轮修复：
+diff --git a/agents/skills/delivery-loop/evals/cases.yaml b/agents/skills/delivery-loop/evals/cases.yaml
+index db8ae42..5da737d 100644
+--- a/agents/skills/delivery-loop/evals/cases.yaml
++++ b/agents/skills/delivery-loop/evals/cases.yaml
+@@ -123,3 +123,16 @@ cases:
+       must_not:
+         - 为局部修复重跑全量测试或全量截图矩阵
+         - 用旧截图充当受影响键的新证据
++
++  - id: bydesign-rejection-requires-derivation
++    kind: boundary
++    judge: deterministic
++    description: 驳回 finding 为「设计内」必须附决策推导，全绿验证不算设计证据
++    given: 评审者想以「这是有意的设计」驳回一条用户或角色 finding，且拿不出可追溯推导
++    expect:
++      must:
++        - 按 acceptance gap 处理，补验收标准后复验
++        - 追问该约定本身的来源与依据
++      must_not:
++        - 以「一致性验证全绿」作为设计正确性证据维持驳回
++        - 把「设计内 / not a bug」当作免检出口
