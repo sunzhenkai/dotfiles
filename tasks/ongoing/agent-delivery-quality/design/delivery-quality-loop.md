@@ -2,6 +2,8 @@
 
 > 用同一个样例输入反复验证：先把质量要求写进方案，再让实现受画像和角色审阅约束，最后用小切片回归发现 skill 缺口并出可审计 patch。
 
+> **真相源**：本文是案例设计与审计记录；通用执行规则已上移到 `agents/skills/taskflow/references/delivery-quality-loop.md`、`acceptance-rubric.md` 与 `implementer-isolation.md`。冲突时以共享 skill 为准。
+
 ## Context
 
 - **Problem**: 功能齐全不等于可交付。复杂 Goal 缺少质量约束、角色审阅和显式降级确认时，agent 会把「看板页存在」当「可用看板」。

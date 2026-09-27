@@ -11,3 +11,13 @@
 ## 状态
 
 design，待 decide。
+
+## 真相源
+
+本目录保留案例设计、取舍与审计过程。通用执行规则已上移到 `agents/skills/taskflow/references/`：
+
+- `delivery-quality-loop.md`
+- `acceptance-rubric.md`
+- `implementer-isolation.md`
+
+两者冲突时以共享 skill 为准。

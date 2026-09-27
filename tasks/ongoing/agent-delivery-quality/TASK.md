@@ -46,6 +46,7 @@
 - 2026-09-25：explore 第二轮 8 问按推荐确定（Q9–Q16）：质量画像为 Goal 方案内结构化小节（受众/规模/生效角色/各角色底线，角色词表借 role-based-reviewer 的 9 角色）；只复杂档强制画像；改 role-based-reviewer 门 1 承认「task-wizard 复杂档调用」为正当触发；降级项交审阅者判「理由是否正当」；UI 规格 = 页面清单 + 三条角色底线，截图存 /tmp；回归案例同时落任务目录与 skill-evolver examples 格式；改动面 = task-wizard + task-explore（taskflow/openspec 不动）；本仓同步 spec + ADR + patches + CONTEXT.md 术语。
 - 2026-09-25：explore 第三轮 4 问按推荐确定（Q17–Q20），frontier 已空。**Q17 修正了第一轮的一处事实错误**：`ui-skills-root` 是路由层（`npx ui-skills start/categories/list/get`，vercel-labs），`frontend-design` 是本仓 `pretty-view-html/references/` 下的参考文档，两者不同层——挂法改为先 `frontend-design` 定方向、再 `ui-skills-root` 按方向选窄 skill，`npx` 不可用时退回 `frontend-design` 单走。Q18：taskflow proposal 模板加一行引用质量画像。Q19：回溯验证取「读新 skill 文本 + 对照失败点清单」，不实跑。Q20：本任务走完整 design → decide → handoff → taskflow 流程。
 - 2026-09-27：driver 规划完成并交接。wizard、explore/taskflow/reviewer 传播链、静态回归包均已落地；`make registry validate`、secret-scan、`pytest` 1041 passed，OpenSpec strict 校验通过。
+- 2026-09-27：通用闭环已上移 taskflow：小切片回归、验收 rubric、实现者输入双模式（正常交付 / 盲测复跑）。任务目录只保留案例证据与决策过程。
 - 2026-09-27：样例完成 final polish 并通过最终三角色验收：260/260 tests OK，五维 3.0，UI/UX 3.0，明暗对比 62/62 达标，无 P0/P1；生产部署 checklist 已写入 README/降级表。
 - 2026-09-27：样例窄切片已由 qodercn 实现并返修。首轮 100/100 tests；三角色审阅后修复安全、事务、会话身份、force 审计与 500 泄漏；复核 142/142 tests OK，无 P0。剩余 UI/UX 1.92 未达 2、3 个共享部署前 P1、全链路功能扩展未做。采纳 ISO/IEC 25010 的结构化质量维度思路，并压缩为六字段质量画像；定义复杂档硬指标、pending 降级用户确认门、原文快照传递、三角色评分与小切片回归。第一轮审阅 4 个 Major；修订后逐条复核全部消失，无新 P0/P1，完成程度高。
 

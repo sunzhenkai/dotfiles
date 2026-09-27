@@ -15,3 +15,7 @@
 ## 产物
 
 所有运行证据写 `/tmp/agent-delivery-quality/`，不进共享 skill。
+
+## 真相源
+
+本目录保留本轮案例的样例、rubric 快照与证据约定。通用规则已上移到 `agents/skills/taskflow/references/`；后续演进先改共享 skill，再同步本案例快照。
