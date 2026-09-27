@@ -1,0 +1,20 @@
+--- a/agents/skills/task-wizard/SKILL.md
++++ b/agents/skills/task-wizard/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: task-wizard
+ name: task-wizard
+-description: "理解用户意图并生成步骤级任务方案：每步动作、要点、验证，列出阻塞点与坑，带可检查的交付标准；不做详细设计。两条分支：不在 goal 里时产任务方案，确认后衔接 grill-with-docs / OpenSpec / task-explore+taskflow；处在 goal 里（`/goal`，或进行中的 goal 且本条消息挂了本 skill）时产 Goal 方案并自审自执行。在用户点名 /task-wizard、要求做方案/拆解任务/规划步骤，或与 goal 一起调用时使用。"
++description: "理解用户意图并生成步骤级任务方案：每步动作、要点、验证，列出阻塞点与坑，带可检查的交付标准；不做详细设计。两条分支：不在 goal 里时产任务方案，确认后衔接 grill-with-docs / OpenSpec / task-explore+taskflow；处在 goal 里（`/goal`，或进行中的 goal 且本条消息挂了本 skill，或被上游 skill 以 goal 模式委派）时产 Goal 方案并自审自执行。在用户点名 /task-wizard、要求做方案/拆解任务/规划步骤，或与 goal 一起调用时使用。"
+ ---
+ 
+ # Task Wizard：任务完成方案
+@@ -10,7 +10,7 @@
+ 
+ ## 先分流
+ 
+-- **Goal 方案**：这次调用处在 goal 里。消息里看得到 `/goal`，或当前有进行中的 goal 且本条消息挂了本 skill。读完「原则」后只执行「Goal 方案」，按序走：正文 → 外部参照 → 审阅 → 收敛后进入「写完之后」。各节的命中条件由各节自定。
++- **Goal 方案**：这次调用处在 goal 里。消息里看得到 `/goal`，当前有进行中的 goal 且本条消息挂了本 skill，或被上游 skill（如 delivery-loop）以 goal 模式委派调用——三者任一命中即处在 goal 里。读完「原则」后只执行「Goal 方案」，按序走：正文 → 外部参照 → 审阅 → 收敛后进入「写完之后」。各节的命中条件由各节自定。
+ - **任务方案**：没有进行中的 goal。只执行从「工作流」到「边界」各节。写完停下，等人选择。
+ 
+ ## 原则
