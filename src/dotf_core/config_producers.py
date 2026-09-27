@@ -270,15 +270,16 @@ def _codex_factory(repo_root: Path, home: Path):
 # Pi packages retired from the dotf-managed defaults: they are removed from
 # ``packages`` even when a machine installed them previously, so replacing a
 # default with a successor is declarative rather than a one-off cleanup.
+# (@juicesharp/rpiv-todo was retired 2026-07 for conflicting with the then
+# installed pi-agent-extensions' ``todos``; re-adopted as a default on
+# 2026-09-27 after pi-agent-extensions itself was retired.)
 _PI_RETIRED_PACKAGES = frozenset({
     "npm:@virdis/subagents",
-    # Was briefly a default; conflicted with its own ``todos`` once
-    # pi-agent-extensions was also installed. Kept retired even after that
-    # package left the defaults.
-    "npm:@juicesharp/rpiv-todo",
     # Bundled a hard-coded powerline footer that replaced Pi's native footer
     # and dropped token / cache-hit metrics. Succeeded by pi-powerline-footer.
     "npm:pi-agent-extensions",
+    # Succeeded by pi-goal-x (independent completion auditor).
+    "npm:@ogulcancelik/pi-goal",
 })
 
 

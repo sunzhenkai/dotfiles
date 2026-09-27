@@ -4,13 +4,21 @@
   "enableInstallTelemetry": false,
   "packages": [
     "npm:pi-mcp-adapter",
-    "npm:@ogulcancelik/pi-goal",
+    "npm:pi-goal-x",
     "npm:pi-subagents",
     "npm:pi-powerline-footer",
     "npm:pi-web-access",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-background-tasks",
-    "npm:pi-simplify"
+    "npm:pi-simplify",
+    "npm:billion-context",
+    "npm:@langfuse/pi-observability-plugin",
+    "npm:@juicesharp/rpiv-todo",
+    "npm:pi-lens",
+    "npm:@gotgenes/pi-permission-system",
+    "npm:@plannotator/pi-extension",
+    "npm:@dietrichgebert/ponytail",
+    "npm:@ff-labs/pi-fff"
   ],
   "powerline": {
     "preset": "full",
