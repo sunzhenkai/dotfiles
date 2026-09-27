@@ -182,7 +182,7 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 
 最终验收 MUST 按五维评分：功能闭环、UI/UX、工程质量、画像一致性、证据；UI/UX MUST 拆为信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项。通过线为五维均 ≥2 且 UI/UX 六子项均值 ≥2.5，任一 UI/UX 子项为 0 时 MUST NOT 通过。评分 MUST 先收证据再打分，评分主体按岗位分工；实现者自评 MUST NOT 代替岗位评分。缺分或缺证据时 MUST NOT 勾验收标准 checkbox。
 
-派发实现者时 MUST 隔离验收期望：实现者只接收样例或需求原文与运行约束，MUST NOT 接收质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric；复跑 MUST 使用同一份原文，MUST NOT 追加事后提示。评分与证据 MUST NOT 构成 checkbox 之外的第二份完成度；进度仍只认 checkbox。
+普通复杂交付派发实现者时 MUST 提供质量画像原文或保留语义的子范围裁剪、相关验收要求与运行约束；完整评分 rubric 与跨范围审阅意见可由审阅者持有。普通任务 MUST NOT 默认盲派。只有任务显式标记 benchmark / regression 复跑时，实现者才只接收同一份样例或需求原文与运行约束，MUST NOT 接收质量画像、验收 rubric、期望页面清单或审阅意见；复跑 MUST NOT 追加事后提示。评分与证据 MUST NOT 构成 checkbox 之外的第二份完成度；进度仍只认 checkbox。
 
 #### Scenario: 窄切片先行且失败先归因
 
@@ -208,10 +208,16 @@ taskflow SHALL 只新增 `taskflow-new` 一个 command，其余阶段复用 stoc
 - **THEN** 不勾验收标准 checkbox
 - **THEN** 不用实现者自评代替对应岗位评分
 
-#### Scenario: 实现者输入隔离
+#### Scenario: 正常交付提供质量上下文
 
-- **WHEN** 派发复杂交付的实现者
-- **THEN** 实现者只收到样例或需求原文与运行约束
+- **WHEN** 派发普通复杂交付的实现者
+- **THEN** 实现者收到质量画像或保留语义的子范围裁剪、相关验收要求与运行约束
+- **THEN** 不默认盲派，也不隐藏并发、无障碍、错误边界或运行假设
+
+#### Scenario: 盲测复跑才隔离期望
+
+- **WHEN** 任务显式标记 benchmark / regression 并派发盲测实现者
+- **THEN** 实现者只收到同一份样例或需求原文与运行约束
 - **THEN** 质量画像、验收 rubric、期望页面清单与审阅意见只由审阅者持有
 
 #### Scenario: rubric 不成为第二份账本

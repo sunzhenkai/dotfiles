@@ -162,9 +162,11 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 主会话负责派发、汇总、处理冲突与未勾原因。子代理失败或超时不是整轮结束理由，按「一轮结束」继续其余独立项。
 
-### 实现者隔离
+### 实现者输入
 
-派发实现时按 [references/implementer-isolation.md](references/implementer-isolation.md) 隔离输入：实现者只拿样例/需求原文与运行约束，不拿质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric，两边不共享这两份内容；复跑用同一份原文，不追加事后提示。
+默认正常交付：按 [references/implementer-isolation.md](references/implementer-isolation.md)，实现者必须拿到质量画像或保留语义的子范围裁剪、相关验收要求与运行约束；完整 rubric 和跨范围审阅意见仍由审阅者持有。普通任务不得盲派。
+
+只有任务显式标记 benchmark / regression 时才盲测复跑：实现者只拿同一份样例/需求原文与运行约束，不拿画像、rubric、期望清单或审阅意见；复跑不追加事后提示。
 
 ---
 

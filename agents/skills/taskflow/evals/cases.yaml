@@ -220,17 +220,32 @@ cases:
         - 缺分或缺证据仍勾验收标准 checkbox
         - 用实现者自评代替对应岗位评分
 
-  - id: implementer-input-isolation
+  - id: normal-delivery-input-context
     kind: core
     judge: deterministic
-    description: 派发实现时隔离验收期望
-    given: 派发复杂交付的实现者
+    description: 正常交付实现者必须拿到画像或保留语义的子范围上下文
+    given: 派发普通复杂交付的实现者
     expect:
       must:
-        - 实现者只收到样例/需求原文与运行约束
-        - 审阅者持有质量画像与 rubric，两边不共享
-        - 复跑使用同一份原文，不追加事后提示
+        - 实现者收到质量画像，或保留语义的子范围裁剪
+        - 实现者收到本人范围的相关验收要求与运行约束
+        - 完整 rubric 与跨范围审阅意见仍由审阅者持有
       must_not:
+        - 普通任务默认盲派
+        - 隐藏并发、无障碍、错误边界或运行假设等质量约束
+
+  - id: blind-regression-input-isolation
+    kind: core
+    judge: deterministic
+    description: 仅显式 benchmark/regression 复跑隔离验收期望
+    given: 任务显式标记 benchmark 或 regression 并派发盲测实现者
+    expect:
+      must:
+        - 实现者只收到同一份样例/需求原文与运行约束
+        - 审阅者持有质量画像与 rubric，两边不共享
+        - 复跑不追加事后提示
+      must_not:
+        - 未标记 benchmark/regression 就盲派
         - 把质量画像、验收 rubric 或期望页面清单写进实现者 prompt
         - 靠私聊提示词传递未写进需求原文的期望
 
