@@ -1,0 +1,13 @@
+diff --git a/agents/skills/role-based-reviewer/SKILL.md b/agents/skills/role-based-reviewer/SKILL.md
+index 48d4a04..88ea2f0 100644
+--- a/agents/skills/role-based-reviewer/SKILL.md
++++ b/agents/skills/role-based-reviewer/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ id: role-based-reviewer
+ name: role-based-reviewer
+-description: "可组合的角色化只读评审：engineer、algo、data、sre、ops、biz、product、design（别名 uiux）、qa。仅在用户显式点名（/role-based-reviewer）、指定 roles=、或明确要求按岗位/多角色视角时使用。普通「看看代码」「帮我 review」不要自动加载。"
++description: "可组合的角色化只读评审：engineer、algo、data、sre、ops、biz、product、design（别名 uiux）、qa。仅在用户显式点名（/role-based-reviewer）、指定 roles=、明确要求按岗位/多角色视角，或上游工作流以 mode=review + 完整 roles + 审阅边界结构化调用时使用。普通「看看代码」「帮我 review」不要自动加载。"
+ ---
+ 
+ # 角色化评审
