@@ -93,6 +93,8 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 
 `openspec-propose` 对 driver 产出的 `tasks.md` 按下列骨架组织：准备段切分支，实施段每个子 change 至少一条，收尾段含回归、回填验收、提交与逐个子 change 的归档条目。
 
+收尾段的回归按 [references/delivery-quality-loop.md](references/delivery-quality-loop.md) 执行（静态门 / 窄切片 / 全链路三层，失败先归因再修）；验收按 [references/acceptance-rubric.md](references/acceptance-rubric.md) 出分，缺分或缺证据不勾收尾条目。
+
 子 change 的 artifacts 在 propose 阶段一次性备齐（拆分粒度本身是提案决策），apply 阶段只做实施，不在实施循环里改 change 语义。
 
 ````markdown
@@ -132,6 +134,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 - 质量画像与显式降级原文快照由上游任务描述带入 driver proposal，实施阶段不改写、不删减，只按下面规则补新发现的降级。
 - 子 change 实施中发现新的生产性降级——凡比默认期望少交付的都算，改名成「技术选型」「本期简化」也一样——标 `pending`，写入 driver `proposal.md` 的验证记录，并作为需要用户决策的项停下等用户，不静默接受、不自行确认。这命中 Driver 协议「一轮结束」三条件里的「需要用户决策」；不依赖该决策的其余条目仍按「一轮结束」继续。
 - 执行者、子代理与审阅收敛都不算用户确认。用户点名接受该项或明确全部确认后，才允许勾相关验收标准 checkbox，并在验证记录把该项记为 `confirmed`，保留维度与实际选择以便追踪。
+- driver 的最终验收必须按 [references/acceptance-rubric.md](references/acceptance-rubric.md) 给出五维分数与证据，并满足五维均 ≥2、UI/UX 均值 ≥2.5；缺分不得勾验收标准 checkbox。
 
 ### 一轮结束
 
@@ -158,6 +161,10 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
 - 不发明等价命令，不扩大到 `建议` / `排除` 仓的写入
 
 主会话负责派发、汇总、处理冲突与未勾原因。子代理失败或超时不是整轮结束理由，按「一轮结束」继续其余独立项。
+
+### 实现者隔离
+
+派发实现时按 [references/implementer-isolation.md](references/implementer-isolation.md) 隔离输入：实现者只拿样例/需求原文与运行约束，不拿质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric，两边不共享这两份内容；复跑用同一份原文，不追加事后提示。
 
 ---
 

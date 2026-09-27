@@ -1,0 +1,249 @@
+diff --git a/agents/skills/taskflow/SKILL.md b/agents/skills/taskflow/SKILL.md
+index 79a060a..d778cef 100644
+--- a/agents/skills/taskflow/SKILL.md
++++ b/agents/skills/taskflow/SKILL.md
+@@ -93,6 +93,8 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
+ 
+ `openspec-propose` 对 driver 产出的 `tasks.md` 按下列骨架组织：准备段切分支，实施段每个子 change 至少一条，收尾段含回归、回填验收、提交与逐个子 change 的归档条目。
+ 
++收尾段的回归按 [references/delivery-quality-loop.md](references/delivery-quality-loop.md) 执行（静态门 / 窄切片 / 全链路三层，失败先归因再修）；验收按 [references/acceptance-rubric.md](references/acceptance-rubric.md) 出分，缺分或缺证据不勾收尾条目。
++
+ 子 change 的 artifacts 在 propose 阶段一次性备齐（拆分粒度本身是提案决策），apply 阶段只做实施，不在实施循环里改 change 语义。
+ 
+ ````markdown
+@@ -132,6 +134,7 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
+ - 质量画像与显式降级原文快照由上游任务描述带入 driver proposal，实施阶段不改写、不删减，只按下面规则补新发现的降级。
+ - 子 change 实施中发现新的生产性降级——凡比默认期望少交付的都算，改名成「技术选型」「本期简化」也一样——标 `pending`，写入 driver `proposal.md` 的验证记录，并作为需要用户决策的项停下等用户，不静默接受、不自行确认。这命中 Driver 协议「一轮结束」三条件里的「需要用户决策」；不依赖该决策的其余条目仍按「一轮结束」继续。
+ - 执行者、子代理与审阅收敛都不算用户确认。用户点名接受该项或明确全部确认后，才允许勾相关验收标准 checkbox，并在验证记录把该项记为 `confirmed`，保留维度与实际选择以便追踪。
++- driver 的最终验收必须按 [references/acceptance-rubric.md](references/acceptance-rubric.md) 给出五维分数与证据，并满足五维均 ≥2、UI/UX 均值 ≥2.5；缺分不得勾验收标准 checkbox。
+ 
+ ### 一轮结束
+ 
+@@ -159,6 +162,10 @@ taskflow 只提供 `taskflow-new` 一个 command，四个阶段一律复用 stoc
+ 
+ 主会话负责派发、汇总、处理冲突与未勾原因。子代理失败或超时不是整轮结束理由，按「一轮结束」继续其余独立项。
+ 
++### 实现者隔离
++
++派发实现时按 [references/implementer-isolation.md](references/implementer-isolation.md) 隔离输入：实现者只拿样例/需求原文与运行约束，不拿质量画像、验收 rubric、期望页面清单或审阅意见。审阅者持有画像与 rubric，两边不共享这两份内容；复跑用同一份原文，不追加事后提示。
++
+ ---
+ 
+ ## Self-evolution
+diff --git a/agents/skills/taskflow/evals/cases.yaml b/agents/skills/taskflow/evals/cases.yaml
+index f9e1b31..dbd1146 100644
+--- a/agents/skills/taskflow/evals/cases.yaml
++++ b/agents/skills/taskflow/evals/cases.yaml
+@@ -188,3 +188,47 @@ cases:
+         - tasks.md 不存在或未由脚手架写满，留给 propose
+       must_not:
+         - 脚手架阶段把 tasks 写满
++
++  - id: delivery-quality-loop-three-way-triage
++    kind: core
++    judge: deterministic
++    description: 复杂交付收尾按三层验证执行，失败先归因为 skill gap / implementation bug / acceptance gap
++    given: driver 进入收尾段，或大改之后需要回归
++    expect:
++      must:
++        - 静态门 / 窄切片 / 全链路三层有先后，窄切片先行、全链路只跑一次
++        - 失败归因为 skill gap、implementation bug 或 acceptance gap 之一
++        - skill gap 走 patches/ 出可审计 patch；修复后只重跑受影响切片再跑全链路
++      must_not:
++        - 一上来铺全量功能而不先跑窄切片
++        - 不做归因就笼统说「再改改」
++        - 与改动无关地全量重跑图安心
++
++  - id: acceptance-rubric-thresholds
++    kind: core
++    judge: deterministic
++    description: 最终验收按五维 rubric 出分，UI/UX 六子项均值达标才通过
++    given: driver 收尾，准备回填验收标准
++    expect:
++      must:
++        - 五维为功能闭环、UI/UX、工程质量、画像一致性、证据
++        - UI/UX 拆信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项
++        - 五维均 ≥2 且 UI/UX 均值 ≥2.5，UI/UX 任一子项为 0 不通过
++        - 先证据后打分，评分主体按 product / design / engineer 分工
++      must_not:
++        - 缺分或缺证据仍勾验收标准 checkbox
++        - 用实现者自评代替对应岗位评分
++
++  - id: implementer-input-isolation
++    kind: core
++    judge: deterministic
++    description: 派发实现时隔离验收期望
++    given: 派发复杂交付的实现者
++    expect:
++      must:
++        - 实现者只收到样例/需求原文与运行约束
++        - 审阅者持有质量画像与 rubric，两边不共享
++        - 复跑使用同一份原文，不追加事后提示
++      must_not:
++        - 把质量画像、验收 rubric 或期望页面清单写进实现者 prompt
++        - 靠私聊提示词传递未写进需求原文的期望
+diff --git a/agents/skills/taskflow/references/acceptance-rubric.md b/agents/skills/taskflow/references/acceptance-rubric.md
+new file mode 100644
+index 0000000..7f87b80
+--- /dev/null
++++ b/agents/skills/taskflow/references/acceptance-rubric.md
+@@ -0,0 +1,51 @@
++# 验收 rubric
++
++复杂交付的最终验收按本文件评分。评分是给结论用的，不代替 checkbox 进度；进度仍只认 checkbox。
++
++## 评分主体与顺序
++
++- 先交证据，再由对应岗位打分；实现者自评只作输入，不算通过线。
++- 功能闭环与画像一致性由 product 评；UI/UX 由 design 评；工程质量由 engineer 评。
++- 三方结论不一致时保留各自意见，按影响面决定优先级，不取平均掩盖分歧。
++
++## 五维评分
++
++| 维度 | 3 分 | 2 分 | 通过线 |
++|------|------|------|--------|
++| 功能闭环 | 主流程全通，失败路径可用 | 主流程通但有未处理边界 | ≥2 |
++| UI/UX | 信息架构、视觉层级、关键状态、反馈、无障碍、响应式均可检查 | 可用但个别子项不足 | ≥2 |
++| 工程质量 | 测试、错误边界、启动说明齐 | 测试或启动说明有缺口 | ≥2 |
++| 画像一致性 | 实现逐条对得上质量画像 | 只有已确认且记录的降级 | 无未确认偏差 |
++| 证据 | 截图或导出日志 + 可复现命令 | 证据部分缺失 | 全部齐 |
++
++全量通过线：五维均 ≥2，且 UI/UX 均值 ≥2.5。
++
++## UI/UX 六子项
++
++| 子项 | 关注点 |
++|------|--------|
++| 信息架构 | 入口、层级、导航与信息组织是否清楚 |
++| 视觉层级 | 主次、间距、排版、对比是否成体系 |
++| 关键状态 | 空、加载、错误、无权限、无结果是否都有交代 |
++| 反馈 | 操作成功/失败/进行中有明确且及时的反馈 |
++| 无障碍 | 焦点管理、键盘可达、对比度、语义与替代文本 |
++| 响应式 | 常见窄屏与桌面布局都能用，不靠压缩硬塞 |
++
++UI/UX 得分是六个子项的平均分，任一子项为 0 则不通过，即使均值达标。
++
++## 目标为「优秀 UI/UX」时
++
++- 设计底线逐条通过。
++- 截图评审无 Major 级问题。
++- 不满足就按实测分数记录，不用「已经不错了」放行。
++
++## 与画像、rubric 的关系
++
++- 质量画像定义这个任务应该做到什么；rubric 定义做成什么样算过关。
++- 画像字段缺失、底线没有验证方式时，先补画像，不用 rubric 评分顶替。
++- 有降级时，先确认降级，再按确认后的范围评分；未确认降级不得计为通过。
++
++## 记录
++
++- 每维写分数、证据与扣分理由，不写「整体良好」这类无法复核的结论。
++- 分数与证据写进 driver `proposal.md` 的验证记录，或任务约定的验收记录位置。
+diff --git a/agents/skills/taskflow/references/delivery-quality-loop.md b/agents/skills/taskflow/references/delivery-quality-loop.md
+new file mode 100644
+index 0000000..38ca05b
+--- /dev/null
++++ b/agents/skills/taskflow/references/delivery-quality-loop.md
+@@ -0,0 +1,60 @@
++# 交付质量闭环
++
++术语见 [../SKILL.md](../SKILL.md)。本文件规定复杂交付怎么验证，不规定做什么功能；进度仍只认 checkbox，本文件不建第二份账本。
++
++## 什么时候用
++
++- 复杂交付（taskflow driver 编排的任务）在收尾段执行。
++- 单个子 change 的改动面较大、或跨前后端与数据层时，也可在子 change 内先跑一轮窄切片。
++
++## 三层验证
++
++| 层 | 目的 | 什么时候跑 |
++|----|------|------------|
++| 静态门 | 规则/契约是否落地，秒级到分钟级 | 每次改动规则或契约之后 |
++| 窄切片 | 用一个最小闭环暴露流程与实现缺口 | 首次实现或大改之后 |
++| 全链路 | 跨切片一致性、数据层、导航与整体验收 | 收尾段，只跑一次 |
++
++窄切片先行：不要一上来铺全量功能，先跑通一个能从头走到尾的最小闭环，再扩展。
++
++## 窄切片怎么做
++
++1. 从需求原文里挑 1-3 个核心闭环，保证每个都有入口、动作与结束状态。
++2. 只实现这些闭环所需的真实路径——可以少做功能，但不要用假数据、假接口或写死页面冒充打通。
++3. 独立跑一遍：按 README 启动、执行自动化测试、抓运行时证据。
++4. 记录结果后再决定是否铺开。
++
++窄切片的目标是暴露缺口，不是交作业；它不通过就不进全量。
++
++## 失败三分类
++
++窄切片或全链路失败时，先归因再动手，只治一类病：
++
++| 分类 | 判据 | 处置 |
++|------|------|------|
++| skill gap | 规则没写清、门禁缺失或指引矛盾，换个任务同样会错 | 改对应 skill，走 `patches/` 协议出可审计 patch |
++| implementation bug | 规则正确，实现写错 | 在交付仓修复并补回归测试 |
++| acceptance gap | 评分或验收标准本身漏了维度 | 补 rubric / 验收标准，再重验 |
++
++一次失败可能同时命中多类，按上面顺序拆开，分别处置，不要混成一句「再改改」。
++
++## 证据
++
++- 每个进入交付目录之外的文件都写绝对路径；项目已有约定临时目录时用那个。
++- 至少留：启动命令与输出、自动化测试结果、关键流程运行时证据（截图或导出日志）、失败与修复对照。
++- 证据必须与当次代码状态一致；换代码后旧证据作废，重跑受影响部分。
++- 不把本机路径、凭据、内部 URL 写进共享 skill 或交付文档。
++
++## 只重跑受影响切片
++
++skill gap 或 implementation bug 修好后：
++
++1. 先重跑直接受影响的那一层（静态门 / 窄切片）。
++2. 通过后再跑一次全链路验收。
++3. 不做与本次改动无关的全量重跑来「图安心」；预算要留给扩范围。
++
++## 收尾
++
++- 全链路验收通过、证据齐、pending 降级为 0，才回填验收标准。
++- 验收评分按 [acceptance-rubric.md](acceptance-rubric.md)。
++- 失败未归类、证据缺失或仍有未确认降级时，不勾收尾 checkbox。
+diff --git a/agents/skills/taskflow/references/implementer-isolation.md b/agents/skills/taskflow/references/implementer-isolation.md
+new file mode 100644
+index 0000000..9a6e30b
+--- /dev/null
++++ b/agents/skills/taskflow/references/implementer-isolation.md
+@@ -0,0 +1,36 @@
++# 实现者隔离
++
++复杂交付容易因为「实现者早知道验收期望」而得出虚高结论。派发实现时按本文件隔离输入，让验证测的是流程能力，不是复述能力。
++
++## 实现者只收到
++
++- 需求或样例原文（保持原样，不改写、不补充期望）。
++- 工作目录、允许写入的范围与不得提交/不得外发的约束。
++- 运行约束：语言与依赖边界、本地启动要求、时间预算。
++- 交付要求：可运行、有测试、有说明、留证据。
++
++## 实现者不收到
++
++- 质量画像、角色底线清单。
++- 验收 rubric、评分维度与通过线。
++- 期望的页面清单、功能清单或「必须包含」的隐藏清单。
++- 审阅者的具体意见与历史失败细节。
++
++需要实现者知道的信息，必须已经写在需求原文或运行约束里；写不进去的期望，说明画像或需求还没定清，回去补，不靠私聊提示词传递。
++
++## 派发方式
++
++1. 记录本次派发的样例/需求原文，作为可复跑的输入。
++2. 由审阅者持有画像与 rubric；实现者与审阅者不共享这两份内容。
++3. 同一输入需要复跑时，用同一份原文，不追加事后提示；否则结果不可比。
++4. 实现者产出直接进交付仓与证据目录，编排者只做审计与应用，不改写实现者结论。
++
++## 并行时
++
++- 多个实现者并行时，每个只拿自己那一块的原文与约束，不给别人的期望。
++- 子代理产出按 [delivery-quality-loop.md](delivery-quality-loop.md) 归因与复验。
++
++## 边界
++
++- 隔离的是「验收期望」，不是必要上下文；构建方式、环境、依赖这些属于运行约束，要照常给。
++- 隔离不降低实现要求：画像与 rubric 仍然生效，只是由审阅者而非实现者持有。

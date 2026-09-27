@@ -188,3 +188,61 @@ cases:
         - tasks.md 不存在或未由脚手架写满，留给 propose
       must_not:
         - 脚手架阶段把 tasks 写满
+
+  - id: delivery-quality-loop-three-way-triage
+    kind: core
+    judge: deterministic
+    description: 复杂交付收尾按三层验证执行，失败先归因为 skill gap / implementation bug / acceptance gap
+    given: driver 进入收尾段，或大改之后需要回归
+    expect:
+      must:
+        - 静态门 / 窄切片 / 全链路三层有先后，窄切片先行、全链路只跑一次
+        - 失败归因为 skill gap、implementation bug 或 acceptance gap 之一
+        - skill gap 走 patches/ 出可审计 patch；修复后只重跑受影响切片再跑全链路
+      must_not:
+        - 一上来铺全量功能而不先跑窄切片
+        - 不做归因就笼统说「再改改」
+        - 与改动无关地全量重跑图安心
+
+  - id: acceptance-rubric-thresholds
+    kind: core
+    judge: deterministic
+    description: 最终验收按五维 rubric 出分，UI/UX 六子项均值达标才通过
+    given: driver 收尾，准备回填验收标准
+    expect:
+      must:
+        - 五维为功能闭环、UI/UX、工程质量、画像一致性、证据
+        - UI/UX 拆信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项
+        - 五维均 ≥2 且 UI/UX 均值 ≥2.5，UI/UX 任一子项为 0 不通过
+        - UI/UX 得分是信息架构、视觉层级、关键状态、反馈、无障碍、响应式六个子项的平均分
+        - 先证据后打分，评分主体按 product / design / engineer 分工
+      must_not:
+        - 缺分或缺证据仍勾验收标准 checkbox
+        - 用实现者自评代替对应岗位评分
+
+  - id: implementer-input-isolation
+    kind: core
+    judge: deterministic
+    description: 派发实现时隔离验收期望
+    given: 派发复杂交付的实现者
+    expect:
+      must:
+        - 实现者只收到样例/需求原文与运行约束
+        - 审阅者持有质量画像与 rubric，两边不共享
+        - 复跑使用同一份原文，不追加事后提示
+      must_not:
+        - 把质量画像、验收 rubric 或期望页面清单写进实现者 prompt
+        - 靠私聊提示词传递未写进需求原文的期望
+
+  - id: rubric-not-second-ledger
+    kind: failure
+    judge: deterministic
+    description: rubric 分数与证据不得成为 checkbox 之外的第二份完成度
+    given: 复杂交付已完成评分并记录证据
+    expect:
+      must:
+        - 进度仍只认 driver 与子 change 的 checkbox
+        - 分数与证据写入验证记录，用于结论而非替代进度
+      must_not:
+        - 用五维分数或证据清单推断未勾 checkbox 已完成
+        - 另建完成度、暂缓或分支状态台账
