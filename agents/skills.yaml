@@ -86,16 +86,19 @@ groups:
       - id: archify
         optional: true
 
-  # ui-templates 暂时下掉：注释掉即不进编目，不自动装也不可经 overlay/apply 引用。
-  # 恢复时取消注释整个 group，并确保 skills.lock.yaml 仍有其审计锁。
-  # ui-templates:
-  #   type: third-party
-  #   source: github
-  #   package: https://github.com/sunzhenkai/ui-templates-skill
-  #   skills:
-  #     - ui-template-author
-  #     - ui-template-apply
-  #     - ui-template-design
+  # ui-templates 留在编目内但默认不装：三条都标 optional: true，可经 overlay /
+  # `dotf agents apply` 按需启用。skills.lock.yaml 仍持有其审计锁（重锁会继续刷新）。
+  ui-templates:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/ui-templates-skill
+    skills:
+      - id: ui-template-author
+        optional: true
+      - id: ui-template-apply
+        optional: true
+      - id: ui-template-design
+        optional: true
 
   ui-skills:
     type: third-party
