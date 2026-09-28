@@ -342,6 +342,15 @@ modules:
     doctor: true
     bin: claude
 
+  - name: mcode
+    kind: binary
+    desc: MiniMax Code CLI（npm -g @minimax-ai/code）
+    group: agents
+    depends_on: [sdk]
+    install: true
+    doctor: true
+    bin: mcode
+
   # ---------- config-only: shell ----------
   - name: zsh
     kind: config
