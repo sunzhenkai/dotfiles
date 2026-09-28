@@ -19,18 +19,18 @@ skills:
       evidence: https://github.com/sunzhenkai/agent-roster/commit/d42624456c362e60c15d44e115307ac62a47a390
   - id: archify
     source: https://github.com/tt-a1i/archify
-    revision: 9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993
+    revision: 1017b47ee707aeb8e88960b35aabf5672a012242
     subdirectory: archify
-    content_hash: 6a4d2d3c63613f92876cfbfd17d3fba79a6d6e24b54d3bede66e5a17c34922af
+    content_hash: 6c569c6386793469b05be07180f8406800bef24fed8c4fb56c46ea02a71e9215
     license:
       spdx: MIT
       file: LICENSE
       hash: b799ab081703e7821ae5096d2c1abdf14bbdc75e8ea1c4045998c36ed6db9706
     audit:
       status: approved
-      date: '2026-09-24'
+      date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/tt-a1i/archify/commit/9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993
+      evidence: https://github.com/tt-a1i/archify/commit/1017b47ee707aeb8e88960b35aabf5672a012242
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -159,9 +159,9 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: senv-cli
     source: https://github.com/solo-kingdom/senv
-    revision: 4765db14d98abd6a2daf3f821facbf059f09ca9e
+    revision: a48fc3f6a53081111d5ce5c7c574d245312f7f47
     subdirectory: .agents/skills/senv-cli
-    content_hash: 7a90179a8cd18a8e577870f3474bac8e5c0e7758e0317a0b2dc5d9aff056d049
+    content_hash: d4bdc053f45193b9fde3488c89421681a3c840edcf9e112df711513616e07c9c
     license:
       spdx: MIT
       file: LICENSE
@@ -170,7 +170,7 @@ skills:
       status: approved
       date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/solo-kingdom/senv/commit/4765db14d98abd6a2daf3f821facbf059f09ca9e
+      evidence: https://github.com/solo-kingdom/senv/commit/a48fc3f6a53081111d5ce5c7c574d245312f7f47
   - id: setup-matt-pocock-skills
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -271,9 +271,9 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: ui-template-apply
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: af71248d6a6df46a3d6ffa76778814a8a04ea671
+    revision: 79b9082295cb7c7656319e0578446aef81ec4c5a
     subdirectory: skills/ui-template-apply
-    content_hash: 5e5054ae0307404813515b49ea1709551c9075b0d9f7dbcab788fea0c544837a
+    content_hash: d49efefb865254e7a8d2fca80e24fe6fad495e2e7d0c70211366599118873e02
     license:
       spdx: MIT
       file: LICENSE
@@ -282,12 +282,12 @@ skills:
       status: approved
       date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/af71248d6a6df46a3d6ffa76778814a8a04ea671
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/79b9082295cb7c7656319e0578446aef81ec4c5a
   - id: ui-template-author
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: af71248d6a6df46a3d6ffa76778814a8a04ea671
+    revision: 79b9082295cb7c7656319e0578446aef81ec4c5a
     subdirectory: skills/ui-template-author
-    content_hash: e81e4109ee2790cd255ff42255ac371f5430714a0fb8d1014d8693e419612d3b
+    content_hash: bbaf418b21ea8305cfb83b897a87763256edb62f2d3c8a861b5a86726cb7c334
     license:
       spdx: MIT
       file: LICENSE
@@ -296,7 +296,7 @@ skills:
       status: approved
       date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/af71248d6a6df46a3d6ffa76778814a8a04ea671
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/79b9082295cb7c7656319e0578446aef81ec4c5a
   - id: wait-what
     source: https://github.com/mattpocock/skills
     revision: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
@@ -355,9 +355,9 @@ skills:
       evidence: https://github.com/mattpocock/skills/commit/c55ee46073ed923f86ce59a5eb3b6d895095d1b7
   - id: ui-template-design
     source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: af71248d6a6df46a3d6ffa76778814a8a04ea671
+    revision: 79b9082295cb7c7656319e0578446aef81ec4c5a
     subdirectory: skills/ui-template-design
-    content_hash: 5818b3fbccd2b9e6c9824cc9f0515d0a7eea72d949f48d0b9c6efc9804db09a1
+    content_hash: 31b3ab1b5095ca922dce20d02fc08451526ede8c98aef54ba334c6e15bf0ab7a
     license:
       spdx: MIT
       file: LICENSE
@@ -366,10 +366,10 @@ skills:
       status: approved
       date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/af71248d6a6df46a3d6ffa76778814a8a04ea671
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/79b9082295cb7c7656319e0578446aef81ec4c5a
   - id: ui-skills-root
     source: https://github.com/ibelick/ui-skills
-    revision: f9515cb90e9d1ed1eee9384f79f1e0ac6c26825e
+    revision: ee4596c4c86a5049ef9b9731f92e4f4fed0c04c1
     subdirectory: skills/ui-skills-root
     content_hash: 61016c98036a78ba25ca4788390f47a0c0a06386763fe0c773713336f4d8cb0c
     license:
@@ -380,4 +380,4 @@ skills:
       status: approved
       date: '2026-09-28'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/ibelick/ui-skills/commit/f9515cb90e9d1ed1eee9384f79f1e0ac6c26825e
+      evidence: https://github.com/ibelick/ui-skills/commit/ee4596c4c86a5049ef9b9731f92e4f4fed0c04c1
