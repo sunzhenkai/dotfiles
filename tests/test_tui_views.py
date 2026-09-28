@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from dotf_tui.app import (  # noqa: E402
     ConfirmModal,
     DotfTuiApp,
+    HelpModal,
     ModulesPane,
     ProgressModal,
     SkillsPane,
@@ -70,15 +71,9 @@ def _module_row(**kwargs) -> ModuleRow:
 
 def test_format_action_status_lists_declared_module_actions():
     text = format_action_status(_module_row())
-    assert text.startswith("j/k 上下") or "j/k 上下" in text
-    assert "C-d/C-u 半屏" in text
-    assert "gg/G 首末" in text
-    assert "已选 0" in text
-    assert "i install 安装软件" in text
-    assert "c config 写入配置" in text
-    assert "d deconfig 撤回受管配置" in text
-    assert "D doctor 诊断" in text
-    assert "uninstall" not in text
+    assert text == "已选 0 │ i c d D"
+    assert "\n" not in text
+    assert "install" not in text
 
 
 def test_format_action_status_includes_uninstall_when_declared():
@@ -86,9 +81,7 @@ def test_format_action_status_includes_uninstall_when_declared():
         _module_row(capabilities=("install", "uninstall")),
         selected_count=2,
     )
-    assert "已选 2" in text
-    assert "C-x 清空选中" in text
-    assert "u uninstall 卸载软件" in text
+    assert text == "已选 2 · C-x 清空 │ i u"
     assert "config" not in text
 
 
@@ -110,9 +103,7 @@ def test_format_row_cells_marks_selected():
 
 def test_format_action_status_skill():
     skill = format_action_status(SkillRow("grill-with-docs", "desired", True))
-    assert "j/k 上下" in skill
-    assert "a apply 写入 Desired Set" in skill
-    assert "x remove 移出 Desired Set" in skill
+    assert skill == "已选 0 │ a x"
 
 
 def test_skill_actions_always_pass_yes(home, monkeypatch):
@@ -166,10 +157,7 @@ def test_skill_actions_always_pass_yes(home, monkeypatch):
 
 def test_format_action_status_readonly():
     text = format_action_status(None, readonly=True)
-    assert "j/k 上下" in text
-    assert "C-d/C-u 半屏" in text
-    assert "只读" in text
-    assert "install" not in text
+    assert text == "只读"
 
 
 def test_half_page_row_steps_by_half_view():
@@ -309,14 +297,13 @@ def test_status_bar_shows_row_actions(home):
             await pilot.pause()
             await pilot.pause()
             text = _bar_text(app)
-            assert "u uninstall 卸载软件" in text
-            assert "i install 安装软件" in text
+            assert text == "已选 0 │ i u D"
             pane.query_one("#filter", Input).value = "nvim"
             await pilot.pause()
             await pilot.pause()
             text = _bar_text(app)
-            assert "c config 写入配置" in text
-            assert "uninstall" not in text
+            assert text == "已选 0 │ c d D"
+            assert "u" not in text
 
     _run(main())
 
@@ -362,15 +349,44 @@ def test_half_page_ctrl_d_and_ctrl_u(home):
     _run(main())
 
 
-def test_status_bar_shows_movement_help(home):
+def test_question_mark_opens_help_sheet(home):
     async def main():
+        from textual.widgets import Static
+
         app = DotfTuiApp(Path.cwd())
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            text = _bar_text(app)
-            assert "j/k 上下" in text
-            assert "C-d/C-u 半屏" in text
-            assert "gg/G 首末" in text
+            bar = app.query_one("#status_bar", Static)
+            assert bar.region.height == 1
+            assert "j/k" not in _bar_text(app)
+            await pilot.press("question_mark")
+            await pilot.pause()
+            assert isinstance(app.screen, HelpModal)
+            content = str(app.screen.query_one("#help_text", Static).content)
+            assert "j/k 上下" in content
+            assert "C-d/C-u 半屏" in content
+            assert "gg/G 首末" in content
+            assert "i install" in content
+            assert "Enter 执行选中" in content
+            await pilot.press("escape")
+            await pilot.pause()
+            assert not isinstance(app.screen, HelpModal)
+
+    _run(main())
+
+
+def test_startup_hint_points_to_help(home):
+    async def main():
+        from textual.widgets import Static
+
+        app = DotfTuiApp(Path.cwd())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            log = app.query_one("#log", Static)
+            assert "?" in str(log.content)
+            await pilot.press("j")
+            await pilot.pause()
+            assert "?" in str(log.content)
 
     _run(main())
 

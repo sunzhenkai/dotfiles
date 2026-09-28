@@ -51,7 +51,7 @@ _AGENT_ACTIONS: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
-MOVE_HELP = "j/k 上下  ·  C-d/C-u 半屏  ·  gg/G 首末"
+HELP_HINT = "按 ? 查看快捷键 · 悬停表格看动作图例"
 SELECTED_STYLE = "bold black on cyan"
 SELECTED_MARK = "[x]"
 UNSELECTED_MARK = "[ ]"
@@ -87,26 +87,50 @@ def format_action_status(
     selected_count: int = 0,
     readonly: bool = False,
 ) -> str:
-    """Status-bar text: movement keys, selected count, and the current row's actions."""
+    """Single-line status bar: selected count and the current row's bare action keys.
+
+    Explanations live in the ``?`` help sheet and the table tooltip, not here.
+    """
+    if readonly:
+        return "只读"
     prefix = f"已选 {selected_count}"
     if selected_count:
-        prefix = f"{prefix}  ·  C-x 清空选中"
-    if readonly:
-        return f"{MOVE_HELP}\n{prefix}  │  只读，无动作快捷键"
+        prefix = f"{prefix} · C-x 清空"
     if item is None:
-        return f"{MOVE_HELP}\n{prefix}"
-    parts: list[str] = []
+        return prefix
+    keys: list[str] = []
     if isinstance(item, ModuleRow):
-        for cap, key, name, desc in _MODULE_ACTIONS:
+        for cap, key, _name, _desc in _MODULE_ACTIONS:
             if cap in item.capabilities:
-                parts.append(f"{key} {name} {desc}")
+                keys.append(key)
     elif isinstance(item, SkillRow):
-        for _cap, key, name, desc in _AGENT_ACTIONS:
-            parts.append(f"{key} {name} {desc}")
-    extra = "  ·  ".join(parts)
-    if extra:
-        return f"{MOVE_HELP}\n{prefix}  │  {extra}"
-    return f"{MOVE_HELP}\n{prefix}"
+        for _cap, key, _name, _desc in _AGENT_ACTIONS:
+            keys.append(key)
+    if keys:
+        return f"{prefix} │ {' '.join(keys)}"
+    return prefix
+
+
+def help_lines() -> list[str]:
+    """Full key help shown by the ``?`` sheet; kept out of the status bar."""
+    lines = [
+        "移动    j/k 上下 · C-d/C-u 半屏 · gg/G 首末 · h/l 切换 tab",
+        "选择    Space 勾选 · C-x 清空选中 · Enter 执行选中",
+        "过滤    / 过滤 · Esc 关闭",
+        "模块动作",
+    ]
+    lines += [
+        f"        {key} {name:<9s} {desc}" for _cap, key, name, desc in _MODULE_ACTIONS
+    ]
+    lines.append("技能动作")
+    lines += [
+        f"        {key} {name:<9s} {desc}" for _cap, key, name, desc in _AGENT_ACTIONS
+    ]
+    lines += [
+        "图例    actions 列: I C D U X = 模块动作首字母",
+        "        A = 已在 Desired Set；a/X = 可 apply / 可 remove",
+    ]
+    return lines
 
 
 def _missing_textual_message() -> str:
@@ -161,6 +185,40 @@ async def exec_selected_action(
             on_line(text)
     await proc.wait()
     return proc.returncode or 0, "\n".join(lines)
+
+
+# -------------------------- Help sheet ------------------------------------
+
+
+class HelpModal(ModalScreen[None]):
+    """Full key help; the status bar intentionally shows bare keys only."""
+
+    BINDINGS = [
+        Binding("escape", "close_help", "关闭", show=False),
+        Binding("question_mark", "close_help", "关闭", show=False),
+    ]
+
+    DEFAULT_CSS = """
+    HelpModal {
+        align: center middle;
+    }
+    HelpModal > Vertical {
+        width: 52;
+        height: auto;
+        max-height: 90%;
+        padding: 1 2;
+        border: round $primary;
+        background: $panel;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("快捷键", id="help_title")
+            yield Static("\n".join(help_lines()), id="help_text")
+
+    def action_close_help(self) -> None:
+        self.dismiss(None)
 
 
 # -------------------------- Confirm / progress modals ---------------------
@@ -325,6 +383,7 @@ class ManagerTable(DataTable):
         Binding("ctrl+d", "half_page_down", show=False),
         Binding("ctrl+u", "half_page_up", show=False),
         Binding("space", "toggle_select", show=False),
+        Binding("enter", "select_cursor", show=False),
         Binding("ctrl+x", "clear_selection", show=False),
     ]
 
@@ -386,6 +445,7 @@ class _SubPane(Vertical):
     """Shared behaviours: filter Input + DataTable + selection state."""
 
     READONLY = False
+    TABLE_TOOLTIP: str | None = None
 
     DEFAULT_CSS = """
     _SubPane {
@@ -416,7 +476,10 @@ class _SubPane(Vertical):
             id="filter",
             compact=True,
         )
-        yield ManagerTable(zebra_stripes=True, cursor_type="row", id="table")
+        table = ManagerTable(zebra_stripes=True, cursor_type="row", id="table")
+        if self.TABLE_TOOLTIP:
+            table.tooltip = self.TABLE_TOOLTIP
+        yield table
 
     def on_mount(self) -> None:
         self.query_one("#filter", Input).display = False
@@ -523,6 +586,8 @@ class _SubPane(Vertical):
 
 
 class ModulesPane(_SubPane):
+    TABLE_TOOLTIP = "actions 列: I install · C config · D doctor · U uninstall · X deconfig"
+
     BINDINGS = [
         Binding("i", "act('install')", "install", show=False),
         Binding("c", "act('config')", "config", show=False),
@@ -599,6 +664,8 @@ class ModulesPane(_SubPane):
 
 
 class SkillsPane(_SubPane):
+    TABLE_TOOLTIP = "actions 列: A = 已在 Desired Set；a/X = 可 apply / 可 remove"
+
     BINDINGS = [
         Binding("a", "act('apply')", "apply", show=False),
         Binding("x", "act('remove')", "remove", show=False),
@@ -757,7 +824,8 @@ class DotfTuiApp(App[list[str] | None]):
         Binding("tab", "next_tab", "下一类", priority=True),
         Binding("shift+tab", "prev_tab", "上一类", priority=True),
         Binding("slash", "focus_filter", "过滤"),
-        Binding("escape", "back_or_clear", "清空"),
+        Binding("escape", "back_or_clear", "关过滤"),
+        Binding("question_mark", "toggle_help", "帮助"),
         Binding("ctrl+x", "clear_selection", "清空选中"),
         Binding("q", "quit_manager", "退出"),
     ]
@@ -768,7 +836,7 @@ class DotfTuiApp(App[list[str] | None]):
     TabbedContent { height: 1fr; }
     TabPane { height: 1fr; layout: vertical; }
     #log { height: 1; padding: 0 1; color: $text-muted; }
-    #status_bar { height: 2; padding: 0 1; background: $boost; }
+    #status_bar { height: 1; padding: 0 1; background: $boost; }
     """
 
     def __init__(self, dotfiles_root: Path) -> None:
@@ -776,6 +844,7 @@ class DotfTuiApp(App[list[str] | None]):
         self.dotfiles_root = dotfiles_root
         self.session_changes: list[str] = []
         self._pending_g = False
+        self._startup_hint = HELP_HINT
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -795,6 +864,13 @@ class DotfTuiApp(App[list[str] | None]):
     def on_mount(self) -> None:
         self.query_one(ModulesPane).query_one("#table", DataTable).focus()
         self.refresh_action_status()
+        self.query_one("#log", Static).update(self._startup_hint)
+        self.set_timer(5.0, self._clear_startup_hint)
+
+    def _clear_startup_hint(self) -> None:
+        log = self.query_one("#log", Static)
+        if str(log.content) == self._startup_hint:
+            log.update("")
 
     @property
     def active_pane(self) -> _SubPane:
@@ -840,6 +916,11 @@ class DotfTuiApp(App[list[str] | None]):
         if self._modal_open():
             return
         self.exit()
+
+    def action_toggle_help(self) -> None:
+        if self._modal_open():
+            return
+        self.push_screen(HelpModal())
 
     def action_toggle_select(self) -> None:
         pane = self.active_pane
