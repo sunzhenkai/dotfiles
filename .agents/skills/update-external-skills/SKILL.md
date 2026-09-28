@@ -81,7 +81,8 @@ diff -r /tmp/verify-skill/<subdirectory> ~/.agents/skills/<id>
 7. **`dotf agents -d`（doctor）是 L0 浅检**：只确认 managed manifest 就位，不验证 lock 内容一致性。真验证靠第 4 步，doctor 不能替代。
 8. **mattpocock 重钉常是纯 revision 前进**：上游提交往往只动锁外路径（in-progress/、README），17 个锁内 skill 内容零变化。重锁后 diff 里只有 revision 行在动属正常，别当成失败。
 9. **`optional: true` 的锁内条目本机没有副本，不是下发失败**：编目里标 optional 的第三方条目不进默认安装，`defaults` 段也不部署（本机经 overlay / `agents apply` 启用过的才会有，如 ui-skills-root）。第 4 步对它们只验上游 checkout 的 tree_hash == lock content_hash，`diff -r` 会报 MISSING，属预期。
-10. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复补 `tests/test_audit_skill.py`（误报 + 真风险各一条），并在 `agents/skills/skills-store/patches/` 留 proposal/change/result 三件套；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。
+10. **optional 条目在本机有非托管副本时，`diff -r` 对不上不是下发失败**：坑 9 说的是 optional 默认没有副本；若它**恰好存在**且内容对不上，多半是更早手工拷贝的陈旧副本，本流程不负责刷新，别顺手覆盖。四个信号一起看才能定性：副本里带着 `patches/`、`evals/` 等本应被剥离的 authoring 目录（锁定部署不会留下它们）；`~/.local/state/dotf/agents-manifest.json` 里查无此 id（`defaults` 段没部署过）；与**旧** revision 的 diff 行数明显少于与新 revision 的（说明血缘更老，不是"同步失败"）；副本 mtime 早于本轮更新。定性后按 optional 条目只验上游 `tree_hash == content_hash` 即可落地级收尾。是否刷新这类副本是独立决策——它们可能有意保留着上游后来重建掉的内容。实例（2026-09-28）：`ui-template-apply` / `ui-template-author` / `ui-template-design` 在 `~/.agents/skills/` 下正是这种副本，而 `archify` / `senv-cli` 无副本。
+11. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复补 `tests/test_audit_skill.py`（误报 + 真风险各一条），并在 `agents/skills/skills-store/patches/` 留 proposal/change/result 三件套；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。
 
 ## 边界
 
