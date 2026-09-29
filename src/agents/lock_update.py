@@ -52,12 +52,22 @@ LOCK_HEADER = (
 )
 
 
+# 阻断原因要活到 stdout 末尾：审计输出可达数百行，而 checkout 是 TemporaryDirectory，
+# 跑完即删，尾部读不到原因就只能重新取上游。
+MAX_BLOCKED_FINDINGS = 8
+MAX_BLOCKED_REPORTED = 5
+
+
 class LockUpdateError(RuntimeError):
     pass
 
 
 class AuditBlocked(LockUpdateError):
     """Critical audit finding; this skill must stay on its locked revision."""
+
+    def __init__(self, message: str, *, findings: Sequence[str] = ()) -> None:
+        super().__init__(message)
+        self.findings: tuple[str, ...] = tuple(findings)
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +238,41 @@ def _default_audit(skill_dir: Path, script: Path) -> tuple[int, str]:
     return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
 
 
+def blocking_findings(output: str, limit: int = MAX_BLOCKED_FINDINGS) -> tuple[str, ...]:
+    lines = output.splitlines()
+    kept: list[str] = []
+    total = shown = 0
+    for index, line in enumerate(lines):
+        if not line.startswith("[BLOCK]"):
+            continue
+        total += 1
+        if shown >= limit:
+            continue
+        shown += 1
+        kept.append(line)
+        evidence = lines[index + 1] if index + 1 < len(lines) else ""
+        if evidence[:1].isspace():
+            kept.append(evidence.strip())
+    if not kept:
+        non_empty = [line.strip() for line in lines if line.strip()]
+        return tuple(non_empty[-limit:])
+    if total > shown:
+        kept.append(f"({total - shown} more blocking findings)")
+    return tuple(kept)
+
+
+def report_blocked(detail: Sequence[tuple[str, Sequence[str]]]) -> None:
+    if not detail:
+        return
+    print(f"  blocked {len(detail)} skill(s); audit findings:", flush=True)
+    for skill_id, findings in detail[:MAX_BLOCKED_REPORTED]:
+        print(f"    {skill_id}")
+        for finding in findings:
+            print(f"      {finding}")
+    if len(detail) > MAX_BLOCKED_REPORTED:
+        print(f"    ({len(detail) - MAX_BLOCKED_REPORTED} more blocked skills above)")
+
+
 def _audit_skill(
     item: LockedSkill,
     checkout: Path,
@@ -247,7 +292,10 @@ def _audit_skill(
         raise LockUpdateError(
             f"{item.id}: audit reported warnings; re-run without --fail-on-warn after review"
         )
-    raise AuditBlocked(f"{item.id}: audit failed (exit {rc})")
+    raise AuditBlocked(
+        f"{item.id}: audit failed (exit {rc})",
+        findings=blocking_findings(output),
+    )
 
 
 def update_lock(
@@ -275,6 +323,7 @@ def update_lock(
     updated: list[SourceUpdate] = []
     current: list[str] = []
     blocked: list[str] = []
+    blocked_detail: list[tuple[str, tuple[str, ...]]] = []
 
     def _refresh(staging: Path) -> None:
         for source, items in grouped.items():
@@ -307,6 +356,7 @@ def update_lock(
                 except AuditBlocked as exc:
                     print(f"    keep {item.id} @ {item.revision[:12]}  ({exc})")
                     blocked.append(item.id)
+                    blocked_detail.append((item.id, exc.findings))
                     continue
                 by_id[item.id] = promoted
                 promoted_ids.append(item.id)
@@ -327,6 +377,8 @@ def update_lock(
             _refresh(Path(temporary))
     else:
         _refresh(workdir)
+
+    report_blocked(blocked_detail)
 
     skills = tuple(by_id[item.id] for item in lock.skills)
     if not updated:

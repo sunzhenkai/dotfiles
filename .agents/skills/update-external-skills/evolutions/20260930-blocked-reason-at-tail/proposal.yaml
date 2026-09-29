@@ -1,0 +1,57 @@
+skill: update-external-skills
+round: 20260930-blocked-reason-at-tail
+
+problem: >
+  正文只教「跑哪三条命令」，没教「输出必须整体留存」。agent 的自然动作是把第 1 步
+  直接接 tail，而第 1 步的 stdout 是被阻断 source 审计细节的唯一载体
+  （_audit_skill 只 print(output)，checkout 是 TemporaryDirectory 跑完即删，
+  AuditBlocked 的消息只带 exit code）。截断即永久丢失，只能重新取上游找回，
+  把「全流程唯一必经的网络成本」变成两次。正文对 blocked>0 也没有处置分支
+  （坑 11 只讲怎么改规则，不讲本轮怎么定性）。
+
+evidence:
+  - 2026-09-30 一轮真实执行：第 1 步输出被 tail -60 截断，某 source 的十余条
+    [BLOCK] 行全部丢失；为定性阻断原因另建 ad-hoc clone 并重跑全树审计
+    （多一次网络往返 + 一次大文件扫描），事后需手工删除该 checkout，
+    否则给后续轮次留下坑 6 那类「易被误认为锁定 revision」的残留。
+  - 同轮第 2 步的 changed 输出被 tail -40 截断，10 条内容变化只看到 9 条，
+    被迫重跑一次（本地、廉价，属同一模式的低价版本）。
+  - 结构性证据（非偶发）：src/agents/lock_update.py 中 _audit_skill 仅 print(output)；
+    AuditBlocked 消息只含 exit {rc}；checkout 用 tempfile.TemporaryDirectory；
+    CLI 无 --log/--report 选项 ⇒ 阻断原因的唯一载体就是第 1 步 stdout。
+
+pattern: >
+  「输出易失 + 读取时截断」⇒ 补跑（本地）或补取上游（网络）。
+  第 1 步属后者，代价最高且不可逆（checkout 已删）。
+
+proposed_change:
+  skill_body:
+    - 第 1 步命令改为 tee 到本轮日志后再挑读，明写不要截断实时输出，并给出理由。
+    - 第 1 步新增 blocked>0 处置分支：读输出末尾的合并报告定性（规则 / 文件 / 行 /
+      命中原文），对照坑 11 判断是否过宽规则误报；明写不要为定性另建 ad-hoc clone、
+      不要重跑第 1 步。
+    - 第 1 步完成标准由 blocked=0 改为 blocked=M，并说明 M>0 是合法结局而非失败。
+    - 第 2 步补「输出一次读全」：挑读用 grep，不用 tail。
+    - 新增坑 16 记录结构性根因与已修部分，防止后人把「整体留存」要求简化掉。
+  repo_tooling:
+    - src/agents/lock_update.py：AuditBlocked 携带 findings；新增纯函数
+      blocking_findings（[BLOCK] 行 + 紧随的命中行，每 skill 上限 8 条，
+      无 marker 时回退到输出尾部）与 report_blocked（最多列 5 个 skill）；
+      update_lock 在所有 source 处理完、wrote 行之前打合并报告。
+    - tests/test_lock_update.py：4 个新用例（配对 / 上限与溢出计数 / 无 marker 回退 /
+      端到端断言报告落在最后一个 source 之后、wrote 行之上）。
+
+expected_improvement: >
+  blocked 轮次省掉一次上游 clone + 一次全树审计（本轮量级：分钟级 → 秒级），
+  消除 /tmp 易混淆残留；阻断原因进入 tail 窗口，不再依赖 agent 记得 tee；
+  第 2 步少一次无谓重跑。附带收益：给用户的结论有完整证据，不再靠推测。
+
+risk: low
+risk_notes: >
+  未改 frontmatter（触发条件不变）、未删任何既有硬规则、未扩权限、未新增破坏性操作。
+  代码改动只增加 stdout 行与异常属性；UpdateResult.blocked 类型不变（仍是 id 元组），
+  keep 行格式不变，wrote 行格式不变，既有 grep/解析不受影响。
+
+out_of_scope: >
+  下发那 ~390s 的成本（acquire_all 取回策略、dotf agents 子集入口）按正文「边界」
+  属独立仓库任务，本轮不碰。用户已在范围选择中确认。

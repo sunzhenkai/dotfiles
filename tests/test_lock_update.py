@@ -317,3 +317,108 @@ def test_update_lock_refuses_missing_subdirectory(tmp_path: Path) -> None:
             today="2026-09-17",
         )
     assert (dotfiles / "agents" / "skills.lock.yaml").read_text(encoding="utf-8") == payload
+
+
+AUDIT_BLOCK_OUTPUT = "\n".join(
+    [
+        "=== Skill 安全审计: /checkout/skills/bad ===",
+        "[WARN ] browser_session (assets/template.html:26)",
+        "      try { theme = localStorage.getItem('demo-theme'); } catch (_) {}",
+        "[BLOCK] hardcoded_secret (scripts/check-update.mjs:321)",
+        "      const token = preparedCacheDirectories.get(path.resolve(cacheDirectory));",
+        "[BLOCK] jailbreak_role (renderers/shared/cli.mjs:32)",
+        "    // the same contract as before, just",
+        "结论: 存在阻断项，禁止安装。",
+    ]
+)
+
+
+def test_blocking_findings_pairs_block_line_with_its_evidence() -> None:
+    assert lock_update.blocking_findings(AUDIT_BLOCK_OUTPUT) == (
+        "[BLOCK] hardcoded_secret (scripts/check-update.mjs:321)",
+        "const token = preparedCacheDirectories.get(path.resolve(cacheDirectory));",
+        "[BLOCK] jailbreak_role (renderers/shared/cli.mjs:32)",
+        "// the same contract as before, just",
+    )
+
+
+def test_blocking_findings_caps_output_and_counts_overflow() -> None:
+    output = "\n".join(
+        f"[BLOCK] rule_{index} (file.mjs:{index})\n    evidence {index}"
+        for index in range(lock_update.MAX_BLOCKED_FINDINGS + 3)
+    )
+    findings = lock_update.blocking_findings(output)
+    blocks = [line for line in findings if line.startswith("[BLOCK]")]
+    assert len(blocks) == lock_update.MAX_BLOCKED_FINDINGS
+    assert findings[-1] == "(3 more blocking findings)"
+
+
+def test_blocking_findings_falls_back_to_tail_without_block_marker() -> None:
+    findings = lock_update.blocking_findings("=== audit ===\n\nunexpected format\nexit 2\n")
+    assert findings == ("=== audit ===", "unexpected format", "exit 2")
+
+
+def test_report_blocked_caps_detailed_skills(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    total = lock_update.MAX_BLOCKED_REPORTED + 2
+    detail = [(f"skill-{index}", (f"[BLOCK] rule (f:{index})",)) for index in range(total)]
+    lock_update.report_blocked(detail)
+    out = capsys.readouterr().out
+    assert f"blocked {total} skill(s); audit findings:" in out
+    assert f"skill-{lock_update.MAX_BLOCKED_REPORTED - 1}" in out
+    assert f"skill-{lock_update.MAX_BLOCKED_REPORTED}" not in out
+    assert "(2 more blocked skills above)" in out
+
+
+def test_update_lock_reports_block_reasons_at_end_of_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    other_source = "https://github.com/example/other"
+    blocked_upstream = tmp_path / "blocked"
+    _init_repo(blocked_upstream)
+    (blocked_upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    _write_skill(blocked_upstream, "skills/bad", "---\nname: bad\ndescription: a\n---\na\n")
+    blocked_old = _commit(blocked_upstream, "old")
+    _write_skill(blocked_upstream, "skills/bad", "---\nname: bad\ndescription: b\n---\nb\n")
+    _commit(blocked_upstream, "new")
+
+    clean_upstream = tmp_path / "clean"
+    _init_repo(clean_upstream)
+    (clean_upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    _write_skill(clean_upstream, "skills/good", "---\nname: good\ndescription: a\n---\na\n")
+    clean_old = _commit(clean_upstream, "old")
+    _write_skill(clean_upstream, "skills/good", "---\nname: good\ndescription: b\n---\nb\n")
+    _commit(clean_upstream, "new")
+
+    _git(blocked_upstream, "checkout", "--quiet", blocked_old)
+    _git(clean_upstream, "checkout", "--quiet", clean_old)
+    bad = _locked("bad", blocked_upstream, "skills/bad", blocked_old)
+    good = _locked("good", clean_upstream, "skills/good", clean_old, source=other_source)
+    _git(blocked_upstream, "checkout", "--quiet", "main")
+    _git(clean_upstream, "checkout", "--quiet", "main")
+
+    dotfiles = tmp_path / "dotfiles"
+    _write_repo(dotfiles, _lock_body([bad, good]))
+
+    def audit(path: Path) -> tuple[int, str]:
+        return (2, AUDIT_BLOCK_OUTPUT) if path.name == "bad" else (0, "")
+
+    result = lock_update.update_lock(
+        dotfiles,
+        aliases={SOURCE: str(blocked_upstream), other_source: str(clean_upstream)},
+        audit=audit,
+        today="2026-09-17",
+    )
+    assert result.blocked == ("bad",)
+
+    out = capsys.readouterr().out
+    report = out.index("blocked 1 skill(s); audit findings:")
+    last_source = out.rindex("==> lock-update")
+    wrote = out.index("wrote agents/skills.lock.yaml")
+    assert report > last_source, "阻断原因必须打在最后一个 source 之后"
+    assert report < wrote, "阻断原因必须留在 wrote 行之上，才在 tail 窗口内"
+    assert (
+        "const token = preparedCacheDirectories.get(path.resolve(cacheDirectory));"
+        in out[report:wrote]
+    )
