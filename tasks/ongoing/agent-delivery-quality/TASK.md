@@ -36,7 +36,7 @@
 - 假设：taskflow 的 proposal 模板具体改动位置（在「验收标准」小节加引用行）尚未读模板原文确认，design 阶段核对。
 - 步骤：待 design 阶段细化。
 - 阻塞点：无。
-- 坑：本任务改动落在 `agents/skills/`，必须走 `pwd-skill-manager` → skill-upgrader 的 patches 协议，不能直接手改 SKILL.md。
+- 坑：本任务改动落在共享 skill（现已迁至 `sunzhenkai/solo-skills` 的 `skills/<id>/`），必须走 skill-upgrader 的 patches 协议，不能直接手改 SKILL.md。
 - 坑：`role-based-reviewer` 门 1 的改动要同时改它自己的 SKILL.md 与本仓 `openspec/specs/` 中相关条目，否则两处说法会分叉。
 - 坑：本仓工作区当前已有未提交改动（`agents/runtime.yaml`、`agents/skills/task-wizard/SKILL.md`、`references/legacy-plans.md` 与两个未应用的 patches 目录），本轮改动叠加前要确认这些改动如何处置。
 

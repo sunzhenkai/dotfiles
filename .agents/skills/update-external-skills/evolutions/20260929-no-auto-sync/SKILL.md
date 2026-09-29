@@ -131,6 +131,6 @@ make skills-verify IDS=a,b VERBOSE=1     # 指定条目 + 打印干净项
 ## 边界
 
 - **只刷新已有第三方条目**。新装/移除第三方 skill、改编目（增删 group 或成员）需要新审计锁，走 skills-store / `dotf skills add` / 直接编辑 `agents/skills.yaml`，不在本流程。
-- **共享 skill 的修改去 `sunzhenkai/solo-skills` 仓**（原 first-party 集合已全部迁出，本仓以第三方 group 消费）；本仓项目级 skill（`.agents/skills/`）直接编辑其生产稿，与本流程无交集。
+- **共享 skill 的修改去 `sunzhenkai/solo-skills` 仓**（原 first-party 集合已全部迁出，本仓以第三方 group 消费）；本仓项目级 skill（`.agents/skills/`）的修改走 pwd-skill-manager，与本流程无交集。
 - **下发、提交、推送一律不在流程内执行**（见「收尾」）。用户要求本流程给结论时，交付物是 lock diff 与 `changed` 计数；`make registry validate` 通过只代表具备提交条件，不代表可以代提交。
 - 想让下发变便宜是**仓库工具**的活，不在本 skill：`acquire_all` 按 source 去重取回、`dotf agents` 增加子集入口。改这两处走本仓常规改动流程，不要试图在 skill 正文里绕开。

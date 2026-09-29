@@ -2,7 +2,7 @@ skill: update-external-skills
 patch: 20260929-scripted-verify
 mode: update
 risk: medium
-status: proposed
+status: superseded
 
 problem: >
   第 2 步（判断内容是否真变）与第 4 步（逐 skill 验证 + 差异判读）是确定性工作，

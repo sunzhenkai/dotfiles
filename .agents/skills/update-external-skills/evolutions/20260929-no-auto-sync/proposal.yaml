@@ -1,0 +1,64 @@
+skill: update-external-skills
+patch: 20260929-no-auto-sync
+mode: update
+risk: high
+status: promoted
+
+base: evolutions/20260929-scripted-verify/SKILL.md
+base_status: superseded-by-this
+note: >
+  底稿是上一轮未晋升的候选稿（它重写第 2、4 步为调用 lock_verify.py）。
+  本轮在其上叠加，两份改动合并为一次晋升。
+
+problem: >
+  四步流程把「产出可审计的锁变更」与「本机生效 + 提交推送」绑成一条必做链路。
+  第 3 步的下发是全流程最贵、blast radius 最大的一环——一次锁变更即全量重取上游
+  并跨三个 layout 全量重写——而它并不是交付物的必要条件。收尾一句
+  「提交遵循仓库惯例」进一步把 commit 变成流程内动作，push 更是全程无授权来源，
+  agent 据此改动 git 历史与远端。
+
+evidence:
+  - 一轮完整执行的下发单步实测 390s（dotf last-run duration_ms），而同轮的变化判定
+    只需 0.11s、纯本地；成本差三个数量级，且贵的一步与交付物无关
+  - 成本机制已在代码定位：下发在算计划之前无条件取回全部锁内条目；取回按条目而非
+    按 source（同仓 N 个 skill 触发 N 次 shallow fetch）；staging 用 TemporaryDirectory，
+    无跨轮缓存；第三方安装身份内嵌整把锁的 digest，锁动一个字符即全部条目重写
+  - 同轮的验证被执行 2 遍，只为查看逐 layout 明细；验证复用同一条按条目取回的路径，
+    网络取回次数因此翻倍
+  - 同轮 agent 自行提交，因把在制品混入锁提交而追加一次重写历史的返工
+  - 查实 only_ids 只到 planner 层，CLI 无子集下发入口——「只同步有变的条目」不可执行
+
+pattern: >
+  流程应止于交付物：一份审计过、变化已判定的 lock diff。上游哈希断言与逐 layout
+  落地核对共用一个调用，而后者要求本机已下发，因此核对天然排在下发之后——把下发
+  留作授权动作，同时把网络取回次数从「必经」变成「按需且只一次」。
+  判据：动作的授权来源必须是用户本轮点名，不能是 skill 正文里的含糊惯例措辞。
+
+proposed_change:
+  - 流程收敛为三步：重锁 → 纯本地判定 content_hash（lock_verify.py changed）→
+    make registry validate；原第 3 步的下发与原第 4 步的核对合并为
+    新增的「下一步：下发与核对（需授权）」段，原有分段解读表与核对判读全部保留在下发段
+  - 新增「收尾：默认不动本机」段，硬禁止三项（agents -c 同步 / git commit / git push），
+    改为输出可直接执行的下一步命令清单并写明各自后果；用户本轮点名哪条才执行哪条
+  - 新增规则：同一轮 verify 只跑一次，要看逐 layout 明细就在同一次调用带 VERBOSE，
+    不重跑整条命令
+  - 认下并写明回归代价：独立的上游哈希复验随之移出必经路径，锁在单独走完时属
+    「审计判过 + 哈希自报」；采信非自审来源的 revision 前必须先完成下发与核对
+  - 坑 4 改写为完整成本机制（按条目取回 + digest 身份 + 无跨轮缓存 + 无子集入口），
+    并明确禁止承诺「只同步有变的条目」；新增坑 15（把下发/提交/推送当流程内步骤的返工）
+  - frontmatter description 去掉「并下发本机」语义，触发列表保留「同步 skill 上游」；
+    边界新增两条：三项授权动作不在流程内执行、想让下发变便宜属仓库工具改动不在此绕
+
+expected_improvement: >
+  必经路径墙钟去掉那 390s 与跨三 layout 的全量文件重写，并去掉一次必经的网络取回；
+  验证不再重复取上游；流程不再产生未授权的本机覆写与 git 历史/远端改动，
+  本轮那类提交返工因此无发生条件。
+
+risk_notes:
+  - risk high：把既有必经步骤降级为提示 + 收窄 description 触发语义 + 收回三项权限，
+    三项均需用户明确同意（本次由用户主动提出）
+  - 安全方向为收紧：删除的是 agent 自动覆写本机与自动提交/推送的授权，未放宽任何破坏性动作
+  - 已知回归：锁的独立哈希复验不再必经，已在正文写明补救条件，不做隐藏
+  - 未触碰 lock_update.py / defaults.py / managed_runtime.py / lock_verify.py 行为；
+    按 source 去重取回与 CLI 子集入口两项写进边界作为仓库侧后续，不夹带进本 patch
+  - 底稿未晋升，晋升即同时落地两份改动；若否决则两份都留在 evolutions/ 作否决记录
