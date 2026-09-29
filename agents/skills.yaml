@@ -19,9 +19,7 @@ groups:
   dotfiles:
     type: first-party
     skills:
-      - agent-roster-flow
       - commit-push
-      - delivery-loop
       - dotf-code-explore
       - dotf-code-review
       - id: lark-cli
@@ -31,16 +29,12 @@ groups:
       - project-init
       - project-spec-mirror
       - repo-manager
-      - role-based-reviewer
       - id: role-chat
         optional: true
       - service-manager
       - skill-evolver
       - skill-upgrader
       - skills-store
-      - task-explore
-      - task-wizard
-      - taskflow
       - trouble-grill
 
   mattpocock:
@@ -74,6 +68,20 @@ groups:
     package: https://github.com/sunzhenkai/agent-roster
     skills:
       - agent-roster
+
+  task-flow-skills:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/task-flow-skills
+    skills:
+      # 从本仓库 agents/skills/ 迁出的任务流/交付编排 skill（见 README）。
+      # agent-roster-flow 依赖底层 agent-roster（另一 group），需一并安装。
+      - agent-roster-flow
+      - delivery-loop
+      - role-based-reviewer
+      - task-explore
+      - task-wizard
+      - taskflow
 
   archify:
     type: third-party

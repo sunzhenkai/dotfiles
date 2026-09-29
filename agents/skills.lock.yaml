@@ -17,6 +17,90 @@ skills:
       date: '2026-09-25'
       tool: agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/sunzhenkai/agent-roster/commit/d42624456c362e60c15d44e115307ac62a47a390
+  - id: agent-roster-flow
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/agent-roster-flow
+    content_hash: ee578b2e9b994401d0c37a612f51734c7e24e739430540be307d0861c846560d
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
+  - id: delivery-loop
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/delivery-loop
+    content_hash: 1dd30febe8acb46c60ef71a25433688ea2e2f30374e735e621af4ad114388e93
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
+  - id: role-based-reviewer
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/role-based-reviewer
+    content_hash: 7251bae829605e51438a5c0f5a4fda4d3298e9bcab4c94f5f7c1066351434d79
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
+  - id: task-explore
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/task-explore
+    content_hash: ebcfbe044bd191ace4cabad4b158fb559687085bb8274243ac72cae43b55a9e5
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
+  - id: task-wizard
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/task-wizard
+    content_hash: dd9283bf1b0e777adbca3ffddd0d4b2444d52ca924dc2ebffb05b0aabbe9c1a6
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
+  - id: taskflow
+    source: https://github.com/sunzhenkai/task-flow-skills
+    revision: e5dfae5aa4010172124e9eba2b50115c30433043
+    subdirectory: skills/taskflow
+    content_hash: 20c9754320ca37153d24e88e3c9dfbba40600efb65d115d5a05400e992b269f5
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-09-29'
+      tool: agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/task-flow-skills/commit/e5dfae5aa4010172124e9eba2b50115c30433043
   - id: archify
     source: https://github.com/tt-a1i/archify
     revision: 1017b47ee707aeb8e88960b35aabf5672a012242

@@ -43,13 +43,16 @@ def test_repository_catalog_matches_strict_lock() -> None:
     # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
     assert "taste-skill" not in set(catalog.ids())
-    # ui-template-* 同样：审计锁保留，编目已注释。
+    # ui-template-*：审计锁保留，且已回到编目内标 optional（709cc55）——
+    # 在 catalog.ids() 与 third_party 中，但不进默认 Desired Set。
     assert "ui-template-apply" in ids
     assert "ui-template-author" in ids
     assert "ui-template-design" in ids
-    assert "ui-template-apply" not in set(catalog.ids())
-    assert "ui-template-author" not in set(catalog.ids())
-    assert "ui-template-design" not in set(catalog.ids())
+    assert {"ui-template-apply", "ui-template-author", "ui-template-design"} <= set(catalog.ids())
+    assert {"ui-template-apply", "ui-template-author", "ui-template-design"} <= third_party
+    assert "ui-template-apply" not in catalog.default_ids()
+    assert "ui-template-author" not in catalog.default_ids()
+    assert "ui-template-design" not in catalog.default_ids()
     # lark-cli / role-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
     by_id = catalog.by_id()
     assert by_id["lark-cli"].optional is True
@@ -65,7 +68,13 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "wizard" not in catalog.default_ids()
     assert "to-questionnaire" not in catalog.default_ids()
     assert "commit-push" in catalog.default_ids()
-    assert "agent-roster-flow" in catalog.default_ids()
+    # task-flow 系列已迁出到 sunzhenkai/task-flow-skills：仍是默认安装项，
+    # 但来源从 first-party 变为 third-party（由严格审计锁覆盖）。
+    migrated = {"agent-roster-flow", "delivery-loop", "role-based-reviewer",
+                "task-explore", "task-wizard", "taskflow"}
+    assert migrated <= set(catalog.default_ids())
+    assert migrated.isdisjoint(first_party)
+    assert migrated <= third_party
     assert "wait-what" in catalog.default_ids()
     assert "writing-for-agents" in catalog.default_ids()
     assert "ask-matt" not in ids

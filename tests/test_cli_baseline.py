@@ -221,12 +221,23 @@ def test_skills_install_resolves_third_party_skill_id(tmp_home: Path) -> None:
 
 
 def test_skills_install_commented_out_skill_passes_through(tmp_home: Path) -> None:
-    # taste-skill / ui-template-* are commented out of the catalog -> plain names.
-    for name in ("taste-skill", "ui-template-apply"):
-        result = run_dotf("skills", "-i", name, "--dry-run")
+    # taste-skill 已从编目注释掉 -> 透传为普通名字。
+    # （ui-template-* 自 709cc55 起回到编目内标 optional，改由 catalog 解析，见下一条用例。）
+    result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
 
-        assert result.returncode == 0
-        assert f"==> npx skills add {name}" in result.stdout
+    assert result.returncode == 0
+    assert "==> npx skills add taste-skill" in result.stdout
+
+
+def test_skills_install_optional_catalog_skill_resolves_package(tmp_home: Path) -> None:
+    # ui-template-* 是 optional 编目条目：仍在编目内，按 package + -s id 解析。
+    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
+
+    assert result.returncode == 0
+    assert (
+        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
+        " -s ui-template-apply" in result.stdout
+    )
 
 
 def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:
