@@ -18,7 +18,8 @@ lock: skills.lock.yaml
 groups:
   # 自有 skill 已全部迁至 sunzhenkai/solo-skills：原 dotfiles first-party group 与
   # task-flow-skills、agent-roster 两个 third-party group 并入此组（其中 2 个改名：
-  # dotf-code-explore→code-explore、dotf-code-review→solo-code-review）。
+  # dotf-code-explore→code-explore、dotf-code-review→solo-code-review；
+  # 上游 cd1d135 又把 delivery-loop 改名为 task-delivery 并拆出 task-goal）。
   # first-party type 概念保留：未来自有 skill 仍可落回 agents/skills/<id>/ 并以
   # first-party group 编目；当前编目无 first-party group，校验按空集通过。
   solo-skills:
@@ -30,7 +31,6 @@ groups:
       - agent-roster-flow
       - code-explore
       - commit-push
-      - delivery-loop
       - id: lark-cli
         optional: true
       - llm-wiki
@@ -46,7 +46,9 @@ groups:
       - skill-upgrader
       - skills-store
       - solo-code-review
+      - task-delivery
       - task-explore
+      - task-goal
       - taskflow
       - task-wizard
       - trouble-grill

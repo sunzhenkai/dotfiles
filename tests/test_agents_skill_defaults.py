@@ -43,6 +43,9 @@ def test_repository_catalog_matches_strict_lock() -> None:
     # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
     assert "taste-skill" in ids
     assert "taste-skill" not in set(catalog.ids())
+    # delivery-loop 已被上游改名（cd1d135），旧 id 不得再出现在编目或锁里。
+    assert "delivery-loop" not in set(catalog.ids())
+    assert "delivery-loop" not in {item.id for item in lock.skills}
     # ui-template-*：审计锁保留，且已回到编目内标 optional（709cc55）——
     # 在 catalog.ids() 与 third_party 中，但不进默认 Desired Set。
     assert "ui-template-apply" in ids
@@ -70,8 +73,8 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "commit-push" in catalog.default_ids()
     # task-flow 系列已迁出到 sunzhenkai/task-flow-skills：仍是默认安装项，
     # 但来源从 first-party 变为 third-party（由严格审计锁覆盖）。
-    migrated = {"agent-roster-flow", "delivery-loop", "role-based-reviewer",
-                "task-explore", "task-wizard", "taskflow"}
+    migrated = {"agent-roster-flow", "task-delivery", "role-based-reviewer",
+                "task-explore", "task-goal", "task-wizard", "taskflow"}
     assert migrated <= set(catalog.default_ids())
     assert migrated.isdisjoint(first_party)
     assert migrated <= third_party
