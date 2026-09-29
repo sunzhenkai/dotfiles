@@ -1,4 +1,4 @@
-.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update
+.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update skills-verify
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
@@ -31,6 +31,20 @@ ci: registry test shellcheck secret-scan acceptance smoke bash32
 # critical 审计不过的条目会留在旧 revision，不阻断其它 source。
 skills-lock-update:
 	PYTHONUNBUFFERED=1 python3 src/agents/lock_update.py $(if $(filter 1,$(FAIL_ON_WARN)),--fail-on-warn,)
+
+# 报告工作区 lock 相对 HEAD 的变化（内容变 / 仅 revision 变 / 条目增删），
+# 并按锁定的 revision 重新取上游、逐 layout 核对已装副本。只读，不写任何东西。
+#   make skills-verify                 只验内容真变的条目
+#   make skills-verify ALL=1           验锁内全部条目
+#   make skills-verify IDS=a,b         验指定条目
+#   make skills-verify VERBOSE=1       连未受影响的条目与全部 finding 一起打印
+skills-verify:
+	@PYTHONUNBUFFERED=1 python3 src/agents/lock_verify.py changed
+	@args="verify"; \
+	[ -n "$(ALL)" ] && args="$$args --all"; \
+	[ -n "$(IDS)" ] && args="$$args --ids $(IDS)"; \
+	[ -n "$(VERBOSE)" ] && args="$$args --verbose"; \
+	PYTHONUNBUFFERED=1 python3 src/agents/lock_verify.py $$args
 
 install:
 	@if [ -L "$(LINK_TARGET)" ]; then \

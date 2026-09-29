@@ -1,0 +1,48 @@
+skill: update-external-skills
+patch: 20260929-scripted-verify
+mode: update
+risk: medium
+status: proposed
+
+problem: >
+  第 2 步（判断内容是否真变）与第 4 步（逐 skill 验证 + 差异判读）是确定性工作，
+  却每次由 agent 现场手写：临时 python 解析 lock、逐条 diff、把坑 5/9/10 的判读
+  规则在脑子里重跑。一次真实执行里为此写了 3 段一次性代码，其中 2 段是 src/agents
+  已有能力的重复实现。
+
+evidence:
+  - 2026-09-29 一轮完整执行：23 个条目 × 3 个 layout 的比对全部手写了临时脚本
+  - 一次性误判成本已出现：把 .audit-allow、__pycache__、tests/ 当候选漂移逐条查证
+  - 可复用件核对过签名：third_party.load_lock / tree_hash / verify_checkout /
+    acquire_all；layouts.LAYOUTS + skills_target；
+    managed_runtime.compile_skills_plan + load_runtime_policy；
+    desired_set.resolve_skill_desired_set
+  - 全仓 grep 确认：三 layout 的 diff -r 分类逻辑此前只以散文形式存在于本 SKILL
+
+pattern: >
+  「期望的已装副本」不该由消费侧近似重写：直接调安装器自己用的
+  compile_skills_plan(include_unlisted=True)，剥离面与渲染差异自动跟随
+  agents/runtime.yaml 与各 layout renderer，脚本判读不可能与部署漂移。
+
+proposed_change:
+  - 新增 src/agents/lock_verify.py：`changed` 子命令对比 HEAD 与工作区 lock，
+    输出 changed_content / changed_revision_only / added / removed；
+    `verify` 子命令重新取上游到锁定 revision、断言 tree_hash == content_hash，
+    再对三个 layout 用安装器计划核对，出口 missing / content / unowned /
+    NOT-INSTALLED / prunable，运行残留不计。
+  - 新增 Makefile target `skills-verify`（ALL= / IDS= / VERBOSE=）。
+  - 新增 tests/test_agents_lock_verify.py（9 例，取上游用 stub，不打网络）。
+  - SKILL.md 第 2、4 步改为调用脚本；第 3 步补同步失败定性；坑 5/6/9 标注已自动化并保留手工兜底；
+    新增坑 12（改名需同时补锁种子条目 + YAML 全 0 哈希与 evidence URL 两个坑）、
+    坑 13（first-party 迁出遗留副本挡住 defaults）、
+    坑 14（命名空间包导致 except 身份漏接，须用扁平 import）。
+
+expected_improvement: >
+  第 2 步从「写临时 python + 读 grep」变成一条命令四行计数；
+  第 4 步从 69 次人工比对与逐条判读变成「读 FAIL 行」；
+  allowlist 或渲染规则变化时脚本自动跟随，不再依赖 agent 记住剥离了哪些目录。
+
+risk_notes:
+  - 新增 src/ 模块与 Makefile target：纯读取，不写 lock、不写 layout、不动 manifest
+  - SKILL.md 第 2、4 步原文被替换，手工路径压缩为兜底段
+  - 未改动 lock_update.py / defaults.py / managed_runtime.py 任何行为
