@@ -49,6 +49,7 @@ make skills-lock-update             # 升级第三方 lock 到各 source HEAD（
 - Skill 装到三个 layout：`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`（清单见 `src/agents/layouts.py`）。
 - 安装产物（`~/.agents/AGENTS.md`、`~/.claude/CLAUDE.md`、各 vendor 配置、上述三个目录里由本系统生成的文件）不要手改，改了会被 `dotf agents --doctor` 判漂移。
 - Skill 源仓库位置约定：`.agents/skills/` 项目级；`agents/skills/` 是 first-party 源位置（当前为空）——自有共享 skill 已迁 `sunzhenkai/solo-skills`，以第三方 group `solo-skills` 编目消费，改共享 skill 去那个仓。见 `AGENTS.md`。
+- 第三方 checkout 缓存在 `${XDG_STATE_HOME:-~/.local/state}/dotf/third-party-checkouts/<source+revision 哈希>/`：同一 revision 只拉一次，且只落地 lock 要的子目录与 license（blobless + sparse）；命中缓存完全不联网，删该目录即强制重拉。
 
 ## 仓库开发
 

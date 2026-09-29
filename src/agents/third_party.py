@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -22,6 +24,8 @@ LOCK_KIND = "third-party-skills-lock"
 REVISION = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 SPDX = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*")
+GIT_TIMEOUT_SECONDS = 180
+CACHE_DIRNAME = "third-party-checkouts"
 
 
 
@@ -220,30 +224,161 @@ def verify_checkout(lock: LockedSkill, checkout: Path, revision: str) -> Path:
     return skill
 
 
-def _git(args: Sequence[str], *, cwd: Path, run: Run) -> str:
-    proc = run(list(args), cwd=str(cwd), text=True, capture_output=True, check=False)
+def _git(
+    args: Sequence[str],
+    *,
+    cwd: Path,
+    run: Run,
+    timeout: int = GIT_TIMEOUT_SECONDS,
+) -> str:
+    try:
+        proc = run(
+            list(args),
+            cwd=str(cwd),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        subcommand = args[1] if len(args) > 1 else "command"
+        raise ThirdPartyLockError(f"git {subcommand} timed out after {timeout}s") from exc
     if proc.returncode != 0:
         raise ThirdPartyLockError("third-party acquisition command failed")
     return proc.stdout.strip()
 
 
-def acquire_all(lock: ThirdPartyLock, destination: Path, *, run: Run = subprocess.run) -> Path:
-    """Acquire every lock entry into private staging and verify all before returning."""
+def _cache_root(cache: Path | None) -> Path:
+    if cache is not None:
+        return cache.expanduser().absolute()
+    from dotf_core.modules_state import xdg_state_home
+
+    return xdg_state_home() / "dotf" / CACHE_DIRNAME
+
+
+def _cache_entry(root: Path, source: str, revision: str) -> Path:
+    key = hashlib.sha256(f"{source}\0{revision}".encode("utf-8")).hexdigest()
+    return root / key
+
+
+def _at_revision(checkout: Path, revision: str, *, run: Run) -> bool:
+    try:
+        return _git(["git", "rev-parse", "HEAD"], cwd=checkout, run=run) == revision
+    except ThirdPartyLockError:
+        return False
+
+
+def _grouped(skills: Sequence[LockedSkill]) -> list[tuple[str, str, list[LockedSkill]]]:
+    """Group lock entries by source and revision, keeping lock order."""
+    groups: dict[tuple[str, str], list[LockedSkill]] = {}
+    for item in skills:
+        groups.setdefault((item.source, item.revision), []).append(item)
+    return [(source, revision, items) for (source, revision), items in groups.items()]
+
+
+def _pattern(path: str) -> str:
+    """Render one sparse-checkout pattern for an exact repository path."""
+    escaped = "".join("\\" + char if char in "*?[]!\\#" else char for char in path)
+    return f"/{escaped}"
+
+
+def _patterns(items: Sequence[LockedSkill]) -> list[str]:
+    wanted = {_pattern(item.license.file) for item in items}
+    wanted.update(_pattern(item.subdirectory + "/") for item in items)
+    return sorted(wanted)
+
+
+def _select(checkout: Path, items: Sequence[LockedSkill], *, run: Run) -> None:
+    """Restrict the working tree to the locked license files and skill directories."""
+    _git(["git", "sparse-checkout", "set", "--no-cone", *_patterns(items)], cwd=checkout, run=run)
+
+
+def _checkout(checkout: Path, revision: str, *, run: Run) -> None:
+    _git(["git", "checkout", "--quiet", "--detach", revision], cwd=checkout, run=run)
+    if not _at_revision(checkout, revision, run=run):
+        raise ThirdPartyLockError("checkout does not sit at the locked revision")
+
+
+def _fetch_checkout(
+    source: str,
+    revision: str,
+    items: Sequence[LockedSkill],
+    destination: Path,
+    *,
+    run: Run,
+) -> None:
+    """Materialize one repository revision, fetching only the locked paths' blobs."""
+    destination.mkdir(mode=0o700, parents=True, exist_ok=False)
+    _git(["git", "init", "--quiet"], cwd=destination, run=run)
+    _git(["git", "remote", "add", "origin", source], cwd=destination, run=run)
+    _git(["git", "sparse-checkout", "init", "--no-cone"], cwd=destination, run=run)
+    _select(destination, items, run=run)
+    _git(
+        ["git", "fetch", "--quiet", "--filter=blob:none", "--depth=1", "origin", revision],
+        cwd=destination,
+        run=run,
+    )
+    _checkout(destination, revision, run=run)
+
+
+def _obtain_checkout(
+    source: str,
+    revision: str,
+    items: Sequence[LockedSkill],
+    root: Path,
+    *,
+    run: Run,
+) -> Path:
+    """Return a checkout of the locked revision, reusing a cached one without network."""
+    entry = _cache_entry(root, source, revision)
+    if entry.is_dir() and not entry.is_symlink() and _at_revision(entry, revision, run=run):
+        _select(entry, items, run=run)
+        _checkout(entry, revision, run=run)
+        return entry
+    if root.is_symlink():
+        raise ThirdPartyLockError("checkout cache directory is a symlink")
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if entry.is_symlink():
+        raise ThirdPartyLockError("checkout cache entry is a symlink")
+    if entry.exists():
+        shutil.rmtree(entry, ignore_errors=True)
+    temporary = Path(tempfile.mkdtemp(prefix=".fetch-", dir=root))
+    try:
+        _fetch_checkout(source, revision, items, temporary / "checkout", run=run)
+        try:
+            os.replace(temporary / "checkout", entry)
+        except OSError as exc:
+            if not (entry.is_dir() and _at_revision(entry, revision, run=run)):
+                raise ThirdPartyLockError(f"{source}: cannot publish a checkout") from exc
+            _select(entry, items, run=run)
+            _checkout(entry, revision, run=run)
+    finally:
+        shutil.rmtree(temporary, ignore_errors=True)
+    return entry
+
+
+def acquire_all(
+    lock: ThirdPartyLock,
+    destination: Path,
+    *,
+    run: Run = subprocess.run,
+    cache: Path | None = None,
+) -> Path:
+    """Acquire every lock entry into private staging and verify all before returning.
+
+    Entries sharing a source and revision share one checkout, that checkout holds
+    only the locked paths, and a cached one costs no network at all.
+    """
     destination.mkdir(mode=0o700, parents=True, exist_ok=False)
     skills_root = destination / "skills"
     skills_root.mkdir(mode=0o700)
-    checkouts = destination / "checkouts"
-    checkouts.mkdir(mode=0o700)
-    for item in lock.skills:
-        checkout = checkouts / item.id
-        checkout.mkdir(mode=0o700)
-        _git(["git", "init", "--quiet"], cwd=checkout, run=run)
-        _git(["git", "remote", "add", "origin", item.source], cwd=checkout, run=run)
-        _git(["git", "fetch", "--quiet", "--depth=1", "origin", item.revision], cwd=checkout, run=run)
-        _git(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=checkout, run=run)
-        revision = _git(["git", "rev-parse", "HEAD"], cwd=checkout, run=run)
-        verified = verify_checkout(item, checkout, revision)
-        shutil.copytree(verified, skills_root / item.id, symlinks=False)
-        if tree_hash(skills_root / item.id) != item.content_hash:
-            raise ThirdPartyLockError(f"{item.id}: staged copy changed after verification")
+    cache_root = _cache_root(cache)
+    for source, revision, items in _grouped(lock.skills):
+        checkout = _obtain_checkout(source, revision, items, cache_root, run=run)
+        for item in items:
+            verified = verify_checkout(item, checkout, revision)
+            target = skills_root / item.id
+            shutil.copytree(verified, target, symlinks=False)
+            if tree_hash(target) != item.content_hash:
+                raise ThirdPartyLockError(f"{item.id}: staged copy changed after verification")
     return skills_root
