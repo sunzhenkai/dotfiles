@@ -133,10 +133,10 @@ dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/modules/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（一手 skills + skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）
+- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（first-party skill 源位置（当前为空）+ skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）；自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)，本仓以第三方 group `solo-skills` 编目消费
 - 脚本：Python 包 `src/agents/`（`doctor.py` / `sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
-- 对外安装：本仓库可直接作 `npx skills` 源，`npx skills add sunzhenkai/dotfiles` 可装 `agents/skills/` 下全部一手 skill（装原样字节，`{{slash:x}}` 占位符不渲染）
+- 对外安装：共享 skill 用 `npx skills add sunzhenkai/solo-skills`；本仓 `npx skills add sunzhenkai/dotfiles` 只暴露 `.agents/skills/` 项目级 skill（`dotf-repo` 等）
 
 详见 `agents/README.md`、`agents/env/README.md`。
 

@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 RESOLVER = ROOT / "src" / "agents" / "skills_map.py"
 
@@ -108,11 +110,27 @@ def test_remove_mode_group_resolves_installed_skill_names() -> None:
     ]
 
 
-def test_first_party_skill_id_is_rejected_with_guidance() -> None:
-    result = run_resolver("commit-push")
+def test_first_party_skill_id_is_rejected_with_guidance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # first-party 集合当前为空：拒绝守卫用 DOTFILES_ROOT 沙箱编目验证。
+    repo = tmp_path / "repo"
+    skill = repo / "agents" / "skills" / "demo-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo-skill\ndescription: sandbox fixture\n---\n", encoding="utf-8"
+    )
+    (repo / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  dotfiles:\n    type: first-party\n    skills:\n      - demo-skill\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DOTFILES_ROOT", str(repo))
+
+    result = run_resolver("demo-skill")
     assert result.returncode != 0
     assert "first-party" in result.stderr
-    assert "dotf agents skill apply commit-push" in result.stderr
+    assert "dotf agents skill apply demo-skill" in result.stderr
 
 
 def test_unknown_name_passes_through_for_npx_search() -> None:

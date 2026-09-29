@@ -9,8 +9,8 @@
 ## Skills 目录约定
 
 - `.agents/skills/`（项目级 skill）：用于迭代**本项目**，只在当前仓库内生效。
-- `agents/skills/`：用于安装到不同 agent 的**可复用、共享 skill** 源仓库，**不用来迭代本项目**。改动这里的 skill 面向的是各 agent 环境的通用能力，与本项目自身的开发无关。
-- `.agents/skills/dotf-repo/`：给 agent 使用本仓库能力的入口文档（`dotf` CLI 操作、agents 同步、仓库开发约定）。功能改动（新模块/命令、CLI 语义变化、sync 行为、开发流程变化）时同步更新；纯文案或示例微调不必动。（原在仓库根 `SKILL.md`，为让 `npx skills add sunzhenkai/dotfiles` 能下钻发现 `agents/skills/`，根目录不能有 SKILL.md，故移入此；根目录 `skills` 符号链接同为此目的。）
+- `agents/skills/`：first-party skill 源的既定位置，**当前为空**——可复用共享 skill 已全部迁至 `sunzhenkai/solo-skills`（独立仓），本仓以第三方 group `solo-skills` 编目消费（改共享 skill 去那个仓，重锁经 `make skills-lock-update`）。first-party 概念保留：未来自有 skill 落回 `agents/skills/<id>/` 并在 `agents/skills.yaml` 以 first-party group 编目。**不用来迭代本项目**。
+- `.agents/skills/dotf-repo/`：给 agent 使用本仓库能力的入口文档（`dotf` CLI 操作、agents 同步、仓库开发约定）。功能改动（新模块/命令、CLI 语义变化、sync 行为、开发流程变化）时同步更新；纯文案或示例微调不必动。（原在仓库根 `SKILL.md`；曾以根目录 `skills` 符号链接让 `npx skills add sunzhenkai/dotfiles` 下钻发现共享 skill——该源角色已随迁移转到 solo-skills，链接已移除。）
 
 ## 全局 AGENTS.md 安装
 

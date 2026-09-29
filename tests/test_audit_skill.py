@@ -1,19 +1,32 @@
-"""Precision of agents/skills/skills-store/scripts/audit-skill.sh."""
+"""Precision of audit-skill.sh (skills-store, now hosted in sunzhenkai/solo-skills)."""
 
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-AUDIT = ROOT / "agents" / "skills" / "skills-store" / "scripts" / "audit-skill.sh"
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "agents"))
+
+import lock_update  # noqa: E402
+
+
+def _audit_script() -> Path:
+    # 与 lock_update 的回退链同源：仓内 first-party 副本 → 本机受管安装副本。
+    return lock_update.resolve_audit_script(ROOT, None)[0]
 
 
 def _audit(skill: Path) -> subprocess.CompletedProcess[str]:
+    try:
+        audit = _audit_script()
+    except lock_update.LockUpdateError:
+        pytest.skip("audit-skill.sh 不可用（仓内无 first-party 副本且本机未安装 skills-store）")
     return subprocess.run(
-        [str(AUDIT), str(skill)],
+        [str(audit), str(skill)],
         text=True,
         capture_output=True,
         check=False,

@@ -248,8 +248,24 @@ def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:
     assert "==> npx skills add frontend-design" in result.stdout
 
 
-def test_skills_install_rejects_first_party_skill_id(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-i", "commit-push", "--dry-run")
+def test_skills_install_rejects_first_party_skill_id(
+    tmp_home: Path, tmp_path: Path, monkeypatch
+) -> None:
+    # first-party 集合当前为空：拒绝守卫用 DOTFILES_ROOT 沙箱编目验证。
+    repo = tmp_path / "skills-repo"
+    skill = repo / "agents" / "skills" / "demo-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo-skill\ndescription: sandbox fixture\n---\n", encoding="utf-8"
+    )
+    (repo / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  dotfiles:\n    type: first-party\n    skills:\n      - demo-skill\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DOTFILES_ROOT", str(repo))
+
+    result = run_dotf("skills", "-i", "demo-skill", "--dry-run")
 
     assert result.returncode != 0
     assert "first-party" in result.stderr
@@ -323,12 +339,38 @@ def test_skills_help_lists_config(tmp_home: Path) -> None:
     assert "dotf skills -c --dry-run" in result.stdout
 
 
-def test_skills_config_yes_installs_first_party_without_agents_md(tmp_home: Path) -> None:
+def test_skills_config_yes_installs_first_party_without_agents_md(
+    tmp_home: Path, tmp_path: Path, monkeypatch
+) -> None:
+    # first-party 集合当前为空：用 DOTF_REPO_ROOT 沙箱仓验证一手安装路径。
+    repo = tmp_path / "skills-repo"
+    skill = repo / "agents" / "skills" / "demo-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo-skill\ndescription: sandbox fixture\n---\n", encoding="utf-8"
+    )
+    (repo / "agents").mkdir(parents=True, exist_ok=True)
+    (repo / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  dotfiles:\n    type: first-party\n    skills:\n      - demo-skill\n",
+        encoding="utf-8",
+    )
+    (repo / "agents" / "skills.lock.yaml").write_text(
+        "schema_version: 1\nkind: third-party-skills-lock\nskills: []\n",
+        encoding="utf-8",
+    )
+    (repo / "agents" / "runtime.yaml").write_text(
+        "version: 1\nskills:\n  files:\n    - SKILL.md\n  sidecars:\n    - references\n    - scripts\n"
+        "  excluded:\n    - patches\n    - evals\n    - experience\n    - evolutions\n    - authoring\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DOTF_REPO_ROOT", str(repo))
     isolate_agents_sync_for_test(tmp_home)
+
     result = run_dotf("skills", "-c", "--yes")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    skill_dir = tmp_home / ".agents" / "skills" / "commit-push"
+    skill_dir = tmp_home / ".agents" / "skills" / "demo-skill"
     assert (skill_dir / "SKILL.md").is_file()
     assert not (tmp_home / ".agents" / "AGENTS.md").exists()
 

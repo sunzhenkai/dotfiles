@@ -65,8 +65,24 @@ def test_json_error_structure(tmp_home: Path) -> None:
     assert "message" in doc["error"]
 
 
-def test_skills_json_error_structure(tmp_home: Path) -> None:
-    result = run_dotf("skills", "-i", "commit-push", "--dry-run")
+def test_skills_json_error_structure(
+    tmp_home: Path, tmp_path: Path, monkeypatch
+) -> None:
+    # first-party 集合当前为空：拒绝守卫用 DOTFILES_ROOT 沙箱编目验证。
+    repo = tmp_path / "skills-repo"
+    skill = repo / "agents" / "skills" / "demo-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo-skill\ndescription: sandbox fixture\n---\n", encoding="utf-8"
+    )
+    (repo / "agents" / "skills.yaml").write_text(
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  dotfiles:\n    type: first-party\n    skills:\n      - demo-skill\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DOTFILES_ROOT", str(repo))
+
+    result = run_dotf("skills", "-i", "demo-skill", "--dry-run")
     assert result.returncode == 1
     # skills_map 的 first-party 拒绝文案保持可见
     assert "first-party" in result.stderr

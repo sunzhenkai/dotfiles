@@ -15,7 +15,7 @@ description: "更新编目里已有第三方（外部）skill 的上游 revision
 make skills-lock-update
 ```
 
-- 对每个 source：fetch HEAD → 逐 skill 跑 `agents/skills/skills-store/scripts/audit-skill.sh` → 审计通过才写 lock；audit date 与 evidence 链接同步刷新。
+- 对每个 source：fetch HEAD → 逐 skill 跑审计脚本（`src/agents/lock_update.py` 的 `resolve_audit_script` 回退链：仓内 first-party 副本 → source checkout 自带的 `skills/skills-store/scripts/audit-skill.sh` → 本机受管副本 `~/.agents/skills/skills-store/scripts/audit-skill.sh`）→ 审计通过才写 lock；audit date 与 evidence 链接同步刷新。
 - 完成标准：输出末尾 `wrote agents/skills.lock.yaml sources=N blocked=0`。N 只数有推进的 source（已最新的显示 `current`，不计入）。
 - 默认警告也接受写入（fail-open）；要 fail closed 用 `FAIL_ON_WARN=1 make skills-lock-update`。
 
@@ -82,10 +82,10 @@ diff -r /tmp/verify-skill/<subdirectory> ~/.agents/skills/<id>
 8. **mattpocock 重钉常是纯 revision 前进**：上游提交往往只动锁外路径（in-progress/、README），17 个锁内 skill 内容零变化。重锁后 diff 里只有 revision 行在动属正常，别当成失败。
 9. **`optional: true` 的锁内条目本机没有副本，不是下发失败**：编目里标 optional 的第三方条目不进默认安装，`defaults` 段也不部署（本机经 overlay / `agents apply` 启用过的才会有，如 ui-skills-root）。第 4 步对它们只验上游 checkout 的 tree_hash == lock content_hash，`diff -r` 会报 MISSING，属预期。
 10. **optional 条目在本机有非托管副本时，`diff -r` 对不上不是下发失败**：坑 9 说的是 optional 默认没有副本；若它**恰好存在**且内容对不上，多半是更早手工拷贝的陈旧副本，本流程不负责刷新，别顺手覆盖。四个信号一起看才能定性：副本里带着 `patches/`、`evals/` 等本应被剥离的 authoring 目录（锁定部署不会留下它们）；`~/.local/state/dotf/agents-manifest.json` 里查无此 id（`defaults` 段没部署过）；与**旧** revision 的 diff 行数明显少于与新 revision 的（说明血缘更老，不是"同步失败"）；副本 mtime 早于本轮更新。定性后按 optional 条目只验上游 `tree_hash == content_hash` 即可落地级收尾。是否刷新这类副本是独立决策——它们可能有意保留着上游后来重建掉的内容。实例（2026-09-28）：`ui-template-apply` / `ui-template-author` / `ui-template-design` 在 `~/.agents/skills/` 下正是这种副本，而 `archify` / `senv-cli` 无副本。
-11. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复补 `tests/test_audit_skill.py`（误报 + 真风险各一条），并在 `agents/skills/skills-store/patches/` 留 proposal/change/result 三件套；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。
+11. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程（源在 solo-skills 仓）**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复改 `sunzhenkai/solo-skills` 仓的 `skills/skills-store/`（脚本 + `tests/test_audit_skill.py` 本仓侧回归 + 该仓 `skills/skills-store/patches/` 留 proposal/change/result 三件套），提交推送后重锁到新 revision；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。skills-store 自身的自指文本（规则表、误报表）用其 `.audit-allow` 豁免，不走规则放宽。
 
 ## 边界
 
 - **只刷新已有第三方条目**。新装/移除第三方 skill、改编目（增删 group 或成员）需要新审计锁，走 skills-store / `dotf skills add` / 直接编辑 `agents/skills.yaml`，不在本流程。
-- **一手 skill 的修改走 pwd-skill-manager**（或直接改 `agents/skills/<id>/`），与本流程无交集。
+- **共享 skill 的修改去 `sunzhenkai/solo-skills` 仓**（原 first-party 集合已全部迁出，本仓以第三方 group 消费）；本仓项目级 skill（`.agents/skills/`）的修改走 pwd-skill-manager，与本流程无交集。
 - lock 变更是数据变更，收尾提交遵循仓库惯例（`agents: ...` 风格），提交前 `make registry validate` 必须先过。

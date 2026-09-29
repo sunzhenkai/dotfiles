@@ -16,12 +16,21 @@ version: 3
 lock: skills.lock.yaml
 
 groups:
-  dotfiles:
-    type: first-party
+  # 自有 skill 已全部迁至 sunzhenkai/solo-skills：原 dotfiles first-party group 与
+  # task-flow-skills、agent-roster 两个 third-party group 并入此组（其中 2 个改名：
+  # dotf-code-explore→code-explore、dotf-code-review→solo-code-review）。
+  # first-party type 概念保留：未来自有 skill 仍可落回 agents/skills/<id>/ 并以
+  # first-party group 编目；当前编目无 first-party group，校验按空集通过。
+  solo-skills:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/solo-skills
     skills:
+      - agent-roster
+      - agent-roster-flow
+      - code-explore
       - commit-push
-      - dotf-code-explore
-      - dotf-code-review
+      - delivery-loop
       - id: lark-cli
         optional: true
       - llm-wiki
@@ -29,12 +38,17 @@ groups:
       - project-init
       - project-spec-mirror
       - repo-manager
+      - role-based-reviewer
       - id: role-chat
         optional: true
       - service-manager
       - skill-evolver
       - skill-upgrader
       - skills-store
+      - solo-code-review
+      - task-explore
+      - taskflow
+      - task-wizard
       - trouble-grill
 
   mattpocock:
@@ -62,27 +76,6 @@ groups:
         optional: true
       - writing-for-agents
 
-  agent-roster:
-    type: third-party
-    source: github
-    package: https://github.com/sunzhenkai/agent-roster
-    skills:
-      - agent-roster
-
-  task-flow-skills:
-    type: third-party
-    source: github
-    package: https://github.com/sunzhenkai/task-flow-skills
-    skills:
-      # 从本仓库 agents/skills/ 迁出的任务流/交付编排 skill（见 README）。
-      # agent-roster-flow 依赖底层 agent-roster（另一 group），需一并安装。
-      - agent-roster-flow
-      - delivery-loop
-      - role-based-reviewer
-      - task-explore
-      - task-wizard
-      - taskflow
-
   archify:
     type: third-party
     source: github
@@ -90,7 +83,7 @@ groups:
     skills:
       # 审计 2026-09-24：audit-skill.sh 命中 1 WARN（文档示例 URL git.internal，误报）。
       # 此前每次重锁都命中的 1 BLOCK（LICENSE 正文 without limitation）已由审计脚本豁免
-      # 套话后缀修掉，见 agents/skills/skills-store/patches/20260924-175847-jailbreak-license-boilerplate。
+      # 套话后缀修掉，见 solo-skills 仓 skills/skills-store/patches/20260924-175847-jailbreak-license-boilerplate。
       - id: archify
         optional: true
 

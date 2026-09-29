@@ -1,4 +1,0 @@
-interface:
-  display_name: "仓库管理"
-  short_description: "用 grepom/glab 做多仓批量操作；已有 .repo-manager.md 时维护台账"
-  default_prompt: "用 $repo-manager 跨 GitLab/GitHub 多仓做 clone、sync、status 等操作。已有 .repo-manager.md 时维护台账；创建前先询问。"

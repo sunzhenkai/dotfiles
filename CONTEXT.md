@@ -19,7 +19,7 @@ _Avoid_: 插件, prompt, command（command 是另一种制品）
 _Avoid_: skills-defaults（旧名）, 打平列表, skill 清单（含糊）
 
 **First-Party Skill**:
-来源是仓库内 `agents/skills/<id>/` 的 Skill。编目里 `type: first-party`；不带 hash/revision，目录即真相，但目录必须被编目覆盖。
+来源是仓库内 `agents/skills/<id>/` 的 Skill。编目里 `type: first-party`；不带 hash/revision，目录即真相，但目录必须被编目覆盖。自有共享 skill 已迁至 `sunzhenkai/solo-skills`（以第三方 group 消费），当前编目无 first-party group，`agents/skills/` 保留为空的既定源位置。
 _Avoid_: 自家 skill, 内置 skill, vendor 副本
 
 **Third-Party Skill**:
@@ -31,7 +31,7 @@ _Avoid_: 外部 skill, 上游 skill（作为制品名）
 _Avoid_: 未锁定 skill, 浮动上游
 
 **Skill Group**:
-编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。仓库一手 skill 进 `dotfiles`，第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id 或 alias、最后透传 npx。
+编目的组织与 CLI 单位：组声明来源属性（`type` / `source` / `package`），成员写 id。一手 skill 进 first-party 组（当前编目无；自有共享 skill 在 `solo-skills` 第三方组），第三方按来源分。group 不承载信任模型（那是 `type`）。组名兼作 CLI 展开单位，`dotf skills -i <group>` 装整组；名字解析先匹配 group、再匹配 skill id 或 alias、最后透传 npx。
 _Avoid_: type（两者正交）, 包, 命名空间（含糊）
 
 **Skill Layout**:

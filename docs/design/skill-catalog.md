@@ -39,22 +39,26 @@ groups:
 - 组声明来源属性；成员只写 id，**不可能在组内写错来源**。
 - group 名兼作 CLI 展开单位：`dotf skills -i <group>` / `dotf agents skill apply <group>`。
 - **没有 `default` 字段**：编目内即自动全量安装；`optional: true` 条目是唯一例外（不进默认安装，但可受管启用）。不想保留 → 注释掉条目。
-- 一手组（`dotfiles`）不声明 `source`/`package`；其来源是 `agents/skills/<id>/`。
+- 一手组不声明 `source`/`package`；其来源是 `agents/skills/<id>/`（first-party 源位置保留，当前编目无一手组——自有共享 skill 已迁 `sunzhenkai/solo-skills`，以第三方组消费）。
 - 第三方 `source` 两值：`github`（URL/owner-repo）与 `registry`（skills.sh 名）。
 
 ### 当前编目
 
 | group | type | source | package | 成员数 |
 |---|---|---|---|---|
-| `dotfiles` | first-party | — | — | 19 |
+| `solo-skills` | third-party | github | `sunzhenkai/solo-skills` | 22（含 2 optional） |
 | `mattpocock` | third-party | github | `mattpocock/skills` | 10（含 2 optional） |
-| `ui-templates`（注释掉） | third-party | github | `sunzhenkai/ui-templates-skill` | 0 |
+| `archify` | third-party | github | `tt-a1i/archify` | 1 optional |
+| `ui-templates` | third-party | github | `sunzhenkai/ui-templates-skill` | 3 optional |
 | `ui-skills` | third-party | github | `ibelick/ui-skills` | 1 optional |
 | `frontend-slides` | third-party | github | `zarazhangrui/frontend-slides` | 1 optional（别名 `ppt`） |
+| `senv` | third-party | github | `solo-kingdom/senv` | 1 optional |
+| `show-me` | third-party | github | `humanlayer/skills` | 1 optional |
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
-- `lark-cli` / `role-chat` / `wizard` / `to-questionnaire` / `ui-skills-root` / `frontend-slides` 标 `optional: true` → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
-- `taste` 与 `ui-templates` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` / `dotf skills -i ui-template-apply` 会把它们当普通名字透传给 npx。
+- 2026-09-29：原 first-party 组 `dotfiles` 的 15 个 skill 与第三方组 `task-flow-skills`、`agent-roster` 全部并入 `solo-skills` 组（`dotf-code-explore`→`code-explore`、`dotf-code-review`→`solo-code-review` 改名）；first-party 机制保留，`agents/skills/` 为空。
+- `solo-skills` 组内 `lark-cli` / `role-chat` 标 `optional: true`；`wizard` / `to-questionnaire` / `archify` / `ui-template-*` / `ui-skills-root` / `frontend-slides` / `senv-cli` / `show-me` 同为 optional → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
+- `taste` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` 会把它当普通名字透传给 npx。
 
 ## 4. 核心决策
 
@@ -114,7 +118,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 1. `skills` id 全局唯一、非空、不含 `/`。
 2. `type` 必须是 `first-party`/`third-party`；第三方必须有 `source`（`registry`/`github`）与 `package`；一手不得声明 `package`/`source`。
-3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。
+3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。当前两边均为空集，校验按空集通过。
 4. 编目里每个 third-party id 必须在 lock 覆盖；一手 id 不得在 lock。
 5. overlay 只能启用/停用编目内 id。
 6. `optional` 只允许写在成员映射上，且必须是布尔；`aliases` 只允许写在成员映射上，且必须是非空 id 列表。optional / alias 条目与其他条目一样参与 1–5 全部校验。别名不得与 skill id、group 名或其他别名冲突。
@@ -141,6 +145,8 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 - `dotf skills -i <group>`、`dotf agents skill apply <group>` 组展开可用。
 - 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
 - 全量测试 606 passed。
+- 2026-09-24：`ui-templates` 回到编目内并全标 optional（709cc55）。
+- 2026-09-29：first-party skill 迁出至 `sunzhenkai/solo-skills`，`dotfiles` / `task-flow-skills` / `agent-roster` 三组并入单一 `solo-skills` 第三方组；first-party 机制保留（见 `openspec/changes/migrate-first-party-skills-to-solo-skills/`）。
 
 ## 8. 后续可选项
 

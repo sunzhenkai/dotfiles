@@ -139,7 +139,7 @@ lark-cli auth status
 
 参考：[飞书 CLI 安装指南](https://open.feishu.cn/document/no_class/mcp-archive/feishu-cli-installation-guide.md)
 
-Agent 操作飞书业务时用本仓 `agents/skills/lark-cli`（薄路由，按需 `lark-cli skills read <id>`，勿一次加载全部上游 skill，也勿把上游 skill 落盘到 agent skills 目录）。
+Agent 操作飞书业务时用编目 skill `lark-cli`（来自 solo-skills 第三方组；薄路由，按需 `lark-cli skills read <id>`，勿一次加载全部上游 skill，也勿把上游 skill 落盘到 agent skills 目录）。
 
 #### dws（钉钉 Workspace CLI）
 
@@ -155,7 +155,7 @@ dotf agents -ic
 dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把本仓 `agents/skills` 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`，按锁定的第三方默认 skill 补齐，并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 rules，以及 Claude Code 的 `~/.claude/CLAUDE.md`。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`；指令目标清单见 `agents/instructions/install.yaml`。
+`dotf agents -c` 会把编目 Desired Set 的 skill 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`（含 solo-skills 等锁定的第三方默认 skill；`agents/skills/` 为 first-party 源位置、当前为空），并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 rules，以及 Claude Code 的 `~/.claude/CLAUDE.md`。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`；指令目标清单见 `agents/instructions/install.yaml`。
 
 > 本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-*`）；Codex、OpenCode、Pi 等工具的 provider 与密钥由本机自管。
 

@@ -1,5 +1,8 @@
 # 全量 skill 编目收敛到一份 `agents/skills.yaml`，按 group 组织，取消 default 开关
 
+> **状态（2026-09-29）**：本决定的编目机制继续有效；其中「仓库内承载一手 skill 源」部分已被 2026-09-29 的 skill 迁出取代：自有共享 skill 已迁至 sunzhenkai/solo-skills，本仓以第三方 group 消费；见 openspec/changes/migrate-first-party-skills-to-solo-skills/。
+
+
 第三方默认清单（`skills-defaults.yaml`）与短名映射（`skills-map.yaml`）合并为一份 **skill 编目** `agents/skills.yaml`，lock 相应改名 `agents/skills.lock.yaml`。理由：两份文件维护重复，且打平的 id 列表无法表达来源聚合、包形态与别名。
 
 编目**按 group 组织**：

@@ -10,6 +10,7 @@ Aliases resolve to the canonical catalog id before npx / apply.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,10 @@ CATALOG_REL = Path("agents") / "skills.yaml"
 
 
 def repo_root() -> Path:
+    # 与 desired_ops.repo_root 同语义：DOTFILES_ROOT 可指向沙箱 repo（测试用）。
+    configured = os.environ.get("DOTFILES_ROOT")
+    if configured:
+        return Path(configured).resolve()
     return Path(__file__).resolve().parents[2]
 
 

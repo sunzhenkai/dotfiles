@@ -41,6 +41,10 @@ Audit = Callable[[Path], tuple[int, str]]
 
 LOCK_REL = Path("agents") / "skills.lock.yaml"
 AUDIT_REL = Path("agents") / "skills" / "skills-store" / "scripts" / "audit-skill.sh"
+# source checkout 自带的 skills-store（first-party 迁出后，审计脚本随被锁 revision 走）
+CHECKOUT_AUDIT_REL = Path("skills") / "skills-store" / "scripts" / "audit-skill.sh"
+# 本机受管安装副本（经 lock 校验后下发；checkout 不含 skills-store 的 source 用它兜底）
+INSTALLED_AUDIT_REL = Path("~") / ".agents" / "skills" / "skills-store" / "scripts" / "audit-skill.sh"
 AUDIT_TOOL = AUDIT_REL.as_posix()
 LOCK_HEADER = (
     "# Strict third-party skills lock. Do not add an entry without externally\n"
@@ -152,6 +156,7 @@ def _promote(
     revision: str,
     *,
     today: str,
+    tool: str = AUDIT_TOOL,
 ) -> LockedSkill:
     license_path = checkout / item.license.file
     try:
@@ -181,12 +186,34 @@ def _promote(
             item.audit,
             status="approved",
             date=today,
-            tool=AUDIT_TOOL,
+            tool=tool,
             evidence=f"{item.source}/commit/{revision}",
         ),
     )
     verify_checkout(promoted, checkout, revision)
     return promoted
+
+
+def resolve_audit_script(root: Path, checkout: Path | None) -> tuple[Path, str]:
+    """审计脚本来源回退链，返回 (脚本路径, lock tool 字段标签)。
+
+    仓内 first-party 副本优先（first-party 概念保留，未来可落回）；缺省时用本次
+    checkout 自带的 skills-store（版本与被锁 revision 自洽）；checkout 不含
+    skills-store 的 source 退回本机受管安装副本。
+    """
+    candidates: list[tuple[Path, str]] = [(root / AUDIT_REL, AUDIT_TOOL)]
+    if checkout is not None:
+        candidates.append(
+            (checkout / CHECKOUT_AUDIT_REL, CHECKOUT_AUDIT_REL.as_posix() + " (source checkout)")
+        )
+    candidates.append((INSTALLED_AUDIT_REL.expanduser(), INSTALLED_AUDIT_REL.as_posix()))
+    for script, label in candidates:
+        if script.is_file():
+            return script, label
+    raise LockUpdateError(
+        "audit script not found; expected one of: "
+        + ", ".join(str(script) for script, _ in candidates)
+    )
 
 
 def _default_audit(skill_dir: Path, script: Path) -> tuple[int, str]:
@@ -243,7 +270,6 @@ def update_lock(
     for item in lock.skills:
         grouped.setdefault(item.source, []).append(item)
 
-    audit_fn = audit or (lambda skill_dir: _default_audit(skill_dir, root / AUDIT_REL))
     day = today or date.today().isoformat()
     by_id = {item.id: item for item in lock.skills}
     updated: list[SourceUpdate] = []
@@ -264,10 +290,19 @@ def update_lock(
             print(f"    {previous} → {tip[:12]}  ({len(items)} skills)")
             checkout = staging / hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
             materialize(origin, checkout, tip, run=run)
+            if audit is not None:
+                audit_fn: Audit = audit
+                tool_label = AUDIT_TOOL
+            else:
+                script, tool_label = resolve_audit_script(root, checkout)
+
+                def audit_fn(skill_dir: Path, _script: Path = script) -> tuple[int, str]:
+                    return _default_audit(skill_dir, _script)
+
             promoted_ids: list[str] = []
             for item in items:
                 try:
-                    promoted = _promote(item, checkout, tip, today=day)
+                    promoted = _promote(item, checkout, tip, today=day, tool=tool_label)
                     _audit_skill(item, checkout, accept_warn=accept_warn, audit=audit_fn)
                 except AuditBlocked as exc:
                     print(f"    keep {item.id} @ {item.revision[:12]}  ({exc})")

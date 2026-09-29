@@ -1,5 +1,8 @@
 # 编目支持 optional 条目：默认不装、可受管按需启用
 
+> **状态（2026-09-29）**：本决定的编目机制继续有效；其中「仓库内承载一手 skill 源」部分已被 2026-09-29 的 skill 迁出取代：自有共享 skill 已迁至 sunzhenkai/solo-skills，本仓以第三方 group 消费；见 openspec/changes/migrate-first-party-skills-to-solo-skills/。
+
+
 部分推翻 ADR-0012「没有"是否默认安装"字段」：当时只有两级状态——编目内（默认全装）与注释掉（完全不可受管安装）。实际运行后，`lark-cli`（飞书路由，只有操作飞书时才需要）与 `en-chat`（英语陪练）这类 skill 希望平时不装、不占用各 agent 的 skill 扫描面，但需要时仍走受管通道（overlay `enabled_skills` / `dotf agents skill apply`）一键启用，而不是手动复制目录、也不是走 `dotf skills -i` 的 npx 通道绕过受管模型。
 
 决定：编目组成员在纯 id 字符串之外支持映射形态 `- id: <id>` + `optional: true`。optional 条目**仍在编目内**：属 overlay 合法词汇、可经启用进入 Desired Set、参与 approved/lock/一手覆盖校验；但 Desired Set 公式从「编目全部 ∪ 启用 − 停用」改为「编目非 optional ∪ 启用 − 停用」，默认全量安装（`dotf agents -c`）跳过它们，sync 会把已安装的 optional 条目按 stale prune。`lark-cli`、`en-chat` 首批标记 optional。
