@@ -777,7 +777,10 @@ def _default_file_mode(declaration: ConfigDeclaration, source_stat: os.stat_resu
         return 0o600
     if source_stat is None:
         return 0o600 if declaration.target_mode & 0o111 == 0 else 0o700
-    return stat.S_IMODE(source_stat.st_mode) & 0o777
+    # Source file modes follow the checkout machine's umask (git only tracks the
+    # exec bit); clamp to the registry policy so umask noise such as 0664/0775
+    # cannot read as a producer-permission escalation.
+    return stat.S_IMODE(source_stat.st_mode) & declaration.target_mode
 
 
 def _validate_output_mode(declaration: ConfigDeclaration, mode: int) -> None:

@@ -108,6 +108,31 @@ def test_copy_plan_is_side_effect_free_and_apply_is_file_hash_idempotent(tmp_pat
     assert not (home / ".local" / "state" / "dotf" / "backups").exists()
 
 
+def test_copy_directory_source_modes_clamp_to_registry_policy(tmp_path: Path) -> None:
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config"
+    source.mkdir()
+    plain = source / "rc.conf"
+    plain.write_text("plain\n", encoding="utf-8")
+    executable = source / "hook.sh"
+    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    plain.chmod(0o664)
+    executable.chmod(0o775)
+    target = home / ".config" / "fixture"
+    module = _module(source, target)
+
+    plan = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
+    assert plan.status == "changed"
+    applied = apply_config_plan(plan, repo_root=repo, home=home, state_home=state, run_id="run-1")
+    assert applied.status == "changed"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o755
+    assert stat.S_IMODE((target / "rc.conf").stat().st_mode) == 0o644
+    assert stat.S_IMODE((target / "hook.sh").stat().st_mode) == 0o755
+
+    replay = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
+    assert replay.status == "unchanged"
+
+
 def test_copy_update_uses_managed_hash_and_stale_reconcile_is_conservative(tmp_path: Path) -> None:
     repo, home, state = _roots(tmp_path)
     source = repo / "config"
