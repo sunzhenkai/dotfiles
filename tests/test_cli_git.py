@@ -101,6 +101,30 @@ def test_pull_stashes_dirty_tree(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
+def test_pull_untracked_only_no_stash_no_fake_conflict(tmp_path: Path) -> None:
+    remote, clone = _make_remote_repo(tmp_path)
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(remote), str(other))
+    (other / "new.txt").write_text("new\n", encoding="utf-8")
+    _git(other, "add", ".")
+    _git(other, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "add")
+    _git(other, "push", "-q", "origin", "HEAD:main")
+
+    # 只有 untracked 文件（如运行时插件目录，内嵌 .git 的克隆同理）：
+    # 不触发 stash，pull 正常，更不能误报 stash pop 冲突
+    plugins = clone / "tmux" / "plugins" / "tpm"
+    plugins.mkdir(parents=True)
+    (plugins / "tpm").write_text("plugin\n", encoding="utf-8")
+
+    result = _run_cli(clone, "pull")
+    assert result.returncode == 0, result.stderr
+    assert "stash" not in result.stdout
+    assert (clone / "new.txt").read_text(encoding="utf-8") == "new\n"
+    assert (plugins / "tpm").read_text(encoding="utf-8") == "plugin\n"
+    assert _git(clone, "stash", "list").stdout.strip() == ""
+
+
+@pytest.mark.slow
 def test_pull_conflict_reports_conflict_code(tmp_path: Path) -> None:
     remote, clone = _make_remote_repo(tmp_path)
     other = tmp_path / "other"

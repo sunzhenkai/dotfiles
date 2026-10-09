@@ -547,24 +547,22 @@ def _head() -> str:
 
 
 def _protective_pull() -> str:
-    """stash → pull → pop。返回拉取前的 HEAD（用于比对是否有新提交）。"""
-    def dirty() -> bool:
+    """stash → pull → pop。返回拉取前的 HEAD（用于比对是否有新提交）。
+
+    只对 tracked 改动 stash：git stash 默认不收 untracked，若把
+    untracked 也当 dirty，会空 stash（退出码 0）后误置 stashed，
+    随后 stash pop 因无条目退出 1，被误报成冲突。untracked 不阻碍
+    fast-forward；真与 incoming 文件相撞时 pull 自身会失败终止。
+    """
+    def tracked_dirty() -> bool:
         return (
             _git("diff", "--quiet").returncode != 0
             or _git("diff", "--cached", "--quiet").returncode != 0
-            or bool(
-                subprocess.run(
-                    ["git", "ls-files", "--others", "--exclude-standard"],
-                    cwd=REPO_ROOT,
-                    capture_output=True,
-                    text=True,
-                ).stdout.strip()
-            )
         )
 
     before = _head()
     stashed = False
-    if dirty():
+    if tracked_dirty():
         print("检测到未提交的改动，执行 stash...")
         if _git("stash").returncode != 0:
             raise DotfError("env", "错误: git stash 失败")
