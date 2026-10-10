@@ -1,5 +1,7 @@
 # 全局 AGENTS.md 的用户级安装目标。源文件是 AGENTS.md；Cursor 需要 .mdc frontmatter；
-# Claude Code 读 ~/.claude/CLAUDE.md（不读 AGENTS.md）。
+# Claude Code 读 ~/.claude/CLAUDE.md（不读 AGENTS.md）；opencode 的全局指令发现会
+# 一并加载 ~/.claude/CLAUDE.md；pi 用户级指令 = <agent-dir>/AGENTS.md（默认 ~/.pi/agent，
+# 见 pi docs/configuration.md）；omp 与 kimi 读 ~/.agents/AGENTS.md。
 version: 1
 source: AGENTS.md
 targets:
@@ -14,4 +16,7 @@ targets:
     format: cursor-mdc
   - id: claude
     path: ~/.claude/CLAUDE.md
+    format: markdown
+  - id: pi
+    path: ~/.pi/agent/AGENTS.md
     format: markdown
