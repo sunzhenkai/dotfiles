@@ -1,0 +1,4 @@
+python3 src/dotf_core/registry.py validate --strict-handlers
+✓ 注册表校验通过（strict-handlers）
+python3 src/dotf_core/registry.py validate --strict-handlers
+✓ 注册表校验通过（strict-handlers）

@@ -1,0 +1,535 @@
+PYTHONUNBUFFERED=1 python3 src/agents/lock_update.py 
+==> lock-update  https://github.com/sunzhenkai/solo-skills
+    2d8ae05cb63d → 072ef69647bd  (22 skills)
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/agent-roster ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/agent-roster-flow ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/code-explore ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/commit-push ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/lark-cli ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/llm-wiki ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/pretty-view-html ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/project-init ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/project-spec-mirror ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/repo-manager ===
+发现: 0 项阻断, 1 项警告
+
+[WARN ] global_shell_rc (SKILL.md:198)
+    在 `~/.zshrc`（或 `~/.bashrc`）加一次：
+
+结论: 存在警告，需用户明确确认后方可安装。
+warning: repo-manager: audit warnings accepted
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/role-based-reviewer ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/role-chat ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/service-manager ===
+发现: 0 项阻断, 1 项警告
+
+[WARN ] sudo_usage (SKILL.md:292)
+    - 需要 sudo / 改 systemd：说明并先征得同意。
+
+结论: 存在警告，需用户明确确认后方可安装。
+warning: service-manager: audit warnings accepted
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/skill-evolver ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/skill-upgrader ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/skills-store ===
+结果: 通过（未发现风险模式；豁免 31 项，见 .audit-allow）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/solo-code-review ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/task-explore ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/task-confirm ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/taskrail ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/taskflow ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/fc6d2394e36f23c8/skills/trouble-grill ===
+结果: 通过（未发现风险模式）
+==> lock-update  https://github.com/tt-a1i/archify
+    69cf67208728 → 7f483b61e8f6  (1 skills)
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/26de699d3e5c651e/archify ===
+发现: 19 项阻断, 131 项警告
+
+[BLOCK] bypass_approval (test/visual-check.test.mjs:241)
+    test('visual-check disables the Chrome sandbox only for root or an explicit environment opt-in', () => {
+[WARN ] browser_session (test/start-page.test.mjs:96)
+        sessionStorage: {
+[WARN ] browser_session (test/site-language-continuity.test.mjs:30)
+      const localStorage = {
+[WARN ] browser_session (test/site-language-continuity.test.mjs:58)
+        localStorage,
+[WARN ] browser_session (test/site-language-continuity.test.mjs:326)
+          /localStorage\.setItem\(['"]archify-(?:lang|gallery-language|guide-language)['"]/,
+[WARN ] browser_session (test/site-language-continuity.test.mjs:549)
+        await evaluate(browser, sessionId, 'localStorage.clear()');
+[WARN ] browser_session (test/site-language-continuity.test.mjs:551)
+        await evaluate(browser, sessionId, "localStorage.setItem('archify-guide-language', 'zh')");
+[WARN ] browser_session (test/site-language-continuity.test.mjs:555)
+          await evaluate(browser, sessionId, "localStorage.setItem('archify-lang', 'zh')");
+[WARN ] browser_session (test/site-language-continuity.test.mjs:558)
+          await evaluate(browser, sessionId, 'localStorage.clear()');
+[WARN ] browser_session (test/site-language-continuity.test.mjs:565)
+            stored: localStorage.getItem('archify-lang')
+[WARN ] browser_session (test/site-language-continuity.test.mjs:569)
+        await evaluate(browser, sessionId, 'localStorage.clear()');
+[WARN ] browser_session (test/site-language-continuity.test.mjs:574)
+          stored: localStorage.getItem('archify-lang'),
+[WARN ] browser_session (test/site-language-continuity.test.mjs:643)
+          stored: localStorage.getItem('archify-lang'),
+[WARN ] browser_session (test/site-language-continuity.test.mjs:701)
+              pendingState: sessionStorage.getItem('archify-guide-language-state.v1')
+[WARN ] browser_session (test/site-language-continuity.test.mjs:719)
+          assert.equal(await evaluate(browser, sessionId, 'localStorage.getItem("archify-lang")'), 'en');
+[WARN ] browser_session (test/semantic-lens-browser.test.mjs:68)
+        try {localStorage.removeItem('archify-motion');} catch (_) {}
+[WARN ] browser_session (test/route-probe-browser.test.mjs:56)
+        try {localStorage.removeItem('archify-motion');} catch (_) {}
+[WARN ] internal_url (test/repository-evidence.test.mjs:220)
+        url: 'http://git.example.internal:3000/Platform/Services/evidence-repo',
+[WARN ] internal_url (test/repository-evidence.test.mjs:244)
+        ['https://git.internal/Platform/Services/repo.git', 'https://git.internal:443/Platform/Services/repo.git'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:249)
+        ['http://git.internal:3000/Platform/repo.git', 'http://user:SYNTHETIC_TOKEN@git.internal:3000/Platform/repo.git'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:250)
+        ['https://git.internal/Platform/repo.git', 'https://user:SYNTHETIC_TOKEN@git.internal/Platform/repo.git'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:288)
+        ['https://git.internal/Team/repo', 'https://other.internal/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:289)
+        ['https://git.internal/Team/repo', 'https://git.internal/Team/other'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:290)
+        ['https://git.internal/Team/repo', 'https://git.internal/team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:291)
+        ['https://git.internal/Team/repo', 'http://git.internal/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:292)
+        ['https://git.internal/Team/repo', 'https://git.internal:8443/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:294)
+        ['https://git.internal:2222/Team/repo', 'ssh://git@git.internal:2222/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:295)
+        ['https://git.internal/Team/repo', 'git@ssh-alias:Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:296)
+        ['https://git.internal/Team/repo', 'https://git.internal/scm/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:297)
+        ['https://git.internal/Team/repo', 'https://git.internal/Team/ignored/../repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:298)
+        ['https://git.internal/Team/repo', 'git@git.internal:Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:299)
+        ['https://git.internal/Team/repo', 'ssh://git@git.internal/Team/repo'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:301)
+        ['http://git.internal/Team/repo', 'http://git.internal/Team/repo.git'],
+[WARN ] internal_url (test/repository-evidence.test.mjs:315)
+      data.diagram.meta.repository.url = 'http://git.internal/team/repo';
+[WARN ] internal_url (test/repository-evidence.test.mjs:317)
+      git(data.root, 'remote', 'set-url', 'origin', 'http://git.internal/team/repo');
+[WARN ] internal_url (test/repository-evidence.test.mjs:350)
+        { url: 'https://git.internal/team/repo' },
+[WARN ] internal_url (test/repository-evidence.test.mjs:352)
+        { url: 'https://git.internal/team/repo', provider: 'gitee' },
+[WARN ] internal_url (test/repository-evidence.test.mjs:372)
+      data.diagram.meta.repository = { url: 'http://git.internal/Team/repo', revision: data.revision, link_mode: 'local-only...
+[WARN ] internal_url (test/repository-evidence.test.mjs:376)
+        'http://git.internal/Team/repo?token=SYNTHETIC_TOKEN',
+[WARN ] internal_url (test/repository-evidence.test.mjs:407)
+      data.diagram.meta.repository.url = 'http://git.internal/Team/repo';
+[WARN ] internal_url (test/repository-evidence.test.mjs:409)
+      git(data.root, 'remote', 'set-url', 'origin', 'http://git.internal/Team/repo');
+[WARN ] internal_url (test/repository-evidence.test.mjs:441)
+          const url = local ? 'http://git.internal/Team/repo' : `https://${mode}.com/example/evidence-repo`;
+[WARN ] internal_url (test/repository-evidence-types.test.mjs:221)
+        data.diagram.meta.repository = { url: 'http://git.internal:3000/Platform/evidence-repo', revision: data.revision, li...
+[WARN ] internal_url (test/repository-evidence-types.test.mjs:223)
+        git(data.root, 'remote', 'set-url', 'origin', 'http://git.internal:3000/Platform/evidence-repo');
+[WARN ] internal_url (test/repository-evidence-types-browser.test.mjs:52)
+        const url = local ? 'http://git.internal/Team/repo' : 'https://github.com/example/evidence-repo';
+[WARN ] browser_session (test/preset-tryon.test.mjs:100)
+      assert.doesNotMatch(runtime, /localStorage|sessionStorage|history\.|location\.|URLSearchParams/);
+[WARN ] browser_session (test/motion-governor.test.mjs:64)
+      assert.match(html, /localStorage\.setItem\(STORAGE_KEY, 'still'\)/);
+[WARN ] browser_session (test/motion-governor.test.mjs:65)
+      assert.match(html, /localStorage\.removeItem\(STORAGE_KEY\)/);
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:73)
+          // Capture methods without accessing localStorage before Viewer startup.
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:78)
+            removeStored.call(localStorage, 'archify-motion');
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:79)
+            return readStored.call(localStorage, 'archify-motion');
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:168)
+        assert.equal(await run(`localStorage.getItem('archify-motion')`), 'still');
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:170)
+        // Observe after normal startup. A CDP new-document localStorage read can
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:175)
+          const stored = await run(`({current:localStorage.getItem('archify-motion'),navigation:motionNavigation,url:locatio...
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:181)
+        assert.equal(await run(`localStorage.getItem('archify-motion')`), 'still');
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:183)
+        assert.equal(await run(`localStorage.getItem('archify-motion')`), null);
+[WARN ] browser_session (test/motion-governor-browser.test.mjs:199)
+        assert.equal(await run(`localStorage.getItem('archify-motion')`), null, 'Fresh fixtures reset prior stored intent.')...
+[WARN ] browser_session (test/intent-trace-browser.test.mjs:59)
+        try {localStorage.removeItem('archify-motion');} catch (_) {}
+[WARN ] browser_session (test/focus-browser.test.mjs:65)
+        try{localStorage.removeItem('archify-motion');}catch(_){}
+[BLOCK] jailbreak_role (test/edge-label-color.test.mjs:86)
+    test('edge labels use the same variant color contract as their paths in every shared renderer and preset', () => {
+[BLOCK] jailbreak_role (test/cli.test.mjs:627)
+    test('cli: deliver --open launches only the committed absolute artifact as one argument', {
+[WARN ] browser_session (test/architecture-reading-size-browser.test.mjs:176)
+          localStorage.removeItem('archify-rail-placement');
+[WARN ] browser_session (test/architecture-delta.test.mjs:641)
+      assert.doesNotMatch(deltaShell, /localStorage|sessionStorage|history\.(?:pushState|replaceState)/);
+[WARN ] internal_url (test/architecture-delta.test.mjs:550)
+      base.meta.repository = { url: 'https://git.internal/Team/Services/repo.git', revision: 'a'.repeat(40), link_mode: 'loc...
+[WARN ] internal_url (test/architecture-delta.test.mjs:551)
+      head.meta.repository = { url: 'https://git.internal:443/Team/Services/repo.git', revision: 'b'.repeat(40), link_mode: ...
+[WARN ] internal_url (test/architecture-delta.test.mjs:554)
+      assert.equal(canonical.meta.repository.url, 'https://git.internal/Team/Services/repo.git');
+[WARN ] internal_url (test/architecture-delta.test.mjs:556)
+      head.meta.repository.url = 'https://git.internal/team/Services/repo.git';
+[BLOCK] hardcoded_secret (scripts/check-update.mjs:321)
+      const token = preparedCacheDirectories.get(path.resolve(cacheDirectory));
+[BLOCK] jailbreak_role (renderers/shared/cli.mjs:32)
+    // the same "omit locale, disclose the fallback" contract as before, just
+[BLOCK] jailbreak_role (renderers/sequence/render-sequence.mjs:483)
+      // Same default-canvas contract as lifecycle: 920x760 is below the 1.55 wide
+[BLOCK] jailbreak_role (renderers/dataflow/render-dataflow.mjs:507)
+      // Same default-canvas contract as lifecycle: 940x720 is below the 1.55 wide
+[WARN ] internal_url (references/authoring-contract.md:376)
+      "url": "http://git.internal:3000/Platform/Services/service",
+[BLOCK] jailbreak_role (examples/workflow-agent-tool-call-rendered.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (examples/workflow-agent-tool-call-rendered.html:8251)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:5654)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:5663)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:5666)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:5669)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:7302)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:7306)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:7307)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:9506)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:9510)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (examples/workflow-agent-tool-call-rendered.html:9514)
+            try { localStorage.setItem(key, value); } catch (_) {}
+[BLOCK] jailbreak_role (examples/web-app-rendered.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (examples/web-app-rendered.html:8233)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (examples/web-app-rendered.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (examples/web-app-rendered.html:5636)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (examples/web-app-rendered.html:5645)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (examples/web-app-rendered.html:5648)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/web-app-rendered.html:5651)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (examples/web-app-rendered.html:7284)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/web-app-rendered.html:7288)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (examples/web-app-rendered.html:7289)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (examples/web-app-rendered.html:9488)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (examples/web-app-rendered.html:9492)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (examples/web-app-rendered.html:9496)
+            try { localStorage.setItem(key, value); } catch (_) {}
+[BLOCK] jailbreak_role (examples/sequence-cache-miss-request.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (examples/sequence-cache-miss-request.html:8260)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:5663)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:5672)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:5675)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:5678)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:7311)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:7315)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:7316)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:9515)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:9519)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (examples/sequence-cache-miss-request.html:9523)
+            try { localStorage.setItem(key, value); } catch (_) {}
+[BLOCK] jailbreak_role (examples/lifecycle-agent-run.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (examples/lifecycle-agent-run.html:8190)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (examples/lifecycle-agent-run.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (examples/lifecycle-agent-run.html:5593)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (examples/lifecycle-agent-run.html:5602)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (examples/lifecycle-agent-run.html:5605)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/lifecycle-agent-run.html:5608)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (examples/lifecycle-agent-run.html:7241)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/lifecycle-agent-run.html:7245)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (examples/lifecycle-agent-run.html:7246)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (examples/lifecycle-agent-run.html:9445)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (examples/lifecycle-agent-run.html:9449)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (examples/lifecycle-agent-run.html:9453)
+            try { localStorage.setItem(key, value); } catch (_) {}
+[BLOCK] jailbreak_role (examples/dataflow-product-analytics.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (examples/dataflow-product-analytics.html:8245)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (examples/dataflow-product-analytics.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (examples/dataflow-product-analytics.html:5648)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (examples/dataflow-product-analytics.html:5657)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (examples/dataflow-product-analytics.html:5660)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/dataflow-product-analytics.html:5663)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (examples/dataflow-product-analytics.html:7296)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (examples/dataflow-product-analytics.html:7300)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (examples/dataflow-product-analytics.html:7301)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (examples/dataflow-product-analytics.html:9500)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (examples/dataflow-product-analytics.html:9504)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (examples/dataflow-product-analytics.html:9508)
+            try { localStorage.setItem(key, value); } catch (_) {}
+[BLOCK] jailbreak_role (assets/template.html:520)
+        /* Gallery/embed mode keeps the generated artifact as the source of truth
+[BLOCK] hardcoded_secret (assets/template.html:8134)
+                var token = relationshipTokenGeometry(shapes[0], tokenKind, key);
+[WARN ] browser_session (assets/template.html:26)
+              try { theme = localStorage.getItem('archify-theme'); } catch (_) {}
+[WARN ] browser_session (assets/template.html:5537)
+           Theme toggle — persists to localStorage, respects system pref
+[WARN ] browser_session (assets/template.html:5546)
+          // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+[WARN ] browser_session (assets/template.html:5549)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (assets/template.html:5552)
+            try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+[WARN ] browser_session (assets/template.html:7185)
+            try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+[WARN ] browser_session (assets/template.html:7189)
+              if (readerPaused) localStorage.setItem(STORAGE_KEY, 'still');
+[WARN ] browser_session (assets/template.html:7190)
+              else localStorage.removeItem(STORAGE_KEY);
+[WARN ] browser_session (assets/template.html:9389)
+          // to later artifacts, so a blocked or full localStorage cannot freeze it.
+[WARN ] browser_session (assets/template.html:9393)
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+[WARN ] browser_session (assets/template.html:9397)
+            try { localStorage.setItem(key, value); } catch (_) {}
+
+结论: 存在阻断项，禁止安装。
+    keep archify @ 69cf67208728  (archify: audit failed (exit 2))
+    skipped write for https://github.com/tt-a1i/archify: every skill blocked
+==> lock-update  https://github.com/mattpocock/skills
+    current  49dd158d1076  (17 skills)
+==> lock-update  https://github.com/zarazhangrui/frontend-slides
+    current  9906a34d640d  (1 skills)
+==> lock-update  https://github.com/solo-kingdom/senv
+    current  a48fc3f6a530  (1 skills)
+==> lock-update  https://github.com/humanlayer/skills
+    current  653b6411c1f7  (1 skills)
+==> lock-update  https://github.com/Leonxlnx/taste-skill
+    current  717446e07a78  (1 skills)
+==> lock-update  https://github.com/sunzhenkai/ui-templates-skill
+    0d94a51f4f8e,3d5fc437edc4 → 3d5fc437edc4  (3 skills)
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/3f4ae2712ceaabb4/skills/ui-template-apply ===
+结果: 通过（未发现风险模式）
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/3f4ae2712ceaabb4/skills/ui-template-author ===
+发现: 52 项阻断, 0 项警告
+
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:15)
+      project_token: --wt-color-app-shell
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:19)
+      project_token: --wt-color-page-canvas
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:27)
+      project_token: --wt-color-surface-raised
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:31)
+      project_token: --wt-color-secondary
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:35)
+      project_token: --wt-color-secondary-foreground
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:39)
+      project_token: --wt-color-secondary-hover
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:43)
+      project_token: --wt-color-primary-hover
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:47)
+      project_token: --wt-color-brand-hover
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:51)
+      project_token: --wt-color-status-danger-hover
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:59)
+      project_token: --wt-color-ring-focus
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:63)
+      project_token: --wt-color-sidebar-accent
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:67)
+      project_token: --wt-color-sidebar-accent-foreground
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:71)
+      project_token: --wt-color-sidebar-foreground
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:75)
+      project_token: --wt-color-surface-border
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:79)
+      project_token: --wt-color-surface-hover
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:83)
+      project_token: --wt-color-surface-selected
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:91)
+      project_token: --wt-color-text-primary
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:95)
+      project_token: --wt-color-text-secondary
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:99)
+      project_token: --wt-color-text-muted
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:103)
+      project_token: --wt-color-text-disabled
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:107)
+      project_token: --wt-color-text-on-primary
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:115)
+      project_token: --wt-color-brand-foreground
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:123)
+      project_token: --wt-color-status-success
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:127)
+      project_token: --wt-color-status-warning
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:131)
+      project_token: --wt-color-status-danger
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:135)
+      project_token: --wt-color-status-info
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:159)
+      project_token: --wt-font-weight-regular
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:163)
+      project_token: --wt-font-weight-medium
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:167)
+      project_token: --wt-font-weight-semibold
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:199)
+      project_token: --wt-shadow-floating
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:211)
+      project_token: --wt-size-control-height-xs
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:215)
+      project_token: --wt-size-control-height-sm
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:219)
+      project_token: --wt-size-control-height-default
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:223)
+      project_token: --wt-size-control-height-lg
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:227)
+      project_token: --wt-size-icon-default
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:231)
+      project_token: --wt-size-icon-compact
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:239)
+      project_token: --wt-size-dialog-max-height
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:243)
+      project_token: --wt-size-section-nav-default
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:247)
+      project_token: --wt-size-sidebar-default
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:255)
+      project_token: --wt-space-chat-launcher-inset
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:259)
+      project_token: --wt-space-chat-launcher-size
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:263)
+      project_token: --wt-space-header-height
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:267)
+      project_token: --wt-typography-micro
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:271)
+      project_token: --wt-typography-secondary
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:275)
+      project_token: --wt-typography-label
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:279)
+      project_token: --wt-typography-body
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:283)
+      project_token: --wt-typography-body-lg
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:287)
+      project_token: --wt-typography-title-sm
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:291)
+      project_token: --wt-typography-heading
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:295)
+      project_token: --wt-typography-title-lg
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:299)
+      project_token: --wt-typography-display-sm
+[BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:303)
+      project_token: --wt-typography-display
+
+结论: 存在阻断项，禁止安装。
+    keep ui-template-author @ 0d94a51f4f8e  (ui-template-author: audit failed (exit 2))
+=== Skill 安全审计: /tmp/dotf-lock-update-u0d0z5ls/3f4ae2712ceaabb4/skills/ui-template-design ===
+结果: 通过（未发现风险模式）
+==> lock-update  https://github.com/ibelick/ui-skills
+    current  61db8907496d  (1 skills)
+  blocked 2 skill(s); audit findings:
+    archify
+      [BLOCK] bypass_approval (test/visual-check.test.mjs:241)
+      test('visual-check disables the Chrome sandbox only for root or an explicit environment opt-in', () => {
+      [BLOCK] jailbreak_role (test/edge-label-color.test.mjs:86)
+      test('edge labels use the same variant color contract as their paths in every shared renderer and preset', () => {
+      [BLOCK] jailbreak_role (test/cli.test.mjs:627)
+      test('cli: deliver --open launches only the committed absolute artifact as one argument', {
+      [BLOCK] hardcoded_secret (scripts/check-update.mjs:321)
+      const token = preparedCacheDirectories.get(path.resolve(cacheDirectory));
+      [BLOCK] jailbreak_role (renderers/shared/cli.mjs:32)
+      // the same "omit locale, disclose the fallback" contract as before, just
+      [BLOCK] jailbreak_role (renderers/sequence/render-sequence.mjs:483)
+      // Same default-canvas contract as lifecycle: 920x760 is below the 1.55 wide
+      [BLOCK] jailbreak_role (renderers/dataflow/render-dataflow.mjs:507)
+      // Same default-canvas contract as lifecycle: 940x720 is below the 1.55 wide
+      [BLOCK] jailbreak_role (examples/workflow-agent-tool-call-rendered.html:520)
+      /* Gallery/embed mode keeps the generated artifact as the source of truth
+      (11 more blocking findings)
+    ui-template-author
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:15)
+      project_token: --wt-color-app-shell
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:19)
+      project_token: --wt-color-page-canvas
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:27)
+      project_token: --wt-color-surface-raised
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:31)
+      project_token: --wt-color-secondary
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:35)
+      project_token: --wt-color-secondary-foreground
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:39)
+      project_token: --wt-color-secondary-hover
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:43)
+      project_token: --wt-color-primary-hover
+      [BLOCK] hardcoded_secret (catalog/workbench-shell/apply/01-token-map.yaml:47)
+      project_token: --wt-color-brand-hover
+      (44 more blocking findings)
+  wrote agents/skills.lock.yaml  sources=2 blocked=2
+---EXIT=0---
