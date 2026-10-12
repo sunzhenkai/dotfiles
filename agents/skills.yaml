@@ -30,7 +30,6 @@ groups:
     package: https://github.com/sunzhenkai/solo-skills
     skills:
       - agent-roster
-      - agent-roster-flow
       - code-explore
       - commit-push
       - id: lark-cli
@@ -44,7 +43,6 @@ groups:
       - id: role-chat
         optional: true
       - service-manager
-      - skill-evolver
       - skill-upgrader
       - skills-store
       - solo-code-review
