@@ -19,8 +19,8 @@ class PrettyViewPptContractTest(unittest.TestCase):
 
     def test_special_routes_remain_available(self) -> None:
         expected = {
-            "html-ppt": REFERENCES / "html-ppt" / "SKILL.md",
-            "html-slides": REFERENCES / "html-slides" / "SKILL.md",
+            "html-ppt": REFERENCES / "html-ppt" / "REFERENCE.md",
+            "html-slides": REFERENCES / "html-slides" / "REFERENCE.md",
         }
         for route, path in expected.items():
             with self.subTest(route=route):

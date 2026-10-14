@@ -48,7 +48,17 @@ def test_vendor_declares_no_provider_or_model() -> None:
     assert "provider" not in vendor
     assert "model" not in vendor
     assert vendor["$schema"] == "https://opencode.ai/config.json"
-    assert set(vendor["agent"]) == {"build", "plan"}
+    assert set(vendor["agents"]) == {"build", "plan"}
+
+
+def test_vendor_declares_opencode_plugins_and_drops_legacy_file() -> None:
+    plugins = _vendor()["plugins"]
+    names = {entry.split("@", 1)[0] for entry in plugins if isinstance(entry, str)}
+    assert "oh-my-opencode-slim" in names
+    assert "opencode-sessions-sidebar" in names
+    assert "opencode-user-timeline" in names
+    # v2 原生键取代了 v1 时代的独立 plugins.json（{"plugin": [...]}，已移除）
+    assert not (VENDOR / "plugins.json").exists()
 
 
 def test_vendor_files_have_no_company_secrets() -> None:
@@ -70,13 +80,27 @@ def test_merge_preserves_existing_and_fills_vendor_defaults() -> None:
     existing = {
         "model": "local/ollama-qwen",
         "provider": {"ollama": {"name": "Local Ollama"}},
-        "agent": {"build": {"prompt": "local"}},
+        "agents": {"build": {"system": "local"}},
     }
     out = merge(existing, vendor)
     assert out["model"] == "local/ollama-qwen"
-    assert out["agent"] == existing["agent"]
+    assert out["agents"] == existing["agents"]
     assert out["provider"] == existing["provider"]
     assert out["$schema"] == vendor["$schema"]
+    assert out["plugins"] == vendor["plugins"]
+
+
+def test_merge_unions_plugins_vendor_first_and_dedupes() -> None:
+    vendor = {"plugins": ["a@1", "b"]}
+    existing = {"plugins": ["b", "c"]}
+    out = merge(existing, vendor)
+    assert out["plugins"] == ["a@1", "b", "c"]
+
+
+def test_merge_keeps_local_plugins_when_vendor_declares_none() -> None:
+    out = merge({"plugins": ["local-only"]}, {"$schema": "x"})
+    assert out["plugins"] == ["local-only"]
+    assert "plugins" not in merge({}, {"$schema": "x"})
 
 
 def test_merge_uses_vendor_doc_when_no_existing() -> None:
@@ -107,7 +131,8 @@ def test_install_opencode_keeps_existing_keys_on_reinstall(tmp_home: Path) -> No
     assert r.returncode == 0, r.stdout + r.stderr
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     assert cfg["model"] == "local/ollama-qwen"
-    assert cfg["agent"] == _vendor()["agent"]
+    assert cfg["agents"] == _vendor()["agents"]
+    assert cfg["plugins"] == _vendor()["plugins"]
     assert not (target / ".dotf-profile").exists()
 
 

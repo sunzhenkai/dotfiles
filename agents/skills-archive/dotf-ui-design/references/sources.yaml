@@ -19,6 +19,7 @@ sources:
     note: 与 anthropics/claude-code 仓库 plugins/frontend-design/skills/frontend-design 的 SKILL.md 字节一致（2026-09-20 核对）。
     files:
       - path: SKILL.md
+        local_path: REFERENCE.md  # 本地改名，避免加载器把子参考注册成独立 Skill
         revision: 41bbe19d1a1a
       - path: LICENSE.txt
         revision: 41bbe19d1a1a
@@ -28,6 +29,7 @@ sources:
     license: MIT
     files:
       - path: SKILL.md
+        local_path: REFERENCE.md  # 本地改名，避免加载器把子参考注册成独立 Skill
         revision: b7a88e737bc0
       - path: references/plan-template.md
         revision: b7a88e737bc0
@@ -37,6 +39,7 @@ sources:
     license: MIT
     files:
       - path: SKILL.md
+        local_path: REFERENCE.md  # 本地改名，避免加载器把子参考注册成独立 Skill
         revision: 85e8e2363b71
       - path: AUDIT.md
         revision: 86cf9f7d91c6

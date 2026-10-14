@@ -2,7 +2,7 @@
 
 既有界面在其自身设计系统内的问题排查、一致性审查、设计 handoff。产出 findings 报告 + design-plans/ 计划；只读产品源码。
 
-按 [../improve-ui/SKILL.md](../improve-ui/SKILL.md) 执行，骨架：
+按 [../improve-ui/REFERENCE.md](../improve-ui/REFERENCE.md) 执行，骨架：
 
 1. **选面**：尊重用户范围；一个应用、一个 surface family；从路由与布局出发追渲染路径，不做全仓库不一致搜索。
 2. **重建局部系统**：DESIGN.md / 仓库指引 / surface 文档，只认当前有效的；记录 Design language 块。
@@ -27,4 +27,4 @@
 
 ## 品味判断
 
-audit 不引入新品味，只对照 surface 自己的设计证据；品味源头与 design 模式同出 [../frontend-design/SKILL.md](../frontend-design/SKILL.md)。
+audit 不引入新品味，只对照 surface 自己的设计证据；品味源头与 design 模式同出 [../frontend-design/REFERENCE.md](../frontend-design/REFERENCE.md)。

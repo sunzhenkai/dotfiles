@@ -187,7 +187,7 @@ A                               在当前 slide 循环演示一个动画
 
 ```
 html-ppt-skill/
-├── SKILL.md                      agent 入口
+├── REFERENCE.md                  agent 入口
 ├── README.md                     英文 README
 ├── README.zh-CN.md               本文件
 ├── references/                   详细文档

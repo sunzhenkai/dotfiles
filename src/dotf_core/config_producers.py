@@ -69,14 +69,58 @@ def _preserve_single(context: ProducerContext) -> ProducedContent:
 # ---- OpenCode vendor→目标合并（原 scripts/modules/opencode/merge_config.py） ----
 
 
+def _plugin_entry_identity(entry: Any) -> str:
+    """Stable identity so the same plugin declared twice merges to one entry."""
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, Mapping):
+        package = entry.get("package")
+        if isinstance(package, str):
+            return f"package:{package}"
+    return json.dumps(entry, sort_keys=True, ensure_ascii=False)
+
+
+def _plugin_entries(value: Any, *, label: str) -> list[Any]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ConfigDeployError(f"{label} plugins must be a JSON array")
+    return value
+
+
+def _union_plugins(vendor: Any, existing: Any) -> list[Any]:
+    """Vendor entries first, then local additions; first occurrence wins."""
+    merged: list[Any] = []
+    seen: set[str] = set()
+    for entry in _plugin_entries(vendor, label="OpenCode source") + _plugin_entries(
+        existing, label="OpenCode target"
+    ):
+        identity = _plugin_entry_identity(entry)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        merged.append(entry)
+    return merged
+
+
 def opencode_merge(
     existing: dict[str, Any] | None,
     vendor: dict[str, Any],
 ) -> dict[str, Any]:
-    """Overlay vendor-managed keys into the target without clobbering local ones."""
+    """Overlay vendor-managed keys into the target without clobbering local ones.
+
+    ``plugins`` is additive: vendor and local entries union (vendor first,
+    local later entries still win in the host's ordered processing) so results
+    of ``opencode plugin add`` and vendor declarations coexist.
+    """
     out = dict(vendor)
     if existing:
         out.update(existing)
+        plugins = _union_plugins(vendor.get("plugins"), existing.get("plugins"))
+        if plugins:
+            out["plugins"] = plugins
+        else:
+            out.pop("plugins", None)
     return out
 
 
@@ -87,8 +131,6 @@ def _opencode_factory(repo_root: Path):
         for path, content in sorted(context.source_files.items()):
             if path.startswith("agents/") and path.endswith(".md"):
                 outputs.append(ProducedFile(path, content))
-            elif path == "plugins.json":
-                outputs.append(ProducedFile(path, content, format="json"))
             elif path == "opencode.json":
                 source_doc = _json_object(content, label="OpenCode source")
         if source_doc is None:

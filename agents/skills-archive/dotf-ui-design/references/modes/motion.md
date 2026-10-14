@@ -2,7 +2,7 @@
 
 动画/动效/交互手感的专项审计与改进路线图。产出动效 findings + design-plans/ 计划；只读产品源码。
 
-按 [../improve-animations/SKILL.md](../improve-animations/SKILL.md) 与其 [AUDIT.md](../improve-animations/AUDIT.md) 执行，骨架：
+按 [../improve-animations/REFERENCE.md](../improve-animations/REFERENCE.md) 与其 [AUDIT.md](../improve-animations/AUDIT.md) 执行，骨架：
 
 1. **Recon**：技术栈、动效库、token 约定、产品性格、频率地图（每天 100+ 次的高频元素 vs 偶发 vs 罕见）。
 2. **审计八类**：目的与频率、缓动与时长、物理性与 origin、可中断性、性能、可访问性、一致性与 token、错失的机会。大仓库按类别并行只读子代理。

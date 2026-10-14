@@ -166,7 +166,7 @@ Chinese + English deck, and how to export.
 
 ```
 html-ppt/
-├── SKILL.md                 (this file)
+├── REFERENCE.md             (this file)
 ├── references/              (detailed catalogs, load as needed)
 ├── assets/
 │   ├── base.css             (tokens + primitives — do not edit per deck)

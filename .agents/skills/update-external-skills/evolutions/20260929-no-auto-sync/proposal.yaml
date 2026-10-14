@@ -4,7 +4,7 @@ mode: update
 risk: high
 status: promoted
 
-base: evolutions/20260929-scripted-verify/SKILL.md
+base: evolutions/20260929-scripted-verify/SKILL.md.candidate
 base_status: superseded-by-this
 note: >
   底稿是上一轮未晋升的候选稿（它重写第 2、4 步为调用 lock_verify.py）。

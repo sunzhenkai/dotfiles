@@ -1,6 +1,6 @@
 # eval — 20260929-no-auto-sync
 
-对照现有行为验证，非文案完整度。底稿 = `evolutions/20260929-scripted-verify/SKILL.md`（未晋升）。
+对照现有行为验证，非文案完整度。底稿 = `evolutions/20260929-scripted-verify/SKILL.md.candidate`（未晋升）。
 
 ## 回归（成功路径是否被新规则打断）
 

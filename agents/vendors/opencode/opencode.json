@@ -7,5 +7,10 @@
     "plan": {
       "system": "请使用中文进行思考和回答。"
     }
-  }
+  },
+  "plugins": [
+    "oh-my-opencode-slim@3.0.4",
+    "opencode-sessions-sidebar@0.2.0",
+    "opencode-user-timeline@0.2.4"
+  ]
 }

@@ -184,7 +184,7 @@ A                               cycle a demo animation on current slide
 
 ```
 html-ppt-skill/
-├── SKILL.md                      agent-facing dispatcher
+├── REFERENCE.md                  agent-facing dispatcher
 ├── README.md                     this file
 ├── references/                   detailed catalogs
 │   ├── themes.md                 36 themes with when-to-use

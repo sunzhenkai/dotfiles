@@ -21,8 +21,8 @@ description: 将已有文档、知识、报告或方案做成可用键盘演示�
 
 | 用户意图 | 路径 | Read |
 |----------|------|------|
-| 做 HTML PPT / 做一份 PPT / 幻灯片 / slides / deck / html-ppt / keynote / slideshow | `html-ppt` | `references/html-ppt/SKILL.md` |
-| 点名 **reveal.js** / `html-slides` / 纵向嵌套幻灯片 | `html-slides` | `references/html-slides/SKILL.md` |
+| 做 HTML PPT / 做一份 PPT / 幻灯片 / slides / deck / html-ppt / keynote / slideshow | `html-ppt` | `references/html-ppt/REFERENCE.md` |
+| 点名 **reveal.js** / `html-slides` / 纵向嵌套幻灯片 | `html-slides` | `references/html-slides/REFERENCE.md` |
 
 默认使用 `html-ppt`。只有用户点名 reveal.js、`html-slides` 或纵向嵌套结构时才使用 `html-slides`；两类口令同时出现时再问。`html-slides` 依赖 jsDelivr，离线或禁止外链时使用 `html-ppt` 并说明原因。
 
