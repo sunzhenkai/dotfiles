@@ -47,6 +47,7 @@ groups:
       - skills-store
       - solo-code-review
       - task-explore
+      - task-intent
       - taskflow
       - taskrail
       - trouble-grill
