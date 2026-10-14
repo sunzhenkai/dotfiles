@@ -19,7 +19,8 @@ if [[ -z "$PKG_CONFIG_PATH" ]]; then
     [[ -d "$p" ]] && PKG_CONFIG_PATH="${p}${PKG_CONFIG_PATH+:$PKG_CONFIG_PATH}"
   done
   # homebrew pkg-config paths
-  for b in /home/linuxbrew/.linuxbrew /opt/homebrew; do
+  # HOMEBREW_PREFIX 由 paths.zsh 的 brew shellenv 设置
+  for b in ${HOMEBREW_PREFIX:+"$HOMEBREW_PREFIX"}; do
     [[ -d "$b/lib/pkgconfig" ]] && PKG_CONFIG_PATH="$b/lib/pkgconfig${PKG_CONFIG_PATH+:$PKG_CONFIG_PATH}"
   done
   export PKG_CONFIG_PATH

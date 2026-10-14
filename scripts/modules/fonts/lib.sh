@@ -1,11 +1,17 @@
 #!/bin/bash
 # Font installation script with system adaptation
-# Maple Mono NF CN https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip
+# 字体全部从上游 release 下载（固定版本），不再把字体压缩包放进仓库。
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
-FONT_URL="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
-FONT_ZIP="MapleMono-NF-CN.zip"
+# 格式：URL|文件名过滤（find -name 模式）
+FONT_SOURCES=(
+  "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip|*.ttf"
+  "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMonoNormalNL-Variable.zip|*.ttf"
+  "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip|JetBrainsMono*.ttf"
+  "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/0xProto.tar.xz|*NerdFontMono-*.ttf"
+  "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/SourceCodePro.tar.xz|*NerdFontMono-*.ttf"
+)
 
 # Detect OS
 detect_os() {
@@ -38,37 +44,33 @@ has_linux_gui() {
   return 1
 }
 
-# Download fonts from GitHub
+# 下载并解出全部字体到 $1（只放 .ttf）
 download_fonts() {
-  local target_dir="$1"
-
-  echo "Downloading Maple Mono NF CN font..."
-  cd "$target_dir" || return 1
-
-  # Download the font zip file
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$FONT_URL" -o "$FONT_ZIP"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$FONT_URL" -O "$FONT_ZIP"
-  else
-    echo "Neither curl nor wget found. Cannot download fonts."
+  local target_dir="$1" entry url pattern archive work
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl not found. Cannot download fonts."
     return 1
   fi
-
-  if [ ! -f "$FONT_ZIP" ]; then
-    echo "Failed to download font file."
-    return 1
-  fi
-
-  echo "Extracting font archive..."
-  unzip -oq "$FONT_ZIP" -d maple_font_extracted
-
-  # Find and move all ttf files to target directory
-  find maple_font_extracted -name "*.ttf" -exec mv {} "$target_dir/" \; 2>/dev/null || true
-
-  # Cleanup
-  rm -rf maple_font_extracted "$FONT_ZIP"
-
+  work="$(mktemp -d "${TMPDIR:-/tmp}/dotf-fonts.XXXXXX")" || return 1
+  for entry in "${FONT_SOURCES[@]}"; do
+    url="${entry%%|*}"
+    pattern="${entry#*|}"
+    archive="$work/$(basename "$url")"
+    echo "Downloading $(basename "$url")..."
+    if ! curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$archive" "$url"; then
+      echo "  ⚠ 下载失败，跳过: $url"
+      continue
+    fi
+    mkdir -p "$work/x"
+    case "$archive" in
+    *.zip) unzip -oq "$archive" -d "$work/x" ;;
+    *.tar.xz) tar -xJf "$archive" -C "$work/x" ;;
+    *.tar.gz) tar -xzf "$archive" -C "$work/x" ;;
+    esac
+    find "$work/x" -type f -name "$pattern" -exec mv -f {} "$target_dir/" \; 2>/dev/null || true
+    rm -rf "$work/x" "$archive"
+  done
+  rm -rf "$work"
   echo "Font download completed."
 }
 
@@ -88,29 +90,21 @@ install_fonts_linux() {
 
   echo "Installing fonts on Linux..."
 
-  local dotfiles_root
-  dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
-
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
-
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
-
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
-  done
+  # 下载到临时目录（旧实现误把 scripts/modules/assets/fonts 当仓库字体目录，本地压缩包从未生效）
+  local fonts_dir
+  fonts_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotf-fonts-out.XXXXXX")" || return 1
+  download_fonts "$fonts_dir" || { rm -rf "$fonts_dir"; return 1; }
+  cd "$fonts_dir" || return 1
 
   # Create system fonts directory
   sudo mkdir -p /usr/share/fonts/local
 
   # Install fonts
-  sudo mv *.ttf /usr/share/fonts/local/ 2>/dev/null || true
+  sudo mv -f ./*.ttf /usr/share/fonts/local/ 2>/dev/null || true
 
   # Refresh font cache
   sudo fc-cache -fv
+  cd - >/dev/null && rm -rf "$fonts_dir"
 
   echo "Fonts installed successfully on Linux."
 }
@@ -119,26 +113,18 @@ install_fonts_linux() {
 install_fonts_macos() {
   echo "Installing fonts on macOS..."
 
-  local dotfiles_root
-  dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  local fonts_dir="$dotfiles_root/assets/fonts"
-
-  mkdir -p "$fonts_dir"
-  cd "$fonts_dir" || exit 1
-
-  # Download and extract fonts from GitHub
-  download_fonts "$fonts_dir"
-
-  # Extract local font archives (suppress macOS extended attributes warnings)
-  for f in *.tar.gz; do
-    [ -f "$f" ] && tar -xzf "$f" 2>/dev/null
-  done
+  # 下载到临时目录（旧实现误把 scripts/modules/assets/fonts 当仓库字体目录，本地压缩包从未生效）
+  local fonts_dir
+  fonts_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotf-fonts-out.XXXXXX")" || return 1
+  download_fonts "$fonts_dir" || { rm -rf "$fonts_dir"; return 1; }
+  cd "$fonts_dir" || return 1
 
   # Create user fonts directory
   mkdir -p ~/Library/Fonts
 
   # Install fonts to user directory
-  mv *.ttf ~/Library/Fonts/ 2>/dev/null || true
+  mv -f ./*.ttf ~/Library/Fonts/ 2>/dev/null || true
+  cd - >/dev/null && rm -rf "$fonts_dir"
 
   echo "Fonts installed successfully on macOS."
 }

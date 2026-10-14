@@ -236,3 +236,105 @@ install_tmux_clipboard_deps() {
   echo "⚠️  剪贴板依赖安装后仍未检测到工具，请手动检查"
   return 1
 }
+
+# ============================================================
+# 远程安装脚本：下载到临时文件 → 校验 → 执行（禁止 curl | sh）
+# ============================================================
+
+# 计算文件 sha256（macOS: shasum；Linux: sha256sum）
+_dotf_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    return 1
+  fi
+}
+
+# 用法: dotf_fetch_run [--sha256 HEX] [--interp sh|bash] URL [脚本参数...]
+# - 仅允许 https（--proto '=https'，重定向同样受限），-f 让 HTTP 错误直接失败
+# - 下载内容必须非空且以 #! 开头（挡住 200 + HTML 拦截页）
+# - 给定 --sha256 时不匹配即拒绝执行；URL 中可自行写死 tag/commit 以固定版本
+dotf_fetch_run() {
+  local sha="" interp="bash" url script actual rc
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --sha256) sha="$2"; shift 2 ;;
+      --interp) interp="$2"; shift 2 ;;
+      *) break ;;
+    esac
+  done
+  url="${1:-}"
+  if [ -z "$url" ]; then
+    echo "✗ dotf_fetch_run: 缺少 URL" >&2
+    return 2
+  fi
+  shift
+  case "$url" in
+    https://*) ;;
+    *) echo "✗ dotf_fetch_run: 仅允许 https URL: $url" >&2; return 2 ;;
+  esac
+
+  script="$(mktemp "${TMPDIR:-/tmp}/dotf-fetch.XXXXXX")" || return 1
+  if ! curl -fsSL --proto '=https' --proto-redir '=https' \
+    --connect-timeout 15 --max-time 300 -o "$script" "$url"; then
+    echo "✗ 下载失败: $url" >&2
+    rm -f "$script"
+    return 1
+  fi
+  if [ ! -s "$script" ] || ! head -n 1 "$script" | grep -q '^#!'; then
+    echo "✗ 下载内容不是 shell 脚本（疑似拦截页）: $url" >&2
+    rm -f "$script"
+    return 1
+  fi
+  if [ -n "$sha" ]; then
+    actual="$(_dotf_sha256 "$script")" || {
+      echo "✗ 无 sha256sum/shasum，无法校验: $url" >&2
+      rm -f "$script"
+      return 1
+    }
+    if [ "$actual" != "$sha" ]; then
+      echo "✗ sha256 不匹配: $url (期望 $sha，实际 $actual)" >&2
+      rm -f "$script"
+      return 1
+    fi
+  fi
+
+  rc=0
+  "$interp" "$script" "$@" || rc=$?
+  rm -f "$script"
+  return "$rc"
+}
+
+# ============================================================
+# Homebrew 定位（唯一真相源：其它脚本不要再写死前缀）
+# ============================================================
+DOTF_BREW_CANDIDATES=(
+  "/opt/homebrew/bin/brew"              # macOS Apple Silicon
+  "/usr/local/bin/brew"                 # macOS Intel
+  "/home/linuxbrew/.linuxbrew/bin/brew" # Linux
+)
+
+# 输出 brew 可执行文件路径；找不到返回 1
+dotf_brew_bin() {
+  local b
+  if b="$(command -v brew 2>/dev/null)" && [ -n "$b" ]; then
+    echo "$b"
+    return 0
+  fi
+  for b in "${DOTF_BREW_CANDIDATES[@]}"; do
+    if [ -x "$b" ]; then
+      echo "$b"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# 输出 brew 前缀（优先 brew --prefix）；找不到返回 1
+dotf_brew_prefix() {
+  local b
+  b="$(dotf_brew_bin)" || return 1
+  "$b" --prefix 2>/dev/null || dirname "$(dirname "$b")"
+}

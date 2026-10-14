@@ -26,7 +26,7 @@ install_cursor_cli() {
   fi
 
   echo "正在安装 Cursor Agent..."
-  curl https://cursor.com/install -fsS | bash
+  dotf_fetch_run https://cursor.com/install
 
   # 官方安装脚本通常放到 ~/.local/bin
   if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then

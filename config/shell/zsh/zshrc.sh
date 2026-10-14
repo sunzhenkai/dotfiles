@@ -1,10 +1,4 @@
 # shellcheck shell=bash disable=SC1090,SC1091,SC2168
-# =============================================================================
-# OpenSpec shell completions configuration
-# =============================================================================
-# fpath=("/home/wii/.oh-my-zsh/custom/completions" $fpath)
-# OPENSPEC:END
-
 export ICONFIG_FLAG=1
 export EDITOR="nvim"
 

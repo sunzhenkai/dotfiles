@@ -21,7 +21,7 @@ install_kiro() {
 
   echo "正在安装 Kiro CLI..."
   # --force 跳过已有 Amazon Q / kiro 交互确认；安装包内脚本会设 KIRO_CLI_SKIP_SETUP
-  if ! curl -fsSL https://cli.kiro.dev/install | bash -s -- --force; then
+  if ! dotf_fetch_run https://cli.kiro.dev/install --force; then
     echo "✗ Kiro CLI 安装失败"
     return 1
   fi

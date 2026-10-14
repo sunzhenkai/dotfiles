@@ -23,7 +23,7 @@ install_kimi_code() {
   fi
 
   echo "正在安装 Kimi Code CLI..."
-  curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
+  dotf_fetch_run https://code.kimi.com/kimi-code/install.sh
 
   _ensure_kimi_path
 

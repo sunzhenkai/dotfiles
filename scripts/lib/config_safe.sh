@@ -96,6 +96,34 @@ dotf_sanitize() {
   fi
 }
 
+# 可移植的绝对路径解析：realpath → GNU readlink -f → 纯 shell（cd -P / pwd -P）
+# 旧版 macOS 无 realpath 且 BSD readlink 不支持 -f，最后一级兜底保证结果总是绝对路径。
+_dotf_abspath() {
+  local p="$1" dir base link i=0
+  if command -v realpath >/dev/null 2>&1 && realpath "$p" 2>/dev/null; then
+    return 0
+  fi
+  if readlink -f "$p" 2>/dev/null; then
+    return 0
+  fi
+  # 逐级跟随 symlink（上限 40 跳，防环）
+  while [ -L "$p" ] && [ "$i" -lt 40 ]; do
+    link="$(readlink "$p")" || break
+    case "$link" in
+    /*) p="$link" ;;
+    *) dir="$(dirname "$p")"; p="${dir%/}/$link" ;;
+    esac
+    i=$((i + 1))
+  done
+  dir="$(dirname "$p")"
+  base="$(basename "$p")"
+  if dir="$(cd -P "$dir" 2>/dev/null && pwd -P)"; then
+    printf '%s/%s\n' "${dir%/}" "$base"
+  else
+    printf '%s\n' "$p"
+  fi
+}
+
 # 解析期望源的绝对路径（用于比较）
 dotf_resolve_source() {
   local source="$1"
@@ -110,21 +138,13 @@ dotf_resolve_source() {
     expected="${DOTFILES_ROOT}/${source}"
     ;;
   esac
-  if command -v realpath >/dev/null 2>&1; then
-    realpath "$expected" 2>/dev/null || printf '%s\n' "$expected"
-  else
-    readlink -f "$expected" 2>/dev/null || printf '%s\n' "$expected"
-  fi
+  _dotf_abspath "$expected"
 }
 
 # 当前 symlink 指向（尽量绝对化）
 dotf_readlink_target() {
   local path="$1"
-  if command -v realpath >/dev/null 2>&1; then
-    realpath "$path" 2>/dev/null || readlink "$path"
-  else
-    readlink -f "$path" 2>/dev/null || readlink "$path"
-  fi
+  _dotf_abspath "$path"
 }
 
 # 确保 target 为指向 source 的 symlink。保持旧调用和 DOTF_CFG_STATUS 语义。

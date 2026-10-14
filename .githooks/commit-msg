@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# 提交信息规范：首行必须为 `scope: 描述`（scope 小写，可带 (子域) 与 !；兼容全角冒号）。
+# 例：`cli: protective_pull 只对 tracked 改动 stash`、`agents(lock): 重锁 solo-skills`
+# 启用：make hooks（设置 core.hooksPath=.githooks）。临时跳过：git commit --no-verify
+set -eu
+
+msg_file="$1"
+first="$(grep -v '^#' "$msg_file" | sed -n '/[^[:space:]]/{p;q;}')"
+
+case "$first" in
+Merge\ * | Revert\ * | fixup!\ * | squash!\ * | amend!\ *) exit 0 ;;
+esac
+
+if ! printf '%s\n' "$first" | grep -Eq '^[a-z0-9][a-z0-9 _./-]*(\([^)]+\))?!?(: |：)[^[:space:]].+$'; then
+  {
+    echo "✗ 提交信息不符合 'scope: 描述' 规范："
+    echo "    $first"
+    echo "  示例：config: copy 目录源文件 mode 裁剪到 target_mode"
+  } >&2
+  exit 1
+fi

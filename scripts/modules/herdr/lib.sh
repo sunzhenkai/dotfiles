@@ -24,7 +24,7 @@ install_herdr() {
   fi
 
   echo "正在安装 Herdr（官方稳定版）..."
-  if ! curl -fsSL https://herdr.dev/install.sh | sh; then
+  if ! dotf_fetch_run --interp sh https://herdr.dev/install.sh; then
     echo "✗ Herdr 安装失败"
     return 1
   fi

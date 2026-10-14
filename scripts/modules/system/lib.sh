@@ -292,20 +292,18 @@ init_darwin() {
   xcode-select --install 2>/dev/null || true
 
   # 确保 PATH 包含 homebrew
-  if [ -x "/opt/homebrew/bin/brew" ]; then
-    eval "$("/opt/homebrew/bin/brew" shellenv 2>/dev/null)"
-  elif [ -x "/usr/local/bin/brew" ]; then
-    eval "$("/usr/local/bin/brew" shellenv 2>/dev/null)"
+  local brew_bin brew_prefix
+  if brew_bin="$(dotf_brew_bin)"; then
+    eval "$("$brew_bin" shellenv 2>/dev/null)"
   fi
 
   # macOS 通过 Homebrew 安装大部分工具（见 init_homebrew）
   # 这里只安装 Homebrew 未覆盖或需要特殊处理的包
 
   # 设置 pkg-config 路径
-  if [ -d "/opt/homebrew/lib/pkgconfig" ]; then
-    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/opt/homebrew/lib/pkgconfig"
-  elif [ -d "/usr/local/lib/pkgconfig" ]; then
-    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/usr/local/lib/pkgconfig"
+  brew_prefix="$(dotf_brew_prefix 2>/dev/null || echo /usr/local)"
+  if [ -d "$brew_prefix/lib/pkgconfig" ]; then
+    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:$brew_prefix/lib/pkgconfig"
   fi
 
   # 安装 Python mysqlclient 包
@@ -321,18 +319,9 @@ change_default_shell() {
   fi
 
   # 设置 brew PATH（确保能找到 homebrew 安装的 zsh）
-  local brew_prefix=""
-  if [[ "$ID" == "darwin" ]]; then
-    if [ -x "/opt/homebrew/bin/brew" ]; then
-      brew_prefix="/opt/homebrew"
-    elif [ -x "/usr/local/bin/brew" ]; then
-      brew_prefix="/usr/local"
-    fi
-
-    # 加载 brew 环境变量
-    if [ -n "$brew_prefix" ]; then
-      eval "$("$brew_prefix/bin/brew" shellenv 2>/dev/null)"
-    fi
+  local brew_bin=""
+  if [[ "${ID:-}" == "darwin" ]] && brew_bin="$(dotf_brew_bin)"; then
+    eval "$("$brew_bin" shellenv 2>/dev/null)"
   fi
 
   # 确定 zsh 路径：优先使用 homebrew 安装的 zsh
@@ -404,21 +393,21 @@ change_default_shell() {
 config_zsh() {
   echo "---- Configuring zsh ----"
 
-  # 设置 ZSH_CUSTOM 路径
-  if [ -f ~/.zshrc ]; then
-    if [[ "$ID" == "darwin" ]]; then
-      sed -i '' 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
-    else
-      sed -i 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc
-    fi
-  fi
-
   # 安装 oh-my-zsh
   if [ ! -d "$HOME/.oh-my-zsh" ]; then
     echo "Installing oh-my-zsh..."
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    # KEEP_ZSHRC=yes：不让安装器覆盖已有 ~/.zshrc；DOTF_OMZ_REF 可固定到 tag/commit
+    KEEP_ZSHRC=yes dotf_fetch_run --interp sh \
+      "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/${DOTF_OMZ_REF:-master}/tools/install.sh" --unattended
   else
     echo "oh-my-zsh is already installed"
+  fi
+
+  # 设置 ZSH_CUSTOM 路径（须在 omz 安装之后，安装器可能生成新的 ~/.zshrc）
+  if [ -f ~/.zshrc ]; then
+    # -i.bak 写法 BSD/GNU sed 通用，不依赖 $ID
+    sed -i.dotf-bak 's/^# ZSH_CUSTOM.*/ZSH_CUSTOM=~\/.config\/zsh\/oh-my-zsh/g' ~/.zshrc &&
+      rm -f ~/.zshrc.dotf-bak
   fi
 
   # 更改用户默认 shell 为 zsh

@@ -8,12 +8,10 @@ source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 官方安装器落位 ~/.local/bin，临时确保在 PATH（新终端由 paths.zsh 加载）
 _ensure_omp_path() {
-  local d
-  for d in "$HOME/.local/bin"; do
-    if [[ -d "$d" && ":$PATH:" != *":$d:"* ]]; then
-      export PATH="$d:$PATH"
-    fi
-  done
+  local d="$HOME/.local/bin"
+  if [[ -d "$d" && ":$PATH:" != *":$d:"* ]]; then
+    export PATH="$d:$PATH"
+  fi
 }
 
 install_omp() {

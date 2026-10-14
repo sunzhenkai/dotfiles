@@ -1,4 +1,4 @@
-.PHONY: install registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update skills-verify
+.PHONY: install hooks registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update skills-verify
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
@@ -46,28 +46,30 @@ skills-verify:
 	[ -n "$(VERBOSE)" ] && args="$$args --verbose"; \
 	PYTHONUNBUFFERED=1 python3 src/agents/lock_verify.py $$args
 
+# 启用仓库内 git hooks（commit-msg 校验 `scope: 描述`）
+hooks:
+	git config core.hooksPath .githooks
+	@echo "✓ core.hooksPath=.githooks"
+
+# 备份最多保留 BACKUP_KEEP 份（默认 3），更旧的自动清理
+BACKUP_KEEP ?= 3
+
 install:
-	@if [ -L "$(LINK_TARGET)" ]; then \
-		current=$$(readlink "$(LINK_TARGET)"); \
-		if [ "$$current" = "$(PROJECT_DIR)" ]; then \
-			echo "✓ $(LINK_TARGET) 已指向当前目录，无需更改"; \
-		else \
-			echo "⚠ $(LINK_TARGET) 是指向 $$current 的软链接"; \
-			mv "$(LINK_TARGET)" "$(LINK_TARGET).bak.$$(date +%Y%m%d%H%M%S)"; \
-			ln -s "$(PROJECT_DIR)" "$(LINK_TARGET)"; \
-			echo "✓ 已备份旧链接并创建新链接 → $(PROJECT_DIR)"; \
-		fi; \
-	elif [ -d "$(LINK_TARGET)" ]; then \
-		echo "⚠ $(LINK_TARGET) 是一个已存在的目录"; \
-		mv "$(LINK_TARGET)" "$(LINK_TARGET).bak.$$(date +%Y%m%d%H%M%S)"; \
-		ln -s "$(PROJECT_DIR)" "$(LINK_TARGET)"; \
-		echo "✓ 已备份旧目录并创建软链接 → $(PROJECT_DIR)"; \
-	elif [ -e "$(LINK_TARGET)" ]; then \
-		echo "⚠ $(LINK_TARGET) 是一个已存在的文件"; \
-		mv "$(LINK_TARGET)" "$(LINK_TARGET).bak.$$(date +%Y%m%d%H%M%S)"; \
-		ln -s "$(PROJECT_DIR)" "$(LINK_TARGET)"; \
-		echo "✓ 已备份旧文件并创建软链接 → $(PROJECT_DIR)"; \
+	@mkdir -p "$(dir $(LINK_TARGET))"; \
+	backup() { \
+		bak="$(LINK_TARGET).bak.$$(date +%Y%m%d%H%M%S).$$$$"; \
+		mv "$(LINK_TARGET)" "$$bak" || exit 1; \
+		ls -1d "$(LINK_TARGET)".bak.* 2>/dev/null | sort -r | tail -n +$$(( $(BACKUP_KEEP) + 1 )) | \
+			while IFS= read -r old; do rm -rf "$$old"; echo "  已清理旧备份 $$old"; done; \
+	}; \
+	if [ -L "$(LINK_TARGET)" ] && [ "$$(readlink "$(LINK_TARGET)")" = "$(PROJECT_DIR)" ]; then \
+		echo "✓ $(LINK_TARGET) 已指向当前目录，无需更改"; \
 	else \
+		if [ -L "$(LINK_TARGET)" ]; then \
+			echo "⚠ $(LINK_TARGET) 是指向 $$(readlink "$(LINK_TARGET)") 的软链接"; backup; \
+		elif [ -e "$(LINK_TARGET)" ]; then \
+			echo "⚠ $(LINK_TARGET) 已存在（目录或文件）"; backup; \
+		fi; \
 		ln -s "$(PROJECT_DIR)" "$(LINK_TARGET)"; \
 		echo "✓ 已创建软链接 $(LINK_TARGET) → $(PROJECT_DIR)"; \
 	fi
