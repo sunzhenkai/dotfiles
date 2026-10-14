@@ -1,11 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "agent": {
+  "agents": {
     "build": {
-      "prompt": "请使用中文进行思考和回答。"
+      "system": "请使用中文进行思考和回答。"
     },
     "plan": {
-      "prompt": "请使用中文进行思考和回答。"
+      "system": "请使用中文进行思考和回答。"
     }
   }
 }

@@ -74,7 +74,7 @@ init_homebrew() {
 
   # 开发工具
   brew install mise tmux zsh uv pkg-config mysql-client
-  brew install anomalyco/tap/opencode
+  brew install anomalyco/tap/opencode-v2
   brew install codex
   brew install k9s
   # Linux：tmux-yank 需要系统剪贴板工具（macOS 用自带 pbcopy）

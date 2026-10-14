@@ -1,5 +1,5 @@
 #!/bin/bash
-# OpenCode CLI 安装（Homebrew: anomalyco/tap/opencode）
+# OpenCode CLI 安装（Homebrew: anomalyco/tap/opencode-v2）
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
@@ -16,8 +16,14 @@ install_opencode() {
     return 1
   fi
 
-  echo "正在安装 OpenCode（anomalyco/tap/opencode）..."
-  brew install anomalyco/tap/opencode
+  # v2 formula 与 v1（opencode）binary 冲突，若已装 v1 需先卸载
+  if brew list --formula opencode &>/dev/null; then
+    echo "检测到 v1（anomalyco/tap/opencode），先卸载以安装 v2..."
+    brew uninstall opencode
+  fi
+
+  echo "正在安装 OpenCode v2（anomalyco/tap/opencode-v2）..."
+  brew install anomalyco/tap/opencode-v2
 
   if command -v opencode &>/dev/null; then
     echo "✓ OpenCode 已就绪: $(command -v opencode)"

@@ -2,15 +2,15 @@
 description: 多视角对话陪练 — 金融 / 开发 / 架构 / 产品 / 英语，按需切换或组合
 mode: primary
 temperature: 0.7
-permission:
+permissions:
   edit: deny
-  bash: deny
+  shell: deny
   grep: deny
   glob: deny
   list: deny
   webfetch: deny
   websearch: deny
-  task: deny
+  subagent: deny
   # 允许读：role-chat 的角色细节在 skill 的 references/roles/ 下，按需加载。
   # 只读该 skill 自带的角色文件，不去读用户项目里的内容。
   read: allow
