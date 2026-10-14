@@ -87,20 +87,8 @@ groups:
       - id: archify
         optional: true
 
-  # ui-templates 暂时下掉（2026-10-14）：注释掉即不进编目，不自动装也不可经
-  # overlay / agents apply 引用。skills.lock.yaml 仍持有其审计锁（重锁会继续刷新），
-  # 恢复时取消注释整个 group 即可。
-  # ui-templates:
-  #   type: third-party
-  #   source: github
-  #   package: https://github.com/sunzhenkai/ui-templates-skill
-  #   skills:
-  #     - id: ui-template-author
-  #       optional: true
-  #     - id: ui-template-apply
-  #       optional: true
-  #     - id: ui-template-design
-  #       optional: true
+  # ui-templates 组已移除（2026-10-14）：不再编目、不再持锁、不可经 overlay / agents apply
+  # 引用。历史审计锁与 task 记录见 git 历史 / tasks/ongoing/ui-templates-audit-overreach。
 
   ui-skills:
     type: third-party

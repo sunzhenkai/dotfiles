@@ -222,7 +222,6 @@ def test_skills_install_resolves_third_party_skill_id(tmp_home: Path) -> None:
 
 def test_skills_install_commented_out_skill_passes_through(tmp_home: Path) -> None:
     # taste-skill 已从编目注释掉 -> 透传为普通名字。
-    # （ui-template-* 自 709cc55 起回到编目内标 optional，改由 catalog 解析，见下一条用例。）
     result = run_dotf("skills", "-i", "taste-skill", "--dry-run")
 
     assert result.returncode == 0
@@ -230,14 +229,23 @@ def test_skills_install_commented_out_skill_passes_through(tmp_home: Path) -> No
 
 
 def test_skills_install_optional_catalog_skill_resolves_package(tmp_home: Path) -> None:
-    # ui-template-* 是 optional 编目条目：仍在编目内，按 package + -s id 解析。
-    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
+    # optional 编目条目（frontend-slides）：仍在编目内，按 package + -s id 解析。
+    result = run_dotf("skills", "-i", "frontend-slides", "--dry-run")
 
     assert result.returncode == 0
     assert (
-        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
-        " -s ui-template-apply" in result.stdout
+        "==> npx skills add https://github.com/zarazhangrui/frontend-slides"
+        " -s frontend-slides" in result.stdout
     )
+
+
+def test_skills_install_removed_ui_templates_passes_through(tmp_home: Path) -> None:
+    # ui-templates 组已移除：ui-template-* 不再被编目解析，透传为普通名字。
+    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
+
+    assert result.returncode == 0
+    assert "ui-templates-skill" not in result.stdout
+    assert "==> npx skills add ui-template-apply" in result.stdout
 
 
 def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:

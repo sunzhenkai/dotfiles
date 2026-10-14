@@ -521,34 +521,6 @@ skills:
       date: '2026-10-10'
       tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/mattpocock/skills/commit/49dd158d1076134a641b33efb035946536778336
-  - id: ui-template-apply
-    source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: f4b73b0badb1045d42f54d52088396a57434d21c
-    subdirectory: skills/ui-template-apply
-    content_hash: 56d76cc110a6bcd1b18ce7b18a98c08d689bcf319d514c150a0efc2537ecfa54
-    license:
-      spdx: MIT
-      file: LICENSE
-      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
-    audit:
-      status: approved
-      date: '2026-10-14'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f4b73b0badb1045d42f54d52088396a57434d21c
-  - id: ui-template-author
-    source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: f4b73b0badb1045d42f54d52088396a57434d21c
-    subdirectory: skills/ui-template-author
-    content_hash: 926637cc0cff29f6aa12017e9cc7404fa5ce8fbaac5de6aa620905a877a13a6e
-    license:
-      spdx: MIT
-      file: LICENSE
-      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
-    audit:
-      status: approved
-      date: '2026-10-14'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f4b73b0badb1045d42f54d52088396a57434d21c
   - id: wait-what
     source: https://github.com/mattpocock/skills
     revision: 49dd158d1076134a641b33efb035946536778336
@@ -605,20 +577,6 @@ skills:
       date: '2026-10-10'
       tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/mattpocock/skills/commit/49dd158d1076134a641b33efb035946536778336
-  - id: ui-template-design
-    source: https://github.com/sunzhenkai/ui-templates-skill
-    revision: f4b73b0badb1045d42f54d52088396a57434d21c
-    subdirectory: skills/ui-template-design
-    content_hash: 5982009dc766eb011e0b702df8089f3612117fde8d9f8ae0bfe6c2c881f9cc21
-    license:
-      spdx: MIT
-      file: LICENSE
-      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
-    audit:
-      status: approved
-      date: '2026-10-14'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f4b73b0badb1045d42f54d52088396a57434d21c
   - id: ui-skills-root
     source: https://github.com/ibelick/ui-skills
     revision: c628a5917754ec2396d9cbb47988f280ba1d5cb0

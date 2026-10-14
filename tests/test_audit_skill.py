@@ -145,7 +145,7 @@ def test_schema_local_id_is_not_internal_url(tmp_path: Path) -> None:
     schema = skill / "runtime" / "schemas"
     schema.mkdir(parents=True)
     (schema / "tokens.schema.json").write_text(
-        '{ "$id": "https://ui-templates-skill.local/schemas/v1/tokens.schema.json" }\n',
+        '{ "$id": "https://design-tokens.local/schemas/v1/tokens.schema.json" }\n',
         encoding="utf-8",
     )
     proc = _audit(skill)

@@ -49,7 +49,6 @@ groups:
 | `solo-skills` | third-party | github | `sunzhenkai/solo-skills` | 22（含 2 optional） |
 | `mattpocock` | third-party | github | `mattpocock/skills` | 10（含 2 optional） |
 | `archify` | third-party | github | `tt-a1i/archify` | 1 optional |
-| `ui-templates` | third-party | github | `sunzhenkai/ui-templates-skill` | 3 optional |
 | `ui-skills` | third-party | github | `ibelick/ui-skills` | 1 optional |
 | `frontend-slides` | third-party | github | `zarazhangrui/frontend-slides` | 1 optional（别名 `ppt`） |
 | `senv` | third-party | github | `solo-kingdom/senv` | 1 optional |
@@ -57,7 +56,7 @@ groups:
 | `taste`（注释掉） | third-party | github | `Leonxlnx/taste-skill` | 0 |
 
 - 2026-09-29：原 first-party 组 `dotfiles` 的 15 个 skill 与第三方组 `task-flow-skills`、`agent-roster` 全部并入 `solo-skills` 组（`dotf-code-explore`→`code-explore`、`dotf-code-review`→`solo-code-review` 改名）；first-party 机制保留，`agents/skills/` 为空。
-- `solo-skills` 组内 `lark-cli` / `role-chat` 标 `optional: true`；`wizard` / `to-questionnaire` / `archify` / `ui-template-*` / `ui-skills-root` / `frontend-slides` / `senv-cli` / `show-me` 同为 optional → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
+- `solo-skills` 组内 `lark-cli` / `role-chat` 标 `optional: true`；`wizard` / `to-questionnaire` / `archify` / `ui-skills-root` / `frontend-slides` / `senv-cli` / `show-me` 同为 optional → 默认不装、sync 会 prune；可经 overlay `enabled_skills` 或 `dotf agents skill apply <id|alias>` 按需启用。`frontend-slides` 另有别名 `ppt`。
 - `taste` 组整体注释 → 不自动装、不可经 overlay / `agents apply` 引用；其 lock 条目保留。`dotf skills -i taste-skill` 会把它当普通名字透传给 npx。
 
 ## 4. 核心决策
@@ -146,6 +145,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 - 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
 - 全量测试 606 passed。
 - 2026-09-24：`ui-templates` 回到编目内并全标 optional（709cc55）。
+- 2026-10-14：`ui-templates` 组从编目与 lock 永久移除（不再依赖 `sunzhenkai/ui-templates-skill`）。
 - 2026-09-29：first-party skill 迁出至 `sunzhenkai/solo-skills`，`dotfiles` / `task-flow-skills` / `agent-roster` 三组并入单一 `solo-skills` 第三方组；first-party 机制保留（见 `openspec/changes/migrate-first-party-skills-to-solo-skills/`）。
 
 ## 8. 后续可选项

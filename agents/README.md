@@ -162,7 +162,7 @@ scripts/lib/dispatch_config.sh agents
 
 - `solo-skills`（自有集合，第三方消费）：22 个 skill，`lark-cli`、`role-chat` 标 `optional: true`，其余默认安装
 - `mattpocock/skills` 默认装 `setup-matt-pocock-skills`、`grill-with-docs`、`grilling`、`codebase-design`、`diagnosing-bugs`、`domain-modeling`、`wait-what`、`writing-for-agents`；`wizard`、`to-questionnaire` 标 `optional: true`；注释掉的还有 `to-spec`、`to-tickets`、`implement`、`code-review`、`tdd`、`research`、`wayfinder`
-- optional 的 `ibelick/ui-skills`（`ui-skills-root`）、`zarazhangrui/frontend-slides`（id `frontend-slides`，别名 `ppt`）、`tt-a1i/archify`、`solo-kingdom/senv`（`senv-cli`）、`humanlayer/skills`（`show-me`）与 `sunzhenkai/ui-templates-skill`（`ui-template-author`/`ui-template-apply`/`ui-template-design`，编目内全 optional，默认不装）
+- optional 的 `ibelick/ui-skills`（`ui-skills-root`）、`zarazhangrui/frontend-slides`（id `frontend-slides`，别名 `ppt`）、`tt-a1i/archify`、`solo-kingdom/senv`（`senv-cli`）、`humanlayer/skills`（`show-me`）
 - `taste-skill` 的 group 在编目中注释，故不自动装也不能经 overlay/apply 引用（其审计锁保留）；`dotf skills -i taste-skill` 会按字面透传给 npx 搜索安装
 
 锁定 skill 安装到全部 skill layout（`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`），并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。
