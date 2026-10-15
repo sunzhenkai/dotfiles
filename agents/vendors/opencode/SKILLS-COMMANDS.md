@@ -3,7 +3,7 @@
 由仓库根目录 `agents/skills|commands` 经 `scripts/agents/sync.sh opencode` 生成，
 安装到 **`~/.config/opencode/{skills,commands}/`**（home 真实目录，与其他 agent 一致）。
 
-本目录 `agents/vendors/opencode/` 只保留手写内容（人格 `agents/`、`opencode.json` 模板等），
+本目录 `agents/vendors/opencode/` 只保留手写内容（`opencode.json` 模板），
 **不再**存放 sync 生成的 skills/commands，也**不再**整目录软链到 `~/.config/opencode`。
 
 插件声明在 `opencode.json` 的 v2 原生键 `plugins`（`opencode plugin add` 的落点）；
