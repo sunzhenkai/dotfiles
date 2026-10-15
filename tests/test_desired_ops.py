@@ -88,7 +88,7 @@ def test_third_party_apply_installs_the_locked_skill(
     rc = desired_ops.run_desired_op("skill.apply", f"skill:{THIRD_PARTY}", root=repo)
 
     assert rc == 0, capsys.readouterr()
-    assert calls == [(repo, "block")]
+    assert calls == [(repo, "backup")]
     assert THIRD_PARTY in _enabled_skills(repo, tmp_home)
 
 
@@ -138,7 +138,9 @@ def test_conflict_failure_names_the_target_and_the_cause(
     target.write_text("local edit\n", encoding="utf-8")
     capsys.readouterr()
 
-    rc = desired_ops.run_desired_op("skill.apply", "skill:demo", root=repo)
+    rc = desired_ops.run_desired_op(
+        "skill.apply", "skill:demo", root=repo, on_conflict="block", on_takeover="skip"
+    )
 
     assert rc == 1
     emitted = [line for line in capsys.readouterr().out.splitlines() if line.startswith("RESULT\t")]

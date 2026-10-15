@@ -139,18 +139,84 @@ def test_malformed_manifest_degrades_without_prune_or_overwrite(tmp_path: Path) 
     assert manifest.read_bytes() == before
 
 
-def test_owned_drift_blocks_by_default(tmp_path: Path) -> None:
+def test_owned_drift_backs_up_and_continues_by_default(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    installed = target.read_bytes()
+    target.write_text("local edit\n", encoding="utf-8")
+    result = _run(repo, home, verbose=True)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "(overwrite, backup)" in result.stdout
+    assert target.read_bytes() == installed
+    saved = _backups(home, ".agents", "skills", "demo", "SKILL.md")
+    assert len(saved) == 1, saved
+    assert saved[0].read_text(encoding="utf-8") == "local edit\n"
+
+
+def test_on_conflict_block_still_blocks_owned_drift(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     assert _run(repo, home).returncode == 0
     target = home / ".agents" / "skills" / "demo" / "SKILL.md"
     target.write_text("local edit\n", encoding="utf-8")
-    result = _run(repo, home)
+    result = _run(repo, home, on_conflict="block")
     assert result.returncode != 0
     assert "owned target was modified locally" in result.stdout
     assert target.read_text(encoding="utf-8") == "local edit\n"
     assert _backups(home, ".agents", "skills", "demo", "SKILL.md") == []
+
+
+def test_identity_mismatch_with_drift_backs_up_and_continues(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    installed = target.read_bytes()
+    target.write_text("local edit\n", encoding="utf-8")
+
+    # Simulate a lock move: the recorded ownership identity no longer matches
+    # the plan while the target was edited locally.
+    manifest = _manifest(home)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    item = next(entry for entry in data["items"] if entry["target"] == str(target))
+    item["source_identity"] = "agents/skills@old-lock/demo/SKILL.md"
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    manifest.chmod(0o600)
+
+    result = _run(repo, home)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == installed
+    saved = _backups(home, ".agents", "skills", "demo", "SKILL.md")
+    assert len(saved) == 1, saved
+    assert saved[0].read_text(encoding="utf-8") == "local edit\n"
+    current = json.loads(manifest.read_text(encoding="utf-8"))
+    updated = next(entry for entry in current["items"] if entry["target"] == str(target))
+    assert updated["source_identity"] == "agents/skills/demo/SKILL.md"
+
+
+def test_identity_mismatch_with_drift_blocks_under_block_policy(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    target.write_text("local edit\n", encoding="utf-8")
+    manifest = _manifest(home)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    item = next(entry for entry in data["items"] if entry["target"] == str(target))
+    item["source_identity"] = "agents/skills@old-lock/demo/SKILL.md"
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    manifest.chmod(0o600)
+
+    result = _run(repo, home, on_conflict="block")
+    assert result.returncode != 0
+    assert "manifest ownership identity differs" in result.stdout
+    assert target.read_text(encoding="utf-8") == "local edit\n"
 
 
 def test_on_conflict_backup_overwrites_drift_and_keeps_the_original(tmp_path: Path) -> None:
@@ -287,7 +353,28 @@ def test_intermediate_symlink_layout_is_not_adopted(tmp_path: Path) -> None:
     assert "unowned" in result.stdout
 
 
-def test_divergent_unowned_targets_stay_blocked(tmp_path: Path) -> None:
+def test_divergent_unowned_targets_taken_over_by_default(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    managed = target.read_bytes()
+    target.write_text("someone else's version\n", encoding="utf-8")
+    _manifest(home).unlink()
+
+    result = _run(repo, home)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == managed
+    saved = _backups(home, ".agents", "skills", "demo", "SKILL.md")
+    assert len(saved) == 1, saved
+    assert saved[0].read_text(encoding="utf-8") == "someone else's version\n"
+    data = json.loads(_manifest(home).read_text(encoding="utf-8"))
+    assert any(item["owner"] == "agents:skill:demo" for item in data["items"])
+
+
+def test_takeover_skip_still_blocks_divergent_unowned(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
@@ -296,7 +383,7 @@ def test_divergent_unowned_targets_stay_blocked(tmp_path: Path) -> None:
     target.write_text("someone else's version\n", encoding="utf-8")
     _manifest(home).unlink()
 
-    result = _run(repo, home)
+    result = _run(repo, home, on_takeover="skip")
 
     assert result.returncode != 0
     assert "unowned" in result.stdout or "without agents ownership" in result.stdout
@@ -348,7 +435,7 @@ def test_skill_conflict_does_not_block_sibling_skill(tmp_path: Path) -> None:
         "---\nname: other\ndescription: other skill\n---\nother body v2\n", encoding="utf-8"
     )
 
-    result = _run(repo, home)
+    result = _run(repo, home, on_conflict="block", on_takeover="skip")
     assert result.returncode != 0
     assert "demo" in result.stdout
     other_target = home / ".agents" / "skills" / "other" / "SKILL.md"
@@ -397,7 +484,7 @@ def test_parent_and_leaf_symlink_attacks_are_preserved(tmp_path: Path) -> None:
         assert not (outside / "demo").exists()
 
 
-def test_stale_sidecar_and_whole_skill_prune_only_when_unmodified(tmp_path: Path) -> None:
+def test_stale_sidecar_and_whole_skill_prune_when_unmodified(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
@@ -420,21 +507,57 @@ def test_stale_sidecar_and_whole_skill_prune_only_when_unmodified(tmp_path: Path
     assert not (home / ".agents" / "skills" / "demo").exists()
 
 
-def test_local_and_unowned_conflicts_are_preserved(tmp_path: Path) -> None:
+def test_stale_modified_file_backs_up_and_prunes_by_default(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    source = repo / "agents" / "skills" / "demo" / "references" / "guide.md"
+    target = home / ".agents" / "skills" / "demo" / "references" / "guide.md"
+    source.unlink()
+    target.write_text("local edit\n", encoding="utf-8")
+
+    result = _run(repo, home)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert not target.exists()
+    saved = _backups(home, ".agents", "skills", "demo", "references", "guide.md")
+    assert len(saved) == 1, saved
+    assert saved[0].read_text(encoding="utf-8") == "local edit\n"
+
+
+def test_stale_modified_file_blocks_under_block_policy(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    source = repo / "agents" / "skills" / "demo" / "references" / "guide.md"
+    target = home / ".agents" / "skills" / "demo" / "references" / "guide.md"
+    source.unlink()
+    target.write_text("local edit\n", encoding="utf-8")
+
+    result = _run(repo, home, on_conflict="block")
+
+    assert result.returncode != 0
+    assert "stale owned target was modified locally" in result.stdout
+    assert target.read_text(encoding="utf-8") == "local edit\n"
+
+
+def test_strict_policies_preserve_conflicts(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     unowned = home / ".agents" / "skills" / "demo" / "SKILL.md"
     unowned.parent.mkdir(parents=True)
     unowned.write_text("unowned\n", encoding="utf-8")
-    result = _run(repo, home)
+    result = _run(repo, home, on_takeover="skip")
     assert result.returncode != 0
     assert unowned.read_text(encoding="utf-8") == "unowned\n"
     unowned.unlink()
     unowned.parent.rmdir()
     assert _run(repo, home).returncode == 0
     unowned.write_text("local\n", encoding="utf-8")
-    result = _run(repo, home)
+    result = _run(repo, home, on_conflict="block")
     assert result.returncode != 0
     assert unowned.read_text(encoding="utf-8") == "local\n"
 
@@ -465,7 +588,7 @@ def test_missing_owned_target_with_stale_identity_is_recreated(tmp_path: Path) -
     assert current["source_identity"] == "agents/skills/demo/SKILL.md"
 
 
-def test_locally_modified_to_new_expected_bytes_still_conflicts(tmp_path: Path) -> None:
+def test_locally_modified_to_new_expected_bytes_continues_by_default(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
@@ -480,6 +603,28 @@ def test_locally_modified_to_new_expected_bytes_still_conflicts(tmp_path: Path) 
     expected = render_skill_bytes(skill, "demo")
     target.write_bytes(expected)
     result = _run(repo, home)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == expected
+    # The local bytes already equal the managed bytes: nothing unique to
+    # preserve, so the write path short-circuits without a backup.
+    assert _backups(home, ".agents", "skills", "demo", "SKILL.md") == []
+
+
+def test_locally_modified_to_new_expected_bytes_blocks_under_block_policy(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    skill = repo / "agents" / "skills" / "demo"
+    (skill / "SKILL.md").write_text(
+        "---\nname: demo\ndescription: demo skill\n---\nnew body\n", encoding="utf-8"
+    )
+    from sync import render_skill_bytes
+
+    target = home / ".agents" / "skills" / "demo" / "SKILL.md"
+    expected = render_skill_bytes(skill, "demo")
+    target.write_bytes(expected)
+    result = _run(repo, home, on_conflict="block")
     assert result.returncode != 0
     assert "modified locally" in result.stdout
     assert target.read_bytes() == expected
@@ -567,7 +712,26 @@ def test_manifest_mode_drift_is_repaired_without_rewrite(tmp_path: Path) -> None
     assert (manifest.stat().st_ino, manifest.stat().st_mtime_ns, manifest.read_bytes()) == before
 
 
-def test_owned_target_mode_drift_conflicts_and_is_preserved(tmp_path: Path) -> None:
+def test_owned_target_mode_drift_remediated_by_default(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    source = repo / "agents" / "skills" / "demo" / "scripts" / "run.sh"
+    source.chmod(0o755)
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(repo, home).returncode == 0
+    target = home / ".agents" / "skills" / "demo" / "scripts" / "run.sh"
+    target.chmod(0o777)
+
+    result = _run(repo, home)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.stat().st_mode & 0o777 == 0o755
+    # Content is identical; only the mode bit is repaired in place, so there is
+    # nothing to back up.
+    assert _backups(home, ".agents", "skills", "demo", "scripts", "run.sh") == []
+
+
+def test_owned_target_mode_drift_blocks_under_block_policy(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     source = repo / "agents" / "skills" / "demo" / "scripts" / "run.sh"
     source.chmod(0o755)
@@ -578,7 +742,7 @@ def test_owned_target_mode_drift_conflicts_and_is_preserved(tmp_path: Path) -> N
     target.chmod(0o777)
     before = (target.stat().st_ino, target.stat().st_mtime_ns, target.read_bytes())
 
-    result = _run(repo, home)
+    result = _run(repo, home, on_conflict="block")
 
     assert result.returncode != 0
     assert "mode was modified locally" in result.stdout

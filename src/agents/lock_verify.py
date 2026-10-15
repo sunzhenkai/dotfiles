@@ -187,6 +187,10 @@ def _check_layout(
         identity_prefix=identity_prefix(layout, f"{THIRD_PARTY_IDENTITY}@{lock.digest}"),
         include_unlisted=True,
         only_ids=frozenset(item.id for item in items),
+        # Verification reports raw drift: strict policies keep local edits and
+        # unowned targets visible as deviations instead of pending backups.
+        on_conflict="block",
+        on_takeover="skip",
     )
     expected = {op.target for op in plan.operations if op.state != "prune"}
     report: dict[str, list[str]] = {}

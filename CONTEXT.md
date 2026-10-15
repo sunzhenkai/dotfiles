@@ -69,15 +69,15 @@ _Avoid_: uninstall, deconfig（用在 Skill 上时）, 只删文件
 _Avoid_: update, 更新（作为动作名）
 
 **Conflict**:
-owned 目标的内容或 mode 已不等于上次受管 hash。默认 fail closed：正向动作报告并保留，deconfig / remove 必须留下它并报告，不得当未修改目标撤掉。出口是 `--on-conflict=backup`：先把当前内容备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 再覆写。不涵盖 Unowned Target、不安全类型、manifest 异常、所有权身份不符、越界目标，也不影响任何反向动作。
+owned 目标的内容 / mode / 所有权身份（identity）已不等于上次受管 hash。默认「先备份再继续」：当前字节备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 后写入受管内容（反向动作则是备份后 prune）。`--on-conflict=block` 恢复严格模式：报告并保留，整份 Skill 跳过。不涵盖 Unowned Target、不安全类型、manifest 异常、越界目标。
 _Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖, 用 Conflict 指无所有权文件
 
 **Unowned Target**:
-计划要写的路径上已有常规文件，但 managed manifest 没有对应 ownership（agents sync 的 agent owner 或 config 部署的 `config:<module>`）。字节已等于将写入内容时可静默登记 ownership（adopt）；字节不等价时默认留下，不得经 `--on-conflict` 解除。
+计划要写的路径上已有常规文件，但 managed manifest 没有对应 ownership（agents sync 的 agent owner 或 config 部署的 `config:<module>`）。字节已等于将写入内容时可静默登记 ownership（adopt）；字节不等价时默认走 Takeover（先备份再接管），不得经 `--on-conflict` 解除。
 _Avoid_: Conflict（那是已 owned 的漂移）, 外来文件（含糊）, 无主（口语）
 
 **Takeover**:
-把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的显式动作。与 Conflict 的 `--on-conflict=backup` 分家；CLI 为 `--takeover=backup`（环境变量 `DOTF_TAKEOVER`）。TTY 在计划确认之外对可接管项做一次汇总二次确认（写到控制终端 `/dev/tty`，不依赖 Handler stdout 是否被 Executor 捕获）；非 TTY 必须带显式 flag，默认跳过。一次确认覆盖整次 agents sync（一手 / defaults / OpenSpec）；config 部署（`dotf <module> -c`）同语义，确认覆盖该模块本次计划的全部可接管项（见 ADR-0024）。symlink、类型不符、foreign owner 等其余冲突不可接管，带 flag 也保持 fail closed。
+把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的动作。与 Conflict 的 `--on-conflict=backup` 分家；默认执行（`--takeover=backup`），`--takeover=skip`（环境变量 `DOTF_TAKEOVER`）跳过并保持冲突。一次策略覆盖整次 agents sync（一手 / defaults / OpenSpec）；config 部署（`dotf <module> -c`）同语义但默认仍为 skip + TTY 确认（见 ADR-0024）。symlink、类型不符、foreign owner 等其余冲突不可接管，保持 fail closed。
 _Avoid_: on-conflict（管 owned 漂移）, adopt（只用于字节已等价）, 强制覆盖
 
 ### Scope

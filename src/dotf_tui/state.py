@@ -193,7 +193,9 @@ def load_instructions(root: Path) -> list[InstructionsRow]:
     try:
         from instructions import compile_instructions_plan
 
-        plan = compile_instructions_plan(root)
+        # Strict policies: the panel reports raw drift, not what a sync would
+        # auto-resolve by backup.
+        plan = compile_instructions_plan(root, on_conflict="block", on_takeover="skip")
     except Exception:
         return [InstructionsRow(target_id="planner", drift="unknown")]
     rows: list[InstructionsRow] = []

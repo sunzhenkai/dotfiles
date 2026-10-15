@@ -129,8 +129,8 @@ def _apply_generated(
     destination: Path,
     layout: SkillLayout,
     dry_run: bool,
-    on_conflict: OnConflict = "block",
-    on_takeover: OnTakeover = "skip",
+    on_conflict: OnConflict = "backup",
+    on_takeover: OnTakeover = "backup",
 ) -> int:
     home = home_for_target(destination)
     renderer = renderers_for(layout)

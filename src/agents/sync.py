@@ -9,7 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, TextIO, Tuple
+from typing import Dict, List, Optional, Tuple
 
 _AGENTS = Path(__file__).resolve().parent
 _SCRIPTS = _AGENTS.parent
@@ -234,8 +234,8 @@ def _sync_runtime(
     label: str,
     dry_run: bool,
     only_ids: frozenset[str] | None = None,
-    on_conflict: OnConflict = "block",
-    on_takeover: OnTakeover = "skip",
+    on_conflict: OnConflict = "backup",
+    on_takeover: OnTakeover = "backup",
     verbose: bool = False,
 ) -> SyncOutcome:
     print(f"==> skills  {label}  planning…", flush=True)
@@ -293,7 +293,12 @@ def _sync_runtime(
         }
         for operation in plan.operations:
             marker = "~" if operation.remediated else markers[operation.action]
-            suffix = " (overwrite, backup)" if operation.remediated else ""
+            if operation.remediated and operation.action == "prune":
+                suffix = " (remove, backup)"
+            elif operation.remediated:
+                suffix = " (overwrite, backup)"
+            else:
+                suffix = ""
             if operation.target in adoptable:
                 marker, suffix = "+", " (adopt equivalent)"
             skill_id = skill_id_from_target(operation.target, base)
@@ -337,114 +342,6 @@ def _sync_runtime(
     if skipped and not detail:
         detail = f"skipped {', '.join(skipped)}"
     return SyncOutcome(label, 1 if skipped else 0, detail)
-
-
-def _takeover_candidates(
-    root: Path,
-    *,
-    on_conflict: OnConflict,
-) -> list[tuple[str, str]]:
-    """Return (layout_label, skill_id) pairs that need Takeover if policy is skip."""
-    from desired_set import resolve_skill_desired_set
-
-    desired = resolve_skill_desired_set(root)
-    found: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for layout in LAYOUTS:
-        plan = compile_skills_plan(
-            root,
-            renderers_for(layout),
-            target_root=skills_target(layout),
-            owner_prefix=owner_prefix(layout, "first-party"),
-            identity_prefix=identity_prefix(layout, FIRST_PARTY_IDENTITY),
-            only_ids=desired,
-            on_conflict=on_conflict,
-            on_takeover="skip",
-        )
-        adoptable = {item.target for item in adoptable_equivalent(plan)}
-        for operation in plan.conflicts:
-            if operation.target in adoptable or operation.conflict != ADOPT_REASON:
-                continue
-            skill_id = skill_id_from_target(operation.target, plan.target_root)
-            if not skill_id:
-                continue
-            key = (layout.label, skill_id)
-            if key not in seen:
-                seen.add(key)
-                found.append(key)
-    return found
-
-
-def _interactive_tty() -> tuple[TextIO, TextIO] | None:
-    """Return controlling-terminal streams when the user can answer a prompt.
-
-    Executor captures handler stdout, so sys.stdout.isatty() is false during
-    `dotf agents -c`. stdin still inherits the terminal; /dev/tty is the prompt.
-    Tests and pipes have a non-TTY stdin, so they never touch /dev/tty.
-    """
-    if not sys.stdin.isatty():
-        return None
-    try:
-        return (
-            open("/dev/tty", "r", encoding="utf-8"),
-            open("/dev/tty", "w", encoding="utf-8", buffering=1),
-        )
-    except OSError:
-        return None
-
-
-def _confirm_takeover(
-    candidates: list[tuple[str, str]],
-    *,
-    tty_in: TextIO,
-    tty_out: TextIO,
-) -> bool:
-    skills = sorted({skill_id for _, skill_id in candidates})
-    print(
-        f"Takeover: {len(skills)} skill(s) have unowned divergent files "
-        f"({', '.join(skills)}).",
-        file=tty_out,
-        flush=True,
-    )
-    print(
-        "Backup those files under XDG_STATE_HOME/dotf/backups/, then write managed bytes?",
-        file=tty_out,
-        flush=True,
-    )
-    try:
-        print("Takeover with backup? [y/N]: ", end="", file=tty_out, flush=True)
-        answer = tty_in.readline().strip().lower()
-    except (EOFError, OSError):
-        return False
-    return answer in {"y", "yes"}
-
-
-def decide_takeover(
-    root: Path,
-    *,
-    on_conflict: OnConflict | None = None,
-    on_takeover: OnTakeover | None = None,
-) -> OnTakeover:
-    """Return skip or backup; prompt on the controlling TTY when needed."""
-    takeover = on_takeover if on_takeover is not None else on_takeover_from_env()
-    if takeover == "backup":
-        return "backup"
-    conflict = on_conflict if on_conflict is not None else on_conflict_from_env()
-    streams = _interactive_tty()
-    if streams is None:
-        return "skip"
-    tty_in, tty_out = streams
-    try:
-        print("Scanning for unowned skills…", file=tty_out, flush=True)
-        candidates = _takeover_candidates(root, on_conflict=conflict)
-        if not candidates:
-            return "skip"
-        if _confirm_takeover(candidates, tty_in=tty_in, tty_out=tty_out):
-            return "backup"
-        return "skip"
-    finally:
-        tty_in.close()
-        tty_out.close()
 
 
 def sync_layout(
@@ -540,24 +437,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--on-conflict",
         choices=("block", "backup"),
         default=None,
-        help="block（默认）遇到本机改动即跳过该 Skill；backup 先备份再覆写已受管目标的漂移",
+        help="backup（默认）先备份再覆写已受管目标的漂移；block 遇到本机改动即跳过该 Skill",
     )
     parser.add_argument(
         "--takeover",
         choices=("skip", "backup"),
         default=None,
         dest="on_takeover",
-        help="skip（默认）跳过内容不等价的无所有权目标；backup 先备份再接管并登记 ownership",
+        help="backup（默认）先备份再接管内容不等价的无所有权目标并登记 ownership；skip 跳过",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
         help="逐文件打印（默认只打 Layout 进度摘要）",
-    )
-    parser.add_argument(
-        "--decide-takeover",
-        action="store_true",
-        help="print skip or backup after optional TTY confirm; do not sync",
     )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
@@ -567,20 +459,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     root = args.root.resolve() if args.root else repo_root()
 
-    if args.decide_takeover:
-        print(
-            decide_takeover(
-                root,
-                on_conflict=args.on_conflict,
-                on_takeover=args.on_takeover,
-            )
-        )
-        return 0
-
-    takeover = args.on_takeover
-    if takeover is None and not args.dry_run:
-        takeover = decide_takeover(root, on_conflict=args.on_conflict)
-
     outcomes: List[SyncOutcome] = []
     rc = 0
     try:
@@ -588,7 +466,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             root,
             dry_run=args.dry_run,
             on_conflict=args.on_conflict,
-            on_takeover=takeover,
+            on_takeover=args.on_takeover,
             verbose=args.verbose,
         )
         rc = max((item.rc for item in outcomes), default=0)

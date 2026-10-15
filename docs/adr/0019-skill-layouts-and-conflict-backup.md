@@ -1,5 +1,7 @@
 # skill 目标收敛为一处 layout 注册表；apply 覆盖全部来源；冲突补备份出口
 
+> **状态（2026-10-15）**：默认策略已由 ADR-0033 改为「先备份再继续」：`--on-conflict=backup` 升为默认（`block` 为严格回退），identity 不符与 stale 修改项也进入可补救集合；不安全类型、manifest 异常、越界目标仍永远 fail closed。
+
 三个问题一起处理，因为它们都出在"skill 装到哪、由谁装"这件事没有单一表达上。
 
 **一、apply 不装第三方 skill（缺陷）。** `desired_ops` 只调 `sync_skills` + `sync_kiro_skills`，而这两个只遍历仓库内 `agents/skills/<id>/`。`codebase-design` 这类 Locked Skill 由 `defaults.install_defaults` 经网络获取后安装，apply 从不调用它。于是 `dotf agents skill apply codebase-design` 写了 overlay、报了成功、磁盘上什么都没装。根因不是漏了一个函数调用，而是 apply 手抄了 `agents -c` 四步里的两步：同一个"使 Desired Set 存在"的语义有两份实现，必然漂移。

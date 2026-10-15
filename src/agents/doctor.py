@@ -238,6 +238,11 @@ def _check_skills_plan(
             owner_prefix=owner_prefix,
             identity_prefix=identity_prefix,
             only_ids=only_ids,
+            # Doctor reports raw drift: compile with the strict policies so
+            # owned drift and unowned targets surface as conflicts regardless
+            # of the sync-time default (which backs them up and continues).
+            on_conflict="block",
+            on_takeover="skip",
         )
     except (AgentRuntimeError, OSError, SystemExit, ValueError) as exc:
         planner_id = "planner" if label == "shared" else f"{label}-planner"
@@ -356,7 +361,14 @@ def check_instructions_plan(
 ) -> None:
     """Reuse the instruction planner; never approximate manifest/target drift."""
     try:
-        plan = compile_instructions_plan(root, home=home, state_home=state_home)
+        plan = compile_instructions_plan(
+            root,
+            home=home,
+            state_home=state_home,
+            # Same strict-policy rule as the skills planner above.
+            on_conflict="block",
+            on_takeover="skip",
+        )
     except (AgentRuntimeError, OSError, ValueError) as exc:
         report.add("instructions", "planner", STATUS_FAIL, f"instructions planner unavailable: {exc}")
         return

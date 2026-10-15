@@ -108,7 +108,7 @@ bin/dotf agents -c --yes && make skills-verify
 | `defaults`（×各 layout） | **锁内第三方 skill**，按 lock revision 网络取回部署 | 第三方是否更新看这行的 changed |
 | `openspec skills` | OpenSpec 全局 skills | CLI 缺失会 warning 跳过，与本流程无关 |
 
-同步报 `error: agents sync 有阶段失败` 时，失败行本身就写着原因，别猜：`target exists without agents ownership` / `stale owned target was modified locally` 指某个 layout 里已有副本不归本轮计划覆写，最常见是 first-party 迁出后留在 `~/.agents/skills/` 的陈旧目录（坑 13）。备份改名再重跑，不要就地覆盖。
+同步报 `error: agents sync 有阶段失败` 时，失败行本身就写着原因，别猜。注意：自 ADR-0033 起 owned 漂移（含重锁后的 identity 迁移）与 unowned 接管默认先备份再继续（旧字节在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/`），该报错只剩不安全目标（symlink / 越界 / manifest 损坏）等真正 fail-closed 的情况；先看失败行点名的文件再修复，不要就地覆盖。
 
 ### 核对（`make skills-verify`）
 

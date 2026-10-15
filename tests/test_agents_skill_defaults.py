@@ -68,10 +68,11 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "wizard" not in catalog.default_ids()
     assert "to-questionnaire" not in catalog.default_ids()
     assert "commit-push" in catalog.default_ids()
-    # task-flow 系列已迁出到 sunzhenkai/task-flow-skills：仍是默认安装项，
-    # 但来源从 first-party 变为 third-party（由严格审计锁覆盖）。
-    migrated = {"agent-roster-flow", "task-delivery", "role-based-reviewer",
-                "task-explore", "task-goal", "task-wizard", "taskflow"}
+    # 自有 skill 已迁出到 sunzhenkai/solo-skills：task* 收敛为 taskrail /
+    # task-explore / taskflow（task-wizard / task-goal / task-delivery 已删，
+    # task-confirm 并入 taskrail），agent-roster-flow 改名 agent-roster。
+    # 它们仍是默认安装项，来源为 third-party（由严格审计锁覆盖）。
+    migrated = {"agent-roster", "role-based-reviewer", "task-explore", "taskflow"}
     assert migrated <= set(catalog.default_ids())
     assert migrated.isdisjoint(first_party)
     assert migrated <= third_party
@@ -396,10 +397,25 @@ def test_install_conflict_reports_file_and_reason(
     destination = tmp_home / ".agents" / "skills"
     assert defaults.install_defaults(repo, dest_root=destination) == 0
     target = destination / "demo" / "SKILL.md"
+    installed = target.read_bytes()
     target.write_text("local edit\n", encoding="utf-8")
     capsys.readouterr()
 
-    assert defaults.install_defaults(repo, dest_root=destination) == 1
+    # Default: the local bytes are preserved in the backup directory and the
+    # install continues.
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    assert target.read_bytes() == installed
+    backups = list(
+        (tmp_home / ".local" / "state" / "dotf" / "backups").glob("**/demo/SKILL.md.*")
+    )
+    assert len(backups) == 1, backups
+    assert backups[0].read_text(encoding="utf-8") == "local edit\n"
+
+    # Strict mode still reports the file and the reason.
+    target.write_text("local edit 2\n", encoding="utf-8")
+    capsys.readouterr()
+
+    assert defaults.install_defaults(repo, dest_root=destination, on_conflict="block") == 1
 
     captured = capsys.readouterr()
     assert str(target) in captured.err

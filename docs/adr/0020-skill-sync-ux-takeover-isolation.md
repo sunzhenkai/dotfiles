@@ -1,5 +1,7 @@
 # Skill sync：进度按 Layout 摘要；Takeover 逃离 ownership；冲突按 Skill 隔离
 
+> **状态（2026-10-15）**：确认交互已由 ADR-0033 取消：Takeover 默认执行（`--takeover=backup`），TTY 二次确认与 `--decide-takeover` 删除，`--takeover=skip` 为严格回退；进度摘要与按 Skill 隔离部分继续有效。
+
 ADR-0019 把 `--on-conflict=backup` 限定为 owned 漂移出口，并让 Unowned Target 永远 fail closed。真实机器上大量 skill 来自 `npx skills` 或旧安装，sync 会刷屏逐文件日志，且同一 layout 内任一冲突整批 abort，一手失败还会挡住 defaults/OpenSpec。用户要的不是把 unowned 塞进 on-conflict，而是更好的进度面、可确认的接管，以及按 Skill 继续。
 
 决定：

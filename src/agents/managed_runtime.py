@@ -26,7 +26,7 @@ for _path in (_SCRIPTS, _AGENTS):
         sys.path.insert(0, str(_path))
 
 from dotf_core.atomic import atomic_write  # noqa: E402
-from dotf_core.backup import generate_run_id  # noqa: E402
+from dotf_core.backup import backup_target, generate_run_id  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
@@ -60,20 +60,25 @@ OnTakeover = Literal["skip", "backup"]
 ON_CONFLICT_ENV = "DOTF_ON_CONFLICT"
 ON_TAKEOVER_ENV = "DOTF_TAKEOVER"
 
-# `--on-conflict=backup` may only remediate an owned target that drifted from the
-# bytes we installed. Unowned targets are a different action (Takeover); unsafe
-# paths, malformed manifests, and identity mismatches stay fail-closed.
+# The backup policy is the default for both owned drift and Takeover: a conflict
+# that can be resolved by preserving the local bytes in the run's backup
+# directory is resolved that way and the run continues. Unsafe paths, malformed
+# manifests, and out-of-root stale targets stay fail-closed.
 CONTENT_DRIFT = "owned target was modified locally"
 MODE_DRIFT = "owned target mode was modified locally"
-_REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT})
 
 # Third-party identity embeds the whole-lock digest, so adding or removing one
 # lock entry rewrites the identity of every already-installed third-party skill.
 # A target still owned by us is re-recorded under the new identity instead of
 # conflicting when it holds either the newly locked content or exactly the bytes
-# and mode we recorded installing. Real drift (the target no longer matches what
-# we installed) still fails closed.
+# and mode we recorded installing; any other drift on top of the identity move
+# is remediated like ordinary owned drift under the backup policy, and stays
+# fail-closed under `--on-conflict=block`.
 IDENTITY_MISMATCH = "manifest ownership identity differs"
+
+# Owned drift the backup policy may remediate: the local bytes are preserved in
+# the run's backup directory before the managed content replaces them.
+_REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT, IDENTITY_MISMATCH})
 
 # A target we did not install, but whose bytes already match what we would write.
 # Another installer (`npx skills`) leaves exactly this behind, and refusing it
@@ -82,7 +87,8 @@ ADOPT_REASON = "target exists without agents ownership"
 
 
 def parse_on_conflict(value: str | None) -> OnConflict:
-    policy = (value or "block").strip().lower()
+    # Default: preserve the local bytes in the backup directory, then continue.
+    policy = (value or "backup").strip().lower()
     if policy not in ("block", "backup"):
         raise AgentRuntimeError(f"unknown on-conflict policy: {value!r} (expected block or backup)")
     return policy  # type: ignore[return-value]
@@ -93,7 +99,8 @@ def on_conflict_from_env(env: Mapping[str, str] | None = None) -> OnConflict:
 
 
 def parse_on_takeover(value: str | None) -> OnTakeover:
-    policy = (value or "skip").strip().lower()
+    # Default: back up divergent unowned targets, then take them over.
+    policy = (value or "backup").strip().lower()
     if policy not in ("skip", "backup"):
         raise AgentRuntimeError(f"unknown on-takeover policy: {value!r} (expected skip or backup)")
     return policy  # type: ignore[return-value]
@@ -553,8 +560,9 @@ def _conflict(
 ) -> RuntimeOperation:
     """Block on a conflict, or remediate owned drift / explicit Takeover.
 
-    `apply_owned_plan` already routes updates through `atomic_write` with a
-    backup root, so a remediated operation needs no new write path.
+    Remediated operations reuse the existing write paths: updates go through
+    `atomic_write` with a backup root, remediated prunes through
+    `backup_target(..., remove_source=True)`.
     """
     if (
         reason == IDENTITY_MISMATCH
@@ -581,6 +589,7 @@ def _conflict(
         and reason in _REMEDIABLE_CONFLICTS
         and expected is not None
         and prior is not None
+        and actual.state == "present"
     ):
         return RuntimeOperation(
             "update", "update", target, source_identity, expected_hash,
@@ -779,11 +788,22 @@ def compile_owned_plan(
                     **conflict_kw,
                 ))
             elif actual.state == "present" and actual.digest != prior.installed_hash:
-                operations.append(_conflict(
-                    prior.target, prior.source_identity, None, actual, prior.installed_hash,
-                    "stale owned target was modified locally", None, prior,
-                    **conflict_kw,
-                ))
+                if on_conflict == "backup":
+                    # The desired set no longer holds this file. Preserve the
+                    # locally modified bytes in the backup directory, then let
+                    # the prune proceed instead of blocking the whole Skill.
+                    operations.append(RuntimeOperation(
+                        "prune", "prune", prior.target, prior.source_identity, None,
+                        actual.digest, prior.installed_hash,
+                        "stale owned target was modified locally", None, prior,
+                        actual.state, True,
+                    ))
+                else:
+                    operations.append(_conflict(
+                        prior.target, prior.source_identity, None, actual, prior.installed_hash,
+                        "stale owned target was modified locally", None, prior,
+                        **conflict_kw,
+                    ))
             else:
                 operations.append(RuntimeOperation(
                     "prune", "prune", prior.target, prior.source_identity, None,
@@ -1287,7 +1307,18 @@ def _apply_operations(
         if operation.action == "prune":
             assert operation.prior is not None
             if actual.state == "present":
-                _unlink_owned(home, Path(operation.target), operation.prior.installed_hash)
+                if operation.remediated:
+                    # Preserve the locally modified bytes, then remove the
+                    # stale target in the same verified move.
+                    backup_target(
+                        operation.target,
+                        backup_root,
+                        run,
+                        home,
+                        remove_source=True,
+                    )
+                else:
+                    _unlink_owned(home, Path(operation.target), operation.prior.installed_hash)
                 pruned_parents.append(Path(operation.target).parent)
             pruned += 1
             changed += 1

@@ -24,7 +24,7 @@ from managed_runtime import (  # noqa: E402
     parse_on_takeover,
 )
 from skills_catalog import SkillsCatalogError, load_skills_catalog  # noqa: E402
-from sync import SyncOutcome, decide_takeover, summarize, sync_skills  # noqa: E402
+from sync import SyncOutcome, summarize, sync_skills  # noqa: E402
 
 
 def repo_root() -> Path:
@@ -116,8 +116,6 @@ def run_desired_op(
             artifact_id = canonical_id
             policy = on_conflict_from_env() if on_conflict is None else parse_on_conflict(on_conflict)
             takeover = on_takeover_from_env() if on_takeover is None else parse_on_takeover(on_takeover)
-            if on_takeover is None and takeover == "skip":
-                takeover = decide_takeover(repo, on_conflict=policy)
             upsert_local_overlay(
                 repo,
                 lambda agents: _mutate_skill(agents, artifact_id, enable=enable),
@@ -143,14 +141,14 @@ def main(argv: list[str] | None = None) -> int:
         "--on-conflict",
         choices=("block", "backup"),
         default=None,
-        help="block（默认）本机改动即跳过该 Skill；backup 先备份再覆写已受管目标的漂移",
+        help="backup（默认）先备份再覆写已受管目标的漂移；block 本机改动即跳过该 Skill",
     )
     parser.add_argument(
         "--takeover",
         choices=("skip", "backup"),
         default=None,
         dest="on_takeover",
-        help="skip（默认）跳过无所有权分歧目标；backup 先备份再接管",
+        help="backup（默认）先备份再接管无所有权分歧目标；skip 跳过",
     )
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)

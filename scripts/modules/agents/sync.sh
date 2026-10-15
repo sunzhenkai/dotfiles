@@ -3,6 +3,8 @@
 # + 全局 AGENTS.md。
 # 用法:
 #   sync.sh [all|<tool>] [--dry-run] [--strict] [--on-conflict=block|backup] [--takeover=skip|backup] [--verbose]
+# 冲突默认「先备份再继续」：owned 漂移（内容/mode/identity）与 unowned 接管都会备份旧字节后覆写；
+# --on-conflict=block / --takeover=skip 恢复严格模式（冲突即跳过）。不安全目标始终 fail closed。
 # <tool> 仅为兼容旧调用保留；skills/instructions 与工具过滤无关，一律全量执行。
 # 诊断请用: dotf agents -d  或  PYTHONPATH=scripts python3 src/agents/doctor.py
 set -euo pipefail
@@ -93,28 +95,6 @@ while [ $# -gt 0 ]; do
 done
 
 export PYTHONUNBUFFERED=1
-
-# Confirm Takeover once for the whole sync (first-party + defaults + OpenSpec).
-# Prompt goes to /dev/tty so it still works when Executor captures stdout.
-if [ -z "$ON_TAKEOVER" ] && [ "$DRY_RUN" -eq 0 ]; then
-  decide_args=(--decide-takeover --root "$ROOT")
-  if [ -n "$ON_CONFLICT" ]; then
-    decide_args+=(--on-conflict "$ON_CONFLICT")
-  fi
-  set +e
-  ON_TAKEOVER="$(python3 "$_SRC_AGENTS/sync.py" "${decide_args[@]}")"
-  decide_rc=$?
-  set -e
-  if [ "$decide_rc" -ne 0 ]; then
-    echo "error: takeover confirm failed (exit=$decide_rc)" >&2
-    exit "$decide_rc"
-  fi
-  case "$ON_TAKEOVER" in
-  backup | skip) ;;
-  *) ON_TAKEOVER=skip ;;
-  esac
-  export DOTF_TAKEOVER="$ON_TAKEOVER"
-fi
 
 echo "agents sync  dry_run=$DRY_RUN"
 

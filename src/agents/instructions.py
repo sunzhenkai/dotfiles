@@ -223,14 +223,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--on-conflict",
         choices=("block", "backup"),
         default=None,
-        help="block（默认）遇到本机改动即跳过；backup 先备份再覆写已受管目标的漂移",
+        help="backup（默认）先备份再覆写已受管目标的漂移；block 遇到本机改动即跳过",
     )
     parser.add_argument(
         "--takeover",
         choices=("skip", "backup"),
         default=None,
         dest="on_takeover",
-        help="skip（默认）跳过无所有权目标；backup 先备份再接管并登记 ownership",
+        help="backup（默认）先备份再接管无所有权目标并登记 ownership；skip 跳过",
     )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)

@@ -1,5 +1,7 @@
 # Config 部署补 Takeover 出口：与 skills 同一套 `--takeover=backup` / `/dev/tty` 确认语义
 
+> **状态（2026-10-15）**：skills 侧的 Takeover 默认与确认交互已由 ADR-0033 变更（默认 backup、无 TTY 确认）；config 部署维持本文语义不变（默认 skip + TTY 确认）。
+
 `dotf <module> -c` 的 plan/apply（`src/dotf_core/config_deploy.py`）对 Unowned Target 一直 fail closed：目标路径已有常规文件、内容与受管版本不等价、config-manifest 无 `config:<module>` 所有权 → `unowned-real-target` 冲突，apply 拒写。这在语义上是对的（ADR-0019/0020 对 skills 已经这么定），但 skills 侧有 `--takeover=backup` 出口、config 侧没有：新机器上工具运行时先写了配置（例如 pi 启动即回写 `~/.pi/agent/settings.json`），之后 `dotf pi -c` 永远卡死，只能手删文件让路——而"手删再跑"恰恰绕开了本该做的备份与所有权登记。skills 与 config 同属一套 Unowned Target 词条，出口却只有一半，是词条级的不一致。
 
 决定：

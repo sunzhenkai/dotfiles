@@ -101,15 +101,31 @@ def test_source_env_and_ssh_still_block(tmp_path: Path) -> None:
     assert "credential_paths" in proc.stdout
 
 
-def test_ssh_senv_and_config_mentions_are_not_credential_paths(tmp_path: Path) -> None:
+def test_ssh_config_mention_is_not_a_credential_path(tmp_path: Path) -> None:
     skill = _skill(
         tmp_path,
-        "维护 `~/.ssh/senv/`（`groups/<组>.conf` + `keys/`），"
-        "并幂等注册 `~/.ssh/config` 顶部一行 `Include ~/.ssh/senv/groups/*.conf`。\n",
+        "幂等注册 `~/.ssh/config` 顶部一行 `Include conf.d/*.conf`。\n",
     )
     proc = _audit(skill)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "credential_paths" not in proc.stdout
+
+
+def test_ssh_senv_mention_blocks_unless_exempted(tmp_path: Path) -> None:
+    """个人环境路径特例不进共享规则集（solo-skills 4a66c62），改走 .audit-allow。"""
+    skill = _skill(
+        tmp_path,
+        "维护 `~/.ssh/senv/`（`groups/<组>.conf` + `keys/`）。\n",
+    )
+    blocked = _audit(skill)
+    assert blocked.returncode == 2, blocked.stdout + blocked.stderr
+    assert "credential_paths" in blocked.stdout
+
+    (skill / ".audit-allow").write_text(
+        "credential_paths|SKILL.md|维护\n", encoding="utf-8"
+    )
+    exempted = _audit(skill)
+    assert exempted.returncode == 0, exempted.stdout + exempted.stderr
 
 
 def test_other_ssh_paths_still_block(tmp_path: Path) -> None:

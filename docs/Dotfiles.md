@@ -163,10 +163,12 @@ dotf cursor codex -ic   # 按实际使用的工具
 
 ```bash
 dotf agents -c
-# 已手改过的受管文件想恢复受管版本（先备份到 state/dotf/backups/）
-dotf agents -c --on-conflict=backup
-# 目标处已有工具先写的无主文件（如新机上 pi 启动回写的 settings.json）：
-# TTY 下会确认一次备份接管；非 TTY 用 --takeover=backup
+# 冲突默认先备份再继续：owned 漂移（含重锁后的 identity 迁移）与无主接管都会把
+# 旧字节备份到 state/dotf/backups/ 后写入受管内容，同步不再失败
+# 需要严格模式（冲突即跳过、RESULT failed）时：
+dotf agents -c --on-conflict=block --takeover=skip
+# config 侧（dotf <module> -c）默认仍为跳过；目标处已有工具先写的无主文件
+# （如新机上 pi 启动回写的 settings.json）显式备份接管：
 dotf pi -c --takeover=backup
 ```
 

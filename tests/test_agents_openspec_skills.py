@@ -149,7 +149,7 @@ def test_adopts_equivalent_unowned_file(tmp_path: Path, tmp_home: Path) -> None:
     assert any(item["owner"] == "agents:openspec:openspec-propose" for item in manifest["items"])
 
 
-def test_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_home: Path) -> None:
+def test_divergent_unowned_file_taken_over_by_default(tmp_path: Path, tmp_home: Path) -> None:
     openspec_skills = _load("openspec_skills")
     repo = _repo_with_runtime(tmp_path)
     shared = tmp_home / ".agents" / "skills"
@@ -162,6 +162,33 @@ def test_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_home: Path) -> 
             dest_root=shared,
             generate=_fake_generate,
             openspec=Path("/usr/bin/true"),
+        )
+        == 0
+    )
+    assert target.read_text(encoding="utf-8") == SKILL_BODY
+    backups = list(
+        (tmp_home / ".local" / "state" / "dotf" / "backups").glob(
+            "**/openspec-propose/SKILL.md.*"
+        )
+    )
+    assert len(backups) == 1, backups
+    assert backups[0].read_text(encoding="utf-8").endswith("local edit\n")
+
+
+def test_takeover_skip_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_home: Path) -> None:
+    openspec_skills = _load("openspec_skills")
+    repo = _repo_with_runtime(tmp_path)
+    shared = tmp_home / ".agents" / "skills"
+    target = shared / "openspec-propose" / "SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_text(SKILL_BODY + "local edit\n", encoding="utf-8")
+    assert (
+        openspec_skills.install_openspec_skills(
+            repo,
+            dest_root=shared,
+            generate=_fake_generate,
+            openspec=Path("/usr/bin/true"),
+            on_takeover="skip",
         )
         == 1
     )

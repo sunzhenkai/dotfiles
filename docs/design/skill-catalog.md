@@ -99,7 +99,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 ### D5. 冲突出口
 
-默认 fail closed。"owned 目标漂移"（内容或 mode）可由 `--on-conflict=backup` 解除：编译期改判为 update，写路径复用 `atomic_write(backup_root=...)`，旧字节留在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`。不安全类型、manifest 不可解析、所有权不符、无所有权目标、越界目标，以及所有反向动作，都不受该开关影响。
+默认「先备份再继续」：owned 漂移（内容 / mode / identity）编译期改判为 update，写路径复用 `atomic_write(backup_root=...)`，旧字节留在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/<home 相对路径>`；stale 且被本机修改的项备份后 prune（`backup_target(..., remove_source=True)`）；内容不等价的 Unowned Target 默认走 Takeover（同写路径 + 首次登记 ownership）。`--on-conflict=block` / `--takeover=skip` 分别收紧为报告并保留。不安全类型、manifest 不可解析、越界目标永远 fail closed。
 
 ### D6. 名字解析优先级
 

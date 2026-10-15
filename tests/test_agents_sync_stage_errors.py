@@ -25,10 +25,6 @@ def _stub_agents(root: Path, *, skills_rc: int = 0, defaults_rc: int = 0, opensp
     (agents / "sync.py").write_text(
         dedent(
             f"""\
-            import sys
-            if "--decide-takeover" in sys.argv:
-                print("skip")
-                raise SystemExit(0)
             print("stub skills")
             raise SystemExit({skills_rc})
             """

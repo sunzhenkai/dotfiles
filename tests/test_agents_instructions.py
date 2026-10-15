@@ -16,10 +16,21 @@ from managed_runtime import AGENTS_MANIFEST_NAME  # noqa: E402
 SOURCE = ROOT / "agents" / "instructions" / "AGENTS.md"
 
 
-def _run(home: Path, *, dry_run: bool = False, root: Path = ROOT) -> subprocess.CompletedProcess[str]:
+def _run(
+    home: Path,
+    *,
+    dry_run: bool = False,
+    root: Path = ROOT,
+    on_conflict: str | None = None,
+    on_takeover: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / ".state")
+    if on_conflict is not None:
+        env["DOTF_ON_CONFLICT"] = on_conflict
+    if on_takeover is not None:
+        env["DOTF_TAKEOVER"] = on_takeover
     cmd = [sys.executable, str(ROOT / "src" / "agents" / "instructions.py"), "--root", str(root)]
     if dry_run:
         cmd.append("--dry-run")
@@ -31,10 +42,10 @@ def test_source_is_global_and_omits_skill_catalog() -> None:
     assert "skill" not in text.lower()
     assert not text.lstrip().startswith("---")
     assert "简体中文" in text
-    assert "不 commit" in text
+    assert "不提交" in text
     assert "线上" in text
     assert "点名环境" in text
-    assert "每一步单独过门" in text
+    assert "只覆盖当时点名的那一步" in text
     assert "这份文件" not in text
 
 
@@ -96,13 +107,28 @@ def test_second_sync_is_idempotent(tmp_path: Path) -> None:
     assert OWNER_PREFIX + "claude" in data
 
 
-def test_local_edit_conflicts_without_overwrite(tmp_path: Path) -> None:
+def test_local_edit_backs_up_and_continues_by_default(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    assert _run(home).returncode == 0
+    target = home / ".agents" / "AGENTS.md"
+    installed = target.read_bytes()
+    target.write_text("local edit\n", encoding="utf-8")
+    result = _run(home)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert target.read_bytes() == installed
+    backups = list((home / ".state" / "dotf" / "backups").glob("*/.agents/AGENTS.md.*"))
+    assert len(backups) == 1, backups
+    assert backups[0].read_text(encoding="utf-8") == "local edit\n"
+
+
+def test_local_edit_conflicts_under_block_policy(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir()
     assert _run(home).returncode == 0
     target = home / ".agents" / "AGENTS.md"
     target.write_text("local edit\n", encoding="utf-8")
-    result = _run(home)
+    result = _run(home, on_conflict="block")
     assert result.returncode != 0
     assert "owned target was modified locally" in result.stderr + result.stdout
     assert target.read_text(encoding="utf-8") == "local edit\n"

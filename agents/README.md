@@ -16,8 +16,8 @@ dotf skills -c                 # 安装编目 Desired Set 的全部 skill（锁�
 dotf skills -i <name>          # npx skills 按需安装；先匹配 group，再匹配 skill id 或 alias，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
 dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
 dotf agents skill apply <id|alias>   # 写入本机 overlay Desired Set 并 sync（含该 id 的来源）
-dotf agents skill remove <id|alias>  # 停用并 prune owned 且未漂的目标（不改仓库）
-dotf agents skill apply <id|alias> --on-conflict=backup  # 先备份本机漂移再覆写
+dotf agents skill remove <id|alias>  # 停用并 prune owned 目标（本机改过的项先备份再 prune）
+dotf agents skill apply <id|alias> --on-conflict=block  # 需要严格模式（默认先备份再覆写漂移）
 dotf agents -d                 # L0 诊断
 dotf agents -d --deep          # L0 + agents L1 深度诊断
 dotf agents -d --deep --json   # 深度诊断 JSON（凭据脱敏）
@@ -38,12 +38,12 @@ agents/
   skills.yaml                      # 全量 Skill 编目（按 group；一手 + 第三方；唯一真相源）
   skills.lock.yaml                 # 第三方 skill 的严格审计锁（revision/hash/license/audit）
   skills-archive/<name>/           # 历史归档（不入编目、不参与安装）
-  vendors/<tool>/                  # 工具专属 settings / 人格 / 生成物
+  vendors/<tool>/                  # 工具专属 settings / 生成物
   env/                             # profiles / env 检查 / security 真相源
   README.md
 ```
 
-工具专属 settings、OpenCode 人格等放在 `agents/vendors/<tool>/`。  
+工具专属 settings 放在 `agents/vendors/<tool>/`。  
 env / security 真相源在 `agents/env/`，由单一脚本包 `src/agents/` 编排，不要手写多源漂移。
 
 ## 对外安装（npx skills 源）
@@ -117,24 +117,19 @@ first-party skill 源位置是 `agents/skills/`，在 `agents/skills.yaml` 以 `
 
 ### 冲突与接管
 
-**Conflict** = owned 目标的内容或 mode 已不等于上次受管 hash。默认 **fail closed 到 Skill**：该 Skill 整份跳过，同 layout 其它 Skill 继续。`RESULT` 仍为 failed。出口是 `--on-conflict=backup`：先备份再覆写已受管漂移。
+**Conflict** = owned 目标的内容 / mode / 所有权身份（identity）已不等于上次受管 hash。默认 **先备份再继续**：当前字节备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 后写入受管内容（不再整份跳过、不再使 `RESULT` failed）。`--on-conflict=block` 恢复严格模式：报告并保留，该 Skill 整份跳过，`RESULT` 为 failed。
 
-**Unowned Target**（无 ownership）内容不等价时走 **Takeover**，不经 `--on-conflict`：
+**Unowned Target**（无 ownership）内容不等价时走 **Takeover**，不经 `--on-conflict`，默认执行：先备份再写入并登记 ownership。`--takeover=skip` 跳过并保持冲突。
 
-```bash
-dotf agents -c --takeover=backup
-# 或 TTY 下 sync 发现可接管项时二次确认
-```
-
-字节已等价的 unowned 仍静默 adopt。不安全类型、manifest 异常、越界目标等仍整项 fail closed。
+字节已等价的 unowned 仍静默 adopt。不安全类型（symlink 等）、manifest 异常、越界目标仍整项 fail closed。
 
 ```bash
-dotf agents skill apply codebase-design --on-conflict=backup
-dotf agents -c --on-conflict=backup --takeover=backup
-dotf agents -c --verbose   # 需要逐文件流水时
+dotf agents -c                                        # 默认：冲突先备份再继续
+dotf agents -c --on-conflict=block --takeover=skip    # 严格模式：冲突即跳过
+dotf agents -c --verbose                              # 需要逐文件流水时（补救项标 (overwrite, backup) / (remove, backup)）
 ```
 
-`--on-conflict=backup` 只解除 owned 内容/mode 漂移。`--takeover=backup` 只接管内容不等价的 Unowned Target。反向动作永远 fail closed。
+`--on-conflict` 管 owned 漂移（含 identity 迁移与 stale 修改项的备份后 prune），`--takeover` 管内容不等价的 Unowned Target；两者默认 backup，可分别用 `block` / `skip` 收紧。不安全目标永远 fail closed。
 
 ```bash
 # 同步 skills（三个 layout）+ 全局 AGENTS.md
@@ -148,9 +143,9 @@ scripts/lib/dispatch_config.sh agents
 ```
 
 共享 sync：`dotf agents -c`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
-本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-remove-ai-provider-config.md`），vendor 配置只含工具行为与中文人格等稳定内容。
+本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-remove-ai-provider-config.md`），vendor 配置只含工具行为、内置 agent 的中文 system 提示等稳定内容。
 
-**不要手改** `~/.agents/skills/`、`${KIRO_HOME:-~/.kiro}/skills/` 或 `~/.claude/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 并在 `agents/skills.yaml` 编目后重新 sync，第三方 skill 请改 `agents/skills.yaml` + `agents/skills.lock.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。已经手改过又想要受管版本，用 `--on-conflict=backup`（先备份再覆写）。
+**不要手改** `~/.agents/skills/`、`${KIRO_HOME:-~/.kiro}/skills/` 或 `~/.claude/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 并在 `agents/skills.yaml` 编目后重新 sync，第三方 skill 请改 `agents/skills.yaml` + `agents/skills.lock.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。已经手改过又想要受管版本：下次 sync 默认先备份再覆写，旧字节在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/`。
 
 已归档的 skill 移到 `agents/skills-archive/<name>/`（保留生产内容，不入编目、不参与安装，恢复方式见该目录 `README.md`）。
 
@@ -169,7 +164,7 @@ scripts/lib/dispatch_config.sh agents
 
 ## Managed ownership 与冲突
 
-`dotf agents -c` 先生成无网络、无 secret lookup、无写盘的 plan；确认后才写 HOME。runtime bundle 由 `${XDG_STATE_HOME:-$HOME/.local/state}/dotf/` 下的版本化 managed manifest 记录 owner、source identity 与 hash。只有上次 owned 且仍匹配 managed hash 的 stale 项会被 prune；未托管同名项或本机改写进入 `conflict`，默认保持原样，不静默覆盖。`patches/`、`evals/`、`experience/`、`evolutions/` 等 authoring 数据不属于默认 runtime bundle。
+`dotf agents -c` 先生成无网络、无 secret lookup、无写盘的 plan；确认后才写 HOME。runtime bundle 由 `${XDG_STATE_HOME:-$HOME/.local/state}/dotf/` 下的版本化 managed manifest 记录 owner、source identity 与 hash。只有上次 owned 且仍匹配 managed hash 的 stale 项会被静默 prune；本机改写过的 stale 项备份后 prune；未托管同名项或本机改写默认先备份再覆写（`--on-conflict=block` / `--takeover=skip` 可恢复"报告并保留"）。`patches/`、`evals/`、`experience/`、`evolutions/` 等 authoring 数据不属于默认 runtime bundle。
 
 
 ## TUI manager (`dotf tui`)

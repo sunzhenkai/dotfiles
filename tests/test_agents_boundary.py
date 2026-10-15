@@ -170,6 +170,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         tmp_home / ".claude" / "CLAUDE.md",
         tmp_home / ".codex" / "AGENTS.md",
         tmp_home / ".cursor" / "rules",
+        tmp_home / ".pi" / "agent" / "AGENTS.md",
     )
     for dest in written:
         assert any(dest.startswith(str(prefix)) for prefix in allowed), dest
