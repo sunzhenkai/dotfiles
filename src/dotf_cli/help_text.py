@@ -20,6 +20,7 @@ HELP_TEXT = """dotf — Dotfiles 管理工具
   update                      拉取最新代码，并提示后续同步命令（agents/skills 等）
   cd                          跳转到 dotfiles 目录（需 zsh wrapper）
   skills -c                   安装编目全部 skill（一手 + 锁定第三方 + OpenSpec）
+  skills list                 列出编目已知 skill（按 group，标注 optional 与 alias）
   skills add                  通过 npx skills 安装第三方 skill（交互选择范围）
   skills -i/-r                通过 npx skills 按需安装/移除第三方 skill
 

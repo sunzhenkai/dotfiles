@@ -4,7 +4,8 @@
 Priority: match a group name (expand to its ids) -> match a catalogued skill id
 or alias -> pass the raw name through to `npx skills` (search). A name that is
 both a group and a skill id resolves as the group, with a notice to stderr.
-Aliases resolve to the canonical catalog id before npx / apply.
+Aliases resolve to the canonical catalog id before npx / apply. `--list` prints
+the whole catalog instead of resolving a name.
 """
 
 from __future__ import annotations
@@ -133,15 +134,51 @@ def canonical_name(catalog_path: Path, name: str) -> tuple[str | None, int]:
     return catalog.canonical_id(name), 0
 
 
+def list_catalog(catalog_path: Path) -> int:
+    """Print every catalogued skill, grouped, flagging optional entries and aliases."""
+    catalog = _load_catalog_file(catalog_path)
+    if catalog is None:
+        print(f"error: skills map: cannot list skills: {catalog_path} not found", file=sys.stderr)
+        return 1
+    total = 0
+    for group in catalog.groups:
+        print(f"{group.name} ({group.type})")
+        if group.package:
+            print(f"  package: {group.package}")
+        aliases_for = dict(group.aliases_by_id)
+        for skill_id in group.ids:
+            total += 1
+            markers: list[str] = []
+            if skill_id in group.optional_ids:
+                markers.append("optional")
+            aliases = aliases_for.get(skill_id)
+            if aliases:
+                markers.append("aliases: " + ", ".join(aliases))
+            suffix = f" ({'; '.join(markers)})" if markers else ""
+            print(f"  {skill_id}{suffix}")
+    print(f"{total} skills in {len(catalog.groups)} groups")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Resolve dotf skills short names")
-    parser.add_argument("name", help="skill group, skill id, or raw npx package spec")
+    parser.add_argument(
+        "name",
+        nargs="?",
+        default=None,
+        help="skill group, skill id, or raw npx package spec",
+    )
     parser.add_argument("--remove", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--map", type=Path, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--expand-group", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--canonical", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--list", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     catalog_path = args.map if args.map is not None else repo_root() / CATALOG_REL
+    if args.list:
+        return list_catalog(catalog_path)
+    if args.name is None:
+        parser.error("name is required unless --list is given")
     if args.expand_group:
         members, rc = expand_group(catalog_path, args.name)
         if rc != 0:

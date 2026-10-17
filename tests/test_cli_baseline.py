@@ -347,6 +347,26 @@ def test_skills_help_lists_config(tmp_home: Path) -> None:
     assert "dotf skills -c --dry-run" in result.stdout
 
 
+def test_skills_list_prints_catalog(tmp_home: Path) -> None:
+    result = run_dotf("skills", "list")
+
+    assert result.returncode == 0
+    assert "solo-skills (third-party)" in result.stdout
+    assert "  package: https://github.com/sunzhenkai/solo-skills" in result.stdout
+    assert "  lark-cli (optional)" in result.stdout
+    assert "  frontend-slides (optional; aliases: ppt)" in result.stdout
+    summary = result.stdout.strip().splitlines()[-1]
+    assert " skills in " in summary
+    assert summary.endswith(" groups")
+
+
+def test_skills_list_rejects_extra_args(tmp_home: Path) -> None:
+    result = run_dotf("skills", "list", "mattpocock")
+
+    assert result.returncode == 1
+    assert "skills list 不接受" in result.stderr
+
+
 def test_skills_config_yes_installs_first_party_without_agents_md(
     tmp_home: Path, tmp_path: Path, monkeypatch
 ) -> None:

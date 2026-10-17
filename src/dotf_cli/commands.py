@@ -146,11 +146,13 @@ def cmd_retry(ctx: Ctx) -> int:
 # ============================================================
 
 _SKILLS_HELP = """用法: dotf skills -c|--config [选项...]
+      dotf skills list
       dotf skills add <package> [--global|--project] [选项...]
       dotf skills -i <package> [选项...]
       dotf skills -r|--uninstall [skill-name] [选项...]
   -c 安装编目 Desired Set 的全部 skill（一手 + 锁定第三方 + OpenSpec CLI）
      不含全局 AGENTS.md；完整 agent 运行时仍用 dotf agents -c
+  list 列出编目已知 skill（按 group，标注 optional 与 alias）
   add 通过 npx skills 安装；未指定范围时交互选择用户级或项目级
   -i 通过 npx skills 安装；<package> 一般直接写 skill 名称（兼容语法）
   -r 移除已安装 skill；省略名称时进入 npx skills 交互式移除
@@ -281,10 +283,25 @@ def _select_skill_scope() -> str:
         print("无效选择，请输入 1 或 2")
 
 
+def _list_catalog_skills(argv: list[str]) -> int:
+    for arg in argv:
+        if arg in HELP:
+            print(_SKILLS_HELP)
+            return 0
+        raise DotfError("usage", f"错误: skills list 不接受 '{arg}'")
+    proc = skills_map_py("--list", capture=True)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        return 1
+    sys.stdout.write(proc.stdout)
+    return 0
+
+
 def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
     if not argv:
-        print("错误: 需要 -c/--config、add、-i/--install 或 -r/--remove 动作")
+        print("错误: 需要 -c/--config、list、add、-i/--install 或 -r/--remove 动作")
         print("用法: dotf skills -c|--config")
+        print("      dotf skills list")
         print("      dotf skills add <package> [--global|--project] [选项...]")
         print("      dotf skills -i <package> [选项...]")
         return 1
@@ -293,6 +310,8 @@ def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
     interactive_scope = False
     if verb in ("-c", "--config"):
         return _install_all_catalog_skills(ctx, argv[1:])
+    if verb == "list":
+        return _list_catalog_skills(argv[1:])
     if verb in ("-i", "--install"):
         pass
     elif verb == "add":
@@ -304,10 +323,11 @@ def cmd_skills(ctx: Ctx, argv: list[str]) -> int:
         return 0
     else:
         print(
-            "错误: skills 仅支持 -c/--config、add、-i/--install "
+            "错误: skills 仅支持 -c/--config、list、add、-i/--install "
             "与 -r/--remove/--uninstall"
         )
         print("用法: dotf skills -c|--config")
+        print("      dotf skills list")
         print("      dotf skills add <package> [--global|--project] [选项...]")
         print("      dotf skills -i <package> [选项...]")
         return 1

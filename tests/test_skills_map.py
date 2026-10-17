@@ -189,3 +189,33 @@ def test_missing_catalog_passes_name_through(tmp_path: Path) -> None:
     result = run_resolver("anything", "--map", str(tmp_path / "missing.yaml"))
     assert result.returncode == 0
     assert result.stdout.splitlines() == ["anything"]
+
+
+def test_list_prints_catalog_grouped_with_markers(tmp_path: Path) -> None:
+    map_file = tmp_path / "skills.yaml"
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  demo:\n    type: third-party\n    source: github\n"
+        "    package: owner/one\n    skills:\n"
+        "      - foo\n"
+        "      - id: slides\n        optional: true\n        aliases: [ppt, deck]\n"
+        "  dotfiles:\n    type: first-party\n    skills: [own]\n",
+    )
+    result = run_resolver("--list", "--map", str(map_file))
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "demo (third-party)",
+        "  package: owner/one",
+        "  foo",
+        "  slides (optional; aliases: ppt, deck)",
+        "dotfiles (first-party)",
+        "  own",
+        "3 skills in 2 groups",
+    ]
+
+
+def test_list_missing_catalog_fails(tmp_path: Path) -> None:
+    result = run_resolver("--list", "--map", str(tmp_path / "missing.yaml"))
+    assert result.returncode == 1
+    assert "not found" in result.stderr
