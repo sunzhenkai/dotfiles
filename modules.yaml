@@ -342,6 +342,15 @@ modules:
     doctor: true
     bin: claude
 
+  - name: claude-plugins
+    kind: binary
+    desc: Claude Code 插件（marketplace + 插件 desired set 幂等同步）
+    group: agents
+    depends_on: [claude-code]
+    install: true
+    doctor: true
+    bin: claude
+
   - name: mcode
     kind: binary
     desc: MiniMax Code CLI（npm -g @minimax-ai/code）

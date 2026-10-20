@@ -36,6 +36,7 @@ dotf -a --dry-run                      # 全量预览
 ```shell
 dotf agents -ic                     # 装 agent CLI 工具包 + 同步 skills/全局指令
 dotf agents -d --json               # 深度诊断（JSON 报告）
+dotf claude-plugins -i              # 幂等同步 Claude Code 插件 desired set（agents -i 已展开包含）
 dotf agents skill apply <id|alias>        # 启用一条 Skill（写 overlay 并 sync，含该 id 的来源）
 dotf agents skill remove <id|alias>       # 停用并 prune owned 目标（本机改过的项先备份再 prune）
 dotf agents skill apply <id|alias> --on-conflict=block  # 需要严格模式（默认先备份再覆写漂移）
@@ -51,6 +52,7 @@ make skills-lock-update             # 升级第三方 lock 到各 source HEAD（
 - 安装产物（`~/.agents/AGENTS.md`、`~/.claude/CLAUDE.md`、各 vendor 配置、上述三个目录里由本系统生成的文件）不要手改，改了会被 `dotf agents --doctor` 判漂移。
 - sync 冲突默认「先备份再继续」（owned 漂移含重锁后的 identity 迁移、无主接管；旧字节在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/`），不再失败；`--on-conflict=block` / `--takeover=skip` 收紧为严格模式，symlink / manifest 损坏等不安全情况仍 fail closed。见 `docs/adr/0033-*`。
 - Skill 源仓库位置约定：`.agents/skills/` 项目级；`agents/skills/` 是 first-party 源位置（当前为空）——自有共享 skill 已迁 `sunzhenkai/solo-skills`，以第三方 group `solo-skills` 编目消费，改共享 skill 去那个仓。见 `AGENTS.md`。
+- Claude Code 插件的 desired set 在 `scripts/modules/claude-plugins/lib.sh` 顶部两个列表（marketplace 源 / 插件 spec）；模块只做幂等同步（已在位 → unchanged），插件本地状态与 Codex 登录凭据属本机自管。
 - 第三方 checkout 缓存在 `${XDG_STATE_HOME:-~/.local/state}/dotf/third-party-checkouts/<source+revision 哈希>/`：同一 revision 只拉一次，且只落地 lock 要的子目录与 license（blobless + sparse）；命中缓存完全不联网，删该目录即强制重拉。
 
 ## 仓库开发
