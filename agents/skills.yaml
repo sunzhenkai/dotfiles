@@ -22,6 +22,8 @@ groups:
   # 2026-10-12：task* 收敛为三件套——taskrail（唯一编排入口，含确认协议与门包）、
   # task-explore（探索台账，出口 handoff）、taskflow（交接后 OpenSpec 执行）；
   # task-confirm 已并入 taskrail；已删 task-wizard / task-goal / task-delivery。
+  # 2026-10-21：task-explore / task-intent 并入 taskrail（references/ 与 `taskrail intent`），
+  # 编目移除这两个 id；taskflow 仍是交接后执行入口。
   # first-party type 概念保留：未来自有 skill 仍可落回 agents/skills/<id>/ 并以
   # first-party group 编目；当前编目无 first-party group，校验按空集通过。
   solo-skills:
@@ -35,7 +37,7 @@ groups:
       - id: lark-cli
         optional: true
       - llm-wiki
-      - pretty-view-html
+      - pretty-ui
       - project-init
       - project-spec-mirror
       - repo-manager
@@ -46,8 +48,6 @@ groups:
       - skill-upgrader
       - skills-store
       - solo-code-review
-      - task-explore
-      - task-intent
       - taskflow
       - taskrail
       - trouble-grill
