@@ -48,10 +48,10 @@ root = Path(sys.argv[1]).resolve()
 catalog = yaml.safe_load((root / "agents" / "skills.yaml").read_text(encoding="utf-8"))
 # 只有第三方 skill 依赖网络获取；一手 skill 来自仓库，保持启用以检验 sync 路径。
 third_party_ids = sorted(
-    skill_id
+    (skill["id"] if isinstance(skill, dict) else skill)
     for group in (catalog.get("groups") or {}).values()
     if isinstance(group, dict) and group.get("type") == "third-party"
-    for skill_id in (group.get("skills") or [])
+    for skill in (group.get("skills") or [])
 )
 
 
@@ -234,8 +234,9 @@ export PATH="$STUB_BIN:$PATH"
 
 agents_first="$TMP_ROOT/agents-first.log"
 "$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" all >"$agents_first"
-if ! grep -Eq 'done skills: changed=[1-9][0-9]* ' "$agents_first"; then
-  echo "error: first Agent skills sync did not report changed" >&2
+# 首次 sync 应安装 instructions 或 defaults（third-party skills 已迁至 defaults）
+if ! grep -Eq 'done (instructions|defaults [^:]*): .*changed=[1-9][0-9]*' "$agents_first"; then
+  echo "error: first Agent sync did not report instructions or defaults changed" >&2
   exit 1
 fi
 if [ -e "$NETWORK_ATTEMPTED" ]; then
@@ -248,8 +249,10 @@ snapshot_paths "$HOME" >"$agents_before"
 agents_backups_before="$(backup_count)"
 agents_second="$TMP_ROOT/agents-second.log"
 "$BASH_BIN" "$ROOT/scripts/modules/agents/sync.sh" all >"$agents_second"
-if ! grep -Eq 'done skills: changed=0 pruned=0 unchanged=[1-9][0-9]*' "$agents_second"; then
-  echo "error: second Agent skills sync was not fully unchanged" >&2
+# 第二次 sync 应全部 unchanged（instructions 不再变化）
+# defaults 区段因为 disabled_skills 覆盖全部第三方 skill 而为空，unchanged=0 是预期行为
+if ! grep -Eq 'done instructions: changed=0 pruned=0 unchanged=[1-9][0-9]*' "$agents_second"; then
+  echo "error: second Agent sync instructions was not fully unchanged" >&2
   exit 1
 fi
 if [ -e "$NETWORK_ATTEMPTED" ]; then

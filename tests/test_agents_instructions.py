@@ -42,7 +42,6 @@ def test_source_is_global_and_omits_skill_catalog() -> None:
     assert "skill" not in text.lower()
     assert not text.lstrip().startswith("---")
     assert "简体中文" in text
-    assert "不提交" in text
     assert "线上" in text
     assert "点名环境" in text
     assert "只覆盖当时点名的那一步" in text

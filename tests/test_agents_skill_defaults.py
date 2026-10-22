@@ -69,10 +69,10 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert "to-questionnaire" not in catalog.default_ids()
     assert "commit-push" in catalog.default_ids()
     # 自有 skill 已迁出到 sunzhenkai/solo-skills：task* 收敛为 taskrail /
-    # task-explore / taskflow（task-wizard / task-goal / task-delivery 已删，
-    # task-confirm 并入 taskrail），agent-roster-flow 改名 agent-roster。
+    # taskflow（task-wizard / task-goal / task-delivery / task-explore / task-intent 已删或并入），
+    # agent-roster-flow 改名 agent-roster。
     # 它们仍是默认安装项，来源为 third-party（由严格审计锁覆盖）。
-    migrated = {"agent-roster", "role-based-reviewer", "task-explore", "taskflow"}
+    migrated = {"agent-roster", "role-based-reviewer", "taskrail", "taskflow"}
     assert migrated <= set(catalog.default_ids())
     assert migrated.isdisjoint(first_party)
     assert migrated <= third_party
