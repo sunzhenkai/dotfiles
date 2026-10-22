@@ -73,7 +73,7 @@ def test_macos_workflow_requires_system_bash32_and_migration_smoke() -> None:
         "legacy writable config-link migration",
         "second config run did not report unchanged",
         "sync.sh\" all",
-        "done skills: changed=0 pruned=0 unchanged=",
+        "done instructions: changed=0 pruned=0 unchanged=",
         "metadata=inode+mtime+hash-stable",
         "repo_status=unchanged",
         "repo_diff=unchanged",

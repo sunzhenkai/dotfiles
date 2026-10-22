@@ -38,6 +38,7 @@ def _make_remote_repo(tmp_path: Path) -> tuple[Path, Path]:
     _git(seed, "branch", "-M", "main")
     _git(seed, "remote", "add", "origin", str(remote))
     _git(seed, "push", "-q", "origin", "main")
+    _git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
 
     clone = tmp_path / "clone"
     _git(tmp_path, "clone", "-q", str(remote), str(clone))
