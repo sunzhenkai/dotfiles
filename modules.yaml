@@ -326,6 +326,15 @@ modules:
     doctor: true
     bin: omp
 
+  - name: omo
+    kind: binary
+    desc: OmO 独立版 coding agent CLI（原生二进制，~/.local/bin/omo）
+    group: agents
+    install: true
+    doctor: true
+    bin: omo
+    enabled: false   # 独立安装，不进 profile/--all；dotf omo -i 显式装
+
   - name: zcode
     kind: binary
     desc: ZCode CLI
