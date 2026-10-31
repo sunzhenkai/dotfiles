@@ -26,6 +26,7 @@ for _path in (_SRC, _SRC / "agents"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
+from defaults import entry_identity_suffixes  # noqa: E402
 from desired_set import resolve_skill_desired_set  # noqa: E402
 from layouts import (  # noqa: E402
     LAYOUTS,
@@ -184,7 +185,8 @@ def _check_layout(
         target_root=destination,
         source_root=staging,
         owner_prefix=owner_prefix(layout, "third-party"),
-        identity_prefix=identity_prefix(layout, f"{THIRD_PARTY_IDENTITY}@{lock.digest}"),
+        identity_prefix=identity_prefix(layout, THIRD_PARTY_IDENTITY),
+        identity_suffixes=entry_identity_suffixes(items),
         include_unlisted=True,
         only_ids=frozenset(item.id for item in items),
         # Verification reports raw drift: strict policies keep local edits and

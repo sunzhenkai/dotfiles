@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 # dotf — Dotfiles CLI shim
-# 零逻辑：分发到 python3 -m dotf_cli；DOTF_LEGACY_CLI=1 时走旧版逃生门。
+# 零逻辑：分发到 python3 -m dotf_cli。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [ "${DOTF_LEGACY_CLI:-0}" = "1" ]; then
-  exec bash "$SCRIPT_DIR/scripts/legacy/dotf.sh" "$@"
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "[dotf] env: 未找到 python3，请先安装 Python 3（或临时 DOTF_LEGACY_CLI=1）" >&2
+  echo "[dotf] env: 未找到 python3，请先安装 Python 3" >&2
   exit 2
 fi
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -41,7 +42,7 @@ from skills_catalog import (
     validate_first_party_coverage,
 )
 from sync import renderers_for
-from third_party import ThirdPartyLock, ThirdPartyLockError, acquire_all, load_lock
+from third_party import LockedSkill, ThirdPartyLock, ThirdPartyLockError, acquire_all, load_lock
 
 _yaml = ensure_yaml()
 CATALOG_REL = Path("agents") / "skills.yaml"
@@ -113,6 +114,14 @@ def _destination_specs(
     return tuple((layout, skills_target(layout)) for layout in LAYOUTS)
 
 
+def entry_identity_suffixes(items: Sequence[LockedSkill]) -> dict[str, str]:
+    """Per-entry identity component: what this entry is, not which lock it sits in."""
+    return {
+        item.id: hashlib.sha256(f"{item.revision}\0{item.content_hash}".encode("utf-8")).hexdigest()[:32]
+        for item in items
+    }
+
+
 def install_defaults(
     root: Path,
     *,
@@ -168,7 +177,8 @@ def install_defaults(
                         target_root=destination,
                         source_root=source_root,
                         owner_prefix=owner_prefix(layout, "third-party"),
-                        identity_prefix=identity_prefix(layout, f"{THIRD_PARTY_IDENTITY}@{lock.digest}"),
+                        identity_prefix=identity_prefix(layout, THIRD_PARTY_IDENTITY),
+                        identity_suffixes=entry_identity_suffixes(selected),
                         include_unlisted=True,
                         only_ids=frozenset(item.id for item in selected),
                         on_conflict=policy,

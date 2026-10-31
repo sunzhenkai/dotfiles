@@ -2,10 +2,10 @@
 # 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）
 # + 全局 AGENTS.md。
 # 用法:
-#   sync.sh [all|<tool>] [--dry-run] [--strict] [--on-conflict=block|backup] [--takeover=skip|backup] [--verbose]
+#   sync.sh [--dry-run] [--on-conflict=block|backup] [--takeover=skip|backup] [--verbose]
 # 冲突默认「先备份再继续」：owned 漂移（内容/mode/identity）与 unowned 接管都会备份旧字节后覆写；
 # --on-conflict=block / --takeover=skip 恢复严格模式（冲突即跳过）。不安全目标始终 fail closed。
-# <tool> 仅为兼容旧调用保留；skills/instructions 与工具过滤无关，一律全量执行。
+# 工具过滤已移除：skills/instructions 与工具无关，一律全量执行。
 # 诊断请用: dotf agents -d  或  PYTHONPATH=scripts python3 src/agents/doctor.py
 set -euo pipefail
 
@@ -20,7 +20,6 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 DRY_RUN=0
-STRICT=0
 ON_CONFLICT=""
 ON_TAKEOVER=""
 VERBOSE=0
@@ -34,9 +33,6 @@ while [ $# -gt 0 ]; do
     echo "error: --doctor 已不再作为 sync 旁路旗标" >&2
     echo "请改用: dotf agents -d  或  dotf agents -cd" >&2
     exit 1
-    ;;
-  --strict)
-    STRICT=1
     ;;
   --verbose)
     VERBOSE=1
@@ -132,37 +128,40 @@ fi
 # 阶段互不阻塞：一手 / defaults / OpenSpec 各自记 rc，最后汇总并点名失败阶段。
 sync_rc=0
 failed_stages=()
+failed_details=()
 
 _run_sync_stage() {
   local stage="$1"
   local banner="$2"
-  local step_rc
+  local step_rc log detail
   shift 2
   echo "$banner"
+  log="$(mktemp "${TMPDIR:-/tmp}/dotf-sync-${stage}-XXXXXX.log")"
   set +e
-  python3 "$@"
-  step_rc=$?
+  python3 "$@" 2>&1 | tee "$log"
+  step_rc=${PIPESTATUS[0]}
   set -e
   if [ "$step_rc" -ne 0 ]; then
+    detail="$(grep -m1 '^error:' "$log" 2>/dev/null || true)"
     echo "error: agents sync 阶段失败: $stage（exit=$step_rc）" >&2
     failed_stages+=("$stage")
+    failed_details+=("${detail:-（无 error 行，见上方该阶段输出）}")
     sync_rc=$step_rc
   fi
+  rm -f "$log"
 }
 
 _run_sync_stage skills "--- skills ---" "$_SRC_AGENTS/sync.py" "${skills_args[@]}"
 _run_sync_stage defaults "--- default skills ---" "$_SRC_AGENTS/defaults.py" "${skills_args[@]}"
 _run_sync_stage openspec "--- openspec skills ---" "$_SRC_AGENTS/openspec_skills.py" "${skills_args[@]}"
 
-# --strict 保留：供将来 sync 自身严格模式使用（不再绑定 doctor）
-if [ "$STRICT" -eq 1 ]; then
-  :
-fi
-
 if [ "$sync_rc" -ne 0 ]; then
   joined=$(printf '%s, ' "${failed_stages[@]}")
   joined="${joined%, }"
   echo "error: agents sync 有阶段失败: ${joined}（exit=$sync_rc）" >&2
+  for detail in "${failed_details[@]}"; do
+    echo "  ↳ $detail" >&2
+  done
   exit "$sync_rc"
 fi
 

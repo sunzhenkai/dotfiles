@@ -426,12 +426,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Sync agents skills into every managed runtime layout (tool 无关)"
     )
-    parser.add_argument(
-        "tool",
-        nargs="?",
-        default="all",
-        help="仅兼容旧用法，必须省略或为 all（skills 同步已与 tool 无关）",
-    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--on-conflict",
@@ -453,9 +447,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--root", type=Path, default=None, help="dotfiles root (default: auto)")
     args = parser.parse_args(argv)
-
-    if args.tool.lower() != "all":
-        die(f"skills 同步已与 tool 无关，请直接运行 sync.py（收到: '{args.tool}'）")
 
     root = args.root.resolve() if args.root else repo_root()
 

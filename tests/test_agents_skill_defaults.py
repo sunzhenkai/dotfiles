@@ -442,14 +442,14 @@ def _lock_body_for(
     return body
 
 
-def test_lock_digest_change_reowns_equivalent_third_party_bytes(
+def test_entry_identity_change_reowns_equivalent_third_party_bytes(
     tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Adding a lock entry must not block re-attesting unchanged skill bytes.
+    """A relock that moves this entry's revision must not block re-attesting its bytes.
 
-    The third-party identity embeds the whole-lock digest, so any lock edit
-    rewrites every third-party identity. A target still owned by us whose bytes
-    equal the newly locked content is re-recorded, not reported as a conflict.
+    The third-party identity is scoped to the entry (revision + content hash), so
+    a revision bump moves it. A target still owned by us whose bytes equal the
+    newly locked content is re-recorded, not reported as a conflict.
     """
     defaults = _load("defaults")
     third_party = _load("third_party")
@@ -489,9 +489,20 @@ def test_lock_digest_change_reowns_equivalent_third_party_bytes(
 
     identity_before = recorded_identity()
 
-    # Same locked skill, but the lock file itself changed digest (new entry).
+    # Same skill bytes, but this entry's revision advanced (pure re-pin).
+    next_revision = "2" * 40
+
+    def acquire_repinned(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, next_revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire_repinned)
     _write_min_repo(
-        repo, _lock_body_for(content_hash, license_hash, revision, extra_entry=True), ids=["demo"]
+        repo, _lock_body_for(content_hash, license_hash, next_revision, extra_entry=False), ids=["demo"]
     )
 
     assert defaults.install_defaults(repo, dest_root=destination) == 0
@@ -499,6 +510,51 @@ def test_lock_digest_change_reowns_equivalent_third_party_bytes(
     identity_after = recorded_identity()
     assert identity_after != identity_before
     assert identity_after.endswith("demo/SKILL.md")
+
+
+def test_unrelated_lock_entry_does_not_move_identity(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Adding an entry to the lock must not rewrite the other entries' targets."""
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    content_hash = third_party.tree_hash(skill)
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    _write_min_repo(
+        repo, _lock_body_for(content_hash, license_hash, revision, extra_entry=False), ids=["demo"]
+    )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    target = destination / "demo" / "SKILL.md"
+    mtime = target.stat().st_mtime_ns
+    capsys.readouterr()
+
+    _write_min_repo(
+        repo, _lock_body_for(content_hash, license_hash, revision, extra_entry=True), ids=["demo"]
+    )
+
+    assert defaults.install_defaults(repo, dest_root=destination) == 0
+    assert target.stat().st_mtime_ns == mtime
+    assert "changed=0" in capsys.readouterr().out
 
 
 def test_relocked_third_party_content_updates_pristine_target(

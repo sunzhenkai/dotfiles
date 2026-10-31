@@ -67,13 +67,12 @@ ON_TAKEOVER_ENV = "DOTF_TAKEOVER"
 CONTENT_DRIFT = "owned target was modified locally"
 MODE_DRIFT = "owned target mode was modified locally"
 
-# Third-party identity embeds the whole-lock digest, so adding or removing one
-# lock entry rewrites the identity of every already-installed third-party skill.
-# A target still owned by us is re-recorded under the new identity instead of
-# conflicting when it holds either the newly locked content or exactly the bytes
-# and mode we recorded installing; any other drift on top of the identity move
-# is remediated like ordinary owned drift under the backup policy, and stays
-# fail-closed under `--on-conflict=block`.
+# Third-party identity is scoped to the lock entry (revision + content hash), so a
+# relock that only moves some entries leaves every other entry's identity alone.
+# An identity that moves at all is re-recorded when the target holds either the
+# newly locked content or exactly the bytes and mode we recorded installing; any
+# other drift on top of the identity move is remediated like ordinary owned drift
+# under the backup policy, and stays fail-closed under `--on-conflict=block`.
 IDENTITY_MISMATCH = "manifest ownership identity differs"
 
 # Owned drift the backup policy may remediate: the local bytes are preserved in
@@ -188,6 +187,9 @@ class SkillsPlan:
     # directory per Skill may do that; a flat root (instruction files under HOME)
     # would read each dotdir as a Skill id and swallow the conflict.
     isolate_by_skill: bool = False
+    # Per-entry identity components (skill id -> suffix) so that relocking one
+    # entry does not move the identity of the others.
+    identity_suffixes: Mapping[str, str] | None = None
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -383,6 +385,7 @@ def collect_runtime_files(
     source_root: Path | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
+    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
 ) -> tuple[RuntimeFile, ...]:
@@ -403,7 +406,10 @@ def collect_runtime_files(
             target.relative_to(target_base)
         except ValueError as exc:
             raise AgentRuntimeError(f"runtime target escapes skills root: {target}") from exc
-        identity = (Path(identity_prefix) / Path(relative)).as_posix()
+        identity_base = Path(identity_prefix)
+        if identity_suffixes:
+            identity_base = identity_base / identity_suffixes.get(Path(relative).parts[0], "")
+        identity = (identity_base / Path(relative)).as_posix()
         mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
         item = RuntimeFile(owner, str(target), identity, _sha256(content), content, mode)
         if item.target in targets:
@@ -623,6 +629,7 @@ def compile_skills_plan(
     source_root: Path | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
+    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
@@ -640,6 +647,7 @@ def compile_skills_plan(
         source_root=resolved_source_root,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
+        identity_suffixes=identity_suffixes,
         include_unlisted=include_unlisted,
         only_ids=only_ids,
     )
@@ -652,6 +660,7 @@ def compile_skills_plan(
         source_root=resolved_source_root,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
+        identity_suffixes=identity_suffixes,
         include_unlisted=include_unlisted,
         only_ids=only_ids,
         on_conflict=on_conflict,
@@ -671,6 +680,7 @@ def compile_owned_plan(
     source_root: Path,
     owner_prefix: str,
     identity_prefix: str,
+    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
@@ -828,6 +838,7 @@ def compile_owned_plan(
         on_conflict,
         on_takeover,
         isolate_by_skill,
+        identity_suffixes=identity_suffixes,
     )
 
 
@@ -1086,6 +1097,7 @@ def apply_skills_plan(
             source_root=Path(plan.source_root),
             owner_prefix=plan.owner_prefix,
             identity_prefix=plan.identity_prefix,
+            identity_suffixes=plan.identity_suffixes,
             include_unlisted=plan.include_unlisted,
             only_ids=plan.only_ids,
             on_conflict=plan.on_conflict,

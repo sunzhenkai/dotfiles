@@ -21,7 +21,7 @@ skills:
     source: https://github.com/sunzhenkai/solo-skills
     revision: 6942450b537235f3b028051609c3d1b2c6aff3a9
     subdirectory: skills/anti-lazy
-    content_hash: f18f263a36704400b6c8286ce1c15bb8a4e85489fe3c41d2567d1251979ad99e
+    content_hash: f5bf93070a65118aa2b3dc361e06f3a9bac3ed7be3e10bf48f421a047dbce965
     license:
       spdx: MIT
       file: LICENSE

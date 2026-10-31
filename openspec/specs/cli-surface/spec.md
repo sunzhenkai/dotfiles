@@ -2,22 +2,17 @@
 
 ## Purpose
 
-定义 dotf 用户面命令的横切对外契约：shim 分发、全局 `--json` 输出、错误码与分级诊断、旧版逃生门与 CLI 编号点选。命令的业务语义（agents / skills / 模块动作）由各自 capability 约束，本 capability 只约束"命令面"上所有命令一致的行为。
+定义 dotf 用户面命令的横切对外契约：shim 分发、全局 `--json` 输出、错误码与分级诊断、CLI 编号点选。命令的业务语义（agents / skills / 模块动作）由各自 capability 约束，本 capability 只约束"命令面"上所有命令一致的行为。
 
 ## Requirements
 
 ### Requirement: bin/dotf 是零逻辑 shim
-`bin/dotf` SHALL 只负责设置 `PYTHONPATH` 并执行 `python3 -m dotf_cli`，自身不实现任何命令逻辑、参数解析或输出格式。设置环境变量 `DOTF_LEGACY_CLI=1` 时 SHALL 转发到仓库内保留的旧 bash 脚本作为应急逃生门；该逃生门 SHALL NOT 出现在任何 help 输出或文档推荐路径中。未设置逃生门且 Python 不可用时，shim SHALL 以非零码退出并给出可读报错。
+`bin/dotf` SHALL 只负责设置 `PYTHONPATH` 并执行 `python3 -m dotf_cli`，自身不实现任何命令逻辑、参数解析或输出格式。Python 不可用时，shim SHALL 以非零码退出并给出可读报错。
 
 #### Scenario: 正常调用
 - **WHEN** 用户运行任意 `dotf <command>`
 - **THEN** 进程最终执行 `python3 -m dotf_cli` 处理该命令
 - **THEN** `bin/dotf` 内不包含该命令的业务逻辑
-
-#### Scenario: 逃生门
-- **WHEN** 用户设置 `DOTF_LEGACY_CLI=1` 后运行 `dotf <command>`
-- **THEN** 命令由仓库内保留的旧 bash 脚本执行
-- **THEN** `dotf --help` 中不出现该逃生门的说明
 
 #### Scenario: Python 不可用
 - **WHEN** 用户运行 `dotf <command>` 且系统无可用 `python3`
