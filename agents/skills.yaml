@@ -32,6 +32,7 @@ groups:
     package: https://github.com/sunzhenkai/solo-skills
     skills:
       - agent-roster
+      - anti-lazy
       - code-explore
       - commit-push
       - id: lark-cli
