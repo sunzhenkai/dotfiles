@@ -237,7 +237,7 @@ def test_empty_lock_dry_run_and_apply_never_invoke_network(tmp_home: Path, monke
     assert not (tmp_home / ".agents" / "skills").exists()
 
 
-def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownership(
+def test_verified_locked_skill_installs_shared_and_claude_through_managed_ownership(
     tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     defaults = _load("defaults")
@@ -273,34 +273,25 @@ def test_verified_locked_skill_installs_shared_and_kiro_through_managed_ownershi
 
     monkeypatch.setattr(defaults, "acquire_all", acquire)
     shared_destination = tmp_home / ".agents" / "skills"
-    kiro_destination = tmp_home / ".kiro" / "skills"
     claude_destination = tmp_home / ".claude" / "skills"
-    assert defaults.install_defaults(
-        repo, dest_roots=(shared_destination, kiro_destination, claude_destination)
-    ) == 0
+    assert defaults.install_defaults(repo, dest_roots=(shared_destination, claude_destination)) == 0
     shared_target = shared_destination / "demo" / "SKILL.md"
-    kiro_target = kiro_destination / "demo" / "SKILL.md"
     claude_target = claude_destination / "demo" / "SKILL.md"
     assert shared_target.is_file()
-    assert kiro_target.is_file()
     assert claude_target.is_file()
-    # Claude Code consumes $ARGUMENTS itself; only Kiro needs the explicit marker.
-    assert kiro_target.read_text().rstrip().endswith("$ARGUMENTS")
+    # Claude Code consumes $ARGUMENTS itself, so no Kiro-style marker is injected.
     assert claude_target.read_text().rstrip().endswith("$ARGUMENTS") is False
     assert claude_target.read_bytes() == shared_target.read_bytes()
     manifest = yaml.safe_load((tmp_home / ".local" / "state" / "dotf" / "agents-manifest.json").read_text())
     assert {item["owner"] for item in manifest["items"]} == {
         "agents:third-party:demo",
-        "agents:kiro-third-party:demo",
         "agents:claude-third-party:demo",
     }
     shared_before = shared_target.stat().st_mtime_ns
-    kiro_before = kiro_target.stat().st_mtime_ns
-    assert defaults.install_defaults(
-        repo, dest_roots=(shared_destination, kiro_destination, claude_destination)
-    ) == 0
+    claude_before = claude_target.stat().st_mtime_ns
+    assert defaults.install_defaults(repo, dest_roots=(shared_destination, claude_destination)) == 0
     assert shared_target.stat().st_mtime_ns == shared_before
-    assert kiro_target.stat().st_mtime_ns == kiro_before
+    assert claude_target.stat().st_mtime_ns == claude_before
 
 
 def test_third_party_install_copies_unlisted_runtime_files(

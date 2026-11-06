@@ -239,13 +239,14 @@ modules:
     doctor: true
     bin: cursor
 
-  - name: kiro
-    kind: binary
-    desc: Kiro CLI（skills 镜像由 agents sync 管理）
-    group: agents
-    install: true
-    doctor: true
-    bin: kiro-cli
+  # kiro 停用：CLI 不再安装、~/.kiro skills 镜像不再分发（2026-11）。
+  # - name: kiro
+  #   kind: binary
+  #   desc: Kiro CLI（skills 镜像由 agents sync 管理）
+  #   group: agents
+  #   install: true
+  #   doctor: true
+  #   bin: kiro-cli
 
   - name: opencode
     kind: binary

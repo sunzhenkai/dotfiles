@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Kiro CLI）
+# 统一 agents sync：一手 skills + 第三方默认 skill + OpenSpec CLI skills（~/.agents/skills 与 Claude Code）
 # + 全局 AGENTS.md。
 # 用法:
 #   sync.sh [--dry-run] [--on-conflict=block|backup] [--takeover=skip|backup] [--verbose]

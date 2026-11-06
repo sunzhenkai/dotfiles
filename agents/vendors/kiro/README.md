@@ -1,5 +1,9 @@
 # Kiro CLI
 
+> **已停用（2026-11）**：`modules.yaml` 里的 kiro 模块被注释，`dotf kiro -i` / `dotf agents -i`
+> 都不再安装它；`dotf agents -c` 也不再向 `~/.kiro/skills` 镜像 skill（`src/agents/layouts.py`）。
+> 本文件保留作恢复参考，取消注释对应条目后即可回到旧行为。
+
 [Kiro](https://kiro.dev/docs/cli/) Agent CLI 的安装与配置。主目录：
 
 ```text

@@ -122,7 +122,7 @@ skills、profiles 与 doctor 已收敛为单一对外模块 `agents`：
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro + Claude Code）+ 全局 AGENTS.md
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Claude Code）+ 全局 AGENTS.md
 dotf skills -c                 # 只安装编目全部 skill（不含 AGENTS.md）
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs

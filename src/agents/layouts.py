@@ -38,7 +38,8 @@ class SkillLayout:
 
 
 SHARED = SkillLayout("shared", "skills", ".agents", None, "", "", "shared")
-KIRO = SkillLayout("kiro", "kiro skills", ".kiro", "KIRO_HOME", "kiro-", ":kiro", "kiro")
+# kiro 停用：不再向 ~/.kiro 镜像 skills（恢复时取消下一行注释并加回 LAYOUTS）。
+# KIRO = SkillLayout("kiro", "kiro skills", ".kiro", "KIRO_HOME", "kiro-", ":kiro", "kiro")
 CLAUDE = SkillLayout(
     "claude",
     "claude skills",
@@ -52,7 +53,7 @@ CLAUDE = SkillLayout(
     reserved_ids=frozenset({"synced"}),
 )
 
-LAYOUTS: tuple[SkillLayout, ...] = (SHARED, KIRO, CLAUDE)
+LAYOUTS: tuple[SkillLayout, ...] = (SHARED, CLAUDE)
 SHARED_LAYOUT = SHARED
 LAYOUTS_BY_KEY = {layout.key: layout for layout in LAYOUTS}
 

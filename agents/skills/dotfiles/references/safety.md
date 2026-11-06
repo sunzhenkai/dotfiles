@@ -48,7 +48,7 @@ shared 下通常可直接装的用户级模块：
 ```
 sdk golang git starship（仅配置、不 chsh） delta grepom senv mdserve npm
 ossutil aws aliyun gcp vcpkg d2 dws lark-cli
-agents cursor kiro opencode codex kimi-code pi omp zcode claude-code trae-cli
+agents cursor opencode codex kimi-code pi omp zcode claude-code trae-cli
 nvim helix tmux zellij herdr yazi k9s
 ```
 

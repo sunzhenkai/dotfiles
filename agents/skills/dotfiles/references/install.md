@@ -17,7 +17,7 @@
 | core | sdk / golang / git | 用户级 | 可装 |
 | tools | senv grepom mdserve delta npm vcpkg ossutil aws aliyun gcp d2 | 多为用户级（cargo/go/bin） | 可装 |
 | 办公 | dws / lark-cli | 用户级（npm/npx，需 sdk） | 可装 |
-| agents | agents cursor kiro opencode codex kimi-code pi omp zcode claude-code claude-plugins mcode | 用户级 CLI + 配置 | 可装 |
+| agents | agents cursor opencode codex kimi-code pi omp zcode claude-code claude-plugins mcode | 用户级 CLI + 配置 | 可装 |
 | shell | zsh / starship | zsh 可能 chsh | zsh 见 `references/safety.md` |
 | editors | nvim helix zed | 用户级配置，可能装编辑器 | 装编辑器时确认 |
 | terminals | kitty alacritty wezterm ghostty iterm2 | 用户级配置，可能装终端 | 装终端时确认 |

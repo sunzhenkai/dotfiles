@@ -92,8 +92,8 @@ alias arcl='arc land --onto main'
 # codex
 alias cx='codex --dangerously-bypass-approvals-and-sandbox'
 
-# kiro-cli
-alias kiroc='kiro-cli chat --trust-all-tools'
+# kiro-cli（已停用）
+# alias kiroc='kiro-cli chat --trust-all-tools'
 
 # qoder
 alias qodercn='qoder --yolo'

@@ -131,10 +131,9 @@ def test_disabled_modules_excluded_from_default_lists() -> None:
     cpp = modules.find_module(mods, "cpp-dev")
     archived_names = ("trae-cli", "fcitx5", "logseq")
     zcode = modules.find_module(mods, "zcode")
-    kiro = modules.find_module(mods, "kiro")
     claude = modules.find_module(mods, "claude-code")
-    # 已移除的 vendor 不再注册
-    for removed in ("claude", "qoder", "codebuddy-code", "minimax"):
+    # 已移除/停用的 vendor 不再注册
+    for removed in ("claude", "qoder", "codebuddy-code", "minimax", "kiro"):
         assert modules.find_module(mods, removed) is None
     assert cpp and not modules.is_enabled(cpp)
     for name in archived_names:
@@ -142,33 +141,29 @@ def test_disabled_modules_excluded_from_default_lists() -> None:
         assert module is not None, name
         assert not modules.is_enabled(module), name
     assert zcode and modules.is_enabled(zcode)
-    assert kiro and modules.is_enabled(kiro)
     assert claude and modules.is_enabled(claude)
     assert not zcode.get("config")
-    assert not kiro.get("config")
     assert not claude.get("config")
     assert cpp.get("bin") == "cmake"
     assert zcode.get("bin") == "zcode"
-    assert kiro.get("bin") == "kiro-cli"
     assert claude.get("bin") == "claude"
 
     install_names = {m["name"] for m in modules.filter_modules(mods, capability="install")}
     assert "cpp-dev" not in install_names
     assert "zcode" in install_names
-    assert "kiro" in install_names
     assert "claude-code" in install_names
+    assert "kiro" not in install_names
 
     config_names = {m["name"] for m in modules.filter_modules(mods, capability="config")}
     assert "cpp-dev" not in config_names
     assert "zcode" not in config_names
-    assert "kiro" not in config_names
 
     with_disabled = {
         m["name"]
         for m in modules.filter_modules(mods, capability="install", include_disabled=True)
     }
     assert "cpp-dev" in with_disabled
-    assert "kiro" in with_disabled
+    assert "kiro" not in with_disabled
 
 def test_matches_os_family() -> None:
     assert modules.matches_os(["linux"], "ubuntu")

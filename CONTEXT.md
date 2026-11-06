@@ -35,8 +35,8 @@ _Avoid_: 未锁定 skill, 浮动上游
 _Avoid_: type（两者正交）, 包, 命名空间（含糊）
 
 **Skill Layout**:
-Skill 的安装目标，清单在 `src/agents/layouts.py`：`shared`（`~/.agents/skills`）、`kiro`（`${KIRO_HOME:-~/.kiro}/skills`）、`claude`（`~/.claude/skills`）。每个 layout × 来源（一手 / 第三方 / OpenSpec）派生各自的 owner 前缀，因为 runtime manifest 是全 layout 共用的一份，前缀必须互不重叠。Kiro 在 `SKILL.md` 末尾补 `$ARGUMENTS`；Claude Code 自己消费参数，走与 shared 相同的渲染。
-_Avoid_: 工具（那是 vendor 身份，不是安装目标）, 镜像（Kiro 只是其一）, target root（实现细节）
+Skill 的安装目标，清单在 `src/agents/layouts.py`：`shared`（`~/.agents/skills`）、`claude`（`~/.claude/skills`）。`kiro` layout 已停用（2026-11），保留注释形式以便恢复。每个 layout × 来源（一手 / 第三方 / OpenSpec）派生各自的 owner 前缀，因为 runtime manifest 是全 layout 共用的一份，前缀必须互不重叠。claude 目标走与 shared 相同的渲染（Claude Code 自己消费 `$ARGUMENTS`；旧的 Kiro 目标才会补 `$ARGUMENTS`）。
+_Avoid_: 工具（那是 vendor 身份，不是安装目标）, 镜像, target root（实现细节）
 
 **Kind**:
 `modules.yaml` 里模块的物种声明：`binary` 负责把软件装到本机（必须声明 install 且有 install handler），`config` 只部署配置（不得声明 install、不得有 install handler；专用 `config.sh` 仍是合法配置触点）。`artifact` 为保留值（未来制品型模块），当前校验拒绝。registry validate 强制 kind ↔ install ↔ Handler 对齐。

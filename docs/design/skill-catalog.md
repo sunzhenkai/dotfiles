@@ -93,10 +93,9 @@ Skill 装到哪些目录由 `src/agents/layouts.py` 的 `LAYOUTS` 单一表达�
 | layout | 目标 | 渲染 |
 |---|---|---|
 | `shared` | `~/.agents/skills/<id>/` | `{{slash:x}}` → `/x` |
-| `kiro` | `${KIRO_HOME:-~/.kiro}/skills/<id>/` | 同上 + 末尾补 `$ARGUMENTS` |
 | `claude` | `~/.claude/skills/<id>/` | 同 shared（Claude Code 自消费 `$ARGUMENTS`） |
 
-owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id>`），**必须**互不重叠：runtime manifest 是全 layout 共用的一份，`apply_owned_plan` 按 owner 前缀决定保留哪些既有条目。identity 前缀为 `<base>[:kiro][:claude]`。`claude` 拒绝编目 id `synced`（Claude Code 保留目录名）。
+owner 前缀由 `(layout, source)` 派生（`agents[:claude]-<source>:<id>`），**必须**互不重叠：runtime manifest 是全 layout 共用的一份，`apply_owned_plan` 按 owner 前缀决定保留哪些既有条目。identity 前缀为 `<base>[:claude]`。`claude` 拒绝编目 id `synced`（Claude Code 保留目录名）。`kiro` layout 已停用（2026-11），`layouts.py` 里保留注释形式。
 
 ### D5. 冲突出口
 
@@ -128,7 +127,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 | 模块 | 变更 |
 |---|---|
 | `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺（支持 `optional: true` 与 `aliases` 映射）；无 default |
-| `src/agents/layouts.py` | 安装目标注册表（shared / kiro / claude）+ owner/identity 前缀派生 |
+| `src/agents/layouts.py` | 安装目标注册表（shared / claude；kiro 已停用）+ owner/identity 前缀派生 |
 | `src/agents/defaults.py` | `catalog_skill_ids` 取代 `selected_default_ids`；lock 校验用组 type；遍历 LAYOUTS |
 | `src/agents/desired_set.py` | Desired Set = 编目非 optional ∪ overlay 启用 − 停用 |
 | `src/agents/desired_ops.py` | apply 按 id 来源补齐（一手目录 / 第三方锁定获取）；逐 layout 失败摘要 |
@@ -143,7 +142,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 - 编目重写完成；`taste` 与 `ui-templates` 组注释。
 - `dotf skills -i <group>`、`dotf agents skill apply <group>` 组展开可用。
-- 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
+- 两个 layout（shared / claude）由同一注册表驱动，见 `docs/adr/0019-*`；kiro 于 2026-11 停用。
 - 全量测试 606 passed。
 - 2026-09-24：`ui-templates` 回到编目内并全标 optional（709cc55）。
 - 2026-10-14：`ui-templates` 组从编目与 lock 永久移除（不再依赖 `sunzhenkai/ui-templates-skill`）。
