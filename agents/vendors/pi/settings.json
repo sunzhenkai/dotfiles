@@ -1,6 +1,9 @@
 {
   "enableSkillCommands": true,
-  "quietStartup": false,
+  "quietStartup": "header",
+  "hideThinkingBlock": true,
+  "collapseChangelog": true,
+  "outputPad": 0,
   "enableInstallTelemetry": false,
   "packages": [
     "npm:pi-goal-x",
