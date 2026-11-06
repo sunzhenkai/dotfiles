@@ -8,9 +8,9 @@
 
 ## Skills 目录约定
 
-- `.agents/skills/`（项目级 skill）：用于迭代**本项目**，只在当前仓库内生效。
-- `agents/skills/`：first-party skill 源的既定位置，**当前为空**——可复用共享 skill 已全部迁至 `sunzhenkai/solo-skills`（独立仓），本仓以第三方 group `solo-skills` 编目消费（改共享 skill 去那个仓，重锁经 `make skills-lock-update`）。first-party 概念保留：未来自有 skill 落回 `agents/skills/<id>/` 并在 `agents/skills.yaml` 以 first-party group 编目。**不用来迭代本项目**。
-- `.agents/skills/dotf-repo/`：给 agent 使用本仓库能力的入口文档（`dotf` CLI 操作、agents 同步、仓库开发约定）。功能改动（新模块/命令、CLI 语义变化、sync 行为、开发流程变化）时同步更新；纯文案或示例微调不必动。（原在仓库根 `SKILL.md`；曾以根目录 `skills` 符号链接让 `npx skills add sunzhenkai/dotfiles` 下钻发现共享 skill——该源角色已随迁移转到 solo-skills，链接已移除。）
+- `.agents/skills/`（项目级 skill）：用于迭代**本项目**，只在当前仓库内生效。当前只剩 `update-external-skills`（重锁第三方 skill 的维护流程，全局安装无意义）。
+- `agents/skills/`：first-party skill 源，编目里非 optional 即默认全局安装（`dotf agents -c`）。当前只有 `dotfiles`——`dotf` CLI 的使用说明（原 `dotf-init` / `dotf-install` / `dotf-check` / `dotf-repo` 四个项目级 skill 合并而来）；它说明的是「怎么管这台机器」，跨目录都要用，所以不放项目级。可复用共享 skill 在 `sunzhenkai/solo-skills`（独立仓），本仓以第三方 group `solo-skills` 编目消费（改共享 skill 去那个仓，重锁经 `make skills-lock-update`）。
+- `agents/skills/dotfiles/`：给 agent 使用本仓库能力的入口文档（`dotf` CLI 操作、agents 同步、仓库开发约定）。`SKILL.md` 只留路由与不变量，细节在 `references/{safety,init,install,check,repo}.md`。功能改动（新模块/命令、CLI 语义变化、sync 行为、开发流程变化）时同步更新；纯文案或示例微调不必动。改完必须 `dotf agents -c` 才在本机生效。
 
 ## 全局 AGENTS.md 安装
 

@@ -2,7 +2,7 @@
 
 跨 Cursor / Kiro / OpenCode / Codex / Kimi Code / Pi / ZCode / Claude Code 等工具的 **skills 编目与安装编排真相源**。
 
-自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)（独立维护），本仓库以第三方 group `solo-skills` 消费（经 lock 锁定、`dotf agents -c` 下发）。`agents/skills/` 保留为 first-party skill 源的既定位置，当前为空；first-party type 概念与校验保留，未来自有 skill 可直接落回。
+自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)（独立维护），本仓库以第三方 group `solo-skills` 消费（经 lock 锁定、`dotf agents -c` 下发）。`agents/skills/` 是 first-party skill 源，当前只有 `dotfiles`（`dotf` CLI 的使用说明），编目里非 optional 即默认全局安装。
 
 ## 统一入口（推荐）
 
@@ -12,7 +12,7 @@
 dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 动作
 dotf cursor -i                 # 仅安装 Cursor CLI
 dotf agents -c                 # 聚合同步 skills（~/.agents/skills → Kiro → Claude Code）+ 全局 AGENTS.md
-dotf skills -c                 # 安装编目 Desired Set 的全部 skill（锁定第三方 + OpenSpec CLI；编目当前无一手 group）；不含 AGENTS.md
+dotf skills -c                 # 安装编目 Desired Set 的全部 skill（first-party + 锁定第三方 + OpenSpec CLI）；不含 AGENTS.md
 dotf skills -i <name>          # npx skills 按需安装；先匹配 group，再匹配 skill id 或 alias，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
 dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
 dotf agents skill apply <id|alias>   # 写入本机 overlay Desired Set 并 sync（含该 id 的来源）
@@ -30,7 +30,7 @@ PYTHONPATH=scripts python3 src/agents/doctor.py
 
 ```text
 agents/
-  skills/<skill-id>/SKILL.md       # first-party skill 源既定位置（当前为空，落回时按此布局）
+  skills/<skill-id>/SKILL.md       # first-party skill 源（当前：dotfiles 的入口文档）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
   instructions/AGENTS.md           # 全局 agent 指令（用户级，跨项目）
@@ -55,7 +55,7 @@ npx skills add sunzhenkai/solo-skills                 # 全部共享 skill
 npx skills add sunzhenkai/solo-skills -s taskflow     # 定向安装
 ```
 
-本仓库不再承载共享 skill 源（原根目录 `skills` 符号链接已移除）；`.agents/skills/` 仍是 npx 标准容器，项目级 skill（`dotf-repo` 等，迭代本项目用）可经 `npx skills add sunzhenkai/dotfiles` 发现，装到别的机器无用但无害。仓库入口文档在 `.agents/skills/dotf-repo/`（根目录不能放 `SKILL.md`，否则 CLI 会短路、只认根这一个 skill）。
+本仓库不再承载共享 skill 源（原根目录 `skills` 符号链接已移除）；`.agents/skills/` 仍是 npx 标准容器，项目级 skill（当前 `update-external-skills`）可经 `npx skills add sunzhenkai/dotfiles` 发现，装到别的机器无用但无害。给 agent 看的仓库使用说明在 `agents/skills/dotfiles/`，随 `dotf agents -c` 全局安装（根目录不能放 `SKILL.md`，否则 CLI 会短路、只认根这一个 skill）。
 
 ## Frontmatter（源）
 
@@ -113,7 +113,7 @@ skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单�
 
 `agents skill apply/remove <id|alias>` 与 `agents -c` 一样会补齐该 id 所属来源：一手 id 走仓库目录；第三方 id 追加一次锁定获取（`acquire_all` 按 lock 条目逐条 fetch，所以一手 apply 不会走网络）。别名先收成正规 id 再写 overlay。OpenSpec 的 `openspec-*` 只由 `agents -c` 安装。
 
-first-party skill 源位置是 `agents/skills/`，在 `agents/skills.yaml` 以 `type: first-party` 的 group 编目；未编目的目录会在校验时 fail closed，**当前编目没有 first-party group**（校验按空集双向通过）。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
+first-party skill 源位置是 `agents/skills/`，在 `agents/skills.yaml` 以 `type: first-party` 的 group 编目（当前只有 `dotfiles`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ### 冲突与接管
 

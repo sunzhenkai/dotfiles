@@ -117,8 +117,8 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     readme = _text("README.md")
     agents = _text("agents/README.md")
     env = _text("agents/env/README.md")
-    module_guide = _text(".agents/skills/dotf-install/SKILL.md")
-    init_guide = _text(".agents/skills/dotf-init/SKILL.md")
+    module_guide = _text("agents/skills/dotfiles/references/install.md")
+    init_guide = _text("agents/skills/dotfiles/references/init.md")
     user_guide = _text("docs/Dotfiles.md")
     kitty_readme = _text("config/terminals/kitty/README.md")
     kitty_usage = _text("config/terminals/kitty/USAGE.md")
@@ -134,7 +134,7 @@ def test_state_boundary_docs_cover_operator_contracts() -> None:
     assert all(claim not in module_guide for claim in stale_link_claims)
     assert all(claim not in init_guide for claim in stale_link_claims)
     assert "dotf -a --profile" not in module_guide
-    assert "dotf init --profile remote --dry-run" in module_guide
+    assert "dotf init --profile remote --dry-run" in init_guide
     assert "-a` 始终表示当前 OS 适用模块的完整 all 集合" in module_guide
     for kitty_doc in (kitty_readme, kitty_usage):
         assert "ln -s" not in kitty_doc

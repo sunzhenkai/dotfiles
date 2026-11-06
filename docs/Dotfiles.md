@@ -10,7 +10,7 @@
 ## 总原则
 
 1. **先定位仓库**：优先 `~/.config/dotfiles`；否则用 `dotf __path` / 当前 git 根。
-2. **先读台账**：若存在 `~/.dotf-env.md`，采用其中的共用性判定与已装模块；没有则按 `dotf-init` skill 做共用性探测。
+2. **先读台账**：若存在 `~/.dotf-env.md`，采用其中的共用性判定与已装模块；没有则按 `dotfiles` skill 的 `references/safety.md` 做共用性探测。
 3. **dry-run 优先**：任何会改系统状态的操作，先 `dotf … --dry-run`（或等价预览），再执行。
 4. **多用户安全**：`shared-user` / `shared-home` 下不擅自 `sudo`、不改 `/etc`、不 `chsh`；系统级模块须显式确认。
 5. **按分组推进**：一次只推进用户指定的分组（或按下方推荐顺序）；每组结束后汇报结果，再问是否继续。
@@ -43,7 +43,7 @@ bash scripts/bootstrap.sh --check-only
 dotf status
 
 # 5. 模块清单（按 group）
-python3 src/modules.py list --filter-os
+PYTHONPATH=src python3 -m dotf_core.registry list --filter-os
 ```
 
 不可用 `dotf` 时：先引导 clone 到 `~/.config/dotfiles`，再 `bash scripts/bootstrap.sh`（或 `--yes`），不要硬装零散工具。
@@ -155,7 +155,7 @@ dotf agents -ic
 dotf cursor codex -ic   # 按实际使用的工具
 ```
 
-`dotf agents -c` 会把编目 Desired Set 的 skill 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`（含 solo-skills 等锁定的第三方默认 skill；`agents/skills/` 为 first-party 源位置、当前为空），并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 rules，以及 Claude Code 的 `~/.claude/CLAUDE.md`。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`；指令目标清单见 `agents/instructions/install.yaml`。
+`dotf agents -c` 会把编目 Desired Set 的 skill 同步到共享的 `~/.agents/skills`、Kiro 的 `~/.kiro/skills` 与 Claude Code 的 `~/.claude/skills`（含 solo-skills 等锁定的第三方默认 skill，以及 first-party 的 `dotfiles`——`dotf` CLI 的使用说明），并用本机 `openspec init --tools agents` 把 OpenSpec 阶段 skill 装到同一组目标。同一入口安装全局 `AGENTS.md` 到 `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 rules，以及 Claude Code 的 `~/.claude/CLAUDE.md`。目标清单与各目标的 owner 前缀见 `src/agents/layouts.py`；指令目标清单见 `agents/instructions/install.yaml`。
 
 > 本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-*`）；Codex、OpenCode、Pi 等工具的 provider 与密钥由本机自管。
 
