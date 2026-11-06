@@ -148,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
             on_takeover=on_takeover,
         )
     except (ConfigDeployError, SchemaError, OSError, ValueError) as exc:
-        print(f"config deploy failed: {exc}", file=os.sys.stderr)
+        print(f"config deploy failed: {exc}", file=sys.stderr)
         return 1
     print(result.status)
     return 0
