@@ -14,7 +14,6 @@ dotf pi -i
 2. 默认扩展包（幂等，已装则跳过）：
    - `npm:pi-goal-x` — 目标管理（/goal 规划 + 独立完成度 auditor；2026-09-27 替换 @ogulcancelik/pi-goal，后者已入退役表）
    - `npm:pi-subagents` — 子代理委派
-   - `npm:pi-mcp-adapter` — MCP 接入
    - `npm:pi-powerline-footer` — 可配置 status footer；仓库默认 `powerline.preset=full` + `cache_read.format=both`（上/下 token、缓存量与命中率）
    - `npm:pi-web-access` — 网页搜索 / 抓取 / PDF / 视频理解
    - `npm:@juicesharp/rpiv-ask-user-question` — 结构化提问工具
@@ -28,6 +27,8 @@ dotf pi -i
    - `npm:@plannotator/pi-extension` — 交互式 plan 评审
    - `npm:@dietrichgebert/ponytail` — skill：抑制过度设计的「懒惰资深工程师」模式
    - `npm:@ff-labs/pi-fff` — 模糊文件 / 内容搜索
+
+MCP 用 Pi 自带的 `mcp` 内置扩展，不再装 `pi-mcp-adapter`：服务写在 `~/.pi/agent/mcp.json`（项目级 `.pi/mcp.json` 需信任后生效），工具名形如 `mcp__<server>__<tool>`。两者同时存在会抢 `/mcp`，内置的那个会被顶掉。
 
 验证：
 

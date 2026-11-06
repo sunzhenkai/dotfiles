@@ -30,7 +30,9 @@ def test_vendor_declares_no_provider_model_or_secret() -> None:
 
 def test_vendor_packages_are_declared_defaults() -> None:
     packages = _vendor()["packages"]
-    assert packages[0] == "npm:pi-mcp-adapter"
+    assert packages[0] == "npm:pi-goal-x"
+    # 2026-11-06：MCP 改回 Pi 内置扩展，pi-mcp-adapter 退役
+    assert "npm:pi-mcp-adapter" not in packages
     assert "npm:pi-powerline-footer" in packages
     assert "npm:pi-agent-extensions" not in packages
     assert "npm:pi-subagents" in packages
@@ -61,7 +63,7 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
         "lastChangelogVersion": "0.85.1",
         "theme": "dark",
         "powerline": {"preset": "minimal"},
-        "packages": ["npm:pi-mcp-adapter", "npm:someone-local-only"],
+        "packages": ["npm:some-local-mcp", "npm:someone-local-only"],
     }
     out = merge(existing, _vendor())
     assert out["defaultModel"] == "MiniMax-M3"
@@ -75,7 +77,7 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
     # packages 取并集，本地独有包保留
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-powerline-footer" in out["packages"]
-    assert "npm:pi-mcp-adapter" in out["packages"]
+    assert "npm:some-local-mcp" in out["packages"]
 
 
 def test_merge_drops_retired_package_from_existing_machine() -> None:
@@ -93,6 +95,7 @@ def test_merge_drops_retired_package_from_existing_machine() -> None:
     assert "npm:pi-agent-extensions" not in out["packages"]
     # pi-goal 换代：旧包从本机剔除，由 pi-goal-x 接替
     assert "npm:@ogulcancelik/pi-goal" not in out["packages"]
+    assert "npm:pi-mcp-adapter" not in out["packages"]
     assert "npm:pi-goal-x" in out["packages"]
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-subagents" in out["packages"]
@@ -123,3 +126,18 @@ def test_merge_is_idempotent() -> None:
     first = merge({}, _vendor())
     second = merge(first, _vendor())
     assert second == first
+
+
+def test_merge_restores_builtin_mcp_after_adapter_retirement() -> None:
+    # pi-mcp-adapter 会往 settings.json 写 -builtin:mcp；适配器退役后若保留
+    # 该标记，本机会既没有适配器也没有内置 MCP，因此 merge 时清掉。
+    existing = {
+        "packages": ["npm:pi-mcp-adapter"],
+        "extensions": ["-builtin:mcp", "~/.pi/agent/extensions/exit.ts"],
+    }
+    out = merge(existing, _vendor())
+    assert "npm:pi-mcp-adapter" not in out["packages"]
+    assert out["extensions"] == ["~/.pi/agent/extensions/exit.ts"]
+
+    only_marker = merge({"extensions": ["-builtin:mcp"]}, _vendor())
+    assert "extensions" not in only_marker

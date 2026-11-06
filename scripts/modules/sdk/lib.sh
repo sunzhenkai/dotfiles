@@ -17,7 +17,7 @@ setup_sdk() {
   # 定义要安装的 SDK 及其版本
   local go_versions=("1.24.9")
   local python_versions=("3.13.12")
-  local node_versions=("24.14.0")
+  local node_versions=("24.22.1")
 
   # 安装 Go 多版本
   echo ""

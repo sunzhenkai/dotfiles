@@ -5,12 +5,12 @@
 
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
-# 默认扩展包（目标管理 + 子代理委派 + MCP 适配 + powerline footer + 上下文压缩
+# 默认扩展包（目标管理 + 子代理委派 + powerline footer + 上下文压缩
 # + 可观测性 + todo + 代码反馈 + 权限护栏 + plan 评审 + skills + 模糊搜索等）
+# MCP 用 Pi 内置扩展（读 ~/.pi/agent/mcp.json），不再装 pi-mcp-adapter。
 PI_DEFAULT_PACKAGES=(
   "npm:pi-goal-x"
   "npm:pi-subagents"
-  "npm:pi-mcp-adapter"
   "npm:pi-powerline-footer"
   "npm:pi-web-access"
   "npm:@juicesharp/rpiv-ask-user-question"
