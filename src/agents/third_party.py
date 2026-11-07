@@ -10,6 +10,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -26,6 +27,11 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 SPDX = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*")
 GIT_TIMEOUT_SECONDS = 180
 CACHE_DIRNAME = "third-party-checkouts"
+# A relock refetches every changed source, so one flaky network moment must not
+# fail the whole stage: retry `git fetch` with backoff before reporting.
+FETCH_ATTEMPTS = 3
+FETCH_RETRY_SECONDS = (1.0, 4.0)
+DETAIL_LIMIT = 300
 
 
 
@@ -224,28 +230,45 @@ def verify_checkout(lock: LockedSkill, checkout: Path, revision: str) -> Path:
     return skill
 
 
+def _failure_detail(proc: subprocess.CompletedProcess[str]) -> str:
+    """One line of git's own diagnostic: the last non-empty stderr (or stdout) line."""
+    for stream in (proc.stderr, proc.stdout):
+        lines = [line.strip() for line in (stream or "").splitlines() if line.strip()]
+        if lines:
+            detail = lines[-1]
+            return detail if len(detail) <= DETAIL_LIMIT else detail[:DETAIL_LIMIT] + "…"
+    return "no output"
+
+
 def _git(
     args: Sequence[str],
     *,
     cwd: Path,
     run: Run,
     timeout: int = GIT_TIMEOUT_SECONDS,
+    attempts: int = 1,
 ) -> str:
-    try:
-        proc = run(
-            list(args),
-            cwd=str(cwd),
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as exc:
-        subcommand = args[1] if len(args) > 1 else "command"
-        raise ThirdPartyLockError(f"git {subcommand} timed out after {timeout}s") from exc
-    if proc.returncode != 0:
-        raise ThirdPartyLockError("third-party acquisition command failed")
-    return proc.stdout.strip()
+    """Run one git command; `attempts` > 1 retries transient network failures."""
+    subcommand = args[1] if len(args) > 1 else "command"
+    detail = "no attempt was made"
+    for attempt in range(1, attempts + 1):
+        try:
+            proc = run(
+                list(args),
+                cwd=str(cwd),
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ThirdPartyLockError(f"git {subcommand} timed out after {timeout}s") from exc
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+        detail = f"exit {proc.returncode}: {_failure_detail(proc)}"
+        if attempt < attempts:
+            time.sleep(FETCH_RETRY_SECONDS[min(attempt, len(FETCH_RETRY_SECONDS)) - 1])
+    raise ThirdPartyLockError(f"git {subcommand} failed ({detail})")
 
 
 def _cache_root(cache: Path | None) -> Path:
@@ -317,6 +340,7 @@ def _fetch_checkout(
         ["git", "fetch", "--quiet", "--filter=blob:none", "--depth=1", "origin", revision],
         cwd=destination,
         run=run,
+        attempts=FETCH_ATTEMPTS,
     )
     _checkout(destination, revision, run=run)
 
