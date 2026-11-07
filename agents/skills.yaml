@@ -44,7 +44,6 @@ groups:
       - commit-push
       - id: lark-cli
         optional: true
-      - llm-wiki
       - pretty-ui
       - project-init
       - project-spec-mirror
@@ -59,6 +58,8 @@ groups:
       - taskflow
       - taskrail
       - trouble-grill
+      # 2026-11-06 上游由 llm-wiki 改名 wiki-data（solo-skills f4792acd942c），随改名同步。
+      - wiki-data
 
   mattpocock:
     type: third-party
