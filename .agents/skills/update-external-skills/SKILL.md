@@ -15,11 +15,19 @@ description: "更新编目里已有第三方（外部）skill 的上游 revision
 
 ### 1. 重锁（仓库优先）
 
+三步在同一个 Bash 调用里顺序执行，省去两轮工具往返；后两步只读本地产物。`pipefail` 保证重锁失败不会被 `tee` 掩盖：
+
 ```bash
-LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) && make skills-lock-update 2>&1 | tee "$LOG"
+set -o pipefail
+LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) &&
+  printf 'log=%s\n' "$LOG" &&
+  make skills-lock-update 2>&1 | tee "$LOG" >/dev/null &&
+  tail -80 "$LOG" &&
+  python3 src/agents/lock_verify.py changed &&
+  make registry validate
 ```
 
-**输出整体留存，不要 `tail` 管道里的实时输出**（坑 16）：要看末尾就 `tail "$LOG"`，要挑读就 `grep "$LOG"`。
+**审计全文落盘，终端只显示末尾摘要**：日志路径以 `log=` 打印，要挑读就 `grep "$LOG"`；不要用 `make ... | tail` 代替落盘（坑 16）。
 
 - 对每个 source：fetch HEAD → 逐 skill 跑审计脚本（`src/agents/lock_update.py` 的 `resolve_audit_script` 回退链：仓内 first-party 副本 → source checkout 自带的 `skills/skills-store/scripts/audit-skill.sh` → 本机受管副本 `~/.agents/skills/skills-store/scripts/audit-skill.sh`）→ 审计通过才写 lock；audit date 与 evidence 链接同步刷新。
 - 完成标准：输出末尾 `wrote agents/skills.lock.yaml sources=N blocked=M`。N 只数有推进的 source（已最新的显示 `current`，不计入）；**M>0 是合法结局，不是失败**，走下面的 blocked 分支。
@@ -46,10 +54,6 @@ LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) && make skills-lock-update 2>&1 |
 
 ### 2. 判断内容是否真变（纯本地，不打网络）
 
-```bash
-python3 src/agents/lock_verify.py changed
-```
-
 对比 HEAD 与工作区的 lock，输出末尾：
 
 ```text
@@ -65,10 +69,6 @@ revision / evidence / audit date 必然刷新，**content_hash 才是内容变�
 代价要认：lock 里的 content_hash 由 `lock_update.py` 在自己的 checkout 上算出，属**写入方自报**；独立复验随 `verify` 一起挪到了下发之后。因此本流程单独走完时，锁的可信度停留在「审计脚本判过 + 哈希自报」。**采信来源不是自己审过的 revision 时（新 source、批量跳版本、他人提的锁改动），先走下一步完成下发与核对，再谈采信。**
 
 ### 3. 校验仓库产物
-
-```bash
-make registry validate
-```
 
 只校验编目/注册表自洽，秒级、无网络。过了就具备提交条件——**但提交本身交给你**（见「收尾」）。
 
