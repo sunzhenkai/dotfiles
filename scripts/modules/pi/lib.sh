@@ -6,13 +6,16 @@
 source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # 默认扩展包（目标管理 + 子代理委派 + powerline footer + 上下文压缩
-# + 可观测性 + todo + 代码反馈 + 权限护栏 + plan 评审 + skills + 模糊搜索等）
+# + 可观测性 + todo + 代码反馈 + 权限护栏 + plan 评审 + skills + 模糊搜索
+# + 并行对话 + 记忆 + worktree 管理等）
 # MCP 用 Pi 内置扩展（读 ~/.pi/agent/mcp.json），不再装 pi-mcp-adapter。
 PI_DEFAULT_PACKAGES=(
   "npm:pi-goal-x"
   "npm:pi-subagents"
   "npm:pi-powerline-footer"
   "npm:pi-web-access"
+  # 两者都注册 web_search，后加载者生效，顺序不要调换
+  "npm:pi-web-search"
   "npm:@juicesharp/rpiv-ask-user-question"
   "npm:pi-background-tasks"
   "npm:pi-simplify"
@@ -24,6 +27,9 @@ PI_DEFAULT_PACKAGES=(
   "npm:@plannotator/pi-extension"
   "npm:@dietrichgebert/ponytail"
   "npm:@ff-labs/pi-fff"
+  "npm:pi-btw"
+  "npm:pi-memory"
+  "npm:@narumitw/pi-worktree"
 )
 
 # 常见 npm 全局 bin（mise / ~/.local）临时加入 PATH

@@ -48,6 +48,18 @@ def test_vendor_packages_are_declared_defaults() -> None:
     assert "npm:@plannotator/pi-extension" in packages
     assert "npm:@dietrichgebert/ponytail" in packages
     assert "npm:@ff-labs/pi-fff" in packages
+    # 2026-11-06 扩容：provider 原生搜索、并行侧对话、记忆、worktree 管理
+    assert "npm:pi-web-search" in packages
+    assert "npm:pi-btw" in packages
+    assert "npm:pi-memory" in packages
+    assert "npm:@narumitw/pi-worktree" in packages
+
+
+def test_web_search_packages_ordered_so_provider_native_wins() -> None:
+    # pi-web-access 与 pi-web-search 都注册 web_search；Pi 按 packages 顺序
+    # 加载扩展，后注册者覆盖，pi-web-search 必须排在后面。
+    packages = _vendor()["packages"]
+    assert packages.index("npm:pi-web-search") > packages.index("npm:pi-web-access")
 
 
 def test_vendor_powerline_shows_tokens_and_cache_hit_rate() -> None:
@@ -141,3 +153,16 @@ def test_merge_restores_builtin_mcp_after_adapter_retirement() -> None:
 
     only_marker = merge({"extensions": ["-builtin:mcp"]}, _vendor())
     assert "extensions" not in only_marker
+
+
+def test_compact_output_extension_only_replaces_renderers() -> None:
+    source = (VENDOR / "extensions" / "compact-output.ts").read_text(encoding="utf-8")
+    # 只换渲染，不重注册工具：重注册会连带覆盖执行逻辑和工具定义里的 cwd
+    assert "registerToolRenderer" in source
+    assert "registerTool(" not in source
+    assert "renderResult" in source
+    for tool in ("bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
+        assert tool in source
+    # 展现层不引入外部依赖
+    assert "import type { ExtensionAPI }" in source
+    assert '"@earendil-works/pi-tui"' in source
