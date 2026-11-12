@@ -46,7 +46,6 @@ groups:
         optional: true
       - pretty-ui
       - project-init
-      - project-spec-mirror
       - repo-manager
       - role-based-reviewer
       - id: role-chat
