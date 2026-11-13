@@ -417,7 +417,8 @@ modules:
       writable: true
       sensitive: false
       target_mode: "0755"
-      preserve: [cache, data, debug, history, pack, plugin, session, sessions, .repro, .tests, doc/tags]
+      preserve: [cache, data, debug, history, pack, plugin, session, sessions,
+                 .repro, .tests, doc/tags, lazy-lock.json, lazyvim.json]
       exclude: []
 
   - name: helix
