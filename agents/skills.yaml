@@ -40,7 +40,8 @@ groups:
     skills:
       - agent-roster
       - anti-lazy
-      - code-explore
+      # 2026-11-13 上游 code-explore 改名 project-explore（solo-skills 3096cc4）。
+      - project-explore
       - commit-push
       - id: lark-cli
         optional: true
