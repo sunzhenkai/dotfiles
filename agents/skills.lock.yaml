@@ -3,6 +3,20 @@
 schema_version: 1
 kind: third-party-skills-lock
 skills:
+  - id: agent-docs-writer
+    source: https://github.com/sunzhenkai/solo-skills
+    revision: 3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
+    subdirectory: skills/agent-docs-writer
+    content_hash: 4b14e6f18d5ee9c87437f5ef3cbc34533c3e1fcbbc68aecb28881d923cd4f538
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-13'
+      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
   - id: agent-roster
     source: https://github.com/sunzhenkai/solo-skills
     revision: 3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
@@ -22,6 +36,20 @@ skills:
     revision: 3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
     subdirectory: skills/anti-lazy
     content_hash: f5bf93070a65118aa2b3dc361e06f3a9bac3ed7be3e10bf48f421a047dbce965
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-13'
+      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
+  - id: project-atlas
+    source: https://github.com/sunzhenkai/solo-skills
+    revision: 3096cc4d3b86bec48c6fcca9aa31af8f8c953b59
+    subdirectory: skills/project-atlas
+    content_hash: 1e54802016b851072037cc7b74cbbc9be20db19b341c66aaa5664f6a1ed469dc
     license:
       spdx: MIT
       file: LICENSE

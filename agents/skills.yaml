@@ -38,8 +38,11 @@ groups:
     source: github
     package: https://github.com/sunzhenkai/solo-skills
     skills:
+      # 2026-11-13 补编目：上游一直有、本仓先前未纳入的两个 skill。
+      - agent-docs-writer
       - agent-roster
       - anti-lazy
+      - project-atlas
       # 2026-11-13 上游 code-explore 改名 project-explore（solo-skills 3096cc4）。
       - project-explore
       - commit-push
