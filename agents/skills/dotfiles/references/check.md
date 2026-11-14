@@ -51,7 +51,7 @@
 | 工具健康 | `dotf agents -d`（`--deep` 跑 L1） |
 | skills 漂移 | `dotf agents --doctor` 的 skills 段；或 `dotf tui` 的 Status / Conflicts 面板 |
 | 编目一致性 | `dotf skills list` 与 `~/.agents/skills` 对账 |
-| 全局指令 | `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.cursor/rules/00-dotf-global.mdc`、`~/.pi/agent/AGENTS.md` 的 `agents:instructions:` 漂移 |
+| 全局指令 | `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.cursor/rules/00-dotf-global.mdc`、`~/.pi/agent/AGENTS.md`、`~/.qoder/AGENTS.md` 的 `agents:instructions:` 漂移 |
 | 第三方 lock | `agents/skills.lock.yaml` 与安装副本 revision 是否一致 |
 
 漂移的修复统一是 `dotf agents -c`（本 skill 与全局指令都从 `agents/` 下发），不要手改安装产物。

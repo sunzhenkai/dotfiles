@@ -66,9 +66,11 @@ def test_installs_user_level_targets(tmp_path: Path) -> None:
     codex = home / ".codex" / "AGENTS.md"
     claude = home / ".claude" / "CLAUDE.md"
     cursor = home / ".cursor" / "rules" / "00-dotf-global.mdc"
+    qoder = home / ".qoder" / "AGENTS.md"
     assert agents.read_text(encoding="utf-8") == source
     assert codex.read_text(encoding="utf-8") == source
     assert claude.read_text(encoding="utf-8") == source
+    assert qoder.read_text(encoding="utf-8") == source
     cursor_text = cursor.read_text(encoding="utf-8")
     assert cursor_text.startswith(CURSOR_MDC_HEADER)
     assert "alwaysApply: true" in cursor_text
@@ -85,6 +87,7 @@ def test_dry_run_is_side_effect_free(tmp_path: Path) -> None:
     assert not (home / ".codex").exists()
     assert not (home / ".claude").exists()
     assert not (home / ".cursor").exists()
+    assert not (home / ".qoder").exists()
     assert not (home / ".state").exists()
 
 
@@ -104,6 +107,7 @@ def test_second_sync_is_idempotent(tmp_path: Path) -> None:
     assert OWNER_PREFIX + "codex" in data
     assert OWNER_PREFIX + "cursor" in data
     assert OWNER_PREFIX + "claude" in data
+    assert OWNER_PREFIX + "qoder" in data
 
 
 def test_local_edit_backs_up_and_continues_by_default(tmp_path: Path) -> None:
