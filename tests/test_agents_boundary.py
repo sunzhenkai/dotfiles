@@ -39,7 +39,7 @@ def test_agents_install_plan_expands_tools() -> None:
     document = json.loads(r.stdout)
     assert document["header"] == "DOTF_EXECUTION_PLAN"
     planned = {(action["action"], action["module"]) for action in document["actions"]}
-    for tool in ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode"):
+    for tool in ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode"):
         assert ("install", tool) in planned
     # 已移除的 vendor 不进安装计划
     assert ("install", "claude") not in planned
@@ -51,10 +51,10 @@ def test_removed_vendors_not_in_tools_or_bundle() -> None:
     for removed in ("claude", "qoder", "codebuddy-code"):
         assert removed not in TOOLS
     assert "zcode" in TOOLS
-    assert "kiro" in TOOLS
+    assert "kiro" not in TOOLS
     bundle = (ROOT / "src" / "dotf_core" / "planner.py").read_text(encoding="utf-8")
     assert (
-        'AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode")'
+        'AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode")'
         in bundle
     )
 
@@ -165,18 +165,18 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         tmp_home / ".agents" / "skills",
         tmp_home / ".agents" / "AGENTS.md",
         tmp_home / ".local" / "bin",
-        tmp_home / ".kiro" / "skills",
         tmp_home / ".claude" / "skills",
         tmp_home / ".claude" / "CLAUDE.md",
         tmp_home / ".codex" / "AGENTS.md",
         tmp_home / ".cursor" / "rules",
         tmp_home / ".pi" / "agent" / "AGENTS.md",
+        tmp_home / ".qoder" / "AGENTS.md",
     )
     for dest in written:
         assert any(dest.startswith(str(prefix)) for prefix in allowed), dest
 
 
-def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
+def test_dotf_agents_config_executes_skills_sync(tmp_home: Path) -> None:
     isolate_agents_sync_for_test(tmp_home)
     env = os.environ.copy()
     env["HOME"] = str(tmp_home)
@@ -198,8 +198,9 @@ def test_dotf_agents_config_executes_kiro_skills_sync(tmp_home: Path) -> None:
     assert r.returncode == 0, r.stderr + r.stdout
     assert "--- instructions ---" in r.stdout
     assert "--- skills ---" in r.stdout
-    assert "==> skills  kiro skills" in r.stdout
     assert "planning…" in r.stdout
     assert "--- openspec skills ---" in r.stdout
     assert (tmp_home / ".agents" / "AGENTS.md").is_file()
-    assert (tmp_home / ".kiro" / "skills" / "taskrail" / "SKILL.md").is_file()
+    assert (tmp_home / ".agents" / "skills" / "taskrail" / "SKILL.md").is_file()
+    assert (tmp_home / ".claude" / "skills" / "taskrail" / "SKILL.md").is_file()
+    assert not (tmp_home / ".kiro").exists()

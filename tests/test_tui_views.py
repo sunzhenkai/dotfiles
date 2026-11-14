@@ -449,6 +449,7 @@ def test_load_instructions_reports_missing_targets(home):
         "codex": "missing",
         "cursor": "missing",
         "pi": "missing",
+        "qoder": "missing",
     }
 
 

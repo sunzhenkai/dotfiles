@@ -322,7 +322,15 @@ _PI_RETIRED_PACKAGES = frozenset({
     "npm:pi-agent-extensions",
     # Succeeded by pi-goal-x (independent completion auditor).
     "npm:@ogulcancelik/pi-goal",
+    # Replaced by Pi's built-in ``mcp`` extension: the adapter took over
+    # ``/mcp``, and switching back keeps ``mcp.json`` the single source.
+    "npm:pi-mcp-adapter",
 })
+
+# The adapter turned Pi's built-in MCP off by writing ``-builtin:mcp`` here.
+# Keeping that marker after the adapter is gone would leave the machine with
+# no MCP at all, so the disable marker is dropped.
+_PI_BUILTIN_MCP_DISABLE = "-builtin:mcp"
 
 
 def pi_settings_merge(
@@ -347,6 +355,18 @@ def pi_settings_merge(
             result["packages"] = merged
         else:
             result[key] = value
+
+    extensions = result.get("extensions")
+    if isinstance(extensions, list):
+        kept = [
+            entry
+            for entry in extensions
+            if not (isinstance(entry, str) and entry.strip() == _PI_BUILTIN_MCP_DISABLE)
+        ]
+        if kept:
+            result["extensions"] = kept
+        else:
+            del result["extensions"]
     return result
 
 

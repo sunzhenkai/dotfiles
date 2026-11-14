@@ -122,7 +122,7 @@ skills、profiles 与 doctor 已收敛为单一对外模块 `agents`：
 ```shell
 dotf agents -i                 # 展开为各 agent CLI 的独立 install
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Kiro + Claude Code）+ 全局 AGENTS.md
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills + Claude Code）+ 全局 AGENTS.md
 dotf skills -c                 # 只安装编目全部 skill（不含 AGENTS.md）
 dotf agents skill apply grill-with-docs
 dotf agents skill remove grill-with-docs
@@ -133,10 +133,10 @@ dotf agents -d --deep --json   # L0 + L1 深度诊断（脱敏 JSON）
 scripts/modules/agents/sync.sh all --dry-run
 ```
 
-- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（first-party skill 源位置（当前为空）+ skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）；自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)，本仓以第三方 group `solo-skills` 编目消费
+- 源码：`agents/{skills,skills.yaml,skills.lock.yaml,vendors,env}`（first-party skill 源（当前：`dotfiles`）+ skill 编目与第三方 lock + 工具专属 vendors + env/安全真相源）；自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)，本仓以第三方 group `solo-skills` 编目消费
 - 脚本：Python 包 `src/agents/`（`doctor.py` / `sync.py` 等）+ shell 编排入口 `scripts/modules/agents/sync.sh`
 - 工具专属路径：`agents/vendors/{cursor,kiro,opencode,codex,kimi-code,pi}/`
-- 对外安装：共享 skill 用 `npx skills add sunzhenkai/solo-skills`；本仓 `npx skills add sunzhenkai/dotfiles` 只暴露 `.agents/skills/` 项目级 skill（`dotf-repo` 等）
+- 对外安装：共享 skill 用 `npx skills add sunzhenkai/solo-skills`；本仓 `npx skills add sunzhenkai/dotfiles` 只暴露 `.agents/skills/` 项目级 skill（当前 `update-external-skills`）。`dotf` 的使用说明 `dotfiles` 在 `agents/skills/dotfiles/`，随 `dotf agents -c` 全局安装
 
 详见 `agents/README.md`、`agents/env/README.md`。
 

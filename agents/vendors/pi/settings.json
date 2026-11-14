@@ -1,13 +1,16 @@
 {
   "enableSkillCommands": true,
-  "quietStartup": false,
+  "quietStartup": "header",
+  "hideThinkingBlock": true,
+  "collapseChangelog": true,
+  "outputPad": 0,
   "enableInstallTelemetry": false,
   "packages": [
-    "npm:pi-mcp-adapter",
     "npm:pi-goal-x",
     "npm:pi-subagents",
     "npm:pi-powerline-footer",
     "npm:pi-web-access",
+    "npm:pi-web-search",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-background-tasks",
     "npm:pi-simplify",
@@ -18,7 +21,10 @@
     "npm:@gotgenes/pi-permission-system",
     "npm:@plannotator/pi-extension",
     "npm:@dietrichgebert/ponytail",
-    "npm:@ff-labs/pi-fff"
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-btw",
+    "npm:pi-memory",
+    "npm:@narumitw/pi-worktree"
   ],
   "powerline": {
     "preset": "full",

@@ -56,11 +56,7 @@ tmux
 |--------|------|
 | `Prefix` + `-` | 水平分割 |
 | `Prefix` + `\` | 垂直分割 |
-| `Prefix` + `o` | 右侧 25% 打开 opencode |
-| `Prefix` + `e` | 右侧 25% 打开 claude |
-| `Prefix` + `u` | 右侧 25% 打开 cursor-agent |
-| `Prefix` + `v` | 右侧 25% 打开 kimi |
-| `Prefix` + `p` | 右侧 25% 打开 pi |
+| `Prefix` + `o` | 选择 agent，在右侧 25% 打开（`c`: Claude Code / `x`: Codex / `p`: pi / `u`: cursor-agent / `o`: opencode） |
 | `Prefix` + `h/j/k/l` | 面板导航 (左/下/上/右) |
 | `Prefix` + `H/J/K/L` | 调整面板大小 |
 | `Prefix` + `>` / `<` | 交换面板 |
@@ -93,8 +89,8 @@ tmux
 | 快捷键 | 说明 |
 |--------|------|
 | `Prefix` + `b` | 列出粘贴缓冲区 |
-| `Prefix` + `p` | 粘贴 |
-| `Prefix` + `P` | 选择缓冲区粘贴 |
+| `Prefix` + `v` | 粘贴 |
+| `Prefix` + `V` | 选择缓冲区粘贴 |
 | `Prefix` + `d` | 断开连接 (默认) |
 | `Prefix` + `$` | 重命名会话 (默认) |
 | `Prefix` + `s` | 选择会话 (默认) |

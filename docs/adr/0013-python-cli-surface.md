@@ -11,7 +11,7 @@
 - **输出契约**：所有命令人类可读 + `--json` 双模，字段命名同一套约定；TUI、测试、CI 共用。
 - **错误模型**：错误码表（usage / plan / handler / conflict / env / internal）+ stderr 统一前缀，`--verbose` 输出链路详情。
 - **迁移**：一次性替换，无新旧并存期；开发期用 main 的 worktree 跑旧版自举。
-- **逃生门**：`DOTF_LEGACY_CLI=1` 时 shim 转发到仓库保留的旧 bash 脚本（`scripts/legacy/dotf.sh`），不进 help、不宣传，纯应急。
+- **逃生门（已撤）**：迁移期曾留 `DOTF_LEGACY_CLI=1` 转发到 `scripts/legacy/dotf.sh`；2026-10-31 该脚本与开关一并删除，Python 实现是唯一路径。
 - **测试**：现有 bash CLI 测试全量平移——pytest 单测覆盖 argparse/契约/错误码，交互点选用 pty 真终端测试，`pull`/`init` 的 git 操作用临时真仓库（local remote + clone）跑，慢测单独标记。
 
 ## Considered Options

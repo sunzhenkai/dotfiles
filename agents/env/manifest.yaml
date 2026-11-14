@@ -3,7 +3,6 @@ version: 1
 
 tools:
   - cursor
-  - kiro
   - opencode
   - codex
   - kimi-code
@@ -15,17 +14,17 @@ default_profile: research
 modules:
   tools:
     enabled: true
-    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
     exclude: []
   env:
     enabled: true
-    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
     exclude: []
   security:
     enabled: true
-    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
     exclude: []
   agents:
     enabled: true
-    tools: [cursor, kiro, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
     exclude: []

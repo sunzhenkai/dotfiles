@@ -32,7 +32,7 @@ def _stub_agents(root: Path, *, skills_rc: int = 0, defaults_rc: int = 0, opensp
         encoding="utf-8",
     )
     (agents / "defaults.py").write_text(
-        f'print("stub defaults")\nraise SystemExit({defaults_rc})\n',
+        f'import sys\nprint("stub defaults")\nsys.stderr.write("error: anti-lazy: content hash does not match lock\\n")\nraise SystemExit({defaults_rc})\n',
         encoding="utf-8",
     )
     (agents / "openspec_skills.py").write_text(
@@ -78,6 +78,18 @@ def test_sync_sh_names_every_failed_stage(tmp_path: Path) -> None:
     combined = result.stdout + result.stderr
     assert result.returncode == 2
     assert "有阶段失败: skills, openspec" in combined
+
+
+def test_sync_sh_forwards_stage_error_line_to_summary(tmp_path: Path) -> None:
+    """阶段失败时汇总必须带上子进程自己的 error 行，否则原因滚出窗口就丢了。"""
+    root = tmp_path / "root"
+    home = tmp_path / "home"
+    home.mkdir()
+    _stub_agents(root, defaults_rc=1)
+    result = _run_sync_sh(root, home)
+    assert result.returncode == 1
+    assert "有阶段失败: defaults" in result.stderr
+    assert "anti-lazy: content hash does not match lock" in result.stderr
 
 
 def test_config_sh_forwards_named_stage_to_result() -> None:

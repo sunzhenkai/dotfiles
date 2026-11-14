@@ -59,7 +59,7 @@ install_agents() { install_config agents; }
 install_codex() { install_config codex; }
 install_tmux() { install_config tmux; }
 install_cursor() { install_config cursor; }
-install_kiro_config() { install_config kiro; }
+# install_kiro_config() { install_config kiro; }  # kiro 已停用
 install_zcode_config() { install_config zcode; }
 install_opencode_config() { install_config opencode; }
 install_opencode() { install_config opencode; }

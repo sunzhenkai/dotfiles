@@ -431,11 +431,6 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="stop when audit-skill.sh exits 1 (warnings only); default is to accept warnings",
     )
-    parser.add_argument(
-        "--accept-warn",
-        action="store_true",
-        help="deprecated no-op; warnings are accepted by default",
-    )
     args = parser.parse_args(argv)
     root = (args.root or repo_root()).resolve()
     try:

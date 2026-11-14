@@ -45,3 +45,5 @@ config/tools/k9s/clusters/
 
 # fcitx5 自动生成的键盘布局缓存（部署时亦已 exclude）
 /config/desktop/fcitx5/conf/cached_layouts
+
+.pi

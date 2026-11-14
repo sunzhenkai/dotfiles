@@ -82,7 +82,7 @@ PYTHONPATH=scripts python3 -m dotf_core.overlays migrate
 
 ### Doctor 安全边界
 
-`PYTHONPATH=scripts python3 src/agents/doctor.py` 是唯一受支持的 Agent doctor CLI/renderer；`doctor_impl.py` 仅保留兼容导入，不维护独立检查逻辑。Doctor 与 skills/instructions 同步共用 runtime ownership manifest 与 planner，并以相同 canonical checks 生成 text/JSON。
+`PYTHONPATH=scripts python3 src/agents/doctor.py` 是唯一受支持的 Agent doctor CLI/renderer。Doctor 与 skills/instructions 同步共用 runtime ownership manifest 与 planner，并以相同 canonical checks 生成 text/JSON。
 
 敏感备份默认保留 **7 天**。版本化策略位于 `agents/env/security.yaml` 的 `sensitive_backups.retention_days`，可在提交并审查该安全配置后覆盖。每个敏感备份目录可放置 `.dotf-backup.json` 元数据（`version: 1`、`sensitive: true`、带时区的 `created_at`）；doctor 只读取该元数据判断过期，不读取或打印备份内容。
 

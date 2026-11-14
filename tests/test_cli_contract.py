@@ -10,8 +10,6 @@ from pathlib import Path
 
 from conftest import run_dotf
 
-import pytest
-
 
 def test_legacy_syntax_usage_code(tmp_home: Path) -> None:
     result = run_dotf("-i", "sdk")
@@ -91,9 +89,3 @@ def test_skills_json_error_structure(
 def test_unknown_option_exit_code(tmp_home: Path) -> None:
     result = run_dotf("-x")
     assert result.returncode == 1
-
-
-def test_shim_legacy_escape_hatch(tmp_home: Path) -> None:
-    result = run_dotf("__path", env={"DOTF_LEGACY_CLI": "1"})
-    assert result.returncode == 0
-    assert result.stdout.strip()

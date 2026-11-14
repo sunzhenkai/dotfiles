@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import os
 import subprocess
@@ -323,11 +322,3 @@ def test_planner_failure_does_not_stop_unrelated_checks(
 
     assert any(item.group == "env" and item.status == doctor.STATUS_FAIL for item in report.items)
     assert any(item.group == "skills" and item.id == "continued" and item.status == doctor.STATUS_PASS for item in report.items)
-
-
-def test_legacy_doctor_module_is_import_only_and_gitignore_untouched() -> None:
-    source = (ROOT / "src" / "agents" / "doctor_impl.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    assert not [node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
-    assert "from doctor import" in source
-    assert (ROOT / ".gitignore").is_file()

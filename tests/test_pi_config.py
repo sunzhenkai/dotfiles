@@ -30,7 +30,9 @@ def test_vendor_declares_no_provider_model_or_secret() -> None:
 
 def test_vendor_packages_are_declared_defaults() -> None:
     packages = _vendor()["packages"]
-    assert packages[0] == "npm:pi-mcp-adapter"
+    assert packages[0] == "npm:pi-goal-x"
+    # 2026-11-06：MCP 改回 Pi 内置扩展，pi-mcp-adapter 退役
+    assert "npm:pi-mcp-adapter" not in packages
     assert "npm:pi-powerline-footer" in packages
     assert "npm:pi-agent-extensions" not in packages
     assert "npm:pi-subagents" in packages
@@ -46,6 +48,18 @@ def test_vendor_packages_are_declared_defaults() -> None:
     assert "npm:@plannotator/pi-extension" in packages
     assert "npm:@dietrichgebert/ponytail" in packages
     assert "npm:@ff-labs/pi-fff" in packages
+    # 2026-11-06 扩容：provider 原生搜索、并行侧对话、记忆、worktree 管理
+    assert "npm:pi-web-search" in packages
+    assert "npm:pi-btw" in packages
+    assert "npm:pi-memory" in packages
+    assert "npm:@narumitw/pi-worktree" in packages
+
+
+def test_web_search_packages_ordered_so_provider_native_wins() -> None:
+    # pi-web-access 与 pi-web-search 都注册 web_search；Pi 按 packages 顺序
+    # 加载扩展，后注册者覆盖，pi-web-search 必须排在后面。
+    packages = _vendor()["packages"]
+    assert packages.index("npm:pi-web-search") > packages.index("npm:pi-web-access")
 
 
 def test_vendor_powerline_shows_tokens_and_cache_hit_rate() -> None:
@@ -61,7 +75,7 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
         "lastChangelogVersion": "0.85.1",
         "theme": "dark",
         "powerline": {"preset": "minimal"},
-        "packages": ["npm:pi-mcp-adapter", "npm:someone-local-only"],
+        "packages": ["npm:some-local-mcp", "npm:someone-local-only"],
     }
     out = merge(existing, _vendor())
     assert out["defaultModel"] == "MiniMax-M3"
@@ -75,7 +89,7 @@ def test_merge_preserves_local_preferences_and_unions_packages() -> None:
     # packages 取并集，本地独有包保留
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-powerline-footer" in out["packages"]
-    assert "npm:pi-mcp-adapter" in out["packages"]
+    assert "npm:some-local-mcp" in out["packages"]
 
 
 def test_merge_drops_retired_package_from_existing_machine() -> None:
@@ -93,6 +107,7 @@ def test_merge_drops_retired_package_from_existing_machine() -> None:
     assert "npm:pi-agent-extensions" not in out["packages"]
     # pi-goal 换代：旧包从本机剔除，由 pi-goal-x 接替
     assert "npm:@ogulcancelik/pi-goal" not in out["packages"]
+    assert "npm:pi-mcp-adapter" not in out["packages"]
     assert "npm:pi-goal-x" in out["packages"]
     assert "npm:someone-local-only" in out["packages"]
     assert "npm:pi-subagents" in out["packages"]
@@ -123,3 +138,31 @@ def test_merge_is_idempotent() -> None:
     first = merge({}, _vendor())
     second = merge(first, _vendor())
     assert second == first
+
+
+def test_merge_restores_builtin_mcp_after_adapter_retirement() -> None:
+    # pi-mcp-adapter 会往 settings.json 写 -builtin:mcp；适配器退役后若保留
+    # 该标记，本机会既没有适配器也没有内置 MCP，因此 merge 时清掉。
+    existing = {
+        "packages": ["npm:pi-mcp-adapter"],
+        "extensions": ["-builtin:mcp", "~/.pi/agent/extensions/exit.ts"],
+    }
+    out = merge(existing, _vendor())
+    assert "npm:pi-mcp-adapter" not in out["packages"]
+    assert out["extensions"] == ["~/.pi/agent/extensions/exit.ts"]
+
+    only_marker = merge({"extensions": ["-builtin:mcp"]}, _vendor())
+    assert "extensions" not in only_marker
+
+
+def test_compact_output_extension_only_replaces_renderers() -> None:
+    source = (VENDOR / "extensions" / "compact-output.ts").read_text(encoding="utf-8")
+    # 只换渲染，不重注册工具：重注册会连带覆盖执行逻辑和工具定义里的 cwd
+    assert "registerToolRenderer" in source
+    assert "registerTool(" not in source
+    assert "renderResult" in source
+    for tool in ("bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
+        assert tool in source
+    # 展现层不引入外部依赖
+    assert "import type { ExtensionAPI }" in source
+    assert '"@earendil-works/pi-tui"' in source

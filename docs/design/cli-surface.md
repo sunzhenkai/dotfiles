@@ -83,7 +83,7 @@ src/dotf_cli/
 2. **平移命令**：按 `path → status → retry → modules 动作 → skills → agents → init → pull` 顺序（先易后难，modules 动作依赖 planner 接入）。
 3. **平移守卫与点选**：reject_legacy_syntax、interactive_select（pty 测试先行）。
 4. **测试平移**：现有 `tests/test_cli_baseline.py` 等 bash 测试逐条改写；新增 pty 交互测试与临时 git 仓库测试（慢测打 `slow` mark 单独跑）。
-5. **切换**：shim 默认走 `dotf_cli`；旧脚本移入 `scripts/legacy/dotf.sh` 作为 `DOTF_LEGACY_CLI=1` 逃生门（不进 help）。
+5. **切换**：shim 默认走 `dotf_cli`；旧 bash 脚本一次性删除（无逃生门，出错就修 Python 实现）。
 6. **收尾**：README / docs/Dotfiles.md 命令示例核对；`show_help` 内容由 argparse help 接管。
 
 开发期自举：在 main 上 `git worktree add` 一份旧版，分支上任意折腾，日常维护用旧版 worktree 里的 `bin/dotf`。

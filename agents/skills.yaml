@@ -24,22 +24,32 @@ groups:
   # task-confirm 已并入 taskrail；已删 task-wizard / task-goal / task-delivery。
   # 2026-10-21：task-explore / task-intent 并入 taskrail（references/ 与 `taskrail intent`），
   # 编目移除这两个 id；taskflow 仍是交接后执行入口。
-  # first-party type 概念保留：未来自有 skill 仍可落回 agents/skills/<id>/ 并以
-  # first-party group 编目；当前编目无 first-party group，校验按空集通过。
+  # first-party type 概念保留：自有 skill 仍落回 agents/skills/<id>/ 并以 first-party
+  # group 编目。2026-11-06：dotf CLI 的使用说明由 4 个项目级 skill（dotf-init /
+  # dotf-install / dotf-check / dotf-repo）合并为 `dotfiles`——它说明的是「怎么管这台
+  # 机器」，放项目级只在 cwd 进仓库时才可见，故改为默认全局安装。
+  first-party:
+    type: first-party
+    skills:
+      - dotfiles
+
   solo-skills:
     type: third-party
     source: github
     package: https://github.com/sunzhenkai/solo-skills
     skills:
+      # 2026-11-13 补编目：上游一直有、本仓先前未纳入的两个 skill。
+      - agent-docs-writer
       - agent-roster
-      - code-explore
+      - anti-lazy
+      - project-atlas
+      # 2026-11-13 上游 code-explore 改名 project-explore（solo-skills 3096cc4）。
+      - project-explore
       - commit-push
       - id: lark-cli
         optional: true
-      - llm-wiki
       - pretty-ui
       - project-init
-      - project-spec-mirror
       - repo-manager
       - role-based-reviewer
       - id: role-chat
@@ -51,6 +61,8 @@ groups:
       - taskflow
       - taskrail
       - trouble-grill
+      # 2026-11-06 上游由 llm-wiki 改名 wiki-data（solo-skills f4792acd942c），随改名同步。
+      - wiki-data
 
   mattpocock:
     type: third-party

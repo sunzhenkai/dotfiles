@@ -132,3 +132,36 @@ def test_git_timeout_is_reported_as_a_lock_error(tmp_path: Path) -> None:
 
     with pytest.raises(third_party.ThirdPartyLockError, match="timed out after"):
         third_party._git(["git", "fetch", "origin"], cwd=tmp_path, run=timing_out)
+
+
+def test_git_retries_a_transient_fetch_failure(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(third_party.time, "sleep", lambda _seconds: None)
+    answers = iter(
+        [
+            subprocess.CompletedProcess([], 128, "", "fatal: unable to access upstream"),
+            subprocess.CompletedProcess([], 0, "ok\n", ""),
+        ]
+    )
+    calls: list[list[str]] = []
+
+    def run(*args, **kwargs):
+        calls.append(args[0])
+        return next(answers)
+
+    assert third_party._git(
+        ["git", "fetch", "origin"], cwd=tmp_path, run=run, attempts=3
+    ) == "ok"
+    assert len(calls) == 2
+
+
+def test_git_failure_names_the_command_and_git_diagnostic(tmp_path: Path) -> None:
+    def failing(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args[0], 128, "", "warning: unrelated\nfatal: could not resolve host: github.com\n"
+        )
+
+    with pytest.raises(
+        third_party.ThirdPartyLockError,
+        match=r"git fetch failed \(exit 128: fatal: could not resolve host",
+    ):
+        third_party._git(["git", "fetch", "origin"], cwd=tmp_path, run=failing)

@@ -38,7 +38,8 @@ class SkillLayout:
 
 
 SHARED = SkillLayout("shared", "skills", ".agents", None, "", "", "shared")
-KIRO = SkillLayout("kiro", "kiro skills", ".kiro", "KIRO_HOME", "kiro-", ":kiro", "kiro")
+# kiro 停用：不再向 ~/.kiro 镜像 skills（恢复时取消下一行注释并加回 LAYOUTS）。
+# KIRO = SkillLayout("kiro", "kiro skills", ".kiro", "KIRO_HOME", "kiro-", ":kiro", "kiro")
 CLAUDE = SkillLayout(
     "claude",
     "claude skills",
@@ -52,12 +53,14 @@ CLAUDE = SkillLayout(
     reserved_ids=frozenset({"synced"}),
 )
 
-LAYOUTS: tuple[SkillLayout, ...] = (SHARED, KIRO, CLAUDE)
+LAYOUTS: tuple[SkillLayout, ...] = (SHARED, CLAUDE)
 SHARED_LAYOUT = SHARED
 LAYOUTS_BY_KEY = {layout.key: layout for layout in LAYOUTS}
 
 # Identity bases per source; `identity_prefix` appends the layout's suffix. The
-# third-party base is completed with the lock digest by the caller.
+# third-party base is completed with a per-entry suffix by the caller
+# (`defaults.entry_identity_suffixes`), so one entry's relock leaves the others'
+# identities alone.
 FIRST_PARTY_IDENTITY = "agents/skills"
 THIRD_PARTY_IDENTITY = "agents/skills.lock.yaml"
 OPENSPEC_IDENTITY = "openspec-cli"

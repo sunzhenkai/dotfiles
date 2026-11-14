@@ -239,13 +239,14 @@ modules:
     doctor: true
     bin: cursor
 
-  - name: kiro
-    kind: binary
-    desc: Kiro CLI（skills 镜像由 agents sync 管理）
-    group: agents
-    install: true
-    doctor: true
-    bin: kiro-cli
+  # kiro 停用：CLI 不再安装、~/.kiro skills 镜像不再分发（2026-11）。
+  # - name: kiro
+  #   kind: binary
+  #   desc: Kiro CLI（skills 镜像由 agents sync 管理）
+  #   group: agents
+  #   install: true
+  #   doctor: true
+  #   bin: kiro-cli
 
   - name: opencode
     kind: binary
@@ -325,6 +326,15 @@ modules:
     install: true
     doctor: true
     bin: omp
+
+  - name: omo
+    kind: binary
+    desc: OmO 独立版 coding agent CLI（原生二进制，~/.local/bin/omo）
+    group: agents
+    install: true
+    doctor: true
+    bin: omo
+    enabled: false   # 独立安装，不进 profile/--all；dotf omo -i 显式装
 
   - name: zcode
     kind: binary
@@ -407,7 +417,8 @@ modules:
       writable: true
       sensitive: false
       target_mode: "0755"
-      preserve: [cache, data, debug, history, pack, plugin, session, sessions, .repro, .tests, doc/tags]
+      preserve: [cache, data, debug, history, pack, plugin, session, sessions,
+                 .repro, .tests, doc/tags, lazy-lock.json, lazyvim.json]
       exclude: []
 
   - name: helix

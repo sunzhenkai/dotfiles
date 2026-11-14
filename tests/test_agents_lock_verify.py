@@ -148,7 +148,7 @@ def env(tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch):
     stub = _stub_acquire(checkout, revision)
     monkeypatch.setattr(lock_verify, "acquire_all", stub)
     monkeypatch.setattr(defaults, "acquire_all", stub)
-    destinations = tuple(tmp_home / name / "skills" for name in (".agents", ".kiro", ".claude"))
+    destinations = tuple(tmp_home / name / "skills" for name in (".agents", ".claude"))
     assert defaults.install_defaults(repo, dest_roots=destinations) == 0
 
     class Env:

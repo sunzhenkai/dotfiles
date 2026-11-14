@@ -39,13 +39,14 @@ groups:
 - 组声明来源属性；成员只写 id，**不可能在组内写错来源**。
 - group 名兼作 CLI 展开单位：`dotf skills -i <group>` / `dotf agents skill apply <group>`。
 - **没有 `default` 字段**：编目内即自动全量安装；`optional: true` 条目是唯一例外（不进默认安装，但可受管启用）。不想保留 → 注释掉条目。
-- 一手组不声明 `source`/`package`；其来源是 `agents/skills/<id>/`（first-party 源位置保留，当前编目无一手组——自有共享 skill 已迁 `sunzhenkai/solo-skills`，以第三方组消费）。
+- 一手组不声明 `source`/`package`；其来源是 `agents/skills/<id>/`。当前一手组为 `first-party`，只有 `dotfiles`（`dotf` CLI 的使用说明，默认全局安装）。共享 skill 已迁 `sunzhenkai/solo-skills`，以第三方组消费。
 - 第三方 `source` 两值：`github`（URL/owner-repo）与 `registry`（skills.sh 名）。
 
 ### 当前编目
 
 | group | type | source | package | 成员数 |
 |---|---|---|---|---|
+| `first-party` | first-party | — | `agents/skills/dotfiles` | 1 |
 | `solo-skills` | third-party | github | `sunzhenkai/solo-skills` | 22（含 2 optional） |
 | `mattpocock` | third-party | github | `mattpocock/skills` | 10（含 2 optional） |
 | `archify` | third-party | github | `tt-a1i/archify` | 1 optional |
@@ -92,10 +93,9 @@ Skill 装到哪些目录由 `src/agents/layouts.py` 的 `LAYOUTS` 单一表达�
 | layout | 目标 | 渲染 |
 |---|---|---|
 | `shared` | `~/.agents/skills/<id>/` | `{{slash:x}}` → `/x` |
-| `kiro` | `${KIRO_HOME:-~/.kiro}/skills/<id>/` | 同上 + 末尾补 `$ARGUMENTS` |
 | `claude` | `~/.claude/skills/<id>/` | 同 shared（Claude Code 自消费 `$ARGUMENTS`） |
 
-owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id>`），**必须**互不重叠：runtime manifest 是全 layout 共用的一份，`apply_owned_plan` 按 owner 前缀决定保留哪些既有条目。identity 前缀为 `<base>[:kiro][:claude]`。`claude` 拒绝编目 id `synced`（Claude Code 保留目录名）。
+owner 前缀由 `(layout, source)` 派生（`agents[:claude]-<source>:<id>`），**必须**互不重叠：runtime manifest 是全 layout 共用的一份，`apply_owned_plan` 按 owner 前缀决定保留哪些既有条目。identity 前缀为 `<base>[:claude]`。`claude` 拒绝编目 id `synced`（Claude Code 保留目录名）。`kiro` layout 已停用（2026-11），`layouts.py` 里保留注释形式。
 
 ### D5. 冲突出口
 
@@ -117,7 +117,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 1. `skills` id 全局唯一、非空、不含 `/`。
 2. `type` 必须是 `first-party`/`third-party`；第三方必须有 `source`（`registry`/`github`）与 `package`；一手不得声明 `package`/`source`。
-3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。当前两边均为空集，校验按空集通过。
+3. 一手目录集合 == 编目里 `type: first-party` 的 id 集合（双向）。
 4. 编目里每个 third-party id 必须在 lock 覆盖；一手 id 不得在 lock。
 5. overlay 只能启用/停用编目内 id。
 6. `optional` 只允许写在成员映射上，且必须是布尔；`aliases` 只允许写在成员映射上，且必须是非空 id 列表。optional / alias 条目与其他条目一样参与 1–5 全部校验。别名不得与 skill id、group 名或其他别名冲突。
@@ -127,7 +127,7 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 | 模块 | 变更 |
 |---|---|
 | `src/agents/skills_catalog.py` | schema v3：group 声明 + 成员平铺（支持 `optional: true` 与 `aliases` 映射）；无 default |
-| `src/agents/layouts.py` | 安装目标注册表（shared / kiro / claude）+ owner/identity 前缀派生 |
+| `src/agents/layouts.py` | 安装目标注册表（shared / claude；kiro 已停用）+ owner/identity 前缀派生 |
 | `src/agents/defaults.py` | `catalog_skill_ids` 取代 `selected_default_ids`；lock 校验用组 type；遍历 LAYOUTS |
 | `src/agents/desired_set.py` | Desired Set = 编目非 optional ∪ overlay 启用 − 停用 |
 | `src/agents/desired_ops.py` | apply 按 id 来源补齐（一手目录 / 第三方锁定获取）；逐 layout 失败摘要 |
@@ -142,11 +142,12 @@ owner 前缀由 `(layout, source)` 派生（`agents[:kiro][:claude]-<source>:<id
 
 - 编目重写完成；`taste` 与 `ui-templates` 组注释。
 - `dotf skills -i <group>`、`dotf agents skill apply <group>` 组展开可用。
-- 三个 layout（shared / kiro / claude）由同一注册表驱动，见 `docs/adr/0019-*`。
+- 两个 layout（shared / claude）由同一注册表驱动，见 `docs/adr/0019-*`；kiro 于 2026-11 停用。
 - 全量测试 606 passed。
 - 2026-09-24：`ui-templates` 回到编目内并全标 optional（709cc55）。
 - 2026-10-14：`ui-templates` 组从编目与 lock 永久移除（不再依赖 `sunzhenkai/ui-templates-skill`）。
 - 2026-09-29：first-party skill 迁出至 `sunzhenkai/solo-skills`，`dotfiles` / `task-flow-skills` / `agent-roster` 三组并入单一 `solo-skills` 第三方组；first-party 机制保留（见 `openspec/changes/migrate-first-party-skills-to-solo-skills/`）。
+- 2026-11-06：`agents/skills/` 重新有内容：4 个项目级 skill（`dotf-init` / `dotf-install` / `dotf-check` / `dotf-repo`）合并为 first-party skill `dotfiles`，默认装到全部 layout（见 `openspec/changes/merge-dotf-skills-into-global-dotfiles/`）。
 
 ## 8. 后续可选项
 

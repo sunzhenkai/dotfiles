@@ -1,8 +1,8 @@
 # Shared agent skills
 
-跨 Cursor / Kiro / OpenCode / Codex / Kimi Code / Pi / ZCode / Claude Code 等工具的 **skills 编目与安装编排真相源**。
+跨 Cursor / OpenCode / Codex / Kimi Code / Pi / ZCode / Claude Code 等工具的 **skills 编目与安装编排真相源**。
 
-自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)（独立维护），本仓库以第三方 group `solo-skills` 消费（经 lock 锁定、`dotf agents -c` 下发）。`agents/skills/` 保留为 first-party skill 源的既定位置，当前为空；first-party type 概念与校验保留，未来自有 skill 可直接落回。
+自有共享 skill 已迁至 [`sunzhenkai/solo-skills`](https://github.com/sunzhenkai/solo-skills)（独立维护），本仓库以第三方 group `solo-skills` 消费（经 lock 锁定、`dotf agents -c` 下发）。`agents/skills/` 是 first-party skill 源，当前只有 `dotfiles`（`dotf` CLI 的使用说明），编目里非 optional 即默认全局安装。
 
 ## 统一入口（推荐）
 
@@ -11,8 +11,8 @@
 ```shell
 dotf agents -i                 # 计划展开为各 agent CLI 的独立 install 动作
 dotf cursor -i                 # 仅安装 Cursor CLI
-dotf agents -c                 # 聚合同步 skills（~/.agents/skills → Kiro → Claude Code）+ 全局 AGENTS.md
-dotf skills -c                 # 安装编目 Desired Set 的全部 skill（锁定第三方 + OpenSpec CLI；编目当前无一手 group）；不含 AGENTS.md
+dotf agents -c                 # 聚合同步 skills（~/.agents/skills → Claude Code）+ 全局 AGENTS.md
+dotf skills -c                 # 安装编目 Desired Set 的全部 skill（first-party + 锁定第三方 + OpenSpec CLI）；不含 AGENTS.md
 dotf skills -i <name>          # npx skills 按需安装；先匹配 group，再匹配 skill id 或 alias，最后透传给 npx；-g 全局 / --project 项目 / -y 跳过询问
 dotf skills -r <skill-name>    # 移除已安装 skill（省略名称进入 npx skills 交互式移除；短名同走映射）
 dotf agents skill apply <id|alias>   # 写入本机 overlay Desired Set 并 sync（含该 id 的来源）
@@ -30,7 +30,7 @@ PYTHONPATH=scripts python3 src/agents/doctor.py
 
 ```text
 agents/
-  skills/<skill-id>/SKILL.md       # first-party skill 源既定位置（当前为空，落回时按此布局）
+  skills/<skill-id>/SKILL.md       # first-party skill 源（当前：dotfiles 的入口文档）
   skills/<skill-id>/references/    # 可选：随 skill 原样分发（不做渲染/替换，字节一致）
   skills/<skill-id>/scripts/       # 可选：随 skill 原样分发（helper CLI / 审计脚本）
   instructions/AGENTS.md           # 全局 agent 指令（用户级，跨项目）
@@ -55,7 +55,7 @@ npx skills add sunzhenkai/solo-skills                 # 全部共享 skill
 npx skills add sunzhenkai/solo-skills -s taskflow     # 定向安装
 ```
 
-本仓库不再承载共享 skill 源（原根目录 `skills` 符号链接已移除）；`.agents/skills/` 仍是 npx 标准容器，项目级 skill（`dotf-repo` 等，迭代本项目用）可经 `npx skills add sunzhenkai/dotfiles` 发现，装到别的机器无用但无害。仓库入口文档在 `.agents/skills/dotf-repo/`（根目录不能放 `SKILL.md`，否则 CLI 会短路、只认根这一个 skill）。
+本仓库不再承载共享 skill 源（原根目录 `skills` 符号链接已移除）；`.agents/skills/` 仍是 npx 标准容器，项目级 skill（当前 `update-external-skills`）可经 `npx skills add sunzhenkai/dotfiles` 发现，装到别的机器无用但无害。给 agent 看的仓库使用说明在 `agents/skills/dotfiles/`，随 `dotf agents -c` 全局安装（根目录不能放 `SKILL.md`，否则 CLI 会短路、只认根这一个 skill）。
 
 ## Frontmatter（源）
 
@@ -76,7 +76,7 @@ skill 自带脚本（`scripts/`）只做**确定性**的事：读写结构化文
 - **禁止**让脚本从用户消息 / 自由文本里「挖」需求、意图或语义分类。模型先归纳，再把结论**作为参数**传给脚本（如 `--title` / `--slug`）。
 - **禁止**要求 Agent 把渲染后的消息逐字转存给脚本解析。模型无法可靠复现自己的输入，漏抄是静默的，脚本无从校验，最后会把转录失误变成对用户的错误追问。
 - **禁止**用关键词表决定门禁强度（「这条待办算不算测试项」这类）。脚本列事实与原文，模型说明判断，**用户拍板**。
-- 需要按宿主（Cursor / Kiro …）渲染格式加解析分支时，说明设计错了：换成模型理解 + 参数传入，而不是再加一条围栏规则。
+- 需要按宿主（Cursor / Claude Code …）渲染格式加解析分支时，说明设计错了：换成模型理解 + 参数传入，而不是再加一条围栏规则。
 - 正例：`audit-skill.sh` 只报命中行，由 Agent 复核、用户豁免。启发式来源一律交用户确认，不要让脚本替用户做语义判断。
 
 ## 语言
@@ -93,27 +93,26 @@ id、slash 命令、路径、代码、状态值、CLI flag 与既成术语（如
 {{slash:opsx-apply}}
 ```
 
-同步时统一渲染为 `/opsx-apply`（Kiro 目标例外，见下文）。
+同步时统一渲染为 `/opsx-apply`。
 
 ## 同步
 
-skills 同步到三个 runtime layout（`src/agents/layouts.py` 是目标清单的唯一真相源）：
+skills 同步到两个 runtime layout（`src/agents/layouts.py` 是目标清单的唯一真相源）：
 
 | layout | 目标 | 渲染 |
 |---|---|---|
 | shared | `~/.agents/skills/<id>/` | `{{slash:x}}` → `/x` |
-| kiro | `${KIRO_HOME:-~/.kiro}/skills/<id>/` | 同上，并在末尾补 `$ARGUMENTS` |
 | claude | `~/.claude/skills/<id>/` | 同 shared |
 
-含 `references/`、`scripts/` sidecar，原样字节分发。Kiro CLI 不读 `~/.agents/skills`，因此额外托管一份镜像；`KIRO_HOME` 必须指向 HOME 内的真实目录，避免越过 dotf 的 HOME 写入边界。Claude Code 从 `~/.claude/skills/` 读个人级 skill，并且自己消费 `$ARGUMENTS`（无占位符时按 `ARGUMENTS: <value>` 追加），所以 claude 目标不做 Kiro 式的显式注入；`synced` 是 Claude Code 的保留目录名，编目里用它会 fail closed。
+含 `references/`、`scripts/` sidecar，原样字节分发。Claude Code 从 `~/.claude/skills/` 读个人级 skill，并且自己消费 `$ARGUMENTS`（无占位符时按 `ARGUMENTS: <value>` 追加），所以不做 Kiro 式的显式注入；`synced` 是 Claude Code 的保留目录名，编目里用它会 fail closed。Kiro layout 已停用（`~/.kiro/skills` 不再镜像），恢复方式见 `src/agents/layouts.py` 注释。
 
-同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`，以及 Claude Code 的 `~/.claude/CLAUDE.md`（Claude Code 只读该文件名，不读 `AGENTS.md`）。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
+同一入口还会安装全局 `AGENTS.md`（跨项目默认指令，不含 skill 目录）：`~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、Cursor 用户级 `~/.cursor/rules/00-dotf-global.mdc`、Claude Code 的 `~/.claude/CLAUDE.md`（Claude Code 只读该文件名，不读 `AGENTS.md`）、pi 的 `~/.pi/agent/AGENTS.md`，以及 Qoder CLI 的 `~/.qoder/AGENTS.md`。源在 `agents/instructions/`。**不要手改**这些安装产物。漂移在 doctor 的 `instructions` 段与 TUI 的 Status / Conflicts 面板可见。
 
 本机 Skill Desired Set = `agents/skills.yaml` 编目内非 optional id ∪ overlay `enabled_skills` − `disabled_skills`。**没有 default 字段**：编目内即默认全量安装；成员可写 `- id: <id>` + `optional: true` 映射表示"默认不装、可经 overlay / `agents skill apply` 按需启用"；同一映射可写 `aliases` 作 CLI 短名（overlay 若写别名会收成正规 id）。不想保留就把该条目注释掉（注释即不在编目内，不自动装、也不能经 overlay / `agents skill apply` 引用）。未锁定第三方与 OpenSpec 生成的 `openspec-*` 不能进入 Desired Set。apply / remove 只改 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`，不改仓库编目 / lock。
 
 `agents skill apply/remove <id|alias>` 与 `agents -c` 一样会补齐该 id 所属来源：一手 id 走仓库目录；第三方 id 追加一次锁定获取（`acquire_all` 按 lock 条目逐条 fetch，所以一手 apply 不会走网络）。别名先收成正规 id 再写 overlay。OpenSpec 的 `openspec-*` 只由 `agents -c` 安装。
 
-first-party skill 源位置是 `agents/skills/`，在 `agents/skills.yaml` 以 `type: first-party` 的 group 编目；未编目的目录会在校验时 fail closed，**当前编目没有 first-party group**（校验按空集双向通过）。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
+first-party skill 源位置是 `agents/skills/`，在 `agents/skills.yaml` 以 `type: first-party` 的 group 编目（当前只有 `dotfiles`）；未编目的目录会在校验时 fail closed。第三方 skill 在同一编目里按来源分组成 `type: third-party`（`source: github`/`registry` + `package`），由严格锁 `agents/skills.lock.yaml` 固定 revision/hash/license/audit，经同一入口安装到全部 layout。升 lock 用 `make skills-lock-update`（按 source 拉 HEAD、跑 `audit-skill.sh`，通过才写仓库）；不要手改 revision。OpenSpec 阶段 skill **不**放进 `agents/skills/`：同一入口调用本机 `openspec init --tools agents`，把 CLI 生成的 `openspec-*` 装到全部 layout。缺少 openspec CLI 时只警告，不阻断 skill 同步；技能集合跟随用户的 OpenSpec profile / workflows。
 
 ### 冲突与接管
 
@@ -145,7 +144,7 @@ scripts/lib/dispatch_config.sh agents
 共享 sync：`dotf agents -c`。单工具 `dotf <tool> -c` 只应用 vendor 配置，不隐式全量 sync。
 本仓库不声明 LLM provider / 模型 / 密钥（见 `docs/adr/0017-remove-ai-provider-config.md`），vendor 配置只含工具行为、内置 agent 的中文 system 提示等稳定内容。
 
-**不要手改** `~/.agents/skills/`、`${KIRO_HOME:-~/.kiro}/skills/` 或 `~/.claude/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 并在 `agents/skills.yaml` 编目后重新 sync，第三方 skill 请改 `agents/skills.yaml` + `agents/skills.lock.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。已经手改过又想要受管版本：下次 sync 默认先备份再覆写，旧字节在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/`。
+**不要手改** `~/.agents/skills/` 或 `~/.claude/skills/` 里由本系统生成的文件；一手 skill 请改 `agents/skills` 并在 `agents/skills.yaml` 编目后重新 sync，第三方 skill 请改 `agents/skills.yaml` + `agents/skills.lock.yaml`，OpenSpec 阶段 skill 请升级 CLI 后重新 `dotf agents -c`。已经手改过又想要受管版本：下次 sync 默认先备份再覆写，旧字节在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/`。
 
 已归档的 skill 移到 `agents/skills-archive/<name>/`（保留生产内容，不入编目、不参与安装，恢复方式见该目录 `README.md`）。
 
@@ -160,7 +159,7 @@ scripts/lib/dispatch_config.sh agents
 - optional 的 `ibelick/ui-skills`（`ui-skills-root`）、`zarazhangrui/frontend-slides`（id `frontend-slides`，别名 `ppt`）、`tt-a1i/archify`、`solo-kingdom/senv`（`senv-cli`）、`humanlayer/skills`（`show-me`）
 - `taste-skill` 的 group 在编目中注释，故不自动装也不能经 overlay/apply 引用（其审计锁保留）；`dotf skills -i taste-skill` 会按字面透传给 npx 搜索安装
 
-锁定 skill 安装到全部 skill layout（`~/.agents/skills`、`${KIRO_HOME:-~/.kiro}/skills`、`~/.claude/skills`），并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。
+锁定 skill 安装到全部 skill layout（`~/.agents/skills`、`~/.claude/skills`），并带上 skill 根下的配套文件（如 `catalog/`、`runtime/`），仍排除 `patches/` 等 authoring 目录。
 
 ## Managed ownership 与冲突
 

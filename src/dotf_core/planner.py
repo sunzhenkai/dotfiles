@@ -19,7 +19,8 @@ from dotf_core import plan_protocol  # noqa: E402
 ACTION_ORDER = plan_protocol.ACTION_ORDER
 
 # agents -i 展开为独立单工具 install 动作（不污染 agents -c）
-AGENTS_INSTALL_BUNDLE = ("cursor", "kiro", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode")
+# kiro 已停用（modules.yaml 条目被注释），不再进聚合安装
+AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode")
 
 
 @dataclass
