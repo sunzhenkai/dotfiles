@@ -13,15 +13,21 @@ import subprocess
 import sys
 import tempfile
 from collections import OrderedDict
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
-from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from pathlib import Path, PurePosixPath
 
 _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+import catalog_edit  # noqa: E402
+from skills_catalog import (  # noqa: E402
+    SkillsCatalogError,
+    load_skills_catalog,
+    parse_catalog,
+)
 from third_party import (  # noqa: E402
     LOCK_KIND,
     LOCK_VERSION,
@@ -35,6 +41,10 @@ from third_party import (  # noqa: E402
     tree_hash,
     verify_checkout,
 )
+
+from ensure_pyyaml import ensure_yaml  # noqa: E402
+
+_yaml = ensure_yaml()
 
 Run = Callable[..., subprocess.CompletedProcess[str]]
 Audit = Callable[[Path], tuple[int, str]]
@@ -204,6 +214,103 @@ def _promote(
     return promoted
 
 
+def discover_skills(checkout: Path, items: Sequence[LockedSkill]) -> dict[str, str]:
+    """Upstream skill directories next to the locked ones, as {subdirectory: id}.
+
+    Scope is the parent directories already represented in the lock: a sibling
+    directory with its own SKILL.md is a new skill, while `in-progress/`,
+    `misc/` and other sibling trees stay out of discovery.
+    """
+    parents = {PurePosixPath(item.subdirectory).parent for item in items}
+    known = {item.subdirectory for item in items}
+    taken = {item.id for item in items}
+    found: dict[str, str] = {}
+    for parent in parents:
+        directory = checkout if parent == PurePosixPath(".") else checkout / parent
+        if not directory.is_dir() or directory.is_symlink():
+            continue
+        for child in sorted(directory.iterdir()):
+            subdirectory = (parent / child.name).as_posix()
+            if subdirectory in known:
+                continue
+            if (
+                not child.is_dir()
+                or child.is_symlink()
+                or not (child / "SKILL.md").is_file()
+            ):
+                continue
+            if child.name in taken:
+                raise LockUpdateError(
+                    f"discovered {subdirectory!r} reuses the locked id {child.name!r}"
+                )
+            found[subdirectory] = child.name
+    return found
+
+
+def _seed_lock(
+    skill_id: str, source: str, subdirectory: str, donor: LockedSkill
+) -> LockedSkill:
+    """Placeholder entry for a discovered directory; _promote fills the hashes."""
+    return LockedSkill(
+        skill_id,
+        source,
+        donor.revision,
+        subdirectory,
+        "",
+        LicenseLock(donor.license.spdx, donor.license.file, ""),
+        AuditLock(
+            donor.audit.status, donor.audit.date, donor.audit.tool, donor.audit.evidence
+        ),
+    )
+
+
+def _apply_catalog(
+    root: Path, added: Mapping[str, Sequence[str]], removed: Sequence[LockedSkill]
+) -> None:
+    """Add discovered ids to their source's group; drop removed ones.
+
+    Optional keeps discovery visible without widening the default install: a
+    promoted upstream directory never reaches an agent home unannounced.
+    """
+    if not added and not removed:
+        return
+    path = root / catalog_edit.CATALOG_REL
+    if not path.is_file() or path.is_symlink():
+        raise LockUpdateError(f"missing {catalog_edit.CATALOG_REL}: {path}")
+    try:
+        catalog = load_skills_catalog(root)
+    except SkillsCatalogError as exc:
+        raise LockUpdateError(str(exc)) from exc
+    group_for_source: dict[str, str] = {}
+    for entry in catalog.skills:
+        if entry.package:
+            group_for_source.setdefault(entry.package, entry.group)
+    by_id = catalog.by_id()
+    text = path.read_text(encoding="utf-8")
+    for source, skill_ids in added.items():
+        group = group_for_source.get(source)
+        if group is None:
+            print(
+                f"warning: no catalog group for {source}; "
+                f"{', '.join(skill_ids)} left lock-only"
+            )
+            continue
+        for skill_id in skill_ids:
+            if skill_id not in catalog_edit.member_ids(text, group):
+                text = catalog_edit.add_optional_member(text, group, skill_id)
+    for item in removed:
+        entry = by_id.get(item.id)
+        if entry is not None and item.id in catalog_edit.member_ids(text, entry.group):
+            text = catalog_edit.remove_member(text, entry.group, item.id)
+    try:
+        parse_catalog(_yaml.safe_load(text))
+    except SkillsCatalogError as exc:
+        raise LockUpdateError(
+            f"catalog edit produced an invalid catalogue: {exc}"
+        ) from exc
+    path.write_text(text, encoding="utf-8")
+
+
 def resolve_audit_script(root: Path, checkout: Path | None) -> tuple[Path, str]:
     """审计脚本来源回退链，返回 (脚本路径, lock tool 字段标签)。
 
@@ -214,9 +321,14 @@ def resolve_audit_script(root: Path, checkout: Path | None) -> tuple[Path, str]:
     candidates: list[tuple[Path, str]] = [(root / AUDIT_REL, AUDIT_TOOL)]
     if checkout is not None:
         candidates.append(
-            (checkout / CHECKOUT_AUDIT_REL, CHECKOUT_AUDIT_REL.as_posix() + " (source checkout)")
+            (
+                checkout / CHECKOUT_AUDIT_REL,
+                CHECKOUT_AUDIT_REL.as_posix() + " (source checkout)",
+            )
         )
-    candidates.append((INSTALLED_AUDIT_REL.expanduser(), INSTALLED_AUDIT_REL.as_posix()))
+    candidates.append(
+        (INSTALLED_AUDIT_REL.expanduser(), INSTALLED_AUDIT_REL.as_posix())
+    )
     for script, label in candidates:
         if script.is_file():
             return script, label
@@ -238,7 +350,9 @@ def _default_audit(skill_dir: Path, script: Path) -> tuple[int, str]:
     return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
 
 
-def blocking_findings(output: str, limit: int = MAX_BLOCKED_FINDINGS) -> tuple[str, ...]:
+def blocking_findings(
+    output: str, limit: int = MAX_BLOCKED_FINDINGS
+) -> tuple[str, ...]:
     lines = output.splitlines()
     kept: list[str] = []
     total = shown = 0
@@ -324,6 +438,8 @@ def update_lock(
     current: list[str] = []
     blocked: list[str] = []
     blocked_detail: list[tuple[str, tuple[str, ...]]] = []
+    added: list[tuple[str, str, str]] = []
+    removed: list[LockedSkill] = []
 
     def _refresh(staging: Path) -> None:
         for source, items in grouped.items():
@@ -331,28 +447,48 @@ def update_lock(
             print(f"==> lock-update  {source}", flush=True)
             tip = resolve_tip(origin, cwd=root, run=run)
             locked_revisions = sorted({item.revision for item in items})
-            if all(item.revision == tip for item in items):
+            checkout = staging / hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+            materialize(origin, checkout, tip, run=run)
+            gone = [
+                item
+                for item in items
+                if not (checkout / item.subdirectory / "SKILL.md").is_file()
+            ]
+            kept = [item for item in items if item not in gone]
+            discovered = discover_skills(checkout, kept)
+            untouched = all(item.revision == tip for item in items)
+            if not gone and not discovered and untouched:
                 print(f"    current  {tip[:12]}  ({len(items)} skills)")
                 current.append(source)
                 continue
             previous = ",".join(rev[:12] for rev in locked_revisions)
             print(f"    {previous} → {tip[:12]}  ({len(items)} skills)")
-            checkout = staging / hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
-            materialize(origin, checkout, tip, run=run)
             if audit is not None:
                 audit_fn: Audit = audit
                 tool_label = AUDIT_TOOL
             else:
                 script, tool_label = resolve_audit_script(root, checkout)
 
-                def audit_fn(skill_dir: Path, _script: Path = script) -> tuple[int, str]:
+                def run_audit(
+                    skill_dir: Path, _script: Path = script
+                ) -> tuple[int, str]:
                     return _default_audit(skill_dir, _script)
 
+                audit_fn = run_audit
+
             promoted_ids: list[str] = []
-            for item in items:
+            for item in gone:
+                print(
+                    f"    drop {item.id}  ({item.subdirectory} missing at {tip[:12]})"
+                )
+                removed.append(item)
+                del by_id[item.id]
+            for item in kept:
                 try:
                     promoted = _promote(item, checkout, tip, today=day, tool=tool_label)
-                    _audit_skill(item, checkout, accept_warn=accept_warn, audit=audit_fn)
+                    _audit_skill(
+                        item, checkout, accept_warn=accept_warn, audit=audit_fn
+                    )
                 except AuditBlocked as exc:
                     print(f"    keep {item.id} @ {item.revision[:12]}  ({exc})")
                     blocked.append(item.id)
@@ -360,13 +496,40 @@ def update_lock(
                     continue
                 by_id[item.id] = promoted
                 promoted_ids.append(item.id)
-            if not promoted_ids:
+            for subdirectory, skill_id in discovered.items():
+                donor = kept[0]
+                if skill_id in by_id:
+                    raise LockUpdateError(
+                        f"discovered {skill_id!r} collides with a locked entry"
+                    )
+                try:
+                    promoted = _promote(
+                        _seed_lock(skill_id, source, subdirectory, donor),
+                        checkout,
+                        tip,
+                        today=day,
+                        tool=tool_label,
+                    )
+                    _audit_skill(
+                        promoted, checkout, accept_warn=accept_warn, audit=audit_fn
+                    )
+                except AuditBlocked as exc:
+                    print(f"    skip new {skill_id}  ({exc})")
+                    blocked.append(skill_id)
+                    blocked_detail.append((skill_id, exc.findings))
+                    continue
+                by_id[skill_id] = promoted
+                promoted_ids.append(skill_id)
+                added.append((source, skill_id, subdirectory))
+            if not promoted_ids and not removed:
                 print(f"    skipped write for {source}: every skill blocked")
                 continue
             updated.append(
                 SourceUpdate(
                     source=source,
-                    previous=locked_revisions[0] if len(locked_revisions) == 1 else previous,
+                    previous=locked_revisions[0]
+                    if len(locked_revisions) == 1
+                    else previous,
                     revision=tip,
                     skill_ids=tuple(promoted_ids),
                 )
@@ -380,15 +543,24 @@ def update_lock(
 
     report_blocked(blocked_detail)
 
-    skills = tuple(by_id[item.id] for item in lock.skills)
-    if not updated:
+    for _, skill_id, _ in added:
+        print(f"  + {skill_id}\tnew locked entry")
+    for item in removed:
+        print(f"  - {item.id}\tremoved from lock")
+
+    skills = (
+        tuple(by_id[item.id] for item in lock.skills if item.id in by_id)
+        + tuple(by_id[skill_id] for _, skill_id, _ in added if skill_id in by_id)
+    )
+    if not updated and not added and not removed:
         print("  done lock-update: already current")
         return UpdateResult(
             updated=(), current=tuple(current), blocked=tuple(blocked), wrote=False
         )
 
     payload = dump_lock(skills)
-    load_lock_bytes(payload)
+    if skills:
+        load_lock_bytes(payload)
     if dry_run:
         print(
             f"  done lock-update (plan): sources={len(updated)} "
@@ -401,6 +573,10 @@ def update_lock(
             wrote=False,
         )
     lock_path.write_text(payload, encoding="utf-8")
+    added_by_source: dict[str, list[str]] = {}
+    for source, skill_id, _ in added:
+        added_by_source.setdefault(source, []).append(skill_id)
+    _apply_catalog(root, added_by_source, removed)
     print(f"  wrote {LOCK_REL}  sources={len(updated)} blocked={len(blocked)}")
     return UpdateResult(
         updated=tuple(updated),
@@ -411,7 +587,9 @@ def update_lock(
 
 
 def load_lock_bytes(payload: str) -> ThirdPartyLock:
-    with tempfile.NamedTemporaryFile("w", suffix=".yaml", encoding="utf-8", delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".yaml", encoding="utf-8", delete=False
+    ) as handle:
         handle.write(payload)
         path = Path(handle.name)
     try:

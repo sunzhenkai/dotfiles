@@ -55,6 +55,8 @@ groups:
       - id: role-chat
         optional: true
       - service-manager
+      # 2026-11-17 上游新增 session-wrap（solo-skills dd1d60b），会话收尾补查遗留事项。
+      - session-wrap
       - skill-upgrader
       - skills-store
       - solo-code-review

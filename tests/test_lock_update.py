@@ -293,30 +293,131 @@ def test_update_lock_keeps_critically_blocked_skill(tmp_path: Path) -> None:
     assert loaded["bad"].revision == old
 
 
-def test_update_lock_refuses_missing_subdirectory(tmp_path: Path) -> None:
+def test_update_lock_drops_entry_whose_subdirectory_disappeared(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    upstream = tmp_path / "upstream"
+    _init_repo(upstream)
+    (upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    body = "---\nname: {}\ndescription: old\n---\nold\n"
+    _write_skill(upstream, "skills/gone", body.format("gone"))
+    _write_skill(upstream, "skills/stays", body.format("stays"))
+    old = _commit(upstream, "old")
+    gone = upstream / "skills" / "gone"
+    (gone / "SKILL.md").unlink()
+    gone.rmdir()
+    new = _commit(upstream, "removed")
+    _git(upstream, "checkout", "--quiet", old)
+    items = [
+        _locked("gone", upstream, "skills/gone", old),
+        _locked("stays", upstream, "skills/stays", old),
+    ]
+    _git(upstream, "checkout", "--quiet", "main")
+
+    dotfiles = tmp_path / "dotfiles"
+    _write_repo(dotfiles, _lock_body(items))
+    result = lock_update.update_lock(
+        dotfiles,
+        aliases={SOURCE: str(upstream)},
+        audit=lambda path: (0, ""),
+        today="2026-09-17",
+    )
+    assert result.wrote is True
+    loaded = third_party.load_lock(dotfiles / "agents" / "skills.lock.yaml")
+    assert [item.id for item in loaded.skills] == ["stays"]
+    assert loaded.skills[0].revision == new
+    assert "gone\tremoved from lock" in capsys.readouterr().out
+    catalog = (dotfiles / "agents" / "skills.yaml").read_text(encoding="utf-8")
+    assert "gone" not in catalog
+
+
+def test_update_lock_adds_discovered_sibling_as_optional(tmp_path: Path) -> None:
     upstream = tmp_path / "upstream"
     _init_repo(upstream)
     (upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
     _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: old\n---\nold\n")
     old = _commit(upstream, "old")
-    (upstream / "skills" / "demo" / "SKILL.md").unlink()
-    (upstream / "skills" / "demo").rmdir()
-    _commit(upstream, "removed")
+    _write_skill(upstream, "skills/fresh", "---\nname: fresh\ndescription: new\n---\nnew\n")
+    _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: new\n---\nnew\n")
+    new = _commit(upstream, "new")
     _git(upstream, "checkout", "--quiet", old)
     item = _locked("demo", upstream, "skills/demo", old)
     _git(upstream, "checkout", "--quiet", "main")
 
     dotfiles = tmp_path / "dotfiles"
-    payload = _lock_body([item])
-    _write_repo(dotfiles, payload)
-    with pytest.raises(lock_update.LockUpdateError, match="subdirectory missing"):
-        lock_update.update_lock(
-            dotfiles,
-            aliases={SOURCE: str(upstream)},
-            audit=lambda path: (0, ""),
-            today="2026-09-17",
-        )
-    assert (dotfiles / "agents" / "skills.lock.yaml").read_text(encoding="utf-8") == payload
+    _write_repo(dotfiles, _lock_body([item]))
+    audited: list[str] = []
+
+    def audit(path: Path) -> tuple[int, str]:
+        audited.append(path.name)
+        return (0, "")
+
+    result = lock_update.update_lock(
+        dotfiles,
+        aliases={SOURCE: str(upstream)},
+        audit=audit,
+        today="2026-09-17",
+    )
+    assert result.wrote is True
+    loaded = {item.id: item for item in third_party.load_lock(
+        dotfiles / "agents" / "skills.lock.yaml"
+    ).skills}
+    assert sorted(loaded) == ["demo", "fresh"]
+    assert loaded["fresh"].revision == new
+    assert loaded["fresh"].subdirectory == "skills/fresh"
+    fresh_tree = third_party.tree_hash(upstream / "skills" / "fresh")
+    assert loaded["fresh"].content_hash == fresh_tree
+    assert sorted(audited) == ["demo", "fresh"], "新条目也必须过审计"
+    catalog = (dotfiles / "agents" / "skills.yaml").read_text(encoding="utf-8")
+    assert "- id: fresh" in catalog and "optional: true" in catalog
+
+
+def test_update_lock_skips_new_entry_when_audit_blocks_it(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    _init_repo(upstream)
+    (upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: a\n---\na\n")
+    old = _commit(upstream, "old")
+    _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: b\n---\nb\n")
+    _write_skill(upstream, "skills/risky", "---\nname: risky\ndescription: b\n---\nb\n")
+    _commit(upstream, "new")
+    _git(upstream, "checkout", "--quiet", old)
+    item = _locked("demo", upstream, "skills/demo", old)
+    _git(upstream, "checkout", "--quiet", "main")
+
+    dotfiles = tmp_path / "dotfiles"
+    _write_repo(dotfiles, _lock_body([item]))
+    result = lock_update.update_lock(
+        dotfiles,
+        aliases={SOURCE: str(upstream)},
+        audit=lambda path: (2, AUDIT_BLOCK_OUTPUT) if path.name == "risky" else (0, ""),
+        today="2026-09-17",
+    )
+    assert result.blocked == ("risky",)
+    loaded = third_party.load_lock(dotfiles / "agents" / "skills.lock.yaml")
+    assert [item.id for item in loaded.skills] == ["demo"]
+    catalog = (dotfiles / "agents" / "skills.yaml").read_text(encoding="utf-8")
+    assert "risky" not in catalog
+
+
+def test_discover_skills_stays_inside_locked_parents(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    _write_skill(checkout, "skills/engineering/known", "---\nname: known\n---\n")
+    _write_skill(checkout, "skills/engineering/pr", "---\nname: pr\n---\n")
+    _write_skill(checkout, "skills/in-progress/draft", "---\nname: draft\n---\n")
+    _write_skill(checkout, "skills/productivity/handoff", "---\nname: handoff\n---\n")
+    item = third_party.LockedSkill(
+        "known",
+        SOURCE,
+        "0" * 40,
+        "skills/engineering/known",
+        "h",
+        third_party.LicenseLock("MIT", "LICENSE", "h"),
+        third_party.AuditLock("approved", "2026-09-01", "t", f"{SOURCE}/commit/{'0' * 40}"),
+    )
+    assert lock_update.discover_skills(checkout, [item]) == {
+        "skills/engineering/pr": "pr"
+    }
 
 
 AUDIT_BLOCK_OUTPUT = "\n".join(

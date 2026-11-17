@@ -1,0 +1,70 @@
+diff --git a/.agents/skills/update-external-skills/SKILL.md b/.agents/skills/update-external-skills/SKILL.md
+index 359ca04..2b1f425 100644
+--- a/.agents/skills/update-external-skills/SKILL.md
++++ b/.agents/skills/update-external-skills/SKILL.md
+@@ -1,11 +1,11 @@
+ ---
+ name: update-external-skills
+-description: "更新编目里已有第三方（外部）skill 的上游 revision：make skills-lock-update 重锁+逐 skill 审计 → lock_verify changed 判断内容是否真变 → registry validate 校验仓库产物，到此为止。下发本机（bin/dotf agents -c）与提交/推送不在流程内，作为下一步提示交给用户。在用户要求更新外部/第三方 skill、刷新 revision、重锁 skills.lock、同步 skill 上游时使用。共享 skill 的修改去 `sunzhenkai/solo-skills` 仓；新装/移除第三方 skill 走 skills-store 或直接改 skills.yaml 编目——本 skill 只刷新已有条目的 revision。"
++description: "更新编目里第三方（外部）skill 的上游：make skills-lock-update 重锁（含按父目录自动增删条目）+ 逐 skill 审计 → lock_verify changed 判断内容是否真变 → registry validate 校验仓库产物，到此为止。下发本机（bin/dotf agents -c）与提交/推送不在流程内，作为下一步提示交给用户。在用户要求更新外部/第三方 skill、刷新 revision、重锁 skills.lock、同步 skill 上游时使用。共享 skill 的修改去 `sunzhenkai/solo-skills` 仓；跨父目录新增、换 source、改默认安装面仍要手工改编目或走 skills-store。"
+ ---
+ 
+ # update-external-skills
+ 
+-把 `agents/skills.yaml` 编目里第三方 group 的锁（`agents/skills.lock.yaml`）推进到各 source 当前 HEAD，判定哪些条目内容真变，校验仓库产物自洽。**交付物就是一份审计过、变化已判定的 lock diff**。
++把 `agents/skills.yaml` 编目里第三方 group 的锁（`agents/skills.lock.yaml`）推进到各 source 当前 HEAD，判定哪些条目内容真变，校验仓库产物自洽。**交付物就是一份审计过、变化已判定的 lock diff（外加编目里随之增删的条目）**。
+ 
+ 三步走完即完成。下发本机与提交/推送是**后果与授权面不同的下一步**，默认只给提示、不执行（见「收尾」）。
+ 
+@@ -30,6 +30,7 @@ LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) &&
+ **审计全文落盘，终端只显示末尾摘要**：日志路径以 `log=` 打印，要挑读就 `grep "$LOG"`；不要用 `make ... | tail` 代替落盘（坑 16）。
+ 
+ - 对每个 source：fetch HEAD → 逐 skill 跑审计脚本（`src/agents/lock_update.py` 的 `resolve_audit_script` 回退链：仓内 first-party 副本 → source checkout 自带的 `skills/skills-store/scripts/audit-skill.sh` → 本机受管副本 `~/.agents/skills/skills-store/scripts/audit-skill.sh`）→ 审计通过才写 lock；audit date 与 evidence 链接同步刷新。
++- 条目集自动跟随上游（2026-11-17 起）：每个 source 的 checkout 会按**锁内条目父目录**扫描 `SKILL.md`，上游新出现的子目录补成新条目并跑同一套审计，消失的子目录从锁里删掉，两处变动同时写回 `agents/skills.lock.yaml` 与 `agents/skills.yaml`（新增一律 `optional: true`，即不进默认安装；删除连带移出编目）。终端分别打 `    drop <id>  (<subdir> missing at <rev>)`、`  + <id>	new locked entry`、`  - <id>	removed from lock`——**这些不是需要你手工补的提示，是已完成的动作记录**；扫不到的父目录（如 mattpocock 的 `skills/in-progress/`）不会自动收，属设计边界（坑 17）。
+ - 完成标准：输出末尾 `wrote agents/skills.lock.yaml sources=N blocked=M`。N 只数有推进的 source（已最新的显示 `current`，不计入）；**M>0 是合法结局，不是失败**，走下面的 blocked 分支。
+ - 默认警告也接受写入（fail-open）；要 fail closed 用 `FAIL_ON_WARN=1 make skills-lock-update`。
+ - 这是全流程唯一必经的网络成本，别在它前后加重复取上游的动作。
+@@ -60,7 +61,7 @@ LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) &&
+ changed_content=N changed_revision_only=M added=A removed=R
+ ```
+ 
+-revision / evidence / audit date 必然刷新，**content_hash 才是内容变化的信号**。`N=0` 就是纯重钉（上游只动了锁外文件，如 README、in-progress/），连下一步的下发都可以省。`added` / `removed` 非零说明条目集变了——上游改名或增删 skill，见坑 12：那是编目变更，要先改编目并给锁补种子条目。
++revision / evidence / audit date 必然刷新，**content_hash 才是内容变化的信号**。`N=0` 就是纯重钉（上游只动了锁外文件，如 README、in-progress/），连下一步的下发都可以省。`added` / `removed` 非零说明条目集变了——上游增删或改名 skill，第 1 步已把锁与编目一起改好，这里只需**读一遍新增的是不是你要的**：新增条目默认 `optional: true`，改名会显示成 `added` + `removed` 一对（见坑 12）。
+ 
+ **输出一次读全**：逐条列表在计数行之前，锁内条目数十个时 `tail -40` 就会吃掉开头的「内容真变」项，逼人重跑一遍。要挑读就 `grep 'content+revision'`，别 `tail`。
+ 
+@@ -130,7 +131,7 @@ make skills-verify IDS=a,b VERBOSE=1     # 指定条目 + 打印干净项
+ 
+ 兜底（脚本不可用时手工验）：安装副本不是上游字节树（坑 5），不能拿 content_hash 直接对安装目录算哈希。自己 clone、checkout 到 lock 的 revision，用 `tree_hash` 对上游树，用 `diff -r` 对安装副本；上游侧多出的 `patches/`、`evals/`、`experience/`、`evolutions/`、`authoring/`、`tests/` 之外的任何东西、以及 `~/.agents` / `~/.claude` 副本正文与上游不一致，才算漂移。
+ 
+-## 坑实录（自 2026-09-20 实战沉淀，2026-09-29 补 12–15，2026-09-30 补 16）
++## 坑实录（自 2026-09-20 实战沉淀，2026-09-29 补 12–15，2026-09-30 补 16，2026-11-17 补 17–18）
+ 
+ 坑 5 / 6 / 9 与下发失败定性已由 `src/agents/lock_verify.py` 自动分类，留在这里是为了脚本不可用时能手工复现，以及解释那些标签到底在说什么。
+ 
+@@ -145,17 +146,20 @@ make skills-verify IDS=a,b VERBOSE=1     # 指定条目 + 打印干净项
+ 9. **`optional: true` 的锁内条目本机没有副本，不是下发失败**：编目里标 optional 的第三方条目不进默认安装，`defaults` 段也不部署（本机经 overlay / `agents apply` 启用过的才会有，如 ui-skills-root）。核对时它们只验上游 checkout 的 tree_hash == lock content_hash，`diff -r` 会报 MISSING，属预期。
+ 10. **optional 条目在本机有非托管副本时，`diff -r` 对不上不是下发失败**：坑 9 说的是 optional 默认没有副本；若它**恰好存在**且内容对不上，多半是更早手工拷贝的陈旧副本，本流程不负责刷新，别顺手覆盖。四个信号一起看才能定性：副本里带着 `patches/`、`evals/` 等本应被剥离的 authoring 目录（锁定部署不会留下它们）；`~/.local/state/dotf/agents-manifest.json` 里查无此 id（`defaults` 段没部署过）；与**旧** revision 的 diff 行数明显少于与新 revision 的（说明血缘更老，不是"同步失败"）；副本 mtime 早于本轮更新。定性后按 optional 条目只验上游 `tree_hash == content_hash` 即可落地级收尾。是否刷新这类副本是独立决策——它们可能有意保留着上游后来重建掉的内容。实例（2026-09-28）：`ui-template-apply` / `ui-template-author` / `ui-template-design` 在 `~/.agents/skills/` 下正是这种副本，而 `archify` / `senv-cli` 无副本。
+ 11. **审计误报挡 lock 前进时，改审计规则要走 skills-store 的更新流程（源在 solo-skills 仓）**：`jailbreak_role` 命中 MIT LICENSE 套话（`without limitation`）曾让 archify 每轮重锁都要人工豁免。这类「过宽 token」精度修复改 `sunzhenkai/solo-skills` 仓的 `skills/skills-store/`（脚本 + `tests/test_audit_skill.py` 本仓侧回归 + 该仓 `skills/skills-store/patches/` 留 proposal/change/result 三件套），提交推送后重锁到新 revision；**安装当场**不得改脚本，也不得为放行某个 skill 删规则。skills-store 自身的自指文本（规则表、误报表）用其 `.audit-allow` 豁免，不走规则放宽。
+-12. **上游改名条目：编目改了还不够，重锁读的是锁**。`lock_update.py` 按 `skills.lock.yaml` 现有条目逐个 promote，条目在新 HEAD 缺子目录就硬失败（`error: <id>: subdirectory missing at <rev>`），改名/增删因此永远解不开阻塞。做法：编目改名的同时给锁补种子条目（删旧 id、按同一 source/revision 写新 id），再 `make skills-lock-update`——`_promote` 会重算 content_hash、license hash 与 evidence，种子值随即被覆盖。两个坑：种子的 content_hash 别写全 0，YAML 会把 `000…0` 读成整数 `0`，load_lock 直接报 `content_hash must be a non-empty string`，用 `"a"*64` 这类非零占位；audit.evidence 必须是 https URL，随便写个词过不了 load_lock。`changed` 报告会把改名显示成 `added` + `removed` 一对。
+-
+-   **种子 revision 已等于上游 HEAD 时，占位 content_hash 不会被覆盖**：`_promote` 对 `current` 的 source 直接跳过（输出 `current <rev> (N skills)` 而不是 `old → new`），于是占位值原样留在锁里。补种子时要么选一个缺该子目录的更旧 revision（会硬失败，不可行），要么自己按同一函数算：`python3 -c "import sys;sys.path[:0]=['src','src/agents'];import third_party;print(third_party.tree_hash(__import__('pathlib').Path('<checkout>/skills/<id>')))"`（`tree_hash` 只吃盘上字节树，checkout 必须在该 revision 且干净——本仓工作树里的 `__pycache__/`、`.pytest_cache/` 虽被 git 忽略，仍会被算进哈希，务必用 `git archive <rev> <subdir> | tar -x` 导出干净树再算）。补完再跑一次重锁会显示 `current` 且哈希不变，这不算失败。
++12. **上游改名/增删现在由重锁自己处理，只剩三个手工缺口**：`lock_update.py` 在锁定父目录内发现新 `SKILL.md` 就补条目（`_seed_lock` 起占位，`_promote` 重算 content_hash / license hash / evidence，再走同一个审计脚本），子目录消失就从锁里删——**不要**再手工写种子条目（旧做法：按同 source/revision 手写新 id，content_hash 占位、evidence 必须是 https URL，且种子 revision 已等于 HEAD 时 `_promote` 直接跳 `current`、占位哈希留在锁里；那套只在工具出问题时才用）。仍需人判断的：
++    - 新条目进编目时是 **`optional: true`**，默认不装。要让它进默认安装面就手改 `agents/skills.yaml` 去掉那两行，属独立决策（见坑 17）。
++    - 锁里出现某个 source、但编目里没有对应 group 时，重锁只打 `warning: no catalog group for <source>; … left lock-only`，条目留在锁里而编目不动——先补 group，否则下次重锁还会只剩锁。
++    - 改名后新 id 想在 overlay / `agents apply` 里保持启用状态，要在 overlay 里补新 id：旧 id 被删，启用记录不会自己跟过来。
+ 13. **first-party 迁出后，`~/.agents/skills/` 里的旧副本会挡住锁定部署**：迁出只搬仓库里的源，`defaults` 段要在共享 layout 装同名 skill 时才发现目标已有副本且身份不匹配，于是 `skills` 段报 stale owned、`defaults` 段报 without ownership，整个 sync 失败而 `~/.claude` / `~/.kiro` 已装好。先比对再处置：runtime bundle 由 `agents/runtime.yaml` 的 `excluded` ∪ 点开头文件决定，副本里多出的 `patches/`、`evolutions/` 等在上游 revision 里通常都有——`make skills-verify IDS=<id>` 的 `unowned` 行就是这些差异。备份改名到 skills 树之外（`~/.agents/stale-backups/`）后重跑 sync；留在 skills 树里即使是点开头也会被 agent 运行时扫出来当 skill。
+ 14. **`lock_verify.py` 的取上游必须走模块级 `_acquire`**：`src/agents` 是无 `__init__.py` 的命名空间包，`agents.third_party` 与 `third_party` 是两个模块对象，异常类不同身份，`except ThirdPartyLockError` 会静默漏过。新代码跟同目录邻居一样用扁平 import（`src` 与 `src/agents` 双插 sys.path，只为 `ensure_pyyaml`），别写 `from agents.x import`。
+ 15. **把下发/提交/推送当流程内步骤是自找的返工**：它们改的是本机安装产物与 git 历史，与「一份审计过的锁」这个交付物无关，却占了最贵的时间窗口和最不可逆的动作面。一轮真实执行里，未经要求的提交因把在制品和锁变更混进同一个 commit，又追加了一次 reset 重写历史的返工。判据：动作的授权来源必须是用户本轮的点名，不能是 skill 正文里「收尾遵循仓库惯例」这类含糊措辞。
+ 16. **截断步骤输出 = 证据永久丢失，代价是再取一次上游**：第 1 步的审计输出只活在 stdout 里——`_audit_skill` 只 `print(output)`，source 的 checkout 又是 `tempfile.TemporaryDirectory`、该 source 处理完即删，而 `AuditBlocked` 的异常消息原本只带 `exit <rc>`、不带命中内容。于是把 `make skills-lock-update` 直接接 `tail -60` 之后，想回答「到底为什么被阻断」就只剩一条路：重新 clone 上游 + 重跑全树审计——多一次网络往返、多一次大文件扫描，还在 `/tmp` 留下坑 6 那类易被后续轮次误认的 checkout，事后得手工清掉。已修：阻断原因经 `blocking_findings` / `report_blocked` 汇总后打在 `wrote` 行**之上**，tail 窗口内即可定性。仍要认两点：报告有上限（每 skill 8 条 `[BLOCK]`、最多列 5 个 skill），完整上下文只存在于整体留存的 stdout；以及**已经截断过就认赔，别拿重取上游来补**——先落盘、再挑读，是唯一正确顺序。同一模式在第 2 步的廉价版本是 `tail -40` 吃掉「内容真变」列表首行、被迫重跑。
++17. **`optional: true` 是自动新增条目的默认，也是它的天花板**：重锁只负责「锁跟着上游走」，不替你判断该不该装。新增条目一律以 `optional: true` 进编目——不部署、不进 `dotf agents -c` 的默认面，`make skills-verify` 里显示为 `NOT-INSTALLED`（坑 9）。要让某个新 skill 变成默认安装，手改 `agents/skills.yaml` 删掉那两行，再走下发与核对。发现范围同样有意收窄在锁内条目的父目录：全仓递归会收进 `skills/in-progress/`、`archive/` 这类草稿目录（实测 mattpocock 多 39 个、solo-skills 多 22 个），所以发现范围要改就改 `discover_skills`，别在正文里绕。
++18. **新增条目也必须过审计，但审计失败不会有 `blocked` 之外的显式清单**：新子目录走的是同一个审计脚本，`AuditBlocked` 时打印 `    skip new <id>  (<reason>)` 并计入 `blocked=N`，锁和编目都不写；此时旧条目的推进照常进行。所以 `blocked>0` 里可能同时混着「旧条目被挡」和「新条目被挡」，看 `[BLOCK]` 报告里的 skill id 区分，别一律当成上游变坏。
+ 
+ ## 边界
+ 
+-- **只刷新已有第三方条目**。新装/移除第三方 skill、改编目（增删 group 或成员）需要新审计锁，走 skills-store / `dotf skills add` / 直接编辑 `agents/skills.yaml`，不在本流程。
++- **自动跟进的只有「锁内条目父目录下的增删」**。父目录内新增/消失的条目会连锁带编目一起改；跨父目录搬家的 skill（如 mattpocock 从 `skills/engineering/` 挪到 `skills/misc/`）表现为「删一条 + 别处不理」，需要人补；换 source、增删 group、调整默认安装面（去掉 `optional`）仍走 skills-store / `dotf skills add` / 直接编辑 `agents/skills.yaml`。
+ - **共享 skill 的修改去 `sunzhenkai/solo-skills` 仓**（原 first-party 集合已全部迁出，本仓以第三方 group 消费）；本仓项目级 skill（`.agents/skills/`）直接编辑其生产稿，与本流程无交集。
+ - **下发、提交、推送一律不在流程内执行**（见「收尾」）。用户要求本流程给结论时，交付物是 lock diff 与 `changed` 计数；`make registry validate` 通过只代表具备提交条件，不代表可以代提交。
+-- 想让下发变便宜是**仓库工具**的活，不在本 skill：`acquire_all` 按 source 分组取回（已有）、安装身份已按条目粒度（已完成）、`dotf agents` 增加子集入口。改这几处走本仓常规改动流程，不要试图在 skill 正文里绕开。
++- 想让下发变便宜是**仓库工具**的活，不在本 skill：`acquire_all` 按 source 分组取回（已有）、安装身份已按条目粒度（已完成）、`dotf agents` 增加子集入口。改这几处走本仓常规改动流程，不要试图在 skill 正文里绕开。同理，想扩大自动发现范围（父目录 → 全仓递归）也改 `src/agents/lock_update.py` 的 `discover_skills`，不要指望正文写出效果。

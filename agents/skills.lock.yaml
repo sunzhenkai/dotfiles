@@ -199,6 +199,20 @@ skills:
       date: '2026-11-17'
       tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
       evidence: https://github.com/sunzhenkai/solo-skills/commit/a83f7ac4aaf58f336179fd47b05f439c1a5de060
+  - id: session-wrap
+    source: https://github.com/sunzhenkai/solo-skills
+    revision: a83f7ac4aaf58f336179fd47b05f439c1a5de060
+    subdirectory: skills/session-wrap
+    content_hash: 086de5aa97e57664ed24a095e8c8da9c068a0010dba5e4fd84fb249afad2ba64
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-17'
+      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a83f7ac4aaf58f336179fd47b05f439c1a5de060
   - id: skill-upgrader
     source: https://github.com/sunzhenkai/solo-skills
     revision: a83f7ac4aaf58f336179fd47b05f439c1a5de060
