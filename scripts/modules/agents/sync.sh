@@ -136,7 +136,8 @@ _run_sync_stage() {
   local step_rc log detail
   shift 2
   echo "$banner"
-  log="$(mktemp "${TMPDIR:-/tmp}/dotf-sync-${stage}-XXXXXX.log")"
+  # 模板必须以 X 结尾：GNU coreutils 的 mktemp 遇到 XXXXXX.log 会报 invalid template。
+  log="$(mktemp "${TMPDIR:-/tmp}/dotf-sync-${stage}-XXXXXX")"
   set +e
   python3 "$@" 2>&1 | tee "$log"
   step_rc=${PIPESTATUS[0]}
