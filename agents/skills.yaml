@@ -90,6 +90,26 @@ groups:
       - id: wizard
         optional: true
       - writing-for-agents
+      - id: ask-matt
+        optional: true
+      - id: implement-spec
+        optional: true
+      - id: improve-codebase-architecture
+        optional: true
+      - id: pr
+        optional: true
+      - id: prototype
+        optional: true
+      - id: retro
+        optional: true
+      - id: triage
+        optional: true
+      - id: grill-me
+        optional: true
+      - id: handoff
+        optional: true
+      - id: teach
+        optional: true
 
   archify:
     type: third-party
@@ -111,6 +131,22 @@ groups:
     package: https://github.com/ibelick/ui-skills
     skills:
       - id: ui-skills-root
+        optional: true
+      - id: baseline-ui
+        optional: true
+      - id: component-canvas
+        optional: true
+      - id: create-canvas
+        optional: true
+      - id: create-design-md
+        optional: true
+      - id: fixing-accessibility
+        optional: true
+      - id: fixing-metadata
+        optional: true
+      - id: fixing-motion-performance
+        optional: true
+      - id: improve-ui
         optional: true
 
   frontend-slides:
