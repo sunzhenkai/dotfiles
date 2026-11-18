@@ -82,6 +82,19 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert all(item.audit.status == "approved" for item in lock.skills)
 
 
+def test_ui_kit_default_catalog_and_lock() -> None:
+    catalog_mod = _load("skills_catalog")
+    catalog = catalog_mod.load_skills_catalog(ROOT)
+    locked = _load("third_party").load_lock(ROOT / "agents" / "skills.lock.yaml")
+    item = next(item for item in locked.skills if item.id == "ui-kit")
+    assert "ui-kit" in catalog.default_ids()
+    assert catalog.by_id()["ui-kit"].optional is False
+    assert "pretty-ui" in catalog.default_ids()
+    assert item.source == "https://github.com/sunzhenkai/solo-skills"
+    assert item.subdirectory == "skills/ui-kit"
+    assert item.audit.status == "approved"
+
+
 _OPTIONAL_CATALOG = """
 version: 3
 lock: skills.lock.yaml

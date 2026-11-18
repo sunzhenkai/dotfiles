@@ -49,6 +49,8 @@ groups:
       - id: lark-cli
         optional: true
       - pretty-ui
+      # 2026-11-18 ui-kit 成为默认 UI 总入口；pretty-ui 作为通用路线下游同装。
+      - ui-kit
       - project-init
       - repo-manager
       - role-based-reviewer
