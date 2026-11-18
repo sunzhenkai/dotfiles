@@ -92,8 +92,18 @@ done
 
 export PYTHONUNBUFFERED=1
 
+# 阶段进度：run_plan.sh 的 dotf_core.progress 过滤器消费，其它模式下一律丢弃。
+# shims 属于 skills 阶段的一部分且没有独立结果行，不单独计数，否则进度会卡一格。
+_SYNC_STAGE_TOTAL=4
+_SYNC_STAGE_INDEX=0
+_sync_progress() {
+  _SYNC_STAGE_INDEX=$((_SYNC_STAGE_INDEX + 1))
+  printf 'PROGRESS\t%s\t%s\t%s\n' "$1" "$_SYNC_STAGE_INDEX" "$_SYNC_STAGE_TOTAL"
+}
+
 echo "agents sync  dry_run=$DRY_RUN"
 
+_sync_progress instructions
 echo "--- instructions ---"
 instructions_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -135,6 +145,7 @@ _run_sync_stage() {
   local banner="$2"
   local step_rc log detail
   shift 2
+  _sync_progress "$stage"
   echo "$banner"
   # 模板必须以 X 结尾：GNU coreutils 的 mktemp 遇到 XXXXXX.log 会报 invalid template。
   log="$(mktemp "${TMPDIR:-/tmp}/dotf-sync-${stage}-XXXXXX")"

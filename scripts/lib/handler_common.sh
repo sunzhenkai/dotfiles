@@ -57,6 +57,8 @@ dotf_registry_config() {
     dotf_result_failed "$mod: missing config.strategy"
     return 1
   }
+  # 部署阶段可能占掉整个动作的大半时间，先给进度行一个名字（0/0 表示不计格数）。
+  printf 'PROGRESS\tdeploy\t0\t0\n'
   case "$strategy" in
   copy | merge | render)
     pythonpath_value="${_DOTF_CORE_PYTHONPATH}"

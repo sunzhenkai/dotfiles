@@ -55,6 +55,44 @@ src/dotf_cli/
 - JSON 字段命名约定：snake_case；命令结果包 `ok`、`command`、`data`；错误包 `ok: false`、`error: {code, message, chain?}`。
 - 现有 `--json` 字段名（status 等）不改，TUI 与 CI 已在消费。
 
+### 计划执行的分级输出
+
+`dotf <mods> -i|-c|-d` 走 `run_plan.sh`，人类输出分三档（样式常量统一定义在 `dotf_core/term.py`）：
+
+| 模式 | 判定 | 终端看到什么 |
+|---|---|---|
+| 默认（quiet） | stderr 是 TTY，且非 `--verbose` / `--json` | 一行原地刷新的进度 + `changed`/`failed` 动作各一行 + 末尾汇总 |
+| 透传 | 非 TTY 或 `--verbose` | handler 原始输出、`→ 动作`、`RESULT` 行照旧，末尾加汇总 |
+| `--json` | `--json` | stdout 只有一个 JSON 文档；进度不渲染，汇总落 stderr |
+
+- 非 TTY 下行为与改造前逐行一致，CI 日志和 `RESULT` 行协议不变。
+- 颜色由 `DOTF_COLOR=always|never` > `NO_COLOR` > `TERM=dumb` > TTY 决定；管道里永不带 ANSI。
+
+### 进度行协议
+
+handler 可选地上报阶段进度，`dotf_core/progress.py` 在 `run_plan.sh` 的管道里消费：
+
+```
+PROGRESS\t<stage>\t<done>\t<total>
+```
+
+- 只用于渲染，任何模式下都不进终端；日志文件里保留原文。
+- 不上报的 handler 不受影响，进度退化为动作级文案。
+- 进度条一格 = 一个计划动作；只有一个动作时改画旋转指示，避免 `0/1→1/1` 的死条。
+- `RESULT` 行协议不变；没有 `RESULT` 的动作由 `run_plan.sh` 补一条，保证汇总不丢失败。
+
+### 结尾汇总
+
+`dotf_core/summary.py` 从 `RESULT` 行渲染，不读 journal（status 模式下没有 journal）：
+
+```
+✓ 完成  3 项变更 · 4 项已是最新  32.4s
+  变更  agents/config  nvim/config  zsh/config
+  失败  m5/install  handler-failed
+  报告  ~/.local/state/dotf/last-run.json
+```
+
+
 ## 错误模型
 
 错误码表（`errors.py` 单一定义）：

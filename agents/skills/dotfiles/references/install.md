@@ -97,6 +97,14 @@ dotf agents -d --deep --json  # agents 深度诊断（脱敏 JSON）
 
 `depends_on` 由 planner 拓扑排序，不用手装。例：`golang` → `sdk`，`senv`/`grepom`/`mdserve` → `golang`，`delta` → `git`。dry-run 计划里会展示完整依赖链。
 
+## 输出怎么读
+
+计划执行时终端默认只留两样东西：一行原地刷新的进度（`[████░░] 3/8  nvim · config`），结束时一段汇总。中途的 handler 日志都收在做临时日志里，只在失败时回放。
+
+- 想逐行看全过程：`--verbose`。
+- 脚本/CI 里跑：输出自动退化为完整日志，与 `--verbose` 相同，可安全 grep。
+- 汇总按 `changed` / `failed` / `blocked` 分组列动作；完整报告路径在最后一行。
+
 ## 常见交互
 
 | 用户说 | 行为 |

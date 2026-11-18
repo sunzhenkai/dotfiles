@@ -14,6 +14,7 @@ from typing import Any, Iterable
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dotf_core import registry as modules  # noqa: E402
 from dotf_core import plan_protocol  # noqa: E402
+from dotf_core import term  # noqa: E402
 
 
 ACTION_ORDER = plan_protocol.ACTION_ORDER
@@ -611,7 +612,7 @@ def build_retry_plan(
     )
 
 
-def _group_actions_for_display(
+def group_actions_for_display(
     actions: list[PlanAction],
 ) -> list[tuple[int, str, str, str]]:
     """按模块合并展示行：(首序号, 合并后 ACTION, MODULE, REASON)。"""
@@ -633,20 +634,26 @@ def _group_actions_for_display(
     return rows
 
 
-def format_plan_text(plan: Plan) -> str:
-    lines = [
-        f"执行计划  OS={plan.os_id}"
-        + (f"  profile={plan.profile}" if plan.profile else ""),
-        f"共 {len(plan.actions)} 个动作",
-        "",
+def format_plan_header(os_id: str, profile: str, count: int) -> list[str]:
+    head = f"执行计划  OS={os_id}" + (f"  profile={profile}" if profile else "")
+    return [head, f"共 {count} 个动作", ""]
+
+
+def format_plan_table(actions: list[PlanAction]) -> list[str]:
+    """列宽随内容的计划表；run_plan.sh 与 `format_plan_text` 共用同一套渲染。"""
+    rows = [
+        (str(idx), action_str, mod, reason)
+        for idx, action_str, mod, reason in group_actions_for_display(actions)
     ]
+    return term.table(("#", "ACTION", "MODULE", "REASON"), rows)
+
+
+def format_plan_text(plan: Plan) -> str:
+    lines = format_plan_header(plan.os_id, plan.profile or "", len(plan.actions))
     if not plan.actions:
         lines.append("（空计划）")
         return "\n".join(lines)
-    lines.append(f"{'#':<4} {'ACTION':<16} {'MODULE':<16} REASON")
-    lines.append("-" * 60)
-    for idx, action_str, mod, reason in _group_actions_for_display(plan.actions):
-        lines.append(f"{idx:<4} {action_str:<16} {mod:<16} {reason}")
+    lines.extend(format_plan_table(plan.actions))
     return "\n".join(lines)
 
 

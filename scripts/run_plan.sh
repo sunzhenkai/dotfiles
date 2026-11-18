@@ -79,6 +79,10 @@ cleanup_run_plan() {
 interrupt_run_plan() {
   local signal_code="$1"
   trap - INT TERM
+  printf '\r\033[K' >&2 2>/dev/null || true
+  printf '✗ 中断  已完成 %s/%s\n' \
+    "$(( ${CHANGED:-0} + ${UNCHANGED:-0} + ${SKIPPED:-0} + ${FAILED_N:-0} ))" \
+    "${TOTAL_ACTIONS:-0}" >&2
   if [ -n "$RUN_ID" ] && [ "$RUN_FINALIZED" -eq 0 ]; then
     python3 -m dotf_core.execution_state interrupt --run-id "$RUN_ID" >/dev/null 2>&1 || true
     RUN_FINALIZED=1
@@ -129,42 +133,18 @@ while IFS= read -r line || [ -n "$line" ]; do
   esac
 done <"$NORMALIZED"
 
+TOTAL_ACTIONS=${#ACTIONS[@]}
+
 if [ -z "$OS_ID" ]; then
   echo "错误: validator 未输出 planned OS" >&2
   exit 2
 fi
 
-echo "执行计划  OS=${OS_ID}${PROFILE:+  profile=$PROFILE}"
-echo "共 ${#ACTIONS[@]} 个动作"
+python3 -u -m dotf_core.plan_table <"$NORMALIZED"
 echo ""
-if [ ${#ACTIONS[@]} -eq 0 ]; then
-  echo "（空计划）"
+if [ "$TOTAL_ACTIONS" -eq 0 ]; then
   exit 0
 fi
-printf '%-4s %-16s %-16s %s\n' "#" "ACTION" "MODULE" "REASON"
-echo "------------------------------------------------------------"
-_seen_modules=$'\n'
-for row in "${ACTIONS[@]}"; do
-  IFS=$'\t' read -r a_idx action module reason <<<"$row"
-  case "$_seen_modules" in
-  *$'\n'"$module"$'\n'*) continue ;;
-  esac
-  _seen_modules="${_seen_modules}${module}"$'\n'
-  merged_actions="$action"
-  merged_reason="$reason"
-  for other in "${ACTIONS[@]}"; do
-    IFS=$'\t' read -r o_idx o_action o_module o_reason <<<"$other"
-    [ "$o_module" = "$module" ] || continue
-    [ "$o_idx" = "$a_idx" ] && [ "$o_action" = "$action" ] && continue
-    merged_actions="${merged_actions},${o_action}"
-    case ",${merged_reason}," in
-    *",${o_reason},"*) ;;
-    *) merged_reason="${merged_reason},${o_reason}" ;;
-    esac
-  done
-  printf '%-4s %-16s %-16s %s\n' "$a_idx" "$merged_actions" "$module" "$merged_reason"
-done
-echo ""
 
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "dry-run: 不执行任何动作"
@@ -177,6 +157,12 @@ is_tty_available() {
   if ! exec 3>/dev/tty 2>/dev/null; then return 1; fi
   exec 3>&-
   return 0
+}
+
+# 人类默认模式：TTY 且非 verbose/json 时，终端只留进度行与最终汇总。
+# 必须与 dotf_core.progress 的判定一致（同一个 stderr），否则两边会各说各话。
+progress_enabled() {
+  [ "${JSON_OUT:-0}" -ne 1 ] && [ "${DOTF_VERBOSE:-0}" != "1" ] && [ -t 2 ]
 }
 
 confirm() {
@@ -233,7 +219,6 @@ FAILED_N=0
 BLOCKED=0
 NOT_RUN=0
 RESULT_LINES=()
-FAILED_ITEMS=()
 FAILED_MODULES=()
 
 add_failed_module() {
@@ -268,7 +253,9 @@ record_scheduled_state() {
   local line
   line=$(printf 'RESULT\t%s\t%s\t%s\t0\t0\t%s' "$state" "$module" "$action" "$reason")
   RESULT_LINES+=("$line")
-  printf '%s\n' "$line"
+  if ! progress_enabled; then
+    printf '%s\n' "$line"
+  fi
   state_finish_action "$index" "$state" "$state" 0 0 "$reason"
   case "$state" in
   blocked) BLOCKED=$((BLOCKED + 1)) ;;
@@ -323,7 +310,9 @@ for action_pos in "${!ACTIONS[@]}"; do
   if [ -n "$RUN_ID" ]; then
     python3 -m dotf_core.execution_state action-start --run-id "$RUN_ID" --index "$_a_idx"
   fi
-  echo "→ $action $module ($reason)"
+  if ! progress_enabled; then
+    echo "→ $action $module ($reason)"
+  fi
   extra=()
   case "$action" in
   config)
@@ -346,16 +335,21 @@ for action_pos in "${!ACTIONS[@]}"; do
   out="$(mktemp)"
   chmod 600 "$out"
   CURRENT_OUT="$out"
+  progress_args=(--log "$out" --total-actions "$TOTAL_ACTIONS" --index "$_a_idx" \
+    --module "$module" --action "$action")
+  if ! progress_enabled; then
+    progress_args+=(--no-progress)
+  fi
   set +e
   set +o pipefail
   if [ ${#extra[@]} -gt 0 ]; then
     runner_run_action "$action" "$module" "${extra[@]}" 2>&1 \
       | python3 -u -m dotf_core.execution_state sanitize-stream \
-      | tee "$out"
+      | python3 -u -m dotf_core.progress "${progress_args[@]}"
   else
     runner_run_action "$action" "$module" 2>&1 \
       | python3 -u -m dotf_core.execution_state sanitize-stream \
-      | tee "$out"
+      | python3 -u -m dotf_core.progress "${progress_args[@]}"
   fi
   rc=${PIPESTATUS[0]}
   set -euo pipefail
@@ -376,15 +370,19 @@ for action_pos in "${!ACTIONS[@]}"; do
     skipped) SKIPPED=$((SKIPPED + 1)) ;;
     failed) FAILED_N=$((FAILED_N + 1)) ;;
     esac
-    [ "$st" = "failed" ] && FAILED_ITEMS+=("$module/$action: ${_reason:-handler-failed}")
   elif [ "$rc" -ne 0 ]; then
     FAILED_N=$((FAILED_N + 1))
-    FAILED_ITEMS+=("$module/$action: ${_reason:-handler-failed}")
+    _reason="exit $rc"
   else
     st="changed"
     _e=0
     _reason="ok"
     CHANGED=$((CHANGED + 1))
+  fi
+  # 没有 RESULT 行时补一条，保证汇总能看到这次动作（否则失败会从汇总里消失）。
+  if [ -z "$rline" ]; then
+    RESULT_LINES+=("$(printf 'RESULT\t%s\t%s\t%s\t%s\t%s\t%s' \
+      "$st" "$module" "$action" "${_d:-0}" "${_e:-0}" "${_reason:-$st}")")
   fi
   if [ "$rc" -ne 0 ] || [ "$st" = "failed" ]; then
     state_finish_action "$_a_idx" failed failed "${_d:-0}" "${_e:-$rc}" "${_reason:-handler failed}"
@@ -431,19 +429,23 @@ for action_pos in "${!ACTIONS[@]}"; do
 done
 
 echo ""
-echo "汇总: changed=$CHANGED unchanged=$UNCHANGED skipped=$SKIPPED failed=$FAILED_N blocked=$BLOCKED not-run=$NOT_RUN"
-if [ ${#FAILED_ITEMS[@]} -gt 0 ]; then
-  echo "错误项目:"
-  for item in "${FAILED_ITEMS[@]}"; do echo "  - $item"; done
-fi
-
 if [ -n "$RUN_ID" ]; then
   final_status="completed"
   [ "$FAILED" -ne 0 ] && final_status="failed"
   final_info="$(python3 -m dotf_core.execution_state finalize --run-id "$RUN_ID" --status "$final_status")" || exit $?
   RUN_FINALIZED=1
   saved="${final_info#*$'\t'}"
-  [ -n "${saved:-}" ] && echo "报告已保存: $saved"
+else
+  saved=""
+fi
+
+summary_args=(--total "$TOTAL_ACTIONS")
+[ -n "$saved" ] && summary_args+=(--report "$saved")
+if [ ${#RESULT_LINES[@]} -gt 0 ]; then
+  printf '%s\n' "${RESULT_LINES[@]}" \
+    | python3 -u -m dotf_core.summary "${summary_args[@]}" || true
+else
+  python3 -u -m dotf_core.summary "${summary_args[@]}" </dev/null || true
 fi
 
 if [ "$JSON_OUT" -eq 1 ]; then
@@ -478,5 +480,4 @@ PY
 fi
 
 [ "$FAILED" -ne 0 ] && exit 1
-echo "✓ 计划执行完成"
 exit 0

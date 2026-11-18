@@ -76,7 +76,7 @@ def test_result_protocol_changed(tmp_home: Path, tmp_path: Path) -> None:
     r = _run_plan(plan, home=tmp_home, handlers=handlers)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "RESULT\tchanged\tdemo\tinstall" in r.stdout
-    assert "changed=1" in r.stdout
+    assert "✓ 完成  1 项变更" in r.stdout
 
 
 def test_missing_handler_fails_when_required(tmp_home: Path, tmp_path: Path) -> None:
@@ -247,7 +247,7 @@ def test_idempotent_second_run_unchanged(tmp_home: Path, tmp_path: Path) -> None
     second = _run_plan(plan, home=tmp_home, handlers=handlers)
     assert second.returncode == 0, second.stdout + second.stderr
     assert "RESULT\tunchanged\tidem\tconfig" in second.stdout
-    assert "unchanged=1" in second.stdout
+    assert "✓ 完成  1 项已是最新" in second.stdout
 
 
 def test_dry_run_does_not_load_handlers(tmp_home: Path, tmp_path: Path) -> None:

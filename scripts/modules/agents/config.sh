@@ -9,12 +9,15 @@ dotf_handler_init
 # agents 的 registry config 是锁文件快照；聚合 sync 是独立 managed runtime。
 # 这里必须始终执行，不能因 registry 目标 unchanged 而短路。
 registry_log="$(mktemp)"
-if ! dotf_registry_config >"$registry_log" 2>&1; then
-  cat "$registry_log"
+set +e
+set +o pipefail
+dotf_registry_config 2>&1 | tee "$registry_log"
+registry_rc=${PIPESTATUS[0]}
+set -euo pipefail
+if [ "$registry_rc" -ne 0 ]; then
   dotf_result_failed "agents registry config failed"
   exit 1
 fi
-cat "$registry_log"
 registry_changed=0
 if grep -q $'^RESULT\tchanged\t' "$registry_log"; then
   registry_changed=1

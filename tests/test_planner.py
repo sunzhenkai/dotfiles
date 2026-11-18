@@ -223,11 +223,34 @@ def test_format_text_merges_actions_per_module() -> None:
     data_lines = [
         line
         for line in text.splitlines()
-        if line and not line.startswith(("-", "执行", "共", "#"))
+        if line and not line.startswith(("-", "─", "执行", "共", "#"))
     ]
     assert len(data_lines) == 2
     assert "install,config" in data_lines[0] and "git" in data_lines[0]
     assert data_lines[1].split()[1:][:2] == ["install", "delta"]
+
+
+def test_plan_table_renders_from_validator_tsv() -> None:
+    from dotf_core import plan_table
+
+    tsv = [
+        "META\tarch\tfull",
+        "ACTION\t1\tconfig\tagents\texplicit",
+        "ACTION\t2\tinstall\tgit\tall",
+    ]
+    text = plan_table.render(tsv)
+    lines = text.splitlines()
+    assert lines[0] == "执行计划  OS=arch  profile=full"
+    assert lines[1] == "共 2 个动作"
+    assert "agents" in lines[-2] and "git" in lines[-1]
+
+
+def test_plan_table_renders_empty_plan() -> None:
+    from dotf_core import plan_table
+
+    text = plan_table.render(["META\tarch\t"])
+    assert text.splitlines()[0] == "执行计划  OS=arch"
+    assert "（空计划）" in text
 
 
 def test_disabled_skipped_in_select_all_and_profile() -> None:

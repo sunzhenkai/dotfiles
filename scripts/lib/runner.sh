@@ -80,8 +80,14 @@ runner_now_ms() {
 
 # Copy handler output into $1 for RESULT parsing, and stream the rest live.
 # RESULT lines stay in the capture file only — runner emits its own later.
+# 用 bash 循环而不是 grep：grep 写管道时按块缓冲，会让进度行和阶段文案攒到最后才出现。
 runner_stream_to() {
-  tee "$1" | { grep -v $'^RESULT\t' || true; }
+  tee "$1" | while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+    RESULT$'\t'*) continue ;;
+    esac
+    printf '%s\n' "$line"
+  done
 }
 
 # 执行单个计划动作；打印人类可读行与 RESULT 行。
