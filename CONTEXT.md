@@ -69,7 +69,7 @@ _Avoid_: uninstall, deconfig（用在 Skill 上时）, 只删文件
 _Avoid_: update, 更新（作为动作名）
 
 **Conflict**:
-owned 目标的内容 / mode / 所有权身份（identity）已不等于上次受管 hash。默认「先备份再继续」：当前字节备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 后写入受管内容（反向动作则是备份后 prune）。`--on-conflict=block` 恢复严格模式：报告并保留，整份 Skill 跳过。不涵盖 Unowned Target、不安全类型、manifest 异常、越界目标。
+owned 目标的内容 / mode / 所有权身份（identity）已不等于上次受管 hash。默认「先备份再继续」：当前字节备份到 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/` 后写入受管内容（反向动作则是备份后 prune）。`--on-conflict=block` 恢复严格模式：报告并保留，整份 Skill 跳过。config 部署（`dotf <module> -c`）对 owned 内容漂移同语义（环境变量 `DOTF_ON_CONFLICT`，见 ADR-0034）：默认备份后覆盖并在结果行列出备份路径，`block` 时该模块的 config 动作失败。不涵盖 Unowned Target、不安全类型、manifest 异常、越界目标。
 _Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖, 用 Conflict 指无所有权文件
 
 **Unowned Target**:

@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import TextIO
 
 from .config_deploy import (
+    ConfigApplyResult,
     ConfigDeployError,
     ConfigPlan,
+    OnConflict,
     OnTakeover,
     _load_registry_module,
     compile_config_plan,
@@ -21,6 +23,7 @@ from .config_producers import producer_for
 from .schemas import SchemaError
 
 ON_TAKEOVER_ENV = "DOTF_TAKEOVER"
+ON_CONFLICT_ENV = "DOTF_ON_CONFLICT"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -41,6 +44,15 @@ def _on_takeover_from_env(env: dict[str, str] | None = None) -> OnTakeover | Non
     policy = raw.strip().lower()
     if policy not in ("skip", "backup"):
         raise ValueError(f"unknown on-takeover policy: {raw!r} (expected skip or backup)")
+    return policy  # type: ignore[return-value]
+
+
+def _on_conflict_from_env(env: dict[str, str] | None = None) -> OnConflict:
+    """DOTF_ON_CONFLICT=block|backup; unset means backup, same default as agents sync."""
+    raw = (env if env is not None else os.environ).get(ON_CONFLICT_ENV)
+    policy = (raw or "backup").strip().lower()
+    if policy not in ("block", "backup"):
+        raise ValueError(f"unknown on-conflict policy: {raw!r} (expected block or backup)")
     return policy  # type: ignore[return-value]
 
 
@@ -129,6 +141,17 @@ def _preserved_targets(plan: ConfigPlan) -> list[str]:
     ]
 
 
+def _drift_backup_warning(result: ConfigApplyResult, home: str) -> str | None:
+    # 一行汇总：handler_common.sh 只把第一条 warning 拼进结果行。
+    if not result.drift_backups:
+        return None
+    pairs = "；".join(
+        f"{_display_path(target, home)} → {_display_path(str(backup), home)}"
+        for target, backup in result.drift_backups
+    )
+    return f"warning: 本地改动已备份后覆盖（--on-conflict=block 可改为拒绝）: {pairs}"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if not args.home:
@@ -148,9 +171,11 @@ def main(argv: list[str] | None = None) -> int:
             state_home=args.state_home,
             producer=producer,
             on_takeover=on_takeover,
+            on_conflict=on_conflict,
         )
 
     try:
+        on_conflict = _on_conflict_from_env()
         plan = compile_plan("skip")
         on_takeover = decide_takeover(plan, compile_backup=lambda: compile_plan("backup"))
         result = deploy_config(
@@ -161,10 +186,14 @@ def main(argv: list[str] | None = None) -> int:
             producer=producer,
             run_id=args.run_id,
             on_takeover=on_takeover,
+            on_conflict=on_conflict,
         )
     except (ConfigDeployError, SchemaError, OSError, ValueError) as exc:
         print(f"config deploy failed: {exc}", file=sys.stderr)
         return 1
+    drift_warning = _drift_backup_warning(result, args.home)
+    if drift_warning:
+        print(drift_warning, file=sys.stderr)
     for target in _preserved_targets(plan):
         print(
             "warning: 保留不再托管的目标（本地有改动或类型不安全，未删除）: "

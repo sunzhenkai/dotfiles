@@ -67,8 +67,10 @@ dotf agents -c                              # skills + 全局指令聚合同步
 dotf agents skill apply <id> --on-conflict=backup
 ```
 
+- 本机改过的受管文件（上次由该模块写入）默认先备份再覆盖，结果行列出被覆盖文件与备份路径（`~/.local/state/dotf/backups/<run-id>/`）；要保留本机改动就加 `--on-conflict=block`，该模块 config 动作会失败。见 ADR-0034；agents sync 同语义（ADR-0033）。
 - 配置目标已是无主文件且内容不等价时，config 默认拒绝写入。TTY 下会汇总确认是否备份接管，或显式 `dotf <mod> -c --takeover=backup`（非 TTY 必须带 flag；symlink 等不安全目标不可接管）。见 ADR-0024。
-- 历史整目录软链会被 unlink 后迁移为真实目录；外来软链、未托管目标、本机改过的文件默认 `conflict`，不静默覆盖。sync 冲突默认「先备份再继续」，备份在 `${XDG_STATE_HOME:-~/.local/state}/dotf/backups/<run-id>/`（ADR-0033）。
+- 历史整目录软链会被 unlink 后迁移为真实目录；外来软链、类型不符、他模块所有的目标始终 `conflict`。所有拒绝写入的报错末尾都带「可选处理」，照着选即可。
+- 源目录里的运行时产物（如 zsh 的 `*.zwc`）用模块 `config.exclude` 排除；含 `*?[` 的规则按 glob 匹配整条相对路径，不含的仍按路径前缀匹配。
 - copy 目录下文件的 mode 按源文件派生并裁剪到模块 `target_mode` 位面内；producer 显式给出的 mode 越权时 fail closed。
 
 ### all（全量补装）

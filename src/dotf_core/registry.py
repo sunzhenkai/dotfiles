@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import os
 import posixpath
 import re
@@ -397,7 +398,14 @@ def _metadata_path(value: str) -> str | None:
 
 
 def _paths_overlap(left: str, right: str) -> bool:
-    return left == right or left.startswith(right + "/") or right.startswith(left + "/")
+    # preserve/exclude 规则含 glob 时按 config_deploy._matches_path 的 fnmatch 语义比较。
+    return (
+        left == right
+        or left.startswith(right + "/")
+        or right.startswith(left + "/")
+        or fnmatch.fnmatchcase(left, right)
+        or fnmatch.fnmatchcase(right, left)
+    )
 
 
 def _config_source_type(source: Any) -> str:

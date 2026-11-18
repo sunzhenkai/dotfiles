@@ -384,7 +384,8 @@ modules:
       sensitive: false
       target_mode: "0755"
       preserve: []
-      exclude: []
+      # zcompile 产物不是配置：拷到目标后比 .zsh 新，zsh 会优先加载这份过期字节码
+      exclude: ["*.zwc"]
 
   - name: starship
     kind: config

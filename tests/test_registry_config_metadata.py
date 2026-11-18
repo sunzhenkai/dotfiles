@@ -225,6 +225,7 @@ def test_sensitive_directory_mode_not_broader_than_0700(
         (["plugins"], ["plugins/cache"]),
         (["plugins/cache"], ["plugins"]),
         (["a/../plugins"], ["plugins"]),
+        (["aliases.zsh.zwc"], ["*.zwc"]),
     ],
 )
 def test_preserve_exclude_reject_exact_or_nested_overlap(

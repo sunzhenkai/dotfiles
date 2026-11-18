@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import errno
 import fcntl
+import fnmatch
 import hashlib
 import json
 import os
@@ -48,6 +49,7 @@ CONFIG_LOCK_NAME = "config-manifest.lock"
 _OWNER_PREFIX = "config:"
 
 OnTakeover = Literal["skip", "backup"]
+OnConflict = Literal["block", "backup"]
 
 
 class ConfigDeployError(RuntimeError):
@@ -133,6 +135,7 @@ class ConfigOperation:
     accepted_actual_hash: str | None = None
     metadata_only: bool = False
     takeover: bool = False
+    drift_backup: bool = False
 
     def public_dict(self) -> dict[str, Any]:
         value = self.item.to_dict()
@@ -141,6 +144,7 @@ class ConfigOperation:
             relative_path=self.relative_path,
             metadata_only=self.metadata_only,
             takeover=self.takeover,
+            drift_backup=self.drift_backup,
         )
         return value
 
@@ -195,6 +199,8 @@ class ConfigApplyResult:
     pruned: int
     backups: tuple[Path, ...]
     manifest: Path
+    # (target, backup) for owned targets whose local edits were backed up and overwritten.
+    drift_backups: tuple[tuple[str, Path], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,7 +264,14 @@ def _safe_relative(value: str) -> str:
 
 
 def _matches_path(relative: str, rules: tuple[str, ...]) -> bool:
-    return any(relative == rule or relative.startswith(rule + "/") for rule in rules)
+    # A rule with glob metacharacters matches the whole relative path via
+    # fnmatch, so `*.zwc` also covers nested files; plain rules stay prefix rules.
+    return any(
+        relative == rule
+        or relative.startswith(rule + "/")
+        or (any(char in rule for char in "*?[") and fnmatch.fnmatchcase(relative, rule))
+        for rule in rules
+    )
 
 
 def _scan_tree(root: Path, path: Path, *, ignored: tuple[str, ...] = ()) -> dict[str, tuple[bytes, os.stat_result]]:
@@ -1033,11 +1046,16 @@ def compile_config_plan(
     state_home: os.PathLike[str] | str | None = None,
     producer: ContentProducer | None = None,
     on_takeover: OnTakeover = "skip",
+    on_conflict: OnConflict = "block",
 ) -> ConfigPlan:
     """Compile a plan without creating directories, locks, backups, or files."""
     if on_takeover not in ("skip", "backup"):
         raise ConfigDeployError(
             f"unknown on-takeover policy: {on_takeover!r} (expected skip or backup)"
+        )
+    if on_conflict not in ("block", "backup"):
+        raise ConfigDeployError(
+            f"unknown on-conflict policy: {on_conflict!r} (expected block or backup)"
         )
     repo = Path(repo_root).absolute()
     home_path = Path(home).absolute()
@@ -1234,6 +1252,7 @@ def compile_config_plan(
         metadata_only = False
         accepted_actual_hash: str | None = None
         takeover = False
+        drift_backup = False
         if target_kind == "symlink":
             state, action, reason = "conflict", "block", "unexpected-target-symlink"
         elif target_kind == "other":
@@ -1277,6 +1296,10 @@ def compile_config_plan(
                 # The reviewed producer explicitly performed field-level
                 # reconciliation against these pinned actual bytes.
                 state, action = "update", "update"
+            elif on_conflict == "backup":
+                # Owned drift: apply writes through atomic_write(backup_root=...),
+                # so the locally edited bytes are backed up before replacement.
+                state, action, drift_backup = "update", "update", True
             else:
                 state, action, reason = "conflict", "block", "managed-target-modified"
         operations.append(
@@ -1299,6 +1322,7 @@ def compile_config_plan(
                 accepted_actual_hash=accepted_actual_hash,
                 metadata_only=metadata_only,
                 takeover=takeover,
+                drift_backup=drift_backup,
             )
         )
 
@@ -1372,6 +1396,11 @@ def compile_config_plan(
 def takeover_targets(plan: ConfigPlan) -> tuple[str, ...]:
     """Paths a backup Takeover would convert (divergent unowned regular files)."""
     return tuple(op.item.target for op in plan.operations if op.takeover)
+
+
+def drift_backup_targets(plan: ConfigPlan) -> tuple[str, ...]:
+    """Owned targets whose local edits a backup on-conflict policy would overwrite."""
+    return tuple(op.item.target for op in plan.operations if op.drift_backup)
 
 
 def _manifest_equivalent(left: ManagedManifest, right: ManagedManifest) -> bool:
@@ -1570,6 +1599,30 @@ def _format_conflict(item: PlanItem) -> str:
     return f"拒绝写入 {item.target}：{explanation}{extra}"
 
 
+def _conflict_hint(operation: ConfigOperation) -> str:
+    reason = operation.item.conflict_reason
+    if reason == "managed-target-modified":
+        return "--on-conflict=backup 备份本地改动后覆盖"
+    # Only a divergent regular file is takeable; a directory or special file
+    # in the way reports the same reason but needs manual handling.
+    if (
+        reason == "unowned-real-target"
+        and operation.operation == "write"
+        and operation.accepted_actual_hash is not None
+    ):
+        return "--takeover=backup 备份原文件后接管"
+    if reason == "foreign-managed-owner":
+        return "两个模块声明了同一目标，调整 modules.yaml"
+    return "确认该路径无用后手动移走再重跑"
+
+
+def _format_conflicts(plan: ConfigPlan) -> str:
+    conflicts = [op for op in plan.operations if op.item.state == "conflict"]
+    hints = list(dict.fromkeys(_conflict_hint(op) for op in conflicts))
+    message = "；".join(_format_conflict(op.item) for op in conflicts)
+    return f"{message}。可选处理：{' / '.join(hints)}"
+
+
 def apply_config_plan(
     plan: ConfigPlan,
     *,
@@ -1582,9 +1635,7 @@ def apply_config_plan(
     if not isinstance(plan, ConfigPlan) or plan.schema_version != PLAN_SCHEMA_VERSION:
         raise ConfigDeployError("unsupported config plan")
     if plan.conflicts:
-        raise ConfigConflictError(
-            "；".join(_format_conflict(item) for item in plan.conflicts)
-        )
+        raise ConfigConflictError(_format_conflicts(plan))
     repo = Path(repo_root).absolute()
     home_path = Path(home).absolute()
     state = _state_home(home_path, state_home)
@@ -1594,6 +1645,7 @@ def apply_config_plan(
     unchanged = 0
     pruned = 0
     backups: list[Path] = []
+    drift_backups: list[tuple[str, Path]] = []
 
     with _ManifestLock(home_path, state):
         current_manifest, current_digest = _read_manifest(home_path, state)
@@ -1659,6 +1711,8 @@ def apply_config_plan(
                     )
                     if result.backup is not None:
                         backups.append(result.backup)
+                        if operation.drift_backup:
+                            drift_backups.append((str(target), result.backup))
                     changed += 1
                 expected_hash = _sha256(operation.content)
                 prior_item = prior_by_target.get(str(target))
@@ -1723,6 +1777,7 @@ def apply_config_plan(
         pruned=pruned,
         backups=tuple(backups),
         manifest=manifest_path,
+        drift_backups=tuple(drift_backups),
     )
 
 
@@ -1735,6 +1790,7 @@ def deploy_config(
     producer: ContentProducer | None = None,
     run_id: str | None = None,
     on_takeover: OnTakeover = "skip",
+    on_conflict: OnConflict = "block",
 ) -> ConfigApplyResult:
     plan = compile_config_plan(
         module,
@@ -1743,6 +1799,7 @@ def deploy_config(
         state_home=state_home,
         producer=producer,
         on_takeover=on_takeover,
+        on_conflict=on_conflict,
     )
     return apply_config_plan(
         plan,

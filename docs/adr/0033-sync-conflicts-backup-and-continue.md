@@ -1,5 +1,7 @@
 # agents sync 冲突默认「先备份再继续」：备份即裁决
 
+> **状态（2026-11-18）**：config 部署的 owned 漂移已由 ADR-0034 改为同样默认 backup；config 的 Takeover 仍按 ADR-0024。
+
 ADR-0019/0020 把冲突处理定为 fail-closed：owned 漂移默认报告并保留（`--on-conflict=backup` 只解除内容/mode 漂移），Unowned Target 默认跳过（TTY 下二次确认，非 TTY 需显式 `--takeover=backup`），identity 不符永远 fail closed。实测代价：一次重锁（lock digest 变化）叠加一处本机编辑，就让整个阶段以 `defaults（exit=1）` 失败，需要人工「备份改名再重跑」——而人工步骤本身绕开了 dotf 的备份与所有权登记。
 
 机器的主人要的是：**不失败，有冲突就备份继续**。
