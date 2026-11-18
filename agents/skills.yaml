@@ -49,6 +49,8 @@ groups:
       - id: lark-cli
         optional: true
       - pretty-ui
+      # 2026-11-18 ui-kit 成为默认 UI 总入口；pretty-ui 作为通用路线下游同装。
+      - ui-kit
       - project-init
       - repo-manager
       - role-based-reviewer
@@ -65,8 +67,6 @@ groups:
       - trouble-grill
       # 2026-11-06 上游由 llm-wiki 改名 wiki-data（solo-skills f4792acd942c），随改名同步。
       - wiki-data
-      - id: ui-kit
-        optional: true
 
   mattpocock:
     type: third-party
