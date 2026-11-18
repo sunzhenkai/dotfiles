@@ -124,8 +124,17 @@ groups:
       - id: archify
         optional: true
 
-  # ui-templates 组已移除（2026-10-14）：不再编目、不再持锁、不可经 overlay / agents apply
-  # 引用。历史审计锁与 task 记录见 git 历史 / tasks/ongoing/ui-templates-audit-overreach。
+  # 2026-10-14 曾整组移除；2026-11-18 按用户要求恢复并默认安装。ui-template-apply 的
+  # audit-skill.sh 命中 17 条 browser_session WARN，均为 shadcn sidebar cookie 常量、
+  # 主题 localStorage 读写与 package-lock 里的 cookie 包名，已确认误报。
+  ui-templates:
+    type: third-party
+    source: github
+    package: https://github.com/sunzhenkai/ui-templates-skill
+    skills:
+      - ui-template-author
+      - ui-template-apply
+      - ui-template-design
 
   ui-skills:
     type: third-party
