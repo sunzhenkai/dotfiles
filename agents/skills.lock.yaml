@@ -871,3 +871,45 @@ skills:
       date: '2026-11-17'
       tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
       evidence: https://github.com/ibelick/ui-skills/commit/65cc0edb4f64fe8bfe7e9c59466074de25bece76
+  - id: ui-template-author
+    source: https://github.com/sunzhenkai/ui-templates-skill
+    revision: f24d4b680a1d1e5db2c40dd8403559f611e569ef
+    subdirectory: skills/ui-template-author
+    content_hash: 926637cc0cff29f6aa12017e9cc7404fa5ce8fbaac5de6aa620905a877a13a6e
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-18'
+      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f24d4b680a1d1e5db2c40dd8403559f611e569ef
+  - id: ui-template-apply
+    source: https://github.com/sunzhenkai/ui-templates-skill
+    revision: f24d4b680a1d1e5db2c40dd8403559f611e569ef
+    subdirectory: skills/ui-template-apply
+    content_hash: 73610c95ec1cd975e00bb1afb279ccec7cf3652b1d521296e226c517529070e5
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-18'
+      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f24d4b680a1d1e5db2c40dd8403559f611e569ef
+  - id: ui-template-design
+    source: https://github.com/sunzhenkai/ui-templates-skill
+    revision: f24d4b680a1d1e5db2c40dd8403559f611e569ef
+    subdirectory: skills/ui-template-design
+    content_hash: 5982009dc766eb011e0b702df8089f3612117fde8d9f8ae0bfe6c2c881f9cc21
+    license:
+      spdx: MIT
+      file: LICENSE
+      hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
+    audit:
+      status: approved
+      date: '2026-11-18'
+      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/f24d4b680a1d1e5db2c40dd8403559f611e569ef

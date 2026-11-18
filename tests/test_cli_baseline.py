@@ -239,13 +239,16 @@ def test_skills_install_optional_catalog_skill_resolves_package(tmp_home: Path) 
     )
 
 
-def test_skills_install_removed_ui_templates_passes_through(tmp_home: Path) -> None:
-    # ui-templates 组已移除：ui-template-* 不再被编目解析，透传为普通名字。
-    result = run_dotf("skills", "-i", "ui-template-apply", "--dry-run")
+def test_skills_install_resolves_ui_templates_group(tmp_home: Path) -> None:
+    # ui-templates 组在编目内且默认安装：组名展开为三条 -s id，共用同一 package。
+    result = run_dotf("skills", "-i", "ui-templates", "--dry-run")
 
     assert result.returncode == 0
-    assert "ui-templates-skill" not in result.stdout
-    assert "==> npx skills add ui-template-apply" in result.stdout
+    assert (
+        "==> npx skills add https://github.com/sunzhenkai/ui-templates-skill"
+        " -s ui-template-author -s ui-template-apply -s ui-template-design"
+        in result.stdout
+    )
 
 
 def test_skills_install_passes_through_unknown_name(tmp_home: Path) -> None:

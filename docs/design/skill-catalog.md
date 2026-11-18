@@ -145,7 +145,8 @@ owner 前缀由 `(layout, source)` 派生（`agents[:claude]-<source>:<id>`）�
 - 两个 layout（shared / claude）由同一注册表驱动，见 `docs/adr/0019-*`；kiro 于 2026-11 停用。
 - 全量测试 606 passed。
 - 2026-09-24：`ui-templates` 回到编目内并全标 optional（709cc55）。
-- 2026-10-14：`ui-templates` 组从编目与 lock 永久移除（不再依赖 `sunzhenkai/ui-templates-skill`）。
+- 2026-10-14：`ui-templates` 组从编目与 lock 移除（不再依赖 `sunzhenkai/ui-templates-skill`）。
+- 2026-11-18：`ui-templates` 组恢复编目并改为默认安装（三条均不标 optional）；锁升到 `f24d4b6`，`ui-template-apply` 的 17 条 `browser_session` 审计 WARN 经逐条确认后接受。
 - 2026-09-29：first-party skill 迁出至 `sunzhenkai/solo-skills`，`dotfiles` / `task-flow-skills` / `agent-roster` 三组并入单一 `solo-skills` 第三方组；first-party 机制保留（见 `openspec/changes/migrate-first-party-skills-to-solo-skills/`）。
 - 2026-11-06：`agents/skills/` 重新有内容：4 个项目级 skill（`dotf-init` / `dotf-install` / `dotf-check` / `dotf-repo`）合并为 first-party skill `dotfiles`，默认装到全部 layout（见 `openspec/changes/merge-dotf-skills-into-global-dotfiles/`）。
 

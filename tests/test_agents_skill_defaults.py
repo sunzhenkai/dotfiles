@@ -46,13 +46,11 @@ def test_repository_catalog_matches_strict_lock() -> None:
     # delivery-loop 已被上游改名（cd1d135），旧 id 不得再出现在编目或锁里。
     assert "delivery-loop" not in set(catalog.ids())
     assert "delivery-loop" not in {item.id for item in lock.skills}
-    # ui-templates 组已从编目与 lock 移除（2026-10-14）；不得再出现。
-    assert "ui-template-apply" not in ids
-    assert "ui-template-author" not in ids
-    assert "ui-template-design" not in ids
-    assert "ui-template-apply" not in set(catalog.ids())
-    assert "ui-template-author" not in set(catalog.ids())
-    assert "ui-template-design" not in set(catalog.ids())
+    # ui-templates 组 2026-11-18 恢复编目并默认安装（此前 2026-10-14 整组移除）。
+    for skill_id in ("ui-template-apply", "ui-template-author", "ui-template-design"):
+        assert skill_id in ids
+        assert skill_id in set(catalog.ids())
+        assert skill_id in catalog.default_ids()
     # lark-cli / role-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
     by_id = catalog.by_id()
     assert by_id["lark-cli"].optional is True
