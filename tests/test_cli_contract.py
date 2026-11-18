@@ -89,3 +89,24 @@ def test_skills_json_error_structure(
 def test_unknown_option_exit_code(tmp_home: Path) -> None:
     result = run_dotf("-x")
     assert result.returncode == 1
+
+
+def test_handler_failure_is_not_reported_twice(tmp_home: Path, tmp_path: Path) -> None:
+    """失败已由执行计划末尾的汇总说明，CLI 不再补一条 [dotf] handler:。"""
+    from plan_test_helpers import plan_env, write_test_plan
+
+    handlers = tmp_path / "handlers"
+    module_dir = handlers / "demo"
+    module_dir.mkdir(parents=True)
+    script = module_dir / "config.sh"
+    script.write_text('#!/usr/bin/env bash\ndotf_result_failed "boom"\n', encoding="utf-8")
+    script.chmod(0o755)
+    plan = tmp_path / "plan.txt"
+    write_test_plan(plan, handlers, [("config", "demo")])
+
+    result = run_dotf("demo", "-c", "--yes", env=plan_env(plan, handlers))
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "✗ 失败" in combined
+    assert "boom" in combined
+    assert "[dotf] handler:" not in result.stderr

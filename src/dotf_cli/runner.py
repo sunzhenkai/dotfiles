@@ -147,10 +147,12 @@ def plan_and_run(
 
         rc = subprocess.run(run_args).returncode
         if rc != 0:
+            # run_plan.sh 已经打过失败汇总，这里只透传退出码，不再重复报错。
             raise DotfError(
                 "handler",
                 f"执行失败（退出码 {rc}）",
                 chain=["run_plan.sh --plan-file <plan>"],
+                reported=True,
             )
     finally:
         os.unlink(plan_file.name)

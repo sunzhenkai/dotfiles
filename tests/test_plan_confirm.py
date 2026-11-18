@@ -246,7 +246,8 @@ def test_plan_y_does_not_set_dotf_yes_for_handlers(tmp_home: Path, tmp_path: Pat
     )
     assert "DOTF_YES=" in out
     assert "DOTF_YES=1" not in out
-    assert "RESULT\tchanged\tprobe\tinstall" in out
+    # 终端下 RESULT 行不再外泄，动作结果只看汇总。
+    assert "probe/install" in out
 
 
 def test_run_plan_yes_sets_dotf_yes(tmp_home: Path, tmp_path: Path) -> None:

@@ -1318,8 +1318,9 @@ def compile_config_plan(
         try:
             stale_target.relative_to(declaration.target if source_is_dir else declaration.target.parent)
         except ValueError:
-            reason = "owned-target-outside-current-root"
-            state, action = "conflict", "block"
+            # 目标根变了（modules.yaml 改过），旧条目漂到根外：删不得也写不得，
+            # 放弃托管并告警，不阻断其余部署。
+            reason, state, action = "owned-target-outside-current-root", "prune", "skip"
         else:
             relative = (
                 str(stale_target.relative_to(declaration.target)) if source_is_dir else stale_target.name
@@ -1332,7 +1333,9 @@ def compile_config_plan(
             elif kind == "file" and content is not None and _sha256(content) == prior.installed_hash:
                 reason, state, action = None, "prune", "prune"
             else:
-                reason, state, action = "stale-target-modified-or-unsafe", "conflict", "block"
+                # 过期目标被本地改过或类型不安全：删掉会丢用户数据，阻断又会让整个
+                # 模块失败。保留文件、解除托管，由调用方提示。
+                reason, state, action = "stale-target-modified-or-unsafe", "prune", "skip"
         operations.append(
             ConfigOperation(
                 "prune",
@@ -1528,6 +1531,9 @@ def _assert_operation_fresh(
         return
 
     if operation.operation == "prune":
+        # skip：不会碰这个文件，不需要再校验它是否在规划后被改动。
+        if item.action != "prune":
+            return
         if kind == "missing":
             return
         if (
@@ -1673,6 +1679,8 @@ def apply_config_plan(
                         )
                     )
             elif operation.operation == "prune":
+                # action=skip 表示过期目标被本地改过或类型不安全：保留文件，只把
+                # 它从 manifest 移除（下面 expected_items 不含它，条目自然消失）。
                 if item.action != "prune":
                     continue
                 try:

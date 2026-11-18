@@ -95,6 +95,20 @@ trap cleanup_run_plan EXIT
 trap 'interrupt_run_plan 130' INT
 trap 'interrupt_run_plan 143' TERM
 
+# 颜色判定固定在终端入口：handler 输出会被捕获再转发，子进程里的 isatty() 恒为假。
+# 只在 stdout 也是终端时打开，重定向到文件或管道时日志保持无 ANSI。
+TTY_HUMAN=0
+if [ "$JSON_OUT" -ne 1 ] && [ -t 1 ]; then
+  TTY_HUMAN=1
+  if [ -z "${DOTF_COLOR:-}" ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+    export DOTF_COLOR=always
+  fi
+  # 只有静默渲染时才由进度/汇总接管结果行；--verbose 仍保留 runner 自己那行。
+  if [ "${DOTF_VERBOSE:-0}" != "1" ] && [ "${DOTF_STATUS_MODE:-0}" != "1" ]; then
+    export DOTF_QUIET_RESULT=1
+  fi
+fi
+
 # In JSON mode stdout is exclusively the final bounded machine document.
 if [ "$JSON_OUT" -eq 1 ]; then
   exec 4>&1
@@ -140,8 +154,11 @@ if [ -z "$OS_ID" ]; then
   exit 2
 fi
 
-python3 -u -m dotf_core.plan_table <"$NORMALIZED"
-echo ""
+# status 是只读检查，计划表和结尾汇总都是噪音，只保留 doctor 报告。
+if [ "${DOTF_STATUS_MODE:-0}" != "1" ]; then
+  python3 -u -m dotf_core.plan_table <"$NORMALIZED"
+  echo ""
+fi
 if [ "$TOTAL_ACTIONS" -eq 0 ]; then
   exit 0
 fi
@@ -162,7 +179,13 @@ is_tty_available() {
 # 人类默认模式：TTY 且非 verbose/json 时，终端只留进度行与最终汇总。
 # 必须与 dotf_core.progress 的判定一致（同一个 stderr），否则两边会各说各话。
 progress_enabled() {
-  [ "${JSON_OUT:-0}" -ne 1 ] && [ "${DOTF_VERBOSE:-0}" != "1" ] && [ -t 2 ]
+  [ "${JSON_OUT:-0}" -ne 1 ] && [ "${DOTF_VERBOSE:-0}" != "1" ] \
+    && [ "${DOTF_STATUS_MODE:-0}" != "1" ] && [ -t 2 ]
+}
+
+# doctor 的逐条报告就是结果本身，折叠成一行进度会让命令失去意义。
+action_quiet() {
+  progress_enabled && [ "${1:-}" != "doctor" ]
 }
 
 confirm() {
@@ -253,7 +276,7 @@ record_scheduled_state() {
   local line
   line=$(printf 'RESULT\t%s\t%s\t%s\t0\t0\t%s' "$state" "$module" "$action" "$reason")
   RESULT_LINES+=("$line")
-  if ! progress_enabled; then
+  if ! action_quiet "$action" && [ "$TTY_HUMAN" -eq 0 ]; then
     printf '%s\n' "$line"
   fi
   state_finish_action "$index" "$state" "$state" 0 0 "$reason"
@@ -310,7 +333,7 @@ for action_pos in "${!ACTIONS[@]}"; do
   if [ -n "$RUN_ID" ]; then
     python3 -m dotf_core.execution_state action-start --run-id "$RUN_ID" --index "$_a_idx"
   fi
-  if ! progress_enabled; then
+  if ! action_quiet "$action"; then
     echo "→ $action $module ($reason)"
   fi
   extra=()
@@ -337,8 +360,11 @@ for action_pos in "${!ACTIONS[@]}"; do
   CURRENT_OUT="$out"
   progress_args=(--log "$out" --total-actions "$TOTAL_ACTIONS" --index "$_a_idx" \
     --module "$module" --action "$action")
-  if ! progress_enabled; then
+  if ! action_quiet "$action"; then
     progress_args+=(--no-progress)
+  fi
+  if [ "$TTY_HUMAN" -eq 1 ]; then
+    progress_args+=(--drop-result)
   fi
   set +e
   set +o pipefail
@@ -428,7 +454,9 @@ for action_pos in "${!ACTIONS[@]}"; do
   fi
 done
 
-echo ""
+if [ "${DOTF_STATUS_MODE:-0}" != "1" ]; then
+  echo ""
+fi
 if [ -n "$RUN_ID" ]; then
   final_status="completed"
   [ "$FAILED" -ne 0 ] && final_status="failed"
@@ -439,13 +467,15 @@ else
   saved=""
 fi
 
-summary_args=(--total "$TOTAL_ACTIONS")
-[ -n "$saved" ] && summary_args+=(--report "$saved")
-if [ ${#RESULT_LINES[@]} -gt 0 ]; then
-  printf '%s\n' "${RESULT_LINES[@]}" \
-    | python3 -u -m dotf_core.summary "${summary_args[@]}" || true
-else
-  python3 -u -m dotf_core.summary "${summary_args[@]}" </dev/null || true
+if [ "${DOTF_STATUS_MODE:-0}" != "1" ]; then
+  summary_args=(--total "$TOTAL_ACTIONS")
+  [ -n "$saved" ] && summary_args+=(--report "$saved")
+  if [ ${#RESULT_LINES[@]} -gt 0 ]; then
+    printf '%s\n' "${RESULT_LINES[@]}" \
+      | python3 -u -m dotf_core.summary "${summary_args[@]}" || true
+  else
+    python3 -u -m dotf_core.summary "${summary_args[@]}" </dev/null || true
+  fi
 fi
 
 if [ "$JSON_OUT" -eq 1 ]; then

@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from . import summary, term
 
 PROGRESS_PREFIX = "PROGRESS\t"
+WARNING_PREFIX = "warning: "
 _SUBSTAGE_SEP = " · "
 
 
@@ -180,6 +181,7 @@ def run(
     action: str = "",
     verbose: bool = False,
     no_progress: bool = False,
+    drop_result: bool = False,
     width: int | None = None,
     animate: bool = True,
 ) -> int:
@@ -206,13 +208,24 @@ def run(
                     renderer.update(state)
                     continue
                 if enabled:
-                    # quiet：除进度行与最终结果行外，handler 输出一律只进日志。
+                    # quiet：除进度行、告警与最终结果行外，handler 输出一律只进日志。
+                    if line.startswith(WARNING_PREFIX):
+                        renderer.clear()
+                        passthrough.write(
+                            term.paint(term.SYMBOLS["warn"], "warn", result_color)
+                            + "  "
+                            + line[len(WARNING_PREFIX) :]
+                        )
+                        passthrough.flush()
+                        continue
                     outcome = summary.parse_result(line)
                     if outcome is not None and outcome.status in summary.PERMANENT_STATUSES:
                         renderer.freeze()
                         renderer.clear()
                         passthrough.write(summary.permanent_line(outcome, result_color) + "\n")
                         passthrough.flush()
+                    continue
+                if drop_result and line.startswith("RESULT\t"):
                     continue
                 passthrough.write(line)
                 passthrough.flush()
@@ -233,6 +246,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--action", default="")
     parser.add_argument("--verbose", action="store_true", help="原样透传 handler 输出")
     parser.add_argument("--no-progress", action="store_true", help="不渲染进度行")
+    parser.add_argument(
+        "--drop-result", action="store_true", help="不向终端透传 RESULT 行（仍写入日志）"
+    )
     parser.add_argument("--no-animate", action="store_true", help="不转动旋转符")
     parser.add_argument("--width", type=int, default=None)
     return parser
@@ -256,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         action=args.action,
         verbose=args.verbose,
         no_progress=args.no_progress,
+        drop_result=args.drop_result,
         width=args.width,
         animate=not args.no_animate,
     )

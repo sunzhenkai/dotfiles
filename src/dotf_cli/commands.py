@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dotf_core import term
+
 from .errors import DotfError
 from .help_text import HELP_TEXT
 from .runner import (
@@ -59,7 +61,12 @@ def cmd_status(ctx: Ctx, argv: list[str]) -> int:
     os.environ["DOTF_YES"] = "1"
     ctx.yes = True
 
-    header = f"环境状态  profile={usage_profile} (只读 L0)"
+    header = (
+        term.paint("▸", "accent")
+        + " "
+        + term.paint(f"环境状态 · profile={usage_profile}", "bold")
+        + term.paint("（只读 L0）", "dim")
+    )
     print(header, file=sys.stderr if ctx.json else sys.stdout)
     plan_and_run(ctx, "doctor", profile=usage_profile)
     return 0
@@ -134,7 +141,7 @@ def cmd_retry(ctx: Ctx) -> int:
             ["bash", str(SCRIPTS_DIR / "run_plan.sh"), "--yes", "--plan-file", plan_file]
         ).returncode
         if rc != 0:
-            raise DotfError("handler", f"重试执行失败（退出码 {rc}）")
+            raise DotfError("handler", f"重试执行失败（退出码 {rc}）", reported=True)
     finally:
         os.unlink(report_file)
         os.unlink(plan_file)

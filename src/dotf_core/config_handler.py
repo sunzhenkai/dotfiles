@@ -114,6 +114,21 @@ def decide_takeover(plan, *, compile_backup) -> OnTakeover:
         tty_out.close()
 
 
+def _display_path(target: str, home: str) -> str:
+    if home and target.startswith(home + os.sep):
+        return "~" + target[len(home) :]
+    return target
+
+
+def _preserved_targets(plan: ConfigPlan) -> list[str]:
+    """过期但被本地改过、或类型不安全的目标：保留文件，只解除托管。"""
+    return [
+        op.item.target
+        for op in plan.operations
+        if op.operation == "prune" and op.item.action == "skip"
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if not args.home:
@@ -150,6 +165,12 @@ def main(argv: list[str] | None = None) -> int:
     except (ConfigDeployError, SchemaError, OSError, ValueError) as exc:
         print(f"config deploy failed: {exc}", file=sys.stderr)
         return 1
+    for target in _preserved_targets(plan):
+        print(
+            "warning: 保留不再托管的目标（本地有改动或类型不安全，未删除）: "
+            + _display_path(target, args.home),
+            file=sys.stderr,
+        )
     print(result.status)
     return 0
 

@@ -36,6 +36,7 @@ from layouts import (  # noqa: E402
 from managed_runtime import AgentRuntimeError, compile_skills_plan  # noqa: E402
 from openspec_skills import openspec_command  # noqa: E402
 from sync import renderers_for  # noqa: E402
+from dotf_core import term  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
@@ -950,36 +951,58 @@ def format_json(report: DoctorReport) -> str:
     return json.dumps(canonical_payload(report), indent=2, ensure_ascii=False) + "\n"
 
 
+_STATUS_STYLE = {STATUS_PASS: "ok", STATUS_WARN: "warn", STATUS_FAIL: "err"}
+_STATUS_SYMBOL = {STATUS_PASS: "ok", STATUS_WARN: "warn", STATUS_FAIL: "err"}
+
+
 def format_text(report: DoctorReport, verbose: bool = False) -> str:
     payload = canonical_payload(report)
     summary = payload["summary"]
+    enabled = term.color_mode()
+    status = summary["status"]
+    style = _STATUS_STYLE.get(status, "dim")
+    symbol = term.SYMBOLS[_STATUS_SYMBOL[status]] if status in _STATUS_SYMBOL else term.SYMBOLS["dot"]
+    counts = " · ".join(f"{key}={value}" for key, value in summary["counts"].items())
     lines = [
-        f"agents doctor  profile={payload['profile']}  risk={payload['risk']}  tool={payload['tool'] or '*'}",
-        "", "== summary ==", f"  status: {summary['status']}",
-        "  counts: " + ", ".join(f"{key}={value}" for key, value in summary["counts"].items()), "",
-        "== problems ==",
+        term.paint(
+            f"▸ agents doctor  profile={payload['profile']}  risk={payload['risk']}"
+            f"  tool={payload['tool'] or '*'}",
+            "bold",
+            enabled,
+        ),
+        "",
+        f"{term.paint(symbol, style, enabled)} {term.paint(status, style, enabled)}"
+        f"  {term.paint(counts, 'dim', enabled)}",
     ]
+
     problems = payload["problems"]
-    if not problems:
-        lines.append("  (none)")
-    else:
+    if problems:
+        lines.append("")
         for item in problems:
-            suffix = f"  → {item['hint']}" if item.get("hint") else ""
-            lines.append(f"  [{item['status']}] {item['group']}/{item['id']}: {item['message']}{suffix}")
+            item_style = "err" if item["status"] == STATUS_FAIL else "warn"
+            lines.append(
+                f"  {term.paint(item['status'], item_style, enabled)}"
+                f"  {item['group']}/{item['id']}  {item['message']}"
+            )
+            if item.get("hint"):
+                lines.append(f"    {term.paint('↳ ' + item['hint'], 'dim', enabled)}")
+
     if payload["next_steps"]:
-        lines.extend(["", "== next_steps ==", *[f"  - {step}" for step in payload["next_steps"]]])
+        lines.extend(["", term.paint("下一步", "dim", enabled)])
+        lines.extend(f"  · {step}" for step in payload["next_steps"])
+
     if verbose:
-        lines.extend(["", "== checks =="])
+        lines.extend(["", term.paint("全量 checks", "dim", enabled)])
         groups: dict[str, list[dict[str, Any]]] = {}
         for item in payload["checks"]:
             groups.setdefault(item["group"], []).append(item)
         for group, items in groups.items():
-            lines.append(f"[{group}]")
+            lines.append(f"  [{group}]")
             for item in items:
                 suffix = f"  hint: {item['hint']}" if item.get("hint") else ""
-                lines.append(f"  {item['status']:4}  {item['id']}: {item['message']}{suffix}")
+                lines.append(f"    {item['status']:4}  {item['id']}: {item['message']}{suffix}")
     else:
-        lines.extend(["", "（使用 --verbose 查看全量 checks）"])
+        lines.extend(["", term.paint("（使用 --verbose 查看全量 checks）", "dim", enabled)])
     return "\n".join(lines)
 
 

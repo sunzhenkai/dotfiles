@@ -15,6 +15,7 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
+from dotf_core import term  # noqa: E402
 from dotf_core.schemas import SchemaError, validate_managed_manifest  # noqa: E402
 
 
@@ -91,10 +92,10 @@ def inspect_agents_manifest(
 def main() -> int:
     result = inspect_agents_manifest()
     if result.status == "unchanged":
-        print(f"pass  config: {result.message}")
+        print(term.status_line("pass", f"config: {result.message}"))
         return 0
     level = "warn" if result.status == "missing" else "fail"
-    print(f"{level}  config: {result.message}")
+    print(term.status_line(level, f"config: {result.message}"))
     return 0 if level == "warn" else 1
 
 

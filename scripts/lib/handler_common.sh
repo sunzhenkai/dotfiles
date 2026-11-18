@@ -81,11 +81,16 @@ dotf_registry_config() {
       dotf_result_failed "$mod: safe $strategy deployment failed"
       return 1
     }
+    note="$(grep -m1 '^warning: ' "$errfile" 2>/dev/null || true)"
     rm -f "$errfile"
+    suffix=""
+    if [ -n "$note" ]; then
+      suffix=" · ${note#warning: }"
+    fi
     if [ "$status" = "unchanged" ]; then
-      dotf_result_unchanged "$mod already deployed"
+      dotf_result_unchanged "$mod already deployed$suffix"
     else
-      dotf_result_changed "$mod deployed"
+      dotf_result_changed "$mod deployed$suffix"
     fi
     ;;
   symlink)

@@ -82,6 +82,13 @@ def test_shell_exports_use_bash32_ansi_c_quoting() -> None:
     assert "DOTF_C_RESET=$'\\033[0m'" in colored
 
 
+def test_status_line_keeps_status_word_first() -> None:
+    assert term.status_line("pass", "config: ok", enabled=False) == "pass  config: ok"
+    assert term.status_line("fail", "config: bad", enabled=False) == "fail  config: bad"
+    assert "\033[31m" in term.status_line("fail", "x", enabled=True)
+    assert term.strip_ansi(term.status_line("warn", "x", enabled=True)) == "warn  x"
+
+
 def test_table_aligns_by_display_width() -> None:
     lines = term.table(("A", "B"), [("中", "x"), ("ab", "y")], enabled=False)
     assert lines[0] == "A   B"

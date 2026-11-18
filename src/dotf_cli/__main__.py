@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     except DotfError as err:
         if ctx.json:
             emit_error(command_name, err, json_mode=True, verbose=ctx.verbose)
-        else:
+        elif not err.reported:
             print(render(err, verbose=ctx.verbose), file=sys.stderr)
         return err.rc if err.rc is not None else exit_code(err.code)
     except KeyboardInterrupt:

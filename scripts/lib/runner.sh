@@ -277,14 +277,19 @@ runner_run_action() {
   # 最终规范化 RESULT（stdout，供汇总/报告）
   DOTF_RESULT_FILE="" dotf_emit_result "$status" "$reason" "$duration_ms" "$exit_code"
 
+  # 人类终端下由 run_plan.sh 统一渲染结果行（进度行/汇总），不再打这条机器味的一行。
   case "$status" in
   failed)
-    echo "✗ $action $module → failed (${duration_ms}ms) $reason" >&2
+    if [ "${DOTF_QUIET_RESULT:-0}" != "1" ]; then
+      echo "✗ $action $module → failed (${duration_ms}ms) $reason" >&2
+    fi
     rm -f "$capture"
     return "$exit_code"
     ;;
   *)
-    echo "✓ $action $module → $status (${duration_ms}ms) $reason"
+    if [ "${DOTF_QUIET_RESULT:-0}" != "1" ]; then
+      echo "✓ $action $module → $status (${duration_ms}ms) $reason"
+    fi
     rm -f "$capture"
     return 0
     ;;

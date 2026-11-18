@@ -145,6 +145,29 @@ def test_terminal_width_prefers_columns(monkeypatch) -> None:
     assert progress.terminal_width() >= 20
 
 
+def test_drop_result_hides_machine_line_from_terminal_only(tmp_path) -> None:
+    log = tmp_path / "capture.log"
+    code, out, err = _run(HANDLER_OUTPUT, tty=False, log_path=str(log), drop_result=True)
+    assert code == 0
+    assert "RESULT\t" not in out
+    assert "==> skills  planning…" in out
+    assert "RESULT\tunchanged\tagents\tconfig" in log.read_text(encoding="utf-8")
+
+
+def test_warning_lines_survive_quiet_mode(tmp_path) -> None:
+    source = (
+        "==> zsh  planning…\n"
+        "warning: 保留不再托管的目标（本地有改动或类型不安全，未删除）: ~/.config/zsh/a.zwc\n"
+        "RESULT\tunchanged\tzsh\tconfig\t100\t0\tok\n"
+    )
+    log = tmp_path / "capture.log"
+    code, out, err = _run(source, tty=True, log_path=str(log))
+    assert code == 0
+    assert "保留不再托管的目标" in term.strip_ansi(out)
+    assert "==> zsh" not in term.strip_ansi(out)
+    assert log.read_text(encoding="utf-8") == source
+
+
 def test_quiet_mode_leaves_permanent_line_for_changed_only(tmp_path) -> None:
     source = (
         "RESULT\tchanged\tagents\tconfig\t4934\t0\tok\n"

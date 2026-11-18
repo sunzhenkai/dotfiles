@@ -191,10 +191,60 @@ def test_unowned_modified_and_stale_modified_targets_are_conflicts(tmp_path: Pat
     (source / "managed.txt").unlink()
     actual.write_text("user edit", encoding="utf-8")
     stale = compile_config_plan(module, repo_root=repo, home=home, state_home=state)
-    assert stale.status == "conflict"
-    assert stale.conflicts[0].conflict_reason == "stale-target-modified-or-unsafe"
-    with pytest.raises(ConfigConflictError):
-        apply_config_plan(stale, repo_root=repo, home=home, state_home=state)
+    prune = next(op for op in stale.operations if op.operation == "prune")
+    # 过期目标被本地改过：保留文件、解除托管，不阻断部署。
+    assert stale.status == "changed"
+    assert (prune.item.state, prune.item.action) == ("prune", "skip")
+    assert prune.item.conflict_reason == "stale-target-modified-or-unsafe"
+    result = apply_config_plan(stale, repo_root=repo, home=home, state_home=state, run_id="run-2")
+    assert result.status == "unchanged"
+    assert actual.read_text(encoding="utf-8") == "user edit"
+    assert _manifest(state)["items"] == []
+
+
+def test_handler_warns_but_does_not_fail_on_preserved_stale_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from dotf_core import config_handler
+
+    repo, home, state = _roots(tmp_path)
+    source = repo / "config"
+    source.mkdir()
+    (source / "managed.txt").write_text("expected", encoding="utf-8")
+    target = home / ".config" / "fixture"
+    target.mkdir(parents=True)
+    actual = target / "managed.txt"
+    module = _module(source, target)
+
+    apply_config_plan(
+        compile_config_plan(module, repo_root=repo, home=home, state_home=state),
+        repo_root=repo,
+        home=home,
+        state_home=state,
+        run_id="run-1",
+    )
+    (source / "managed.txt").unlink()
+    actual.write_text("user edit", encoding="utf-8")
+
+    monkeypatch.setattr(config_handler, "_load_registry_module", lambda repo, name: module)
+    monkeypatch.setattr(config_handler, "producer_for", lambda *a, **k: None)
+    rc = config_handler.main(
+        [
+            "fixture",
+            "--repo-root",
+            str(repo),
+            "--home",
+            str(home),
+            "--state-home",
+            str(state),
+            "--run-id",
+            "run-2",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert captured.out.strip() == "unchanged"
+    assert "保留不再托管的目标" in captured.err
     assert actual.read_text(encoding="utf-8") == "user edit"
 
 

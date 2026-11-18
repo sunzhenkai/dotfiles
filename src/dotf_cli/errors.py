@@ -14,6 +14,9 @@ class DotfError(Exception):
 
     rc 允许透传底层工具的原生退出码（如 planner 的契约），
     缺省取错误码表映射值。
+
+    reported=True 表示失败已经由执行器（run_plan.sh 的汇总）报告过，
+    人类模式下不再重复打印，只保留退出码；JSON 模式仍输出错误文档。
     """
 
     def __init__(
@@ -22,6 +25,7 @@ class DotfError(Exception):
         message: str,
         chain: list[str] | None = None,
         rc: int | None = None,
+        reported: bool = False,
     ):
         if code not in EXIT_CODES:
             raise ValueError(f"未知错误码: {code}")
@@ -30,6 +34,7 @@ class DotfError(Exception):
         self.message = message
         self.chain = list(chain or [])
         self.rc = rc
+        self.reported = reported
 
 
 def exit_code(code: str) -> int:

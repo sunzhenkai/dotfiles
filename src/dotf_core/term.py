@@ -186,6 +186,12 @@ def humanize_ms(ms: int) -> str:
     return f"{minutes}m {seconds}s"
 
 
+def status_line(status: str, text: str, enabled: bool | None = None) -> str:
+    """`pass|warn|fail|skip` 状态行；状态词留在行首，便于现有 grep 契约。"""
+    style = {"pass": "ok", "warn": "warn", "fail": "err"}.get(status, "dim")
+    return f"{paint(status, style, enabled)}  {text}"
+
+
 def _single_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 

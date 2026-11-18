@@ -67,6 +67,20 @@ src/dotf_cli/
 
 - 非 TTY 下行为与改造前逐行一致，CI 日志和 `RESULT` 行协议不变。
 - 颜色由 `DOTF_COLOR=always|never` > `NO_COLOR` > `TERM=dumb` > TTY 决定；管道里永不带 ANSI。
+- `dotf status` 只输出 doctor 报告：不打印计划表和结尾汇总。`doctor` 动作永远不折叠成进度行。
+
+### 过期目标的处置
+
+配置部署时，源里已不存在的受管目标算过期：
+
+| 目标现状 | 处置 |
+|---|---|
+| 不存在 | 从 manifest 移除 |
+| 内容仍等于安装时写入的 hash | 正常清理（带备份） |
+| 被本地改过、类型不安全（symlink/目录）、漂到目标根外 | **保留文件**，解除托管，打 `warning:` 并且不让动作失败 |
+
+第三种以前会让整个模块 fail closed；现在失败只留给真正的冲突（无主目标、损坏链接等）。
+告警会写进 `RESULT` 的 reason，quiet 模式下也会出现在终端上。
 
 ### 进度行协议
 
