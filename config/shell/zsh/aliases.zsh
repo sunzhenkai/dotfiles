@@ -9,6 +9,9 @@ alias zlj='zellij'
 alias za='zellij a'
 alias zs='zellij -s'
 
+# Herdr
+alias hdr='herdr --remote'
+
 # Kitty
 if command -v kitty >/dev/null; then
   alias kssh='kitty +kitten ssh'
