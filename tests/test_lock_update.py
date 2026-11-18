@@ -211,6 +211,80 @@ def test_update_lock_skips_write_when_already_current(tmp_path: Path) -> None:
     assert (dotfiles / "agents" / "skills.lock.yaml").read_text(encoding="utf-8") == payload
 
 
+def test_git_retries_a_transient_network_failure(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(lock_update.time, "sleep", lambda _seconds: None)
+    answers = iter(
+        [
+            subprocess.CompletedProcess([], 128, "", "fatal: early EOF"),
+            subprocess.CompletedProcess([], 0, "ok\n", ""),
+        ]
+    )
+    calls: list[list[str]] = []
+
+    def run(*args, **kwargs):
+        calls.append(args[0])
+        return next(answers)
+
+    assert lock_update._git(
+        ["git", "fetch", "origin"], cwd=tmp_path, run=run, attempts=3
+    ) == "ok"
+    assert len(calls) == 2
+
+
+def test_update_lock_current_source_costs_only_ls_remote(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    _init_repo(upstream)
+    (upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: x\n---\nx\n")
+    revision = _commit(upstream, "only")
+    item = _locked("demo", upstream, "skills/demo", revision)
+    dotfiles = tmp_path / "dotfiles"
+    _write_repo(dotfiles, _lock_body([item]))
+
+    commands: list[str] = []
+
+    def run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(args[1])
+        return subprocess.run(args, **kwargs)  # type: ignore[arg-type]
+
+    result = lock_update.update_lock(
+        dotfiles,
+        aliases={SOURCE: str(upstream)},
+        audit=lambda path: (0, ""),
+        run=run,
+        today="2026-09-17",
+    )
+    assert result.current == (SOURCE,)
+    assert "fetch" not in commands, "锁已在 tip 上时不该再取整棵树"
+
+
+def test_update_lock_dry_run_still_fetches_current_source(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    _init_repo(upstream)
+    (upstream / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    _write_skill(upstream, "skills/demo", "---\nname: demo\ndescription: x\n---\nx\n")
+    revision = _commit(upstream, "only")
+    item = _locked("demo", upstream, "skills/demo", revision)
+    dotfiles = tmp_path / "dotfiles"
+    _write_repo(dotfiles, _lock_body([item]))
+
+    commands: list[str] = []
+
+    def run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(args[1])
+        return subprocess.run(args, **kwargs)  # type: ignore[arg-type]
+
+    lock_update.update_lock(
+        dotfiles,
+        dry_run=True,
+        aliases={SOURCE: str(upstream)},
+        audit=lambda path: (0, ""),
+        run=run,
+        today="2026-09-17",
+    )
+    assert "fetch" in commands, "dry-run 必须先扫描再报计划，否则算不出未落盘的条目"
+
+
 def test_update_lock_dry_run_and_audit_warn_do_not_write(tmp_path: Path) -> None:
     upstream = tmp_path / "upstream"
     _init_repo(upstream)

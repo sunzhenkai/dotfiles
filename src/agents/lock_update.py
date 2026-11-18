@@ -12,6 +12,7 @@ import hashlib
 import subprocess
 import sys
 import tempfile
+import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -29,6 +30,8 @@ from skills_catalog import (  # noqa: E402
     parse_catalog,
 )
 from third_party import (  # noqa: E402
+    FETCH_ATTEMPTS,
+    FETCH_RETRY_SECONDS,
     LOCK_KIND,
     LOCK_VERSION,
     REVISION,
@@ -129,12 +132,23 @@ def dump_lock(skills: Sequence[LockedSkill]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _git(args: Sequence[str], *, cwd: Path, run: Run) -> str:
-    proc = run(list(args), cwd=str(cwd), text=True, capture_output=True, check=False)
-    if proc.returncode != 0:
+def _git(
+    args: Sequence[str], *, cwd: Path, run: Run, attempts: int = 1
+) -> str:
+    """Run one git command; `attempts` > 1 retries transient network failures.
+
+    取上游是整条流程唯一的网络成本，一次 TLS 抖动就让整轮从头再来，所以网络
+    命令都带重试（与 third_party 的取回路径一致）。
+    """
+    detail = "no attempt was made"
+    for attempt in range(1, attempts + 1):
+        proc = run(list(args), cwd=str(cwd), text=True, capture_output=True, check=False)
+        if proc.returncode == 0:
+            return proc.stdout.strip()
         detail = (proc.stderr or proc.stdout or "").strip() or f"exit {proc.returncode}"
-        raise LockUpdateError(f"{' '.join(args)} failed: {detail}")
-    return proc.stdout.strip()
+        if attempt < attempts:
+            time.sleep(FETCH_RETRY_SECONDS[min(attempt, len(FETCH_RETRY_SECONDS)) - 1])
+    raise LockUpdateError(f"{' '.join(args)} failed: {detail}")
 
 
 def origin_url(source: str, aliases: Mapping[str, str] | None) -> str:
@@ -144,7 +158,12 @@ def origin_url(source: str, aliases: Mapping[str, str] | None) -> str:
 
 
 def resolve_tip(origin: str, *, cwd: Path, run: Run) -> str:
-    output = _git(["git", "ls-remote", origin, "HEAD"], cwd=cwd, run=run)
+    output = _git(
+        ["git", "ls-remote", origin, "HEAD"],
+        cwd=cwd,
+        run=run,
+        attempts=FETCH_ATTEMPTS,
+    )
     for line in output.splitlines():
         sha, sep, ref = line.partition("\t")
         if not sep or ref != "HEAD":
@@ -163,6 +182,7 @@ def materialize(origin: str, destination: Path, revision: str, *, run: Run) -> N
         ["git", "fetch", "--quiet", "--depth=1", "origin", revision],
         cwd=destination,
         run=run,
+        attempts=FETCH_ATTEMPTS,
     )
     _git(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=destination, run=run)
     got = _git(["git", "rev-parse", "HEAD"], cwd=destination, run=run)
@@ -447,6 +467,14 @@ def update_lock(
             print(f"==> lock-update  {source}", flush=True)
             tip = resolve_tip(origin, cwd=root, run=run)
             locked_revisions = sorted({item.revision for item in items})
+            if not dry_run and all(item.revision == tip for item in items):
+                # 锁就写在这个 tip 上：上游没有新提交，锁内各子目录和父目录下的
+                # 兄弟目录都不可能变，取整棵树只为再确认一遍。跳过它，「什么都没
+                # 变」的一轮就只剩 ls-remote（archify 那种 142MB 的仓尤其明显）。
+                # dry-run 例外：它可能算出过新条目却没落盘，跳过就永远发现不了。
+                print(f"    current  {tip[:12]}  ({len(items)} skills)")
+                current.append(source)
+                continue
             checkout = staging / hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
             materialize(origin, checkout, tip, run=run)
             gone = [
@@ -456,11 +484,6 @@ def update_lock(
             ]
             kept = [item for item in items if item not in gone]
             discovered = discover_skills(checkout, kept)
-            untouched = all(item.revision == tip for item in items)
-            if not gone and not discovered and untouched:
-                print(f"    current  {tip[:12]}  ({len(items)} skills)")
-                current.append(source)
-                continue
             previous = ",".join(rev[:12] for rev in locked_revisions)
             print(f"    {previous} → {tip[:12]}  ({len(items)} skills)")
             if audit is not None:
