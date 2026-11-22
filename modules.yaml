@@ -280,7 +280,7 @@ modules:
       writable: true
       sensitive: true
       target_mode: "0700"
-      preserve: [auth.json, history.jsonl, sessions, archived_sessions, log, shell_snapshots, skills, prompts, tmp, models_cache.json, version.json, AGENTS.md]
+      preserve: [auth.json, history.jsonl, sessions, archived_sessions, log, shell_snapshots, skills, prompts, models_cache.json, version.json, AGENTS.md, tmp, .tmp, packages, plugins, computer-use, app-server-control, app-server-daemon, ipc, node_repl, process_manager, rollout-migrations, sqlite, thread-writer-locks, tui-thread-reference-capabilities, vendor_imports, visualizations, rules, .codex-global-state.json, .codex-global-state.json.bak, .sandbox_migration, .sqlite-maintenance.lock, goals_1.sqlite, logs_2.sqlite, logs_2.sqlite-shm, logs_2.sqlite-wal, memories_1.sqlite, mention_usage.json, mention_usage.lock, queue_1.sqlite, session_index.jsonl, state_5.sqlite, thread_history_1.sqlite, installation_id]
       exclude: [README.md, config.local.toml.example]
 
   - name: kimi-code
