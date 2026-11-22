@@ -13,6 +13,13 @@
 
 先用 `dotf status` 拿基线，再按下面四维扩。
 
+`dotf status` 是 fail-fast：第一个 doctor 失败即停，其后的模块显示 `not-run`——**`not-run` 不等于健康**。全量体检要把剩余模块分批补齐：
+
+```bash
+dotf status 2>&1 | grep '^RESULT' | awk '$2=="not-run"{print $3}'   # 列出未跑模块
+dotf <剩余模块...> -d --yes                                          # 分批补跑（zsh：dotf ${=mods} -d --yes）
+```
+
 ## 维度 1：基础运行时（缺失即阻断）
 
 `bash` / `git` / `curl` 或 `wget` / `python3`（+ PyYAML）是否可用；版本是否满足 `modules.yaml` 要求；`brew` / `apt` / `dnf` / `pacman` 是否可用；`mise` 是否装（`sdk` 模块依赖）。
@@ -56,6 +63,23 @@
 
 漂移的修复统一是 `dotf agents -c`（本 skill 与全局指令都从 `agents/` 下发），不要手改安装产物。
 
+## L1 安全与边界检查的口径
+
+L0 只查命令/配置存在；`dotf agents -d --deep` 的 L1（`src/agents/doctor.py`）另做 link-boundary 与权限审计。读结果先分三类：
+
+| 发现 | 含义 | 处理 |
+|---|---|---|
+| `repository-pointing … symlink` / `unexpected symlink in managed path` | 部署目标或目标树内部仍是指向仓的旧式软链 | `dotf <mod> -c` 迁移为真实目录/文件；迁移只 unlink 链接、不跟随内容 |
+| `broad sensitive mode` | `sensitive: true` 的目标树内目录 0755 / 文件 0644 | 先查该模块 `preserve`/`exclude` 是否漏项（常见：目录改名后条目过时，如 `tmp`→`.tmp`），漏项补进 `modules.yaml`；剩下的才 chmod 0700/0600 |
+| `unexpected internal symlink` | 目标树内部符号链 | 先甄别归属：工具自更新机制的内部链（如 `<tool>/packages/.../current`）属误报，应收进 `preserve`；指向仓的才是真发现 |
+
+两条硬规则：
+
+- **有执行位的第三方运行时收紧不了**：该检查要求普通文件无任何执行位（0700 的文件同样报 broad），工具自更新产出的二进制/脚本永远无法满足——这类目录应进 `preserve`，不要白费 chmod。
+- **不要手工 chmod 指令运行时管理的文件**（如各 agent 的 `AGENTS.md`）：指令同步的 mode 派生是二值（有执行位→755，否则 644，`src/agents/managed_runtime.py`），手工 0600 会产生 `owned target mode was modified locally` conflict，`dotf agents -c` 会把 644 写回。
+
+L1 失败时 handler 输出不回放、report 里只有汇总行；在仓库根直跑 `python3 src/agents/doctor.py --deep --verbose` 看全量 checks。L0/L1 的完整契约见 `docs/design/doctor-check-contract.md`。
+
 ## 配置健康与安全
 
 | 检查 | 依据 |
@@ -77,6 +101,8 @@
 - `[OK]` 只有全维度过时才写一句「无阻断项」
 
 每条给：现象 → 依据（命令输出片段）→ 修复建议（具体命令）。结尾给出「要不要我修」的二选一，并说明修的是哪几项。
+
+修复后复跑同一检查，报告只写变化，并给出前后数字对比（例：`registry-boundaries findings 59491 → 13`）。残余发现按四类定性：**误报**（工具自身布局，应收进 preserve）/ **平台不适用**（当前 OS 无此模块）/ **上游待定**（两个检查口径互相矛盾，记 `references/repo.md`）/ **用户拍板**（是否迁移或豁免）。
 
 ## 修复闭环
 
