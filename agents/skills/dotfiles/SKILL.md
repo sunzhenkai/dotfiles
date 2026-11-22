@@ -21,10 +21,21 @@ description: 用 dotf 管理开发环境：新机初始化（bootstrap / dotf in
 
 ## 四条不变量
 
-1. **薄包装**：不改 `modules.yaml`、不写临时安装脚本。执行一律走 `bin/dotf` 与 `scripts/bootstrap.sh`。
+1. **薄包装**：使用类操作不改 `modules.yaml`、不写临时安装脚本。执行一律走 `bin/dotf` 与 `scripts/bootstrap.sh`。仓库维护类改动（modules.yaml / handler / 编目）见 `references/repo.md`。
 2. **dry-run 优先**：任何改状态的动作先 `--dry-run` 让用户看计划；非 TTY 又没 `--yes` 时 dotf 会快速失败。
 3. **shared 门禁**：sudo、chsh、改 `/etc`、加 docker 组必须显式确认，能用户级就用户级。
 4. **回写台账**：`~/.dotf-env.md` 记共用性判定、profile、已装模块、踩坑；不写密钥。
+
+## Agent / 非 TTY 操作守则
+
+在无终端会话里替人操作或被自动化调用时，遵守：
+
+- **参数顺序**：模块名在前、flag 在后：`dotf <module...> -d`。写成 `dotf -d <module...>` 会被当作未知模块。
+- **非 TTY 一律 `--yes`**：只读的 `dotf status` / `dotf <mod> -d` 也需要；`--json` 不豁免门禁。改状态的动作先 `--dry-run`，用户确认后再 `--yes`。
+- **zsh 批量展开**：`mods="a b c"; dotf ${=mods} -d --yes`。zsh 默认不按空格分词，`dotf $mods ...` 会把整串当成一个模块名。
+- **跨 OS 模块先剔除**：批量命令里混入当前 OS 不适用的模块会让整批计划校验直接失败；按 `PYTHONPATH=src python3 -m dotf_core.registry list --filter-os` 或先 dry-run 过滤。
+- **机读输出**：结果行是 `RESULT<TAB>状态<TAB>模块<TAB>动作…`；用 `awk '$2 != "unchanged"'` 过滤变化/失败，不要用 `tail` 截断（失败行可能在最前）。
+- **`--dry-run` 是迁移预览**：对历史软链目标，计划里能看到 unlink→落真实目录；实际迁移只在执行时发生。
 
 ## 命令速查
 
@@ -35,7 +46,7 @@ dotf <module...> --dry-run               # 只看计划，不执行（允许跨 
 dotf <module...> --uninstall|--deconfig  # 撤软件 / 撤回 owned 且未漂的配置
 dotf -a                                  # 全量装 + 配（不含 doctor）
 dotf init [--os <id>] [--profile <name>] [--list] [--dry-run] [--yes]
-dotf status [--profile <name>]           # 只读 L0 状态
+dotf status [--profile <name>]           # 只读 L0 状态（fail-fast，见 references/check.md）
 dotf retry                               # 重试最近报告里的 failed 动作
 dotf update                              # 拉仓库更新，并提示后续同步命令
 dotf agents -ic                          # agent CLI + skills / 全局指令同步
@@ -46,6 +57,7 @@ dotf skills -c | skills list | skills -i/-r
 
 - 模块没有 update 动作：对已有动作再跑一次就是 re-apply。`dotf update` 是独立命令（拉代码 + 提示 `dotf agents -c` 这类后续同步）。
 - 模块清单的权威来源是 `modules.yaml`；在仓库根用 `PYTHONPATH=src python3 -m dotf_core.registry list[ --filter-os][ --capability install|config|doctor]` 查。
+- L0/L1 各查什么、谁豁免谁、发现如何定性：见 `docs/design/doctor-check-contract.md`。
 
 ## 装完、改完记得
 
