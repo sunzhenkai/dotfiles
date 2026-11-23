@@ -370,6 +370,23 @@ modules:
     doctor: true
     bin: mcode
 
+  - name: antigravity
+    kind: binary
+    desc: Antigravity CLI (agy) + 全局 skills 发现桥接配置
+    group: agents
+    install: true
+    doctor: true
+    bin: agy
+    config:
+      source: agents/vendors/antigravity/skills.json
+      target: ~/.gemini/config/skills.json
+      strategy: copy
+      writable: false
+      sensitive: false
+      target_mode: "0644"
+      preserve: []
+      exclude: []
+
   # ---------- config-only: shell ----------
   - name: zsh
     kind: config

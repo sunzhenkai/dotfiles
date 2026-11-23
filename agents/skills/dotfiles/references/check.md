@@ -38,7 +38,7 @@
 | 版本与语言运行时 | sdk / golang / npm | 装不了后续工具 |
 | 版本控制与仓库管理 | git / delta / grepom | 多仓同步、diff 体验退化 |
 | 文件与服务 | mdserve / ossutil / aws / aliyun / gcp | 文档预览、对象存储操作不可用 |
-| AI 编码环境 | agents 及各家 CLI（codex / opencode / kimi-code / pi / omp / zcode / claude-code …） | 对应 agent 不可用 |
+| AI 编码环境 | agents 及各家 CLI（codex / opencode / kimi-code / pi / omp / zcode / claude-code / antigravity …） | 对应 agent 不可用 |
 | 编辑与终端 | nvim / helix / zed / tmux / zellij / herdr / yazi / k9s | 编辑与多路复用体验缺失 |
 | 桌面体验（仅桌面） | fonts / hypr / kitty / iterm2 | 字体、窗口管理 |
 
@@ -51,7 +51,7 @@
 | 工具健康 | `dotf agents -d`（`--deep` 跑 L1） |
 | skills 漂移 | `dotf agents --doctor` 的 skills 段；或 `dotf tui` 的 Status / Conflicts 面板 |
 | 编目一致性 | `dotf skills list` 与 `~/.agents/skills` 对账 |
-| 全局指令 | `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.cursor/rules/00-dotf-global.mdc`、`~/.pi/agent/AGENTS.md`、`~/.qoder/AGENTS.md` 的 `agents:instructions:` 漂移 |
+| 全局指令 | `~/.agents/AGENTS.md`、`~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.cursor/rules/00-dotf-global.mdc`、`~/.pi/agent/AGENTS.md`、`~/.qoder/AGENTS.md`、`~/.gemini/GEMINI.md` 的 `agents:instructions:` 漂移 |
 | 第三方 lock | `agents/skills.lock.yaml` 与安装副本 revision 是否一致 |
 
 漂移的修复统一是 `dotf agents -c`（本 skill 与全局指令都从 `agents/` 下发），不要手改安装产物。

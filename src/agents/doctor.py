@@ -353,6 +353,79 @@ def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
     )
 
 
+def check_antigravity_skills_bridge(report: DoctorReport, *, home: Path) -> None:
+    """Check whether Antigravity's ~/.gemini/config/skills.json mounts ~/.agents/skills."""
+    skills_json = home / ".gemini" / "config" / "skills.json"
+    detected = (
+        shutil.which("agy") is not None
+        or (home / ".gemini" / "antigravity").is_dir()
+        or skills_json.is_symlink()
+        or skills_json.exists()
+    )
+    if not detected:
+        report.add(
+            "skills",
+            "antigravity-bridge",
+            STATUS_SKIP,
+            "未检测到 Antigravity，跳过 skills 桥接检查",
+            "dotf antigravity -ic",
+        )
+        return
+    if not skills_json.is_file() or skills_json.is_symlink():
+        report.add(
+            "skills",
+            "antigravity-bridge",
+            STATUS_WARN,
+            f"Antigravity 缺少或存在异常桥接文件 {skills_json}，无法发现 ~/.agents/skills",
+            "运行 dotf antigravity -c",
+        )
+        return
+    try:
+        data = json.loads(skills_json.read_text(encoding="utf-8"), object_pairs_hook=_strict_json_object)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        report.add(
+            "skills",
+            "antigravity-bridge",
+            STATUS_FAIL,
+            f"Antigravity {skills_json} JSON 校验失败: {exc}",
+            "运行 dotf antigravity -c 修复",
+        )
+        return
+    entries = data.get("entries") if isinstance(data, dict) else None
+    expected_abs = str((home / ".agents" / "skills").resolve())
+    has_shared = False
+    if isinstance(entries, list):
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            raw_path = item.get("path")
+            if raw_path == "~/.agents/skills":
+                has_shared = True
+                break
+            if isinstance(raw_path, str) and raw_path.startswith("~/"):
+                if str((home / raw_path[2:]).resolve()) == expected_abs:
+                    has_shared = True
+                    break
+            elif isinstance(raw_path, str) and raw_path == expected_abs:
+                has_shared = True
+                break
+    if has_shared:
+        report.add(
+            "skills",
+            "antigravity-bridge",
+            STATUS_PASS,
+            f"Antigravity {skills_json} 已挂载 ~/.agents/skills",
+        )
+        return
+    report.add(
+        "skills",
+        "antigravity-bridge",
+        STATUS_WARN,
+        f"Antigravity {skills_json} 未包含 ~/.agents/skills",
+        "运行 dotf antigravity -c",
+    )
+
+
 def check_instructions_plan(
     root: Path,
     report: DoctorReport,
@@ -896,6 +969,7 @@ def build_report(args: argparse.Namespace) -> DoctorReport:
     _safe_check(report, "tools", "runtime-tools", lambda: check_tools(cat, report, profile))
     _safe_check(report, "skills", "sync-plan-unavailable", lambda: check_skills_plan(root, report, home=home))
     _safe_check(report, "skills", "openspec-unavailable", lambda: check_openspec_skills(report, home=home))
+    _safe_check(report, "skills", "antigravity-bridge-unavailable", lambda: check_antigravity_skills_bridge(report, home=home))
     _safe_check(report, "instructions", "sync-plan-unavailable", lambda: check_instructions_plan(root, report, home=home))
     _safe_check(report, "security", "registry-boundaries-unavailable", lambda: check_config_boundaries(root, report, home=home))
     _safe_check(report, "security", "declared-formats-unavailable", lambda: check_declared_formats(root, report, home=home))

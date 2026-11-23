@@ -37,3 +37,9 @@ if [[ -d "$_kimi_code_path" ]]; then
   export PATH="${_kimi_code_path}:${PATH}"
 fi
 
+# antigravity
+local _agy_bin_path="${HOME}/.gemini/antigravity/bin"
+if [[ -d "$_agy_bin_path" ]]; then
+  export PATH="${_agy_bin_path}:${PATH}"
+fi
+

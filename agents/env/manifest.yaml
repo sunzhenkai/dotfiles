@@ -8,23 +8,24 @@ tools:
   - kimi-code
   - pi
   - zcode
+  - antigravity
 
 default_profile: research
 
 modules:
   tools:
     enabled: true
-    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode, antigravity]
     exclude: []
   env:
     enabled: true
-    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode, antigravity]
     exclude: []
   security:
     enabled: true
-    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode, antigravity]
     exclude: []
   agents:
     enabled: true
-    tools: [cursor, opencode, codex, kimi-code, pi, zcode]
+    tools: [cursor, opencode, codex, kimi-code, pi, zcode, antigravity]
     exclude: []

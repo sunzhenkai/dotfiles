@@ -39,7 +39,7 @@ def test_agents_install_plan_expands_tools() -> None:
     document = json.loads(r.stdout)
     assert document["header"] == "DOTF_EXECUTION_PLAN"
     planned = {(action["action"], action["module"]) for action in document["actions"]}
-    for tool in ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode"):
+    for tool in ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode", "antigravity"):
         assert ("install", tool) in planned
     # 已移除的 vendor 不进安装计划
     assert ("install", "claude") not in planned
@@ -51,10 +51,11 @@ def test_removed_vendors_not_in_tools_or_bundle() -> None:
     for removed in ("claude", "qoder", "codebuddy-code"):
         assert removed not in TOOLS
     assert "zcode" in TOOLS
+    assert "antigravity" in TOOLS
     assert "kiro" not in TOOLS
     bundle = (ROOT / "src" / "dotf_core" / "planner.py").read_text(encoding="utf-8")
     assert (
-        'AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode")'
+        'AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode", "antigravity")'
         in bundle
     )
 
@@ -171,6 +172,7 @@ def test_skills_sync_targets_shared_agents_dir(tmp_home: Path) -> None:
         tmp_home / ".cursor" / "rules",
         tmp_home / ".pi" / "agent" / "AGENTS.md",
         tmp_home / ".qoder" / "AGENTS.md",
+        tmp_home / ".gemini" / "GEMINI.md",
     )
     for dest in written:
         assert any(dest.startswith(str(prefix)) for prefix in allowed), dest

@@ -2,7 +2,7 @@
 # Claude Code 读 ~/.claude/CLAUDE.md（不读 AGENTS.md）；opencode 的全局指令发现会
 # 一并加载 ~/.claude/CLAUDE.md；pi 用户级指令 = <agent-dir>/AGENTS.md（默认 ~/.pi/agent，
 # 见 pi docs/configuration.md）；omp 与 kimi 读 ~/.agents/AGENTS.md；Qoder CLI 读
-# ~/.qoder/AGENTS.md。
+# ~/.qoder/AGENTS.md；Antigravity 读 ~/.gemini/GEMINI.md。
 version: 1
 source: AGENTS.md
 targets:
@@ -23,4 +23,7 @@ targets:
     format: markdown
   - id: qoder
     path: ~/.qoder/AGENTS.md
+    format: markdown
+  - id: antigravity
+    path: ~/.gemini/GEMINI.md
     format: markdown
