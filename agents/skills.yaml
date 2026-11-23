@@ -69,6 +69,9 @@ groups:
       - wiki-data
       - id: visualize
         optional: true
+      # 2026-11-23 上游 agent-api-ops 并入 project-design-patterns 的 references/，不再独立编目。
+      - id: project-design-patterns
+        optional: true
 
   mattpocock:
     type: third-party
@@ -124,6 +127,8 @@ groups:
       # 此前每次重锁都命中的 1 BLOCK（LICENSE 正文 without limitation）已由审计脚本豁免
       # 套话后缀修掉，见 solo-skills 仓 skills/skills-store/patches/20260924-175847-jailbreak-license-boilerplate。
       - id: archify
+        optional: true
+      - id: archify-pr
         optional: true
 
   # 2026-10-14 曾整组移除；2026-11-18 按用户要求恢复并默认安装。ui-template-apply 的
