@@ -615,7 +615,7 @@ def check_config_boundaries(root: Path, report: DoctorReport, *, home: Path) -> 
         if stat.S_ISDIR(target_item.st_mode):
             ignored = tuple(config.get("preserve") or ()) + tuple(config.get("exclude") or ())
             try:
-                for path, item in _walk_nofollow(target):
+                for path, item in _walk_nofollow(target, ignored):
                     relative = path.relative_to(target).as_posix()
                     managed_path = not _relative_rule_match(relative, ignored)
                     if stat.S_ISLNK(item.st_mode) and managed_path:

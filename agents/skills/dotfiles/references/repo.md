@@ -51,9 +51,15 @@ make fmt                    # 格式化
 - `runtime.yaml` 的 `sidecars` 决定哪些子目录随 skill 分发（当前含 `references`、`scripts`）；`patches/`、`evals/`、`experience/`、`evolutions/`、authoring 目录会被剥离，所以不要往 skill 里塞 authoring 产物。
 - 本 skill 的源只有一个：`agents/skills/dotfiles/`。不要再在 `.agents/skills/` 下放同名副本——两份真相源会互相漂移。
 
+## 已知口径冲突
+
+- **指令文件 mode**：instructions 运行时按源文件执行位派生 deployed mode（有执行位→755，否则 644），而 L1 安全审计要求 `sensitive: true` 目标内文件 0600。两者对同一文件互斥：手工 0600 会被记为 `owned target mode was modified locally`，下次 `dotf agents -c` 写回 644。现状按 644 落定，**不要手工 chmod 指令文件**；上游二选一待定：①对 sensitive 目标的指令部署派生 0600，②安全检查豁免 instructions 运行时管理的文件。
+- **JSONC 与严格 JSON**：`declared-formats` 审计按严格 JSON 解析，而部分工具（如 zed）的 settings 允许尾逗号/注释；这类 malformed 属工具格式约定，不是配置损坏，不要为此改文件。
+
 ## 测试与文档同步
 
 - 改 CLI 行为 / 新增命令 / 语义变化：同步 `agents/skills/dotfiles/`（本 skill）与 `docs/Dotfiles.md`、`README.md`。
+- 改 L0/L1 检查语义（doctor 边界、权限、fail-fast）：同步 `docs/design/doctor-check-contract.md`。
 - 改编目机制 / lock 行为：同步 `docs/design/skill-catalog.md` 与 `CONTEXT.md`。
 - 改部署或模块清单：同步 `agents/README.md` 的布局图。
 - `tests/test_ci_contract.py` 会断言若干文档句子仍在（防止写回旧语义），改文档时别删这些句子。

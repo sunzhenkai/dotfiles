@@ -1,4 +1,4 @@
-.PHONY: install hooks registry validate test smoke bash32 shellcheck secret-scan acceptance ci skills-lock-update skills-verify
+.PHONY: install hooks registry validate test smoke bash32 shellcheck secret-scan skill-hygiene acceptance ci skills-lock-update skills-verify
 
 PROJECT_DIR := $(shell pwd)
 LINK_TARGET := $(HOME)/.config/dotfiles
@@ -21,10 +21,13 @@ shellcheck:
 secret-scan:
 	python3 scripts/ci/secret-scan.py
 
+skill-hygiene:
+	python3 scripts/ci/skill-hygiene.py
+
 acceptance:
 	BASH_BIN="$${BASH_BIN:-bash}" bash scripts/ci/acceptance-isolated-home.sh
 
-ci: registry test shellcheck secret-scan acceptance smoke bash32
+ci: registry test shellcheck secret-scan skill-hygiene acceptance smoke bash32
 
 # 把第三方 skills.lock.yaml 升到各 source 当前 HEAD（先审计再写仓库）。
 # 警告默认接受并写入；要 fail closed 加 FAIL_ON_WARN=1。
