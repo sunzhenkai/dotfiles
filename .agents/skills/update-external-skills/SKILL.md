@@ -49,7 +49,7 @@ LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) &&
 
 每个 skill 最多 8 条 `[BLOCK]`（各带命中行原文），最多列 5 个 skill；被截掉的部分仍在完整审计输出里（各 source 段落内），从 `$LOG` grep 取。报告的生成在 `src/agents/lock_update.py`（`blocking_findings` / `report_blocked`），正文只讲怎么读，别在别处复刻判读逻辑。
 
-拿这份报告定性：哪条规则、命中哪个文件的哪一行、命中的文本究竟是什么。是否属过宽规则误报见坑 11——**是误报就去 solo-skills 改规则精度并走它的三件套，不是就地放行、也不是删规则**。
+拿这份报告定性：哪条规则、命中哪个文件的哪一行、命中的文本究竟是什么。是否属过宽规则误报见坑 11——**是误报就去 solo-skills 改规则精度并走它的三件套，不是就地放行、也不是删规则**；改完推送后还得先 `bin/dotf agents -c --yes` 刷新本机受管副本再重锁，否则同一批误报会原样复现（坑 19）。
 
 **不要为定性另建 ad-hoc clone**：多一次网络往返 + 一次全树审计扫描，还会在 `/tmp` 留下坑 6 那类「易被后续轮次误认为锁定 revision」的 checkout。报告不够用就从 `$LOG` 补上下文（`grep -nE '^\[BLOCK\]|^\[WARN' "$LOG"`），**不要重跑第 1 步**。
 
@@ -131,7 +131,7 @@ make skills-verify IDS=a,b VERBOSE=1     # 指定条目 + 打印干净项
 
 兜底（脚本不可用时手工验）：安装副本不是上游字节树（坑 5），不能拿 content_hash 直接对安装目录算哈希。自己 clone、checkout 到 lock 的 revision，用 `tree_hash` 对上游树，用 `diff -r` 对安装副本；上游侧多出的 `patches/`、`evals/`、`experience/`、`evolutions/`、`authoring/`、`tests/` 之外的任何东西、以及 `~/.agents` / `~/.claude` 副本正文与上游不一致，才算漂移。
 
-## 坑实录（自 2026-09-20 实战沉淀，2026-09-29 补 12–15，2026-09-30 补 16，2026-11-17 补 17–18）
+## 坑实录（自 2026-09-20 实战沉淀，2026-09-29 补 12–15，2026-09-30 补 16，2026-11-17 补 17–18，2026-11-23 补 19）
 
 坑 5 / 6 / 9 与下发失败定性已由 `src/agents/lock_verify.py` 自动分类，留在这里是为了脚本不可用时能手工复现，以及解释那些标签到底在说什么。
 
@@ -156,6 +156,7 @@ make skills-verify IDS=a,b VERBOSE=1     # 指定条目 + 打印干净项
 16. **截断步骤输出 = 证据永久丢失，代价是再取一次上游**：第 1 步的审计输出只活在 stdout 里——`_audit_skill` 只 `print(output)`，source 的 checkout 又是 `tempfile.TemporaryDirectory`、该 source 处理完即删，而 `AuditBlocked` 的异常消息原本只带 `exit <rc>`、不带命中内容。于是把 `make skills-lock-update` 直接接 `tail -60` 之后，想回答「到底为什么被阻断」就只剩一条路：重新 clone 上游 + 重跑全树审计——多一次网络往返、多一次大文件扫描，还在 `/tmp` 留下坑 6 那类易被后续轮次误认的 checkout，事后得手工清掉。已修：阻断原因经 `blocking_findings` / `report_blocked` 汇总后打在 `wrote` 行**之上**，tail 窗口内即可定性。仍要认两点：报告有上限（每 skill 8 条 `[BLOCK]`、最多列 5 个 skill），完整上下文只存在于整体留存的 stdout；以及**已经截断过就认赔，别拿重取上游来补**——先落盘、再挑读，是唯一正确顺序。同一模式在第 2 步的廉价版本是 `tail -40` 吃掉「内容真变」列表首行、被迫重跑。
 17. **`optional: true` 是自动新增条目的默认，也是它的天花板**：重锁只负责「锁跟着上游走」，不替你判断该不该装。新增条目一律以 `optional: true` 进编目——不部署、不进 `dotf agents -c` 的默认面，`make skills-verify` 里显示为 `NOT-INSTALLED`（坑 9）。要让某个新 skill 变成默认安装，手改 `agents/skills.yaml` 删掉那两行，再走下发与核对。发现范围同样有意收窄在锁内条目的父目录：全仓递归会收进 `skills/in-progress/`、`archive/` 这类草稿目录（实测 mattpocock 多 39 个、solo-skills 多 22 个），所以发现范围要改就改 `discover_skills`，别在正文里绕。
 18. **新增条目也必须过审计，但审计失败不会有 `blocked` 之外的显式清单**：新子目录走的是同一个审计脚本，`AuditBlocked` 时打印 `    skip new <id>  (<reason>)` 并计入 `blocked=N`，锁和编目都不写；此时旧条目的推进照常进行。所以 `blocked>0` 里可能同时混着「旧条目被挡」和「新条目被挡」，看 `[BLOCK]` 报告里的 skill id 区分，别一律当成上游变坏。
+19. **修完 solo-skills 的审计规则，别的 source 不会立刻受影响**：`resolve_audit_script` 回退链第三档是本机受管副本 `~/.agents/skills/skills-store/scripts/audit-skill.sh`，只有 `dotf agents` 下发才会刷新它。除 solo-skills 自身（checkout 自带 skills-store，走第二档）外，其余 source 的条目在锁里记的正是这个路径（`tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh`）。所以「改规则 → 推送 → 重锁」会让被误报的 skill 原样再被挡一轮，正确顺序是「改规则 → 推送 → `bin/dotf agents -c --yes` → 重锁」；白跑一轮重锁的钱不算大，误判成规则没生效而回头再改规则才贵。
 
 ## 边界
 

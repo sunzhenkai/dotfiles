@@ -632,7 +632,7 @@ class ModulesPane(_SubPane):
             if row is None:
                 continue
             for cap in row.capabilities:
-                if cap in {"install", "config", "uninstall"}:
+                if cap in {"install", "config"}:
                     actions.append(
                         SelectedAction(label=f"{row.name}/{cap}", argv=tuple(self._argv(row.name, cap)))
                     )
@@ -969,7 +969,7 @@ class DotfTuiApp(App[list[str] | None]):
             if event.key != "g":
                 self._pending_g = False
             return
-        if event.character and event.character in "12345":
+        if event.character and event.character.isdigit() and 1 <= int(event.character) <= len(TAB_IDS):
             self.action_go_tab(TAB_IDS[int(event.character) - 1])
             event.prevent_default()
             self._pending_g = False

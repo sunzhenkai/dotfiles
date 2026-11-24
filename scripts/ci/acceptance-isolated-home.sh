@@ -210,7 +210,7 @@ if [ "$(backup_count)" != "$config_backups_before" ]; then
   exit 1
 fi
 case "$(cat "$config_second")" in
-  *unchanged*) ;;
+  *已是最新*|*unchanged*) ;;
   *)
     echo "error: second config run did not report unchanged" >&2
     exit 1

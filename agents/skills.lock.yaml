@@ -5,7 +5,7 @@ kind: third-party-skills-lock
 skills:
   - id: agent-docs-writer
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/agent-docs-writer
     content_hash: 29dca5df8cfd98f41fb3a28adf87a49d7f5931ed6f4db9d16f9a58c206bfaed4
     license:
@@ -15,13 +15,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: agent-roster
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/agent-roster
-    content_hash: 3673eeae1399997dc8814421053239eeb309261b6c987c7a23926f005a88d9b0
+    content_hash: 39ddcb06fed2e9a399a400287775f55920db6136b4f54a1cb7a41363c863296a
     license:
       spdx: MIT
       file: LICENSE
@@ -29,13 +29,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: anti-lazy
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/anti-lazy
-    content_hash: f5bf93070a65118aa2b3dc361e06f3a9bac3ed7be3e10bf48f421a047dbce965
+    content_hash: cd33b4fe678546b4aa5f478f3c58120840810c7837acc7d2bb526816fa443765
     license:
       spdx: MIT
       file: LICENSE
@@ -43,11 +43,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: project-atlas
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/project-atlas
     content_hash: ba0b3d8c95ed0e14e2e7549982aa651634d1ce8470a98b991f231e83e6841bff
     license:
@@ -57,13 +57,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: project-explore
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/project-explore
-    content_hash: c4da30b9efb9f9d8d07724d3e0ef6d00e4cf16813ab98705f4a6e97a31aad5b3
+    content_hash: 37e8ab0fc0fb7aae55fecb9061426eda01e8128c4501fb661aedba03944a973d
     license:
       spdx: MIT
       file: LICENSE
@@ -71,11 +71,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: commit-push
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/commit-push
     content_hash: c8215d7d924c1aee964db7d895de7a2bf72764af2d0cc9c1a6049ecc48e60cc6
     license:
@@ -85,13 +85,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: lark-cli
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/lark-cli
-    content_hash: 281311c7e1a73d2a30c07a7c3fb70ac17685e833c9368143918c5052ed741d4e
+    content_hash: f67a770f35e3957c50771cd7000875a9b260971e71e41679c88c9ead02625531
     license:
       spdx: MIT
       file: LICENSE
@@ -99,13 +99,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: wiki-data
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/wiki-data
-    content_hash: d61f836813c10d518a51ab4319a1506b877f535e24d7fe4e97fa16455afa3bc5
+    content_hash: f1d6d5248c5b057b863d69228ea9e10d66cc053a260045e8261370945cef0326
     license:
       spdx: MIT
       file: LICENSE
@@ -113,13 +113,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: pretty-ui
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/pretty-ui
-    content_hash: 6a953fdf5b675143f8be2826ccd82e045970113bfed1e716c8440e2b9779c503
+    content_hash: 2e13edd0c04b84a0d8ff9d25caa866c4a7109b44713b8cbff1f3a5147214edc0
     license:
       spdx: MIT
       file: LICENSE
@@ -127,13 +127,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: project-init
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/project-init
-    content_hash: 033c00c11f0fdb456a1c5efa5b75a5110aee032253c13b15c1b29837f0f7e41e
+    content_hash: 805266d00a58fc9bff8c2692d00c8541d38b1c7926619c24c8f328cc678dd0f8
     license:
       spdx: MIT
       file: LICENSE
@@ -141,11 +141,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: repo-manager
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/repo-manager
     content_hash: acda1dd8cd326046384397b557ad7034fd275ad99567b1deb5e29e0776233d18
     license:
@@ -155,13 +155,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: role-based-reviewer
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/role-based-reviewer
-    content_hash: a74e86d5f8b10c2ac46f25c19e3a223c1864e15f6e0ff3a0f080f7705d43ad47
+    content_hash: 495986664ef0c1225855dcdabc11d994bc361829e2f31d35b10da8259b45817c
     license:
       spdx: MIT
       file: LICENSE
@@ -169,13 +169,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: role-chat
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/role-chat
-    content_hash: ee444cc1a1a61598d0ebeaa50afc231f52ab65e67959ca3f25a0b621320aa7e1
+    content_hash: 451ed7a94c36ecb0d49d092a8ea0e893a989b1ef509e23c1e2a1c032c3c7c11e
     license:
       spdx: MIT
       file: LICENSE
@@ -183,11 +183,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: service-manager
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/service-manager
     content_hash: 1464ea5ad8719f15b958f4d7f3118e93febb9cb5d50cf61329b60e1c5cef04f6
     license:
@@ -197,13 +197,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: session-wrap
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/session-wrap
-    content_hash: 6dc043496af1e0744b4dfc3e7e8df052819d5fb923cb0694eac18fc974b93118
+    content_hash: a3fc21f7c552e301c83189751fbc22ccc6392a0c93d41ba5f7f864598d12c742
     license:
       spdx: MIT
       file: LICENSE
@@ -211,13 +211,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: skill-upgrader
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/skill-upgrader
-    content_hash: 00f826b27b72b75be7f83b5718924f93d2a1e80153669d54a2d116919f84e07a
+    content_hash: 3a9e511740b27b7c252c1896e4c6b7ce9d1ae67708b59e40a61f4b5043867165
     license:
       spdx: MIT
       file: LICENSE
@@ -225,11 +225,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: skills-store
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/skills-store
     content_hash: 8560e58c7f36382d21a22226222f1e0238f7743d90ffb6fabbfcf5e31980c1bc
     license:
@@ -239,13 +239,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: solo-code-review
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/solo-code-review
-    content_hash: b45a2695da17a4e610909166cb4f70798f9931a8ca2b36b45935d2e2bfeb3732
+    content_hash: 60092e4817c5010e5e5da13962522f60a32fb42ee9242c619c18f366069f5776
     license:
       spdx: MIT
       file: LICENSE
@@ -253,13 +253,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: taskrail
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/taskrail
-    content_hash: 9005e5445ce4815122a6b7f2f1bda3490c495a7770ee555235abb7652d1980e6
+    content_hash: 9a630155f26d86f755f6dee872395392f7cf8139cae8c0d66852fd6f215ead32
     license:
       spdx: MIT
       file: LICENSE
@@ -267,11 +267,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: taskflow
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/taskflow
     content_hash: e8c913eeebad36edb2fc63e30847d731197e8e46b3e2b69ba048f857abd059c3
     license:
@@ -281,13 +281,13 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: trouble-grill
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/trouble-grill
-    content_hash: 523318492f2138d78b82453ffd6701cc1ae3aa1df80fa1732a95717615289ee8
+    content_hash: 0536d4f80bbb73c1f587e1c4583d6d20c8eae2bd498825df198b020e312b1833
     license:
       spdx: MIT
       file: LICENSE
@@ -295,22 +295,22 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: archify
     source: https://github.com/tt-a1i/archify
-    revision: 44781293f38728baf04dbad33ce1a0cef8c39cca
+    revision: 3ca198d867ce4b616332f846ff66e5c8e5e60f95
     subdirectory: archify
-    content_hash: be276b075e1f5caf216529a198878714e31d312e95a27ea56499050bef9ada26
+    content_hash: a60c2affcfae05fd293a0fb5bd214226806bb6c778f3546f079079fb960e3e7b
     license:
       spdx: MIT
       file: LICENSE
       hash: cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
     audit:
       status: approved
-      date: '2026-11-18'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/tt-a1i/archify/commit/44781293f38728baf04dbad33ce1a0cef8c39cca
+      date: '2026-11-23'
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
+      evidence: https://github.com/tt-a1i/archify/commit/3ca198d867ce4b616332f846ff66e5c8e5e60f95
   - id: code-review
     source: https://github.com/mattpocock/skills
     revision: abeeaf95660ba9e8b7c753eb38f441ca707a8823
@@ -323,7 +323,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: codebase-design
     source: https://github.com/mattpocock/skills
@@ -337,7 +337,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: diagnosing-bugs
     source: https://github.com/mattpocock/skills
@@ -351,7 +351,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: domain-modeling
     source: https://github.com/mattpocock/skills
@@ -365,7 +365,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: frontend-slides
     source: https://github.com/zarazhangrui/frontend-slides
@@ -393,7 +393,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: grilling
     source: https://github.com/mattpocock/skills
@@ -407,7 +407,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: implement
     source: https://github.com/mattpocock/skills
@@ -421,7 +421,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: research
     source: https://github.com/mattpocock/skills
@@ -435,22 +435,22 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: senv-cli
     source: https://github.com/solo-kingdom/senv
-    revision: 79c5bf7beac50aa1f30aa510bdfa3062954a3664
+    revision: c8935391fd2b03e6ebc8ae557d19656cdac09ea7
     subdirectory: .agents/skills/senv-cli
-    content_hash: 15510f79b91d581eabb28623a874cc058fcdf6f3ccc80d3db3e89f2da50d10aa
+    content_hash: cf484992b0ad7eb8878be68cbf3c93d80f5c753a5d9e0800586893c84d8bf559
     license:
       spdx: MIT
       file: LICENSE
       hash: ded16afe54acf09ce96aaa211dc49f912a5d826a97edab6c83830ce5d9940c0e
     audit:
       status: approved
-      date: '2026-11-18'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
-      evidence: https://github.com/solo-kingdom/senv/commit/79c5bf7beac50aa1f30aa510bdfa3062954a3664
+      date: '2026-11-24'
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
+      evidence: https://github.com/solo-kingdom/senv/commit/c8935391fd2b03e6ebc8ae557d19656cdac09ea7
   - id: setup-matt-pocock-skills
     source: https://github.com/mattpocock/skills
     revision: abeeaf95660ba9e8b7c753eb38f441ca707a8823
@@ -463,7 +463,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: show-me
     source: https://github.com/humanlayer/skills
@@ -477,7 +477,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-07'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/humanlayer/skills/commit/4d69d20f6e9b57b4fcf0d501ccfb1be961f0f329
   - id: taste-skill
     source: https://github.com/Leonxlnx/taste-skill
@@ -491,7 +491,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/Leonxlnx/taste-skill/commit/6c0b5c78f5d31776e2210305abaa210cdc0030bf
   - id: tdd
     source: https://github.com/mattpocock/skills
@@ -505,7 +505,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: to-questionnaire
     source: https://github.com/mattpocock/skills
@@ -519,7 +519,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: to-spec
     source: https://github.com/mattpocock/skills
@@ -533,7 +533,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: to-tickets
     source: https://github.com/mattpocock/skills
@@ -547,7 +547,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: wait-what
     source: https://github.com/mattpocock/skills
@@ -561,7 +561,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: wayfinder
     source: https://github.com/mattpocock/skills
@@ -575,7 +575,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: wizard
     source: https://github.com/mattpocock/skills
@@ -589,7 +589,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: writing-for-agents
     source: https://github.com/mattpocock/skills
@@ -603,7 +603,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: ui-skills-root
     source: https://github.com/ibelick/ui-skills
@@ -617,7 +617,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: ask-matt
     source: https://github.com/mattpocock/skills
@@ -631,7 +631,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: implement-spec
     source: https://github.com/mattpocock/skills
@@ -645,7 +645,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: improve-codebase-architecture
     source: https://github.com/mattpocock/skills
@@ -659,7 +659,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: pr
     source: https://github.com/mattpocock/skills
@@ -673,7 +673,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: prototype
     source: https://github.com/mattpocock/skills
@@ -687,7 +687,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: retro
     source: https://github.com/mattpocock/skills
@@ -701,7 +701,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: triage
     source: https://github.com/mattpocock/skills
@@ -715,7 +715,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: grill-me
     source: https://github.com/mattpocock/skills
@@ -729,7 +729,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: handoff
     source: https://github.com/mattpocock/skills
@@ -743,7 +743,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: teach
     source: https://github.com/mattpocock/skills
@@ -757,7 +757,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-20'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/mattpocock/skills/commit/abeeaf95660ba9e8b7c753eb38f441ca707a8823
   - id: baseline-ui
     source: https://github.com/ibelick/ui-skills
@@ -771,7 +771,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: component-canvas
     source: https://github.com/ibelick/ui-skills
@@ -785,7 +785,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: create-canvas
     source: https://github.com/ibelick/ui-skills
@@ -799,7 +799,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: create-design-md
     source: https://github.com/ibelick/ui-skills
@@ -813,7 +813,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: fixing-accessibility
     source: https://github.com/ibelick/ui-skills
@@ -827,7 +827,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: fixing-metadata
     source: https://github.com/ibelick/ui-skills
@@ -841,7 +841,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: fixing-motion-performance
     source: https://github.com/ibelick/ui-skills
@@ -855,7 +855,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: improve-ui
     source: https://github.com/ibelick/ui-skills
@@ -869,7 +869,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: ui-template-author
     source: https://github.com/sunzhenkai/ui-templates-skill
@@ -883,7 +883,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/04caf7b5cf1ddd9f9ccc99c48a9e52d812337df1
   - id: ui-template-apply
     source: https://github.com/sunzhenkai/ui-templates-skill
@@ -897,7 +897,7 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/04caf7b5cf1ddd9f9ccc99c48a9e52d812337df1
   - id: ui-template-design
     source: https://github.com/sunzhenkai/ui-templates-skill
@@ -911,11 +911,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/sunzhenkai/ui-templates-skill/commit/04caf7b5cf1ddd9f9ccc99c48a9e52d812337df1
   - id: ui-kit
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/ui-kit
     content_hash: bfc4d6d43bbd83896791aad26c280a768ae623fd6aca1fb28490e1a45d51c1d8
     license:
@@ -925,8 +925,8 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: device-frames
     source: https://github.com/ibelick/ui-skills
     revision: 7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
@@ -939,11 +939,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/ibelick/ui-skills/commit/7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41
   - id: visualize
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/visualize
     content_hash: 376b0343d6a03f7104c4821b8fa8f153abcac7ad83ff13db7d98105189705382
     license:
@@ -953,11 +953,11 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: project-design-patterns
     source: https://github.com/sunzhenkai/solo-skills
-    revision: 04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+    revision: a2890eb86da0324874e0c348a4e2fc37dd6fea96
     subdirectory: skills/project-design-patterns
     content_hash: 530c32f18e3d6a1916310f4b5513a33b6148cde57e22a8b2663a5699e8357ef8
     license:
@@ -967,8 +967,8 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: skills/skills-store/scripts/audit-skill.sh (source checkout)
-      evidence: https://github.com/sunzhenkai/solo-skills/commit/04e4d17859e17b3c6ad3a2b79914a1ba43660b92
+      tool: 'skills/skills-store/scripts/audit-skill.sh (source checkout)'
+      evidence: https://github.com/sunzhenkai/solo-skills/commit/a2890eb86da0324874e0c348a4e2fc37dd6fea96
   - id: archify-pr
     source: https://github.com/tt-a1i/archify
     revision: 3ca198d867ce4b616332f846ff66e5c8e5e60f95
@@ -981,5 +981,5 @@ skills:
     audit:
       status: approved
       date: '2026-11-23'
-      tool: ~/.agents/skills/skills-store/scripts/audit-skill.sh
+      tool: '~/.agents/skills/skills-store/scripts/audit-skill.sh'
       evidence: https://github.com/tt-a1i/archify/commit/3ca198d867ce4b616332f846ff66e5c8e5e60f95

@@ -23,7 +23,7 @@ dotf agents -d --deep          # L0 + agents L1 深度诊断
 dotf agents -d --deep --json   # 深度诊断 JSON（凭据脱敏）
 dotf agents -cd                # 先同步再诊断
 scripts/modules/agents/sync.sh all
-PYTHONPATH=scripts python3 src/agents/doctor.py
+PYTHONPATH=src python3 src/agents/doctor.py
 ```
 
 ## 布局

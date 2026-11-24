@@ -153,8 +153,8 @@ scripts/modules/agents/sync.sh all --dry-run
 本机 Agent/Codex 覆盖只放在 `${XDG_CONFIG_HOME:-$HOME/.config}/dotf/overlays/`：
 
 ```shell
-PYTHONPATH=scripts python3 -m dotf_core.overlays init     # 新机创建外置安全示例
-PYTHONPATH=scripts python3 -m dotf_core.overlays migrate  # 迁移旧仓库 local 配置
+PYTHONPATH=src python3 -m dotf_core.overlays init     # 新机创建外置安全示例
+PYTHONPATH=src python3 -m dotf_core.overlays migrate  # 迁移旧仓库 local 配置
 ```
 
 默认 Agent profile 是低风险 `research`，不会启用 browser；`browser` / `full` 必须显式选择。普通 `dotf agents -c` 只写 HOME 与 XDG state，不反写仓库模板。维护者修改 `agents/env/` 后需显式生成并审查模板：

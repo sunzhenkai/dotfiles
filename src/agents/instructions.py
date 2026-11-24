@@ -173,6 +173,8 @@ def apply_instructions_plan(plan: SkillsPlan, *, run_id: str | None = None):
             Path(plan.repo_root),
             home=Path(plan.home),
             state_home=Path(plan.state_home),
+            on_conflict=plan.on_conflict,
+            on_takeover=plan.on_takeover,
         )
 
     return apply_owned_plan(plan, compile_current, run_id=run_id)

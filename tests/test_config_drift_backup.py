@@ -239,7 +239,7 @@ def test_main_backs_up_owned_drift_by_default(
     assert "~/.config/zsh/aliases.zsh →" in warnings[0]
     source = repo / "config" / "shell" / "zsh" / "aliases.zsh"
     assert aliases.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
-    backups = list((home / ".local" / "state" / "dotf" / "backups" / "drift-e2e").rglob("aliases.zsh.*"))
+    backups = list((state / "dotf" / "backups" / "drift-e2e").rglob("aliases.zsh.*"))
     assert len(backups) == 1
     assert "alias local-only=1" in backups[0].read_text(encoding="utf-8")
 

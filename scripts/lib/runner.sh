@@ -269,6 +269,9 @@ runner_run_action() {
     exit_code="$rc"
   fi
   # failed 必须非零退出码
+  case "$exit_code" in
+    ''|*[!0-9]*) exit_code="$rc" ;;
+  esac
   if [ "$status" = "failed" ] && [ "$exit_code" -eq 0 ]; then
     exit_code=1
   fi

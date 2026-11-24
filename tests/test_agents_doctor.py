@@ -81,9 +81,10 @@ def test_openspec_skills_doctor_skips_warns_and_passes(
     assert missing.status == doctor.STATUS_WARN
     assert "dotf agents -c" in missing.hint
 
-    target = tmp_home / ".agents" / "skills" / "openspec-propose" / "SKILL.md"
-    target.parent.mkdir(parents=True)
-    target.write_text("---\nname: openspec-propose\ndescription: d\n---\n", encoding="utf-8")
+    for layout in doctor.LAYOUTS:
+        target = doctor.skills_target(layout, tmp_home) / "openspec-propose" / "SKILL.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("---\nname: openspec-propose\ndescription: d\n---\n", encoding="utf-8")
     report = _report()
     doctor.check_openspec_skills(report, home=tmp_home)
     present = next(item for item in report.items if item.id == "openspec-global")

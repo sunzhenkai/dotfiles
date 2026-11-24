@@ -87,7 +87,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except DotfError as err:
         if ctx.json:
-            emit_error(command_name, err, json_mode=True, verbose=ctx.verbose)
+            if not (err.reported and err.code == "handler"):
+                emit_error(command_name, err, json_mode=True, verbose=ctx.verbose)
         elif not err.reported:
             print(render(err, verbose=ctx.verbose), file=sys.stderr)
         return err.rc if err.rc is not None else exit_code(err.code)
@@ -221,7 +222,6 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
             if i >= len(args):
                 raise DotfError("usage", "错误: --profile 需要参数")
             ctx.usage_profile = args[i]
-            config_extra += ["--profile", args[i]]
             doctor_extra += ["--profile", args[i]]
         elif a == "--on-conflict" or a.startswith("--on-conflict="):
             if a == "--on-conflict":
@@ -316,7 +316,7 @@ def _dispatch(ctx: Ctx, args: list[str]) -> int:
             agents_only = any(
                 x in (
                     "--strict",
-                    "--deep", "--fail-on",
+                    "--deep", "--fail-on", "--tool",
                 )
                 for x in config_extra + doctor_extra
             )

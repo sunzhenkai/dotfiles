@@ -43,7 +43,9 @@ def cmd_status(ctx: Ctx, argv: list[str]) -> int:
         arg = argv[i]
         if arg == "--profile":
             i += 1
-            usage_profile = argv[i] if i < len(argv) else ""
+            if i >= len(argv):
+                raise DotfError("usage", "错误: --profile 需要参数")
+            usage_profile = argv[i]
         elif arg == "--json":
             ctx.json = True
         elif arg in HELP:
@@ -100,8 +102,8 @@ def cmd_tui(ctx: Ctx, argv: list[str]) -> int:
         )
         return 2
     os.execvp(
-        "python3",
-        ["python3", "-m", "dotf_tui"],
+        sys.executable,
+        [sys.executable, "-m", "dotf_tui"],
     )
     return 0  # pragma: no cover - execvp 不返回
 
@@ -141,7 +143,7 @@ def cmd_retry(ctx: Ctx) -> int:
             ["bash", str(SCRIPTS_DIR / "run_plan.sh"), "--yes", "--plan-file", plan_file]
         ).returncode
         if rc != 0:
-            raise DotfError("handler", f"重试执行失败（退出码 {rc}）", reported=True)
+            raise DotfError("handler", f"重试执行失败（退出码 {rc}）", reported=True, rc=rc)
     finally:
         os.unlink(report_file)
         os.unlink(plan_file)

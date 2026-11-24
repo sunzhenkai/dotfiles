@@ -107,6 +107,8 @@ def _manifest_status_for_module(
     manifest_path: Path,
     owner_prefix: str,
 ) -> str:
+    import hashlib
+
     try:
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
@@ -118,16 +120,43 @@ def _manifest_status_for_module(
     owners = [it for it in items if isinstance(it, dict) and it.get("owner", "").startswith(owner_match)]
     if not owners:
         return "missing"
-    # Map known fields to drift status; fall back to unchanged.
-    statuses = {it.get("status", "unchanged") for it in owners}
-    if "changed" in statuses:
-        return "changed"
-    if "missing" in statuses:
-        return "missing"
-    if "conflict" in statuses:
-        return "conflict"
-    if "permission" in statuses:
-        return "permission"
+    statuses: set[str] = set()
+    for it in owners:
+        if "status" in it:
+            statuses.add(str(it["status"]))
+            continue
+        target_raw = it.get("target")
+        installed_hash = it.get("installed_hash")
+        if not isinstance(target_raw, str) or not target_raw:
+            statuses.add("unknown")
+            continue
+        target = Path(target_raw)
+        try:
+            st = target.lstat()
+        except FileNotFoundError:
+            statuses.add("missing")
+            continue
+        except OSError:
+            statuses.add("unknown")
+            continue
+        import stat as stat_mod
+
+        if not stat_mod.S_ISREG(st.st_mode):
+            statuses.add("conflict")
+            continue
+        if isinstance(installed_hash, str) and installed_hash:
+            try:
+                digest = hashlib.sha256(target.read_bytes()).hexdigest()
+            except OSError:
+                statuses.add("unknown")
+                continue
+            if digest != installed_hash:
+                statuses.add("changed")
+                continue
+        statuses.add("unchanged")
+    for candidate in ("conflict", "changed", "missing", "permission", "unknown"):
+        if candidate in statuses:
+            return candidate
     return "unchanged"
 
 
@@ -141,7 +170,7 @@ def load_modules(root: Path, *, state_home: Path | None = None) -> list[ModuleRo
     registry = mods.load_registry()
     os_id = mods.detect_os()
     records = modules_state.load_state(state_home=state_home)
-    manifest_path = (state_home or modules_state.xdg_state_home()) / "dotf" / "agents-manifest.json"
+    manifest_path = (state_home or modules_state.xdg_state_home()) / "dotf" / "config-manifest.json"
 
     rows: list[ModuleRow] = []
     for mod in mods.filter_modules(registry, os_id=os_id):
@@ -245,7 +274,7 @@ def load_journal_failures(state_home: Path | None = None) -> list[str]:
     runs_dir = (state_home or modules_state.xdg_state_home()) / "dotf" / "runs"
     if not runs_dir.is_dir():
         return []
-    failed: set[str] = set()
+    latest_status: dict[str, str] = {}
     for path in sorted(runs_dir.glob("run-*.json"), reverse=True):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -254,11 +283,11 @@ def load_journal_failures(state_home: Path | None = None) -> list[str]:
         actions = data.get("actions") if isinstance(data, dict) else None
         if not isinstance(actions, list):
             continue
-        for action in actions:
+        for action in reversed(actions):
             if not isinstance(action, dict):
                 continue
-            if action.get("result_status") == "failed":
-                name = action.get("module")
-                if isinstance(name, str) and name:
-                    failed.add(name)
-    return sorted(failed)
+            name = action.get("module")
+            status = action.get("result_status")
+            if isinstance(name, str) and name and name not in latest_status and isinstance(status, str):
+                latest_status[name] = status
+    return sorted(name for name, status in latest_status.items() if status == "failed")

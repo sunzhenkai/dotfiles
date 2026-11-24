@@ -482,9 +482,9 @@ if [ "$JSON_OUT" -eq 1 ]; then
   if [ -n "$RUN_ID" ]; then
     python3 -m dotf_core.execution_state emit-json --run-id "$RUN_ID" >&4
   else
-    python3 - "$ROOT" "$OS_ID" "$PROFILE" "$CHANGED" "$UNCHANGED" "$SKIPPED" "$FAILED_N" "$BLOCKED" "$NOT_RUN" "${RESULT_LINES[@]}" <<'PY' >&4
+    python3 - "$ROOT" "$OS_ID" "$PROFILE" "$CHANGED" "$UNCHANGED" "$SKIPPED" "$FAILED_N" "$BLOCKED" "$NOT_RUN" ${RESULT_LINES[@]+"${RESULT_LINES[@]}"} <<'PY' >&4
 import json, sys
-sys.path.insert(0, sys.argv[1] + "/scripts")
+sys.path.insert(0, sys.argv[1] + "/src")
 from dotf_core.sanitize import sanitize_for_json
 os_id, profile, c, u, s, f, b, n = sys.argv[2:10]
 actions = []

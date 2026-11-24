@@ -413,7 +413,7 @@ def test_main_env_takeover_backup_end_to_end(
     captured = capsys.readouterr()
     assert captured.out.strip() == "changed"
     assert target_file.read_text(encoding="utf-8") == source_file.read_text(encoding="utf-8")
-    backups = list((home / ".local" / "state" / "dotf" / "backups" / "e2e-1").rglob("*"))
+    backups = list((state / "dotf" / "backups" / "e2e-1").rglob("*"))
     assert any(b.is_file() and "foreign local file" in b.read_text(encoding="utf-8") for b in backups)
     manifest = json.loads((state / "dotf" / "config-manifest.json").read_text(encoding="utf-8"))
     assert {i["owner"] for i in manifest["items"]} == {f"config:{module['name']}"}

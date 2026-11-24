@@ -1640,7 +1640,7 @@ def apply_config_plan(
     home_path = Path(home).absolute()
     state = _state_home(home_path, state_home)
     run = run_id or generate_run_id()
-    backup_root = home_path / ".local" / "state" / "dotf" / "backups"
+    backup_root = state / "dotf" / "backups"
     changed = 0
     unchanged = 0
     pruned = 0
@@ -1822,56 +1822,57 @@ def deconfig_owned(
     home_path = Path(home).expanduser().absolute()
     state = _state_home(home_path, state_home)
     owner = f"{_OWNER_PREFIX}{module_name}"
-    current_manifest, _digest = _read_manifest(home_path, state)
-    owned = [item for item in current_manifest.items if item.owner == owner]
-    if not owned:
-        return ConfigApplyResult(
-            status="unchanged",
-            changed=0,
-            unchanged=0,
-            pruned=0,
-            backups=(),
-            manifest=_manifest_paths(home_path, state)[1],
-        )
     run = run_id or generate_run_id()
-    backup_root = Path(os.environ.get("DOTF_BACKUP_DIR", str(home_path / ".config" / "backups" / "dotf")))
-    kept: list[ManagedItem] = [item for item in current_manifest.items if item.owner != owner]
+    backup_root = Path(os.environ.get("DOTF_BACKUP_DIR") or str(state / "dotf" / "backups"))
     backups: list[Path] = []
     pruned = 0
     conflicts = 0
-    for item in owned:
-        target = Path(item.target)
-        kind, content, _stat = _inspect_expected_target(home_path, target)
-        if kind == "missing":
+    with _ManifestLock(home_path, state):
+        current_manifest, _digest = _read_manifest(home_path, state)
+        owned = [item for item in current_manifest.items if item.owner == owner]
+        if not owned:
+            return ConfigApplyResult(
+                status="unchanged",
+                changed=0,
+                unchanged=0,
+                pruned=0,
+                backups=(),
+                manifest=_manifest_paths(home_path, state)[1],
+            )
+        kept: list[ManagedItem] = [item for item in current_manifest.items if item.owner != owner]
+        for item in owned:
+            target = Path(item.target)
+            kind, content, _stat = _inspect_expected_target(home_path, target)
+            if kind == "missing":
+                pruned += 1
+                continue
+            if kind != "file" or content is None:
+                conflicts += 1
+                kept.append(item)
+                continue
+            if _sha256(content) != item.installed_hash:
+                conflicts += 1
+                kept.append(item)
+                print(f"conflict: leaving drifted target {target}", file=os.sys.stderr)
+                continue
+            backup = backup_target(
+                target,
+                backup_root,
+                run,
+                home_path,
+                sensitive=item.sensitive,
+                remove_source=True,
+            )
+            backups.append(backup)
             pruned += 1
-            continue
-        if kind != "file" or content is None:
-            conflicts += 1
-            kept.append(item)
-            continue
-        if _sha256(content) != item.installed_hash:
-            conflicts += 1
-            kept.append(item)
-            print(f"conflict: leaving drifted target {target}", file=os.sys.stderr)
-            continue
-        backup = backup_target(
-            target,
-            backup_root,
-            run,
-            home_path,
-            sensitive=item.sensitive,
-            remove_source=True,
+        new_manifest = ManagedManifest(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            kind="managed-manifest",
+            generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            items=tuple(sorted(kept, key=lambda entry: entry.target)),
         )
-        backups.append(backup)
-        pruned += 1
-    new_manifest = ManagedManifest(
-        schema_version=MANIFEST_SCHEMA_VERSION,
-        kind="managed-manifest",
-        generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        items=tuple(sorted(kept, key=lambda entry: entry.target)),
-    )
-    if new_manifest.items != current_manifest.items:
-        _write_manifest(home_path, state, new_manifest)
+        if new_manifest.items != current_manifest.items:
+            _write_manifest(home_path, state, new_manifest)
     status = "unchanged" if pruned == 0 and conflicts == 0 else "changed"
     if conflicts and pruned == 0:
         status = "unchanged"

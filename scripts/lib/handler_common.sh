@@ -69,7 +69,7 @@ dotf_registry_config() {
     status=$(PYTHONPATH="$pythonpath_value" \
       python3 -m dotf_core.config_handler "$mod" \
       --repo-root "$DOTFILES_ROOT" --home "$HOME" \
-      "${state_args[@]}" --run-id "$DOTF_RUN_ID" 2>"$errfile") || {
+      ${state_args[@]+"${state_args[@]}"} --run-id "$DOTF_RUN_ID" 2>"$errfile") || {
       detail=$(tr '\n' ' ' <"$errfile" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
       rm -f "$errfile"
       if [ -n "$detail" ]; then

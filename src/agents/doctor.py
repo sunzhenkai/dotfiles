@@ -340,16 +340,25 @@ def check_openspec_skills(report: DoctorReport, *, home: Path) -> None:
             "dotf npm -i",
         )
         return
-    propose = skills_target(SHARED_LAYOUT, home) / "openspec-propose" / "SKILL.md"
-    if propose.is_file() and not propose.is_symlink():
-        report.add("skills", "openspec-global", STATUS_PASS, f"OpenSpec skills 已安装到 {propose.parent.parent}")
+    missing: list[str] = []
+    for layout in LAYOUTS:
+        propose = skills_target(layout, home) / "openspec-propose" / "SKILL.md"
+        if not (propose.is_file() and not propose.is_symlink()):
+            missing.append(f"{layout.key}:{propose}")
+    if not missing:
+        report.add(
+            "skills",
+            "openspec-global",
+            STATUS_PASS,
+            f"OpenSpec skills 已安装到全部 {len(LAYOUTS)} 个 layout",
+        )
         return
     report.add(
         "skills",
         "openspec-global",
         STATUS_WARN,
-        f"openspec CLI 已安装，但全局缺少 {propose}",
-        "运行 dotf agents -c 将 OpenSpec skills 装到 ~/.agents/skills",
+        f"openspec CLI 已安装，但全局缺少 {', '.join(missing)}",
+        "运行 dotf agents -c 将 OpenSpec skills 装到受管目录",
     )
 
 

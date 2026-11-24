@@ -153,6 +153,7 @@ def plan_and_run(
                 f"执行失败（退出码 {rc}）",
                 chain=["run_plan.sh --plan-file <plan>"],
                 reported=True,
+                rc=rc,
             )
     finally:
         os.unlink(plan_file.name)

@@ -442,15 +442,12 @@ def test_status_and_conflicts_render(home):
 
 
 def test_load_instructions_reports_missing_targets(home):
+    import yaml
+
+    install_cfg = yaml.safe_load((ROOT / "agents" / "instructions" / "install.yaml").read_text(encoding="utf-8"))
+    expected = {entry["id"]: "missing" for entry in install_cfg["targets"]}
     rows = load_instructions(ROOT)
-    assert {r.target_id: r.drift for r in rows} == {
-        "agents": "missing",
-        "claude": "missing",
-        "codex": "missing",
-        "cursor": "missing",
-        "pi": "missing",
-        "qoder": "missing",
-    }
+    assert {r.target_id: r.drift for r in rows} == expected
 
 
 def test_load_instructions_planner_failure_is_unknown(home, monkeypatch):

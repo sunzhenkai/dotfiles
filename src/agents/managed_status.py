@@ -70,7 +70,7 @@ def inspect_agents_manifest(
     allowed = set(owners)
     entries = [
         entry for entry in manifest.items
-        if entry.owner in allowed or entry.owner.startswith("agents:skill:")
+        if entry.owner in allowed or entry.owner.startswith("agents:")
     ]
     if not entries:
         return ManagedStatus("missing", "managed manifest has no agents ownership entries")

@@ -143,10 +143,10 @@ def _finding(op: RuntimeOperation, target_root: Path) -> str | None:
         return f"missing {relative}"
     if op.action == "update":
         return f"content {relative}"
+    if op.actual_state == "unsafe":
+        return f"unsafe {relative}"
     if op.state == "conflict":
         return f"blocked {relative}: {op.conflict or 'owned target changed'}"
-    if op.state == "unsafe":
-        return f"unsafe {relative}"
     if op.state == "permission":
         return f"permission {relative}"
     if op.state == "prune":

@@ -103,6 +103,12 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _yaml_scalar(value: str) -> str:
+    if value and all(ch.isalnum() or ch in "-_./:@" for ch in value):
+        return value
+    return "'" + value.replace("'", "''") + "'"
+
+
 def dump_lock(skills: Sequence[LockedSkill]) -> str:
     lines = [
         LOCK_HEADER.rstrip("\n"),
@@ -113,20 +119,20 @@ def dump_lock(skills: Sequence[LockedSkill]) -> str:
     for item in skills:
         lines.extend(
             [
-                f"  - id: {item.id}",
-                f"    source: {item.source}",
-                f"    revision: {item.revision}",
-                f"    subdirectory: {item.subdirectory}",
-                f"    content_hash: {item.content_hash}",
+                f"  - id: {_yaml_scalar(item.id)}",
+                f"    source: {_yaml_scalar(item.source)}",
+                f"    revision: {_yaml_scalar(item.revision)}",
+                f"    subdirectory: {_yaml_scalar(item.subdirectory)}",
+                f"    content_hash: {_yaml_scalar(item.content_hash)}",
                 "    license:",
-                f"      spdx: {item.license.spdx}",
-                f"      file: {item.license.file}",
-                f"      hash: {item.license.hash}",
+                f"      spdx: {_yaml_scalar(item.license.spdx)}",
+                f"      file: {_yaml_scalar(item.license.file)}",
+                f"      hash: {_yaml_scalar(item.license.hash)}",
                 "    audit:",
-                f"      status: {item.audit.status}",
+                f"      status: {_yaml_scalar(item.audit.status)}",
                 f"      date: '{item.audit.date}'",
-                f"      tool: {item.audit.tool}",
-                f"      evidence: {item.audit.evidence}",
+                f"      tool: {_yaml_scalar(item.audit.tool)}",
+                f"      evidence: {_yaml_scalar(item.audit.evidence)}",
             ]
         )
     return "\n".join(lines) + "\n"
@@ -338,20 +344,28 @@ def resolve_audit_script(root: Path, checkout: Path | None) -> tuple[Path, str]:
     checkout 自带的 skills-store（版本与被锁 revision 自洽）；checkout 不含
     skills-store 的 source 退回本机受管安装副本。
     """
-    candidates: list[tuple[Path, str]] = [(root / AUDIT_REL, AUDIT_TOOL)]
+    candidates: list[tuple[Path, Path, str]] = [(root, root / AUDIT_REL, AUDIT_TOOL)]
     if checkout is not None:
         candidates.append(
             (
+                checkout,
                 checkout / CHECKOUT_AUDIT_REL,
                 CHECKOUT_AUDIT_REL.as_posix() + " (source checkout)",
             )
         )
+    installed = INSTALLED_AUDIT_REL.expanduser()
     candidates.append(
-        (INSTALLED_AUDIT_REL.expanduser(), INSTALLED_AUDIT_REL.as_posix())
+        (installed.parent, installed, INSTALLED_AUDIT_REL.as_posix())
     )
-    for script, label in candidates:
-        if script.is_file():
-            return script, label
+    for base, script, label in candidates:
+        if script.is_symlink() or not script.is_file():
+            continue
+        try:
+            if not script.resolve().is_relative_to(base.resolve()):
+                continue
+        except OSError:
+            continue
+        return script, label
     raise LockUpdateError(
         "audit script not found; expected one of: "
         + ", ".join(str(script) for script, _ in candidates)
