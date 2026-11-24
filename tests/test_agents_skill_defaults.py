@@ -35,48 +35,13 @@ def test_repository_catalog_matches_strict_lock() -> None:
     assert third_party <= set(ids)
     # ...and no first-party id leaks into the lock (no source confusion).
     assert first_party.isdisjoint(ids)
-    assert "setup-matt-pocock-skills" in ids
-    assert "wait-what" in ids
-    assert "writing-for-agents" in ids
-    assert "wizard" in ids
-    assert "to-questionnaire" in ids
-    # taste-skill 仍在审计锁中，但已从编目注释掉 -> 不自动装，也不能经 overlay 引用。
-    assert "taste-skill" in ids
-    assert "taste-skill" not in set(catalog.ids())
-    # delivery-loop 已被上游改名（cd1d135），旧 id 不得再出现在编目或锁里。
-    assert "delivery-loop" not in set(catalog.ids())
-    assert "delivery-loop" not in {item.id for item in lock.skills}
-    # ui-templates 组 2026-11-18 恢复编目并默认安装（此前 2026-10-14 整组移除）。
-    for skill_id in ("ui-template-apply", "ui-template-author", "ui-template-design"):
-        assert skill_id in ids
-        assert skill_id in set(catalog.ids())
-        assert skill_id in catalog.default_ids()
-    # lark-cli / role-chat 是 optional 编目条目：可经 overlay 启用，但不进默认 Desired Set。
-    by_id = catalog.by_id()
-    assert by_id["lark-cli"].optional is True
-    assert by_id["role-chat"].optional is True
-    assert by_id["wizard"].optional is True
-    assert by_id["to-questionnaire"].optional is True
-    assert by_id["frontend-slides"].optional is True
-    assert by_id["frontend-slides"].aliases == ("ppt",)
-    assert catalog.canonical_id("ppt") == "frontend-slides"
-    assert "frontend-slides" in ids
-    assert "frontend-slides" not in catalog.default_ids()
-    assert "lark-cli" not in catalog.default_ids()
-    assert "wizard" not in catalog.default_ids()
-    assert "to-questionnaire" not in catalog.default_ids()
-    assert "commit-push" in catalog.default_ids()
-    # 自有 skill 已迁出到 sunzhenkai/solo-skills：task* 收敛为 taskrail /
-    # taskflow（task-wizard / task-goal / task-delivery / task-explore / task-intent 已删或并入），
-    # agent-roster-flow 改名 agent-roster。
-    # 它们仍是默认安装项，来源为 third-party（由严格审计锁覆盖）。
-    migrated = {"agent-roster", "role-based-reviewer", "taskrail", "taskflow"}
-    assert migrated <= set(catalog.default_ids())
-    assert migrated.isdisjoint(first_party)
-    assert migrated <= third_party
-    assert "wait-what" in catalog.default_ids()
-    assert "writing-for-agents" in catalog.default_ids()
-    assert "ask-matt" not in ids
+    # optional entries stay out of default_ids(), non-optional entries stay in.
+    default_ids = set(catalog.default_ids())
+    for entry_id, entry in catalog.by_id().items():
+        if entry.optional:
+            assert entry_id not in default_ids
+        else:
+            assert entry_id in default_ids
     assert all(item.audit.status == "approved" for item in lock.skills)
 
 

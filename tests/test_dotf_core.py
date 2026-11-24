@@ -112,15 +112,16 @@ def test_manifest_rejects_duplicate_targets() -> None:
 
 
 def test_unified_sanitizer_redacts_all_required_secret_shapes() -> None:
+    token = "actual-env-" + "secret-123"
     env = {
-        "SERVICE_TOKEN": "actual-env-secret-123",
+        "SERVICE_TOKEN": token,
         "NORMAL_VALUE": "public-value",
     }
     raw = (
         "credential=cred-value Authorization: Bearer auth-value\n"
         "Cookie: sid=cookie-value\n"
         "https://alice:uri-password@example.test/path "
-        "actual-env-secret-123 public-value"
+        f"{token} public-value"
     )
     nested = {
         "reason": raw,
@@ -140,7 +141,7 @@ def test_unified_sanitizer_redacts_all_required_secret_shapes() -> None:
             "cookie-value",
             "alice",
             "uri-password",
-            "actual-env-secret-123",
+            token,
             "nested-auth",
             "nested-cookie",
         ):

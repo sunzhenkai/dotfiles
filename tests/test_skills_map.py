@@ -25,31 +25,24 @@ def _write_catalog(path: Path, body: str) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def test_group_expands_to_its_third_party_skills() -> None:
-    result = run_resolver("mattpocock")
+def test_group_expands_to_its_third_party_skills(tmp_path: Path) -> None:
+    map_file = tmp_path / "skills.yaml"
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  demo:\n    type: third-party\n    source: github\n"
+        "    package: https://github.com/example/skills\n    skills:\n"
+        "      - alpha\n"
+        "      - id: beta\n        optional: true\n",
+    )
+    result = run_resolver("demo", "--map", str(map_file))
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        "https://github.com/mattpocock/skills",
+        "https://github.com/example/skills",
         "-s",
-        "codebase-design",
+        "alpha",
         "-s",
-        "diagnosing-bugs",
-        "-s",
-        "domain-modeling",
-        "-s",
-        "grill-with-docs",
-        "-s",
-        "grilling",
-        "-s",
-        "setup-matt-pocock-skills",
-        "-s",
-        "to-questionnaire",
-        "-s",
-        "wait-what",
-        "-s",
-        "wizard",
-        "-s",
-        "writing-for-agents",
+        "beta",
     ]
 
 
@@ -93,21 +86,19 @@ def test_map_alias_resolves_like_skill_id(tmp_path: Path) -> None:
     assert result.stdout.splitlines() == ["owner/one", "-s", "slides"]
 
 
-def test_remove_mode_group_resolves_installed_skill_names() -> None:
-    result = run_resolver("mattpocock", "--remove")
+def test_remove_mode_group_resolves_installed_skill_names(tmp_path: Path) -> None:
+    map_file = tmp_path / "skills.yaml"
+    _write_catalog(
+        map_file,
+        "version: 3\nlock: skills.lock.yaml\ngroups:\n"
+        "  demo:\n    type: third-party\n    source: github\n"
+        "    package: https://github.com/example/skills\n    skills:\n"
+        "      - alpha\n"
+        "      - id: beta\n        optional: true\n",
+    )
+    result = run_resolver("demo", "--remove", "--map", str(map_file))
     assert result.returncode == 0
-    assert result.stdout.splitlines() == [
-        "codebase-design",
-        "diagnosing-bugs",
-        "domain-modeling",
-        "grill-with-docs",
-        "grilling",
-        "setup-matt-pocock-skills",
-        "to-questionnaire",
-        "wait-what",
-        "wizard",
-        "writing-for-agents",
-    ]
+    assert result.stdout.splitlines() == ["alpha", "beta"]
 
 
 def test_first_party_skill_id_is_rejected_with_guidance(

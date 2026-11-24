@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import pty
 import select
 import subprocess
 import sys
+import termios
 import time
 from pathlib import Path
 
@@ -26,6 +28,9 @@ def _run_in_pty(args: list[str], keys: str, timeout: float = 15.0) -> str:
     env = os.environ.copy()
     env["HOME"] = os.environ.get("HOME", str(Path.home()))
     env["TERM"] = "dumb"
+    def _attach_ctty() -> None:
+        fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+
     proc = subprocess.Popen(
         [str(DOTF), *args],
         stdin=slave,
@@ -33,6 +38,8 @@ def _run_in_pty(args: list[str], keys: str, timeout: float = 15.0) -> str:
         stderr=slave,
         cwd=str(ROOT),
         env=env,
+        start_new_session=True,
+        preexec_fn=_attach_ctty,
         close_fds=True,
     )
     os.close(slave)
@@ -75,15 +82,13 @@ def test_select_lists_modules_and_cancels() -> None:
 
 @pytest.mark.slow
 def test_select_numeric_then_quit() -> None:
-    # 选第一个模块后 plan 阶段非 tty 无 --yes → 快速失败；能走到那一步即说明点选生效
-    out = _run_in_pty(["-i"], "1\nq\n")
+    out = _run_in_pty(["-i"], "1\nn\n")
     assert "可选模块" in out
 
 
 @pytest.mark.slow
 def test_select_all_option_lists_modules() -> None:
-    out = _run_in_pty(["-i"], "a\n")
-    # a 全选后进入 plan 确认；非 tty 确认失败快速退出
+    out = _run_in_pty(["-i"], "a\nn\n")
     assert "可选模块" in out
 
 

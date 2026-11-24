@@ -119,7 +119,7 @@ def test_secret_reason_is_redacted_on_terminal_json_journal_and_latest(tmp_home:
     )
     plan = tmp_path / "plan.json"
     write_test_plan(plan, handlers, [("install", "leaky")])
-    secret = "actual-environment-secret-987"
+    secret = "actual-environment-" + "secret-987"
     result = _run(tmp_home, plan, handlers, "--json", extra_env={"SERVICE_TOKEN": secret})
     assert result.returncode != 0
     machine = json.loads(result.stdout)

@@ -24,7 +24,8 @@ LOG=$(mktemp /tmp/skills-lock-update-XXXX.log) &&
   make skills-lock-update 2>&1 | tee "$LOG" >/dev/null &&
   tail -80 "$LOG" &&
   python3 src/agents/lock_verify.py changed &&
-  make registry validate
+  make registry validate &&
+  python3 -m pytest -q tests/test_agents_skill_defaults.py tests/test_desired_set.py
 ```
 
 **审计全文落盘，终端只显示末尾摘要**：日志路径以 `log=` 打印，要挑读就 `grep "$LOG"`；不要用 `make ... | tail` 代替落盘（坑 16）。
