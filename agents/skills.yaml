@@ -46,16 +46,14 @@ groups:
       # 2026-11-13 上游 code-explore 改名 project-explore（solo-skills 3096cc4）。
       - project-explore
       - commit-push
-      - id: lark-cli
-        optional: true
+      - lark-cli
       - pretty-ui
       # 2026-11-18 ui-kit 成为默认 UI 总入口；pretty-ui 作为通用路线下游同装。
       - ui-kit
       - project-init
       - repo-manager
       - role-based-reviewer
-      - id: role-chat
-        optional: true
+      - role-chat
       - service-manager
       # 2026-11-17 上游新增 session-wrap（solo-skills dd1d60b），会话收尾补查遗留事项。
       - session-wrap
@@ -67,13 +65,10 @@ groups:
       - trouble-grill
       # 2026-11-06 上游由 llm-wiki 改名 wiki-data（solo-skills f4792acd942c），随改名同步。
       - wiki-data
-      - id: visualize
-        optional: true
+      - visualize
       # 2026-11-23 上游 agent-api-ops 并入 project-design-patterns 的 references/，不再独立编目。
-      - id: project-design-patterns
-        optional: true
-      - id: way-to-fix
-        optional: true
+      - project-design-patterns
+      - way-to-fix
 
   mattpocock:
     type: third-party
