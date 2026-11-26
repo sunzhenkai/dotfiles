@@ -260,9 +260,11 @@ def build_plan(
 
     if modules_explicit:
         for m in modules_explicit:
-            if m not in reasons:
-                reasons[m] = "explicit"
-            seeds.append(m)
+            mod = modules.find_module(mod_list, m)
+            canonical = mod["name"] if mod and mod.get("name") else m
+            if canonical not in reasons:
+                reasons[canonical] = "explicit"
+            seeds.append(canonical)
 
     if select_all:
         for m in mod_list:

@@ -22,6 +22,9 @@ def _stub_agents(root: Path, *, skills_rc: int = 0, defaults_rc: int = 0, opensp
     agents = root / "src" / "agents"
     agents.mkdir(parents=True)
     (agents / "instructions.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+    (agents / "antigravity_bridge.py").write_text(
+        "raise SystemExit(0)\n", encoding="utf-8"
+    )
     (agents / "sync.py").write_text(
         dedent(
             f"""\

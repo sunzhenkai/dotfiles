@@ -756,7 +756,9 @@ def _producer_expected(
         payload, format_value, requested_mode = _render_content(
             ProducedContent(produced.content, produced.format, produced.mode), render_path
         )
-        mode = requested_mode if requested_mode is not None else _default_file_mode(declaration, None)
+        mode = requested_mode if requested_mode is not None else _default_file_mode(
+            declaration, None if source_is_dir else source_files["."][1]
+        )
         _validate_output_mode(declaration, mode)
         expected.append(
             _ExpectedFile(

@@ -36,6 +36,7 @@ make fmt                    # 格式化
 - `kind: binary` 必须有 install handler 与 doctor（`system` / `homebrew` / `fonts` 例外）
 - `config` 声明必须显式给 `source/target/strategy/writeable/sensitive/target_mode/preserve/exclude`，`strategy: symlink` 只用于注册表显式声明的只读目标
 - `enabled: false` 的模块不参与 `-a` 与 profile，仍可点名执行
+- `aliases` 可选，给模块加 CLI 短名（正规模块名永远优先）；不得与任何模块名或其它模块的别名重复
 
 ## skill 与全局指令改动
 

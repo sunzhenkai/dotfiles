@@ -386,7 +386,7 @@ def check_antigravity_skills_bridge(report: DoctorReport, *, home: Path) -> None
             "antigravity-bridge",
             STATUS_WARN,
             f"Antigravity 缺少或存在异常桥接文件 {skills_json}，无法发现 ~/.agents/skills",
-            "运行 dotf antigravity -c",
+            "运行 dotf agents -c（或 dotf agy -c）",
         )
         return
     try:
@@ -397,25 +397,26 @@ def check_antigravity_skills_bridge(report: DoctorReport, *, home: Path) -> None
             "antigravity-bridge",
             STATUS_FAIL,
             f"Antigravity {skills_json} JSON 校验失败: {exc}",
-            "运行 dotf antigravity -c 修复",
+            "运行 dotf agents -c 修复（或 dotf agy -c）",
         )
         return
     entries = data.get("entries") if isinstance(data, dict) else None
     expected_abs = str((home / ".agents" / "skills").resolve())
     has_shared = False
+    unresolved: str | None = None
     if isinstance(entries, list):
         for item in entries:
             if not isinstance(item, dict):
                 continue
             raw_path = item.get("path")
-            if raw_path == "~/.agents/skills":
-                has_shared = True
-                break
-            if isinstance(raw_path, str) and raw_path.startswith("~/"):
-                if str((home / raw_path[2:]).resolve()) == expected_abs:
-                    has_shared = True
-                    break
-            elif isinstance(raw_path, str) and raw_path == expected_abs:
+            if not isinstance(raw_path, str):
+                continue
+            # hub server 2.34.0 只认绝对路径：`~/`、相对路径和残留占位符都会
+            # 被静默跳过，报错只进 Antigravity 自己的日志。
+            if not os.path.isabs(raw_path):
+                unresolved = raw_path
+                continue
+            if str(Path(raw_path).resolve()) == expected_abs:
                 has_shared = True
                 break
     if has_shared:
@@ -426,12 +427,21 @@ def check_antigravity_skills_bridge(report: DoctorReport, *, home: Path) -> None
             f"Antigravity {skills_json} 已挂载 ~/.agents/skills",
         )
         return
+    if unresolved is not None:
+        report.add(
+            "skills",
+            "antigravity-bridge",
+            STATUS_WARN,
+            f"Antigravity {skills_json} 的条目 {unresolved!r} 不是绝对路径，hub server 会跳过它",
+            "运行 dotf agents -c 重新展开为绝对路径",
+        )
+        return
     report.add(
         "skills",
         "antigravity-bridge",
         STATUS_WARN,
         f"Antigravity {skills_json} 未包含 ~/.agents/skills",
-        "运行 dotf antigravity -c",
+        "运行 dotf agents -c（或 dotf agy -c）",
     )
 
 

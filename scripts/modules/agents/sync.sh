@@ -94,7 +94,7 @@ export PYTHONUNBUFFERED=1
 
 # 阶段进度：run_plan.sh 的 dotf_core.progress 过滤器消费，其它模式下一律丢弃。
 # shims 属于 skills 阶段的一部分且没有独立结果行，不单独计数，否则进度会卡一格。
-_SYNC_STAGE_TOTAL=4
+_SYNC_STAGE_TOTAL=5
 _SYNC_STAGE_INDEX=0
 _sync_progress() {
   _SYNC_STAGE_INDEX=$((_SYNC_STAGE_INDEX + 1))
@@ -117,6 +117,22 @@ if [ -n "$ON_TAKEOVER" ]; then
   instructions_args+=(--takeover "$ON_TAKEOVER")
 fi
 python3 "$_SRC_AGENTS/instructions.py" "${instructions_args[@]}"
+
+# Antigravity 的 skills.json 桥接：把 ~/.agents/skills 挂进它的全局发现路径。
+# 声明仍在 registry（antigravity.config），这里只是让 dotf agents -c 也覆盖它。
+_sync_progress bridge
+echo "--- antigravity bridge ---"
+bridge_args=(--root "$ROOT")
+if [ "$DRY_RUN" -eq 1 ]; then
+  bridge_args+=(--dry-run)
+fi
+if [ -n "$ON_CONFLICT" ]; then
+  bridge_args+=(--on-conflict "$ON_CONFLICT")
+fi
+if [ -n "$ON_TAKEOVER" ]; then
+  bridge_args+=(--takeover "$ON_TAKEOVER")
+fi
+python3 "$_SRC_AGENTS/antigravity_bridge.py" "${bridge_args[@]}"
 
 skills_args=(--root "$ROOT")
 if [ "$DRY_RUN" -eq 1 ]; then

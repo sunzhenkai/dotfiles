@@ -35,6 +35,12 @@ def _copy_single(context: ProducerContext) -> ProducedContent:
     return ProducedContent(context.source_files["."])
 
 
+# Antigravity's hub server rejects `~/` in skills.json ("must be an absolute
+# path") despite its bundled docs claiming support, so the repo source carries
+# this placeholder and the producer substitutes the deploying HOME.
+_HOME_PLACEHOLDER = "@HOME@"
+
+
 
 def _private_overlay(base: Mapping[str, Any], managed: Mapping[str, Any]) -> dict[str, Any]:
     """Overlay public defaults without replacing machine-private plugin fields."""
@@ -393,6 +399,28 @@ def _pi_factory(repo_root: Path):
     return produce
 
 
+def _antigravity_factory(home: Path):
+    """Expand the `@HOME@` placeholder Antigravity's skills.json requires absolute.
+
+    The hub server (2.34.0) rejects `~/.agents/skills` with "must be an absolute
+    path" even though its bundled docs claim `~/` support, so the bridge has to
+    carry the concrete path. HOME must not be committed, hence the placeholder.
+    """
+
+    def produce(context: ProducerContext) -> ProducedContent:
+        source = context.source_files["."]
+        try:
+            text = source.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ConfigDeployError("Antigravity skills.json is not UTF-8") from exc
+        expanded = text.replace(_HOME_PLACEHOLDER, str(home))
+        if _HOME_PLACEHOLDER in expanded:
+            raise ConfigDeployError("Antigravity skills.json left an @HOME@ placeholder")
+        return ProducedContent(expanded.encode("utf-8"), format="json")
+
+    return produce
+
+
 def producer_for(
     module_name: str, *, repo_root: os.PathLike[str] | str, home: os.PathLike[str] | str
 ):
@@ -404,6 +432,8 @@ def producer_for(
         "kimi-code": _preserve_single,
         "logseq": _logseq,
     }
+    if module_name == "antigravity":
+        return _antigravity_factory(home_path)
     if module_name == "codex":
         return _codex_factory(repo, home_path)
     if module_name == "opencode":
