@@ -5,11 +5,12 @@ source "$DOTFILES_ROOT/scripts/lib/common.sh"
 source "$DOTFILES_ROOT/scripts/modules/homebrew/lib.sh"
 setup_brew_path
 if command -v brew >/dev/null 2>&1; then
+  ensure_homebrew_taps
   init_homebrew || true
   dotf_result_unchanged "homebrew already present"
   exit 0
 fi
-if install_homebrew && init_homebrew; then
+if install_homebrew && ensure_homebrew_taps && init_homebrew; then
   dotf_result_changed "installed homebrew"
 else
   dotf_result_failed "homebrew install failed"

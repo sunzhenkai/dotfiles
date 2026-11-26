@@ -22,6 +22,23 @@ setup_brew_path() {
   fi
 }
 
+# 默认 Homebrew taps
+ensure_homebrew_taps() {
+  setup_brew_path
+  command -v brew &>/dev/null || return 0
+
+  local tap="solo-kingdom/tap"
+  local url="https://github.com/solo-kingdom/homebrew-tap"
+
+  if brew tap 2>/dev/null | grep -qxF "$tap"; then
+    echo "Homebrew tap 已存在: $tap"
+    return 0
+  fi
+
+  echo "添加 Homebrew tap: $tap"
+  brew tap "$tap" "$url"
+}
+
 # 检查并安装 Homebrew
 install_homebrew() {
   if ! command -v brew &>/dev/null; then
