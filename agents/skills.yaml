@@ -46,7 +46,8 @@ groups:
       # 2026-11-13 上游 code-explore 改名 project-explore（solo-skills 3096cc4）。
       - project-explore
       - commit-push
-      - lark-cli
+      - id: lark-cli
+        optional: true
       - pretty-ui
       # 2026-11-18 ui-kit 成为默认 UI 总入口；pretty-ui 作为通用路线下游同装。
       - ui-kit

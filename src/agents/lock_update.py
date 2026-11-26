@@ -368,7 +368,7 @@ def resolve_audit_script(root: Path, checkout: Path | None) -> tuple[Path, str]:
         return script, label
     raise LockUpdateError(
         "audit script not found; expected one of: "
-        + ", ".join(str(script) for script, _ in candidates)
+        + ", ".join(str(script) for _base, script, _label in candidates)
     )
 
 
