@@ -311,9 +311,17 @@ def module_group(mod: dict[str, Any]) -> str:
     return str(val) if val else ""
 
 
+def module_aliases(mod: dict[str, Any]) -> list[str]:
+    raw = mod.get("aliases") or []
+    return [str(item) for item in raw] if isinstance(raw, list) else []
+
+
 def find_module(modules: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
     for mod in modules:
         if mod.get("name") == name:
+            return mod
+    for mod in modules:
+        if name in module_aliases(mod):
             return mod
     return None
 
@@ -600,6 +608,20 @@ def validate_registry(
             dep = mod["depends_on"]
             if not isinstance(dep, list) or not all(isinstance(x, str) for x in dep):
                 errors.append(f"{name}: depends_on 必须为字符串列表")
+        if "aliases" in mod and mod["aliases"] is not None:
+            aliases = mod["aliases"]
+            if not isinstance(aliases, list) or not all(
+                isinstance(x, str) and x.strip() for x in aliases
+            ):
+                errors.append(f"{name}: aliases 必须为非空字符串列表")
+            else:
+                seen_aliases: set[str] = set()
+                for alias in aliases:
+                    if alias in seen_aliases:
+                        errors.append(f"{name}: alias {alias!r} 重复")
+                    seen_aliases.add(alias)
+                    if alias == name:
+                        errors.append(f"{name}: alias 不得与模块名同名")
 
         kind = mod.get("kind")
         if kind is None:
@@ -633,6 +655,19 @@ def validate_registry(
 
     for cycle in _find_cycles(dep_graph):
         errors.append("模块依赖环: " + " -> ".join(cycle))
+
+    # 别名不得与任何模块名或其它模块的别名冲突
+    alias_owners: dict[str, str] = {}
+    for name, mod in by_name.items():
+        for alias in module_aliases(mod):
+            if alias in by_name:
+                errors.append(f"{name}: alias {alias!r} 与模块名冲突")
+            elif alias in alias_owners:
+                errors.append(
+                    f"{name}: alias {alias!r} 已被模块 {alias_owners[alias]} 使用"
+                )
+            else:
+                alias_owners[alias] = name
 
     # profiles
     profiles = profiles_data.get("profiles") or {}
@@ -774,6 +809,9 @@ def cmd_get(args: argparse.Namespace) -> int:
     group = module_group(mod)
     if group:
         print(f"group={group}")
+    aliases = module_aliases(mod)
+    if aliases:
+        print(f"aliases={','.join(aliases)}")
     os_list = mod.get("os") or []
     if os_list:
         if not isinstance(os_list, list):
@@ -815,6 +853,9 @@ def cmd_field(args: argparse.Namespace) -> int:
         return 0
     if args.field == "depends_on":
         print(" ".join(module_depends_on(mod)))
+        return 0
+    if args.field == "aliases":
+        print(" ".join(module_aliases(mod)))
         return 0
     if args.field in (
         "source",
@@ -975,6 +1016,7 @@ def main() -> int:
             "bin",
             "group",
             "depends_on",
+            "aliases",
         ],
     )
     p_field.set_defaults(func=cmd_field)

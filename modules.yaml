@@ -377,10 +377,12 @@ modules:
     install: true
     doctor: true
     bin: agy
+    aliases: [agy]
     config:
       source: agents/vendors/antigravity/skills.json
       target: ~/.gemini/config/skills.json
-      strategy: copy
+      # render：hub server 不展开 ~/，源里的 @HOME@ 由 producer 展开成绝对路径
+      strategy: render
       writable: false
       sensitive: false
       target_mode: "0644"

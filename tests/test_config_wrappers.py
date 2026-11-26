@@ -140,7 +140,7 @@ def test_generic_copy_fallback_creates_real_targets_and_second_run_is_unchanged(
 
 
 EXPECTED_COPY_MODULE_NAMES = {
-    "antigravity", "git", "zsh", "starship", "nvim", "helix", "zed", "kitty", "alacritty",
+    "git", "zsh", "starship", "nvim", "helix", "zed", "kitty", "alacritty",
     "ghostty", "wezterm", "iterm2", "tmux", "zellij", "herdr", "hypr", "fcitx5",
     "yazi", "k9s",
 }
@@ -181,7 +181,7 @@ def test_generic_copy_inventory_is_complete() -> None:
 
 
 EXPECTED_SPECIALIZED_MODULE_NAMES = {
-    "agents", "opencode", "codex", "kimi-code", "logseq", "pi",
+    "agents", "antigravity", "opencode", "codex", "kimi-code", "logseq", "pi",
 }
 
 

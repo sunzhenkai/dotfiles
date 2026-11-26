@@ -23,7 +23,7 @@ def test_antigravity_registry_metadata_is_readonly_single_file() -> None:
     cfg = mod["config"]
     assert cfg["source"] == "agents/vendors/antigravity/skills.json"
     assert cfg["target"] == "~/.gemini/config/skills.json"
-    assert cfg["strategy"] == "copy"
+    assert cfg["strategy"] == "render"
     assert cfg["writable"] is False
     assert cfg["sensitive"] is False
     assert cfg["target_mode"] == "0644"
@@ -67,7 +67,8 @@ def test_antigravity_config_deploys_skills_bridge_without_touching_runtime_dirs(
     target = cfg_dir / "skills.json"
     assert target.is_file() and not target.is_symlink()
     payload = json.loads(target.read_text(encoding="utf-8"))
-    assert payload == {"entries": [{"path": "~/.agents/skills"}]}
+    # hub server 2.34.0 不展开 `~/`，桥接必须是绝对路径
+    assert payload == {"entries": [{"path": str(home / ".agents" / "skills")}]}
     assert target.stat().st_mode & 0o777 == 0o644
     # 运行时兄弟目录原样保留
     assert (cfg_dir / "plugins" / "installed.json").read_text(encoding="utf-8") == "{}"
@@ -84,19 +85,29 @@ def test_doctor_checks_antigravity_skills_bridge(tmp_path: Path) -> None:
     doctor.check_antigravity_skills_bridge(report1, home=home)
     item1 = next(i for i in report1.items if i.id == "antigravity-bridge")
     assert item1.status == doctor.STATUS_WARN
-    assert "dotf antigravity -c" in item1.hint
+    assert "dotf agents -c" in item1.hint
 
-    # 2. 写入正确 skills.json → pass
+    # 2. 写入正确 skills.json（已按 HOME 展开）→ pass
     cfg_dir = home / ".gemini" / "config"
     cfg_dir.mkdir(parents=True)
     (cfg_dir / "skills.json").write_text(
-        (ROOT / "agents" / "vendors" / "antigravity" / "skills.json").read_text(encoding="utf-8"),
+        json.dumps({"entries": [{"path": str(home / ".agents" / "skills")}]}),
         encoding="utf-8",
     )
     report2 = doctor.DoctorReport("research", None, "low")
     doctor.check_antigravity_skills_bridge(report2, home=home)
     item2 = next(i for i in report2.items if i.id == "antigravity-bridge")
     assert item2.status == doctor.STATUS_PASS
+
+    # 2b. 残留未展开的占位符 → warn（hub server 不认）
+    (cfg_dir / "skills.json").write_text(
+        (ROOT / "agents" / "vendors" / "antigravity" / "skills.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    report2b = doctor.DoctorReport("research", None, "low")
+    doctor.check_antigravity_skills_bridge(report2b, home=home)
+    item2b = next(i for i in report2b.items if i.id == "antigravity-bridge")
+    assert item2b.status == doctor.STATUS_WARN
 
     # 3. 损坏 JSON → fail
     (cfg_dir / "skills.json").write_text("{bad json", encoding="utf-8")
