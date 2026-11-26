@@ -166,6 +166,8 @@ groups:
         optional: true
       - id: device-frames
         optional: true
+      - id: photographing-software
+        optional: true
 
   frontend-slides:
     type: third-party
