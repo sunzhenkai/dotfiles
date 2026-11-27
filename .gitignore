@@ -47,3 +47,7 @@ config/tools/k9s/clusters/
 /config/desktop/fcitx5/conf/cached_layouts
 
 .pi
+
+# 本地隔离工作区与临时文件
+.worktrees/
+.tmp/
