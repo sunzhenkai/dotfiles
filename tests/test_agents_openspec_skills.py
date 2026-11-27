@@ -193,9 +193,10 @@ def test_takeover_skip_conflicts_on_divergent_unowned_file(tmp_path: Path, tmp_h
 
 def test_sync_sh_invokes_openspec_skills() -> None:
     script = (ROOT / "scripts" / "modules" / "agents" / "sync.sh").read_text(encoding="utf-8")
-    assert '"$_SRC_AGENTS/openspec_skills.py"' in script
-    assert "--- openspec skills ---" in script
-    assert "_run_sync_stage openspec" in script
+    assert "sync_all.py" in script
+    sync_all = (ROOT / "src" / "agents" / "sync_all.py").read_text(encoding="utf-8")
+    assert "_run_openspec" in sync_all
+    assert "--- openspec skills ---" in sync_all
 
 
 @pytest.mark.skipif(shutil.which("openspec") is None, reason="openspec CLI required")

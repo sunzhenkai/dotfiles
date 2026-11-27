@@ -182,3 +182,14 @@ def test_quiet_mode_leaves_permanent_line_for_changed_only(tmp_path) -> None:
     # 进度行先被抹掉，永久行才落盘
     assert err.endswith("\r\033[K")
     assert log.read_text(encoding="utf-8") == source
+
+
+def test_run_plan_replays_log_tail_on_failure_in_quiet_mode() -> None:
+    from pathlib import Path
+
+    run_plan = (Path(__file__).resolve().parent.parent / "scripts" / "run_plan.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "日志尾部" in run_plan
+    assert "action_quiet" in run_plan
+    assert "tail -n 25" in run_plan

@@ -77,7 +77,7 @@ _Avoid_: drift（当已能判定是 Conflict 时）, 损坏, 自动覆盖, 用 C
 _Avoid_: Conflict（那是已 owned 的漂移）, 外来文件（含糊）, 无主（口语）
 
 **Takeover**:
-把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的动作。与 Conflict 的 `--on-conflict=backup` 分家；默认执行（`--takeover=backup`），`--takeover=skip`（环境变量 `DOTF_TAKEOVER`）跳过并保持冲突。一次策略覆盖整次 agents sync（一手 / defaults / OpenSpec）；config 部署（`dotf <module> -c`）同语义但默认仍为 skip + TTY 确认（见 ADR-0024）。symlink、类型不符、foreign owner 等其余冲突不可接管，保持 fail closed。
+把 Unowned Target（内容不等价）先 backup 再写入受管字节并首次登记 ownership 的动作。与 Conflict 的 `--on-conflict=backup` 分家；默认执行（`--takeover=backup`），`--takeover=skip`（环境变量 `DOTF_TAKEOVER`）跳过并保持冲突。一次策略覆盖整次 agents sync（一手 / defaults / OpenSpec）；config 部署（`dotf <module> -c`）同语义但默认仍为 skip + TTY 确认（见 ADR-0024）。根目录内（`target_root` 之下）的软链在默认策略下只 `unlink` 软链本身（不跟随目标）再写入受管副本，严格模式保持冲突；根目录本身软链、类型不符、foreign owner 等其余冲突不可接管，保持 fail closed。
 _Avoid_: on-conflict（管 owned 漂移）, adopt（只用于字节已等价）, 强制覆盖
 
 ### Scope

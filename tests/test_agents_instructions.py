@@ -50,8 +50,10 @@ def test_source_is_global_and_omits_skill_catalog() -> None:
 
 def test_sync_sh_invokes_instructions() -> None:
     script = (ROOT / "scripts" / "modules" / "agents" / "sync.sh").read_text(encoding="utf-8")
-    assert 'python3 "$_SRC_AGENTS/instructions.py"' in script
-    assert "--- instructions ---" in script
+    assert "sync_all.py" in script
+    sync_all = (ROOT / "src" / "agents" / "sync_all.py").read_text(encoding="utf-8")
+    assert "_run_instructions" in sync_all
+    assert "--- instructions ---" in sync_all
 
 
 def test_installs_user_level_targets(tmp_path: Path) -> None:

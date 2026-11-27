@@ -32,6 +32,7 @@ set -euo pipefail
 if [ "$sync_rc" -ne 0 ]; then
   reason="$(grep '^error: agents sync 有阶段失败' "$sync_log" | tail -1 || true)"
   reason="${reason#error: }"
+  rm -f "$registry_log" "$sync_log"
   dotf_result_failed "${reason:-agents sync failed}"
   exit 1
 fi

@@ -284,7 +284,7 @@ def _check_skills_plan(
             if "without agents ownership" in reason:
                 category = "unowned"
                 counts["conflict"] += 1
-            elif "symlink" in reason or "unsafe" in reason or operation.actual_state == "unsafe":
+            elif "symlink" in reason or "unsafe" in reason or operation.actual_state in {"unsafe", "symlink"}:
                 category = "link-boundary"
                 counts["conflict"] += 1
             elif "malformed" in reason:
@@ -499,7 +499,7 @@ def check_instructions_plan(
             if "without agents ownership" in reason:
                 category = "unowned"
                 counts["conflict"] += 1
-            elif "symlink" in reason or "unsafe" in reason or operation.actual_state == "unsafe":
+            elif "symlink" in reason or "unsafe" in reason or operation.actual_state in {"unsafe", "symlink"}:
                 category = "link-boundary"
                 counts["conflict"] += 1
             elif "malformed" in reason:

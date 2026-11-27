@@ -30,7 +30,7 @@ def _compute_manifest_managed(action: str, module: str) -> int | None:
         from dotf_core.schemas import validate_managed_manifest
         from dotf_core.paths import xdg_state_home  # noqa: F401  (sanity import)
 
-        manifest_path = (Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "dotf" / "agents-manifest.json")
+        manifest_path = (Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "dotf" / "config-manifest.json")
         if not manifest_path.exists():
             return None
         import json

@@ -1,9 +1,4 @@
-"""Ownership-aware first-party Agent runtime planning and apply.
-
-Planning reads source, manifest, and targets only. Apply serializes through a
-nofollow lock, re-plans under that lock, then changes only targets whose current
-bytes still match the ownership decision.
-"""
+"""Ownership-aware Agent runtime planning and apply."""
 
 from __future__ import annotations
 
@@ -32,9 +27,8 @@ from dotf_core.paths import (  # noqa: E402
     assert_no_symlinks,
     assert_path_confined,
     ensure_directory,
-    open_directory_nofollow,
+    lstat_components,
     open_nofollow,
-    open_parent_nofollow,
 )
 from dotf_core.schemas import (  # noqa: E402
     MANIFEST_SCHEMA_VERSION,
@@ -60,33 +54,16 @@ OnTakeover = Literal["skip", "backup"]
 ON_CONFLICT_ENV = "DOTF_ON_CONFLICT"
 ON_TAKEOVER_ENV = "DOTF_TAKEOVER"
 
-# The backup policy is the default for both owned drift and Takeover: a conflict
-# that can be resolved by preserving the local bytes in the run's backup
-# directory is resolved that way and the run continues. Unsafe paths, malformed
-# manifests, and out-of-root stale targets stay fail-closed.
 CONTENT_DRIFT = "owned target was modified locally"
 MODE_DRIFT = "owned target mode was modified locally"
-
-# Third-party identity is scoped to the lock entry (revision + content hash), so a
-# relock that only moves some entries leaves every other entry's identity alone.
-# An identity that moves at all is re-recorded when the target holds either the
-# newly locked content or exactly the bytes and mode we recorded installing; any
-# other drift on top of the identity move is remediated like ordinary owned drift
-# under the backup policy, and stays fail-closed under `--on-conflict=block`.
 IDENTITY_MISMATCH = "manifest ownership identity differs"
-
-# Owned drift the backup policy may remediate: the local bytes are preserved in
-# the run's backup directory before the managed content replaces them.
-_REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT, IDENTITY_MISMATCH})
-
-# A target we did not install, but whose bytes already match what we would write.
-# Another installer (`npx skills`) leaves exactly this behind, and refusing it
-# would make a machine that used one unreconcilable by dotf forever.
+SYMLINK_CONFLICT = "target path contains a symlink"
 ADOPT_REASON = "target exists without agents ownership"
+
+_REMEDIABLE_CONFLICTS = frozenset({CONTENT_DRIFT, MODE_DRIFT, IDENTITY_MISMATCH})
 
 
 def parse_on_conflict(value: str | None) -> OnConflict:
-    # Default: preserve the local bytes in the backup directory, then continue.
     policy = (value or "backup").strip().lower()
     if policy not in ("block", "backup"):
         raise AgentRuntimeError(f"unknown on-conflict policy: {value!r} (expected block or backup)")
@@ -98,7 +75,6 @@ def on_conflict_from_env(env: Mapping[str, str] | None = None) -> OnConflict:
 
 
 def parse_on_takeover(value: str | None) -> OnTakeover:
-    # Default: back up divergent unowned targets, then take them over.
     policy = (value or "backup").strip().lower()
     if policy not in ("skip", "backup"):
         raise AgentRuntimeError(f"unknown on-takeover policy: {value!r} (expected skip or backup)")
@@ -119,7 +95,7 @@ def skill_id_from_target(target: str, target_root: str | Path) -> str | None:
 
 
 class AgentRuntimeError(RuntimeError):
-    """The first-party runtime plan cannot be safely applied."""
+    """The Agent runtime plan cannot be safely applied."""
 
 
 class AgentRuntimeConflict(AgentRuntimeError):
@@ -160,7 +136,7 @@ class RuntimeOperation:
     conflict: str | None
     expected: RuntimeFile | None
     prior: ManagedItem | None
-    actual_state: Literal["missing", "present", "unsafe"]
+    actual_state: Literal["missing", "present", "symlink", "unsafe"]
     remediated: bool = False
 
 
@@ -182,14 +158,7 @@ class SkillsPlan:
     only_ids: frozenset[str] | None = None
     on_conflict: OnConflict = "block"
     on_takeover: OnTakeover = "skip"
-    # Skill-atomic skip: a conflict may quarantine its whole Skill directory and
-    # let the rest of the run succeed. Only plans whose target root holds one
-    # directory per Skill may do that; a flat root (instruction files under HOME)
-    # would read each dotdir as a Skill id and swallow the conflict.
     isolate_by_skill: bool = False
-    # Per-entry identity components (skill id -> suffix) so that relocking one
-    # entry does not move the identity of the others.
-    identity_suffixes: Mapping[str, str] | None = None
 
     @property
     def conflicts(self) -> tuple[RuntimeOperation, ...]:
@@ -224,7 +193,7 @@ class _ManifestSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class _Actual:
-    state: Literal["missing", "present", "unsafe"]
+    state: Literal["missing", "present", "symlink", "unsafe"]
     digest: str | None
     detail: str | None = None
     mode: int | None = None
@@ -244,10 +213,7 @@ def _construct_mapping(loader, node, deep=False):
     return result
 
 
-_UniqueLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-    _construct_mapping,
-)
+_UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
 def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -270,15 +236,6 @@ def _empty_manifest() -> ManagedManifest:
 
 def _sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
-
-
-def _read_fd(fd: int) -> bytes:
-    chunks: list[bytes] = []
-    while True:
-        block = os.read(fd, 1024 * 1024)
-        if not block:
-            return b"".join(chunks)
-        chunks.append(block)
 
 
 def _state_home(home: Path, state_home: Path | None) -> Path:
@@ -383,16 +340,26 @@ def collect_runtime_files(
     render_skill: RenderSkill,
     *,
     source_root: Path | None = None,
+    skill_dirs: Mapping[str, Path] | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
-    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
 ) -> tuple[RuntimeFile, ...]:
     policy = load_runtime_policy(root)
-    source_root = source_root or root / "agents" / "skills"
-    if not source_root.is_dir():
-        raise AgentRuntimeError(f"missing first-party skills source: {source_root}")
+    if skill_dirs is None:
+        source_root = source_root or root / "agents" / "skills"
+        if not source_root.is_dir():
+            raise AgentRuntimeError(f"missing first-party skills source: {source_root}")
+        candidates = sorted(
+            (p.name, p) for p in source_root.iterdir() if p.is_dir() and not p.is_symlink()
+        )
+    else:
+        candidates = sorted(
+            (skill_id, path)
+            for skill_id, path in skill_dirs.items()
+            if path.is_dir() and not path.is_symlink()
+        )
     target_base = assert_path_confined(home, target_root)
     reserved = layout_for_target(target_base)
     reserved_ids = reserved.reserved_ids if reserved is not None else frozenset()
@@ -400,16 +367,13 @@ def collect_runtime_files(
     targets: set[str] = set()
     declared = set(policy.files) | set(policy.sidecars) | set(policy.excluded)
 
-    def add_file(source: Path, relative: PurePosixPath, content: bytes) -> None:
+    def add_file(owner: str, source: Path, relative: PurePosixPath, content: bytes) -> None:
         target = assert_path_confined(home, target_base / Path(relative))
         try:
             target.relative_to(target_base)
         except ValueError as exc:
             raise AgentRuntimeError(f"runtime target escapes skills root: {target}") from exc
-        identity_base = Path(identity_prefix)
-        if identity_suffixes:
-            identity_base = identity_base / identity_suffixes.get(Path(relative).parts[0], "")
-        identity = (identity_base / Path(relative)).as_posix()
+        identity = (Path(identity_prefix) / Path(relative)).as_posix()
         mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
         item = RuntimeFile(owner, str(target), identity, _sha256(content), content, mode)
         if item.target in targets:
@@ -417,17 +381,14 @@ def collect_runtime_files(
         targets.add(item.target)
         result.append(item)
 
-    def add_directory(source_dir: Path, prefix: PurePosixPath) -> None:
+    def add_directory(owner: str, source_dir: Path, prefix: PurePosixPath) -> None:
         if source_dir.is_symlink() or not source_dir.is_dir():
             raise AgentRuntimeError(f"runtime sidecar is not a real directory: {source_dir}")
         for source in _source_files(source_dir):
             nested = source.relative_to(source_dir)
-            add_file(source, prefix / PurePosixPath(nested.as_posix()), source.read_bytes())
+            add_file(owner, source, prefix / PurePosixPath(nested.as_posix()), source.read_bytes())
 
-    for skill_dir in sorted(source_root.iterdir()):
-        if not skill_dir.is_dir() or skill_dir.is_symlink():
-            continue
-        skill_id = skill_dir.name
+    for skill_id, skill_dir in candidates:
         if only_ids is not None and skill_id not in only_ids:
             continue
         if skill_id in reserved_ids:
@@ -445,12 +406,11 @@ def collect_runtime_files(
                     raise AgentRuntimeError(f"runtime file is missing or unsafe: {source}")
                 continue
             content = render_skill(skill_dir, skill_id) if filename == "SKILL.md" else source.read_bytes()
-            add_file(source, PurePosixPath(skill_id) / filename, content)
+            add_file(owner, source, PurePosixPath(skill_id) / filename, content)
         for sidecar in policy.sidecars:
             source_dir = skill_dir / sidecar
-            if not source_dir.exists():
-                continue
-            add_directory(source_dir, PurePosixPath(skill_id) / sidecar)
+            if source_dir.exists():
+                add_directory(owner, source_dir, PurePosixPath(skill_id) / sidecar)
         if include_unlisted:
             for child in sorted(skill_dir.iterdir(), key=lambda path: path.name):
                 if child.name in declared or child.name.startswith("."):
@@ -458,9 +418,9 @@ def collect_runtime_files(
                 if child.is_symlink():
                     raise AgentRuntimeError(f"runtime source contains symlink: {child}")
                 if child.is_file():
-                    add_file(child, PurePosixPath(skill_id) / child.name, child.read_bytes())
+                    add_file(owner, child, PurePosixPath(skill_id) / child.name, child.read_bytes())
                 elif child.is_dir():
-                    add_directory(child, PurePosixPath(skill_id) / child.name)
+                    add_directory(owner, child, PurePosixPath(skill_id) / child.name)
                 else:
                     raise AgentRuntimeError(f"runtime source contains unsupported entry: {child}")
     return tuple(sorted(result, key=lambda item: item.target))
@@ -481,7 +441,8 @@ def _read_manifest(home: Path, state_home: Path) -> _ManifestSnapshot:
         mode = stat.S_IMODE(item.st_mode)
         if not stat.S_ISREG(item.st_mode):
             return _ManifestSnapshot("malformed", _empty_manifest(), None, mode)
-        raw = _read_fd(fd)
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            raw = stream.read()
     finally:
         os.close(fd)
     try:
@@ -498,57 +459,78 @@ def _read_manifest(home: Path, state_home: Path) -> _ManifestSnapshot:
     return _ManifestSnapshot("ok", manifest, _sha256(raw), mode)
 
 
-def _read_actual(home: Path, target: Path) -> _Actual:
+def _inspect_target(home: Path, target_root: Path, target: Path) -> _Actual:
+    """Inspect target without following symlinks; distinguish root boundary vs inside links."""
     try:
-        assert_no_symlinks(home, target)
-        fd = open_nofollow(home, target)
+        confined_root = assert_path_confined(home, target_root)
+        confined = assert_path_confined(home, target)
+        rel = confined.relative_to(confined_root)
+        for comp, st in lstat_components(home, confined_root, missing_ok=True):
+            if st is not None and stat.S_ISLNK(st.st_mode):
+                return _Actual("unsafe", None, f"target root contains a symlink: {comp}")
+    except (OSError, PathBoundaryError, ValueError) as exc:
+        return _Actual("unsafe", None, str(exc))
+
+    if str(rel) == ".":
+        return _Actual("unsafe", None, "target equals root")
+
+    current = confined_root
+    parts = rel.parts
+    for index, part in enumerate(parts):
+        current = current / part
+        try:
+            st = os.lstat(current)
+        except FileNotFoundError:
+            return _Actual("missing", None)
+        except OSError as exc:
+            return _Actual("unsafe", None, str(exc))
+        if stat.S_ISLNK(st.st_mode):
+            return _Actual("symlink", None, f"symlink: {current}")
+        is_leaf = index == len(parts) - 1
+        if not is_leaf:
+            if not stat.S_ISDIR(st.st_mode):
+                return _Actual("unsafe", None, f"target parent is not a directory: {current}")
+        elif not stat.S_ISREG(st.st_mode):
+            return _Actual("unsafe", None, "target is not a regular file")
+
+    try:
+        fd = os.open(confined, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0))
     except FileNotFoundError:
         return _Actual("missing", None)
-    except (OSError, PathBoundaryError) as exc:
+    except OSError as exc:
         return _Actual("unsafe", None, str(exc))
     try:
-        before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode):
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
             return _Actual("unsafe", None, "target is not a regular file")
-        content = _read_fd(fd)
-        after = os.fstat(fd)
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_mode) != (
-            after.st_dev,
-            after.st_ino,
-            after.st_size,
-            after.st_mtime_ns,
-            after.st_mode,
-        ):
-            return _Actual("unsafe", None, "target changed while reading")
-        return _Actual("present", _sha256(content), mode=stat.S_IMODE(after.st_mode))
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            content = stream.read()
+        return _Actual("present", _sha256(content), mode=stat.S_IMODE(st.st_mode))
     finally:
         os.close(fd)
 
 
+def _unlink_symlink_only(target_root: Path, target: Path) -> None:
+    """Unlink the first symlink component strictly beneath target_root without following it."""
+    rel = target.relative_to(target_root)
+    current = target_root
+    for part in rel.parts:
+        current = current / part
+        if os.path.islink(current):
+            os.unlink(current)
+            return
+
+
 def adoptable_equivalent(plan: SkillsPlan) -> tuple[RuntimeOperation, ...]:
-    """Conflicts for a target we never installed whose bytes are already ours.
-
-    Taking these over only records ownership — no unverified content is lost, so
-    no `--on-conflict` decision is involved. Drift on a target we *do* own is
-    deliberately excluded: there the manifest is the authority, and appearance
-    matching the new source must not be read as "nothing to review".
-
-    Only adopt what `_read_actual` already verified as a safe regular file.
-    A skill directory that is itself a symlink (for example a foreign
-    `~/.claude/skills/<id>` pointing at `~/.agents/skills/<id>`) reads as
-    "unsafe" because the *intermediate* component is a link; `Path.is_symlink()`
-    only inspects the leaf, so re-reading the target here would follow that
-    link and wrongly adopt (and later unlink) the sibling layout's bytes.
-    """
-    result: list[RuntimeOperation] = []
-    for operation in plan.conflicts:
-        if operation.conflict != ADOPT_REASON or operation.expected is None:
-            continue
-        if operation.actual_state != "present":
-            continue
-        if operation.current_hash == operation.expected_hash:
-            result.append(operation)
-    return tuple(result)
+    """Unowned regular targets whose bytes already match what we would write."""
+    return tuple(
+        op
+        for op in plan.conflicts
+        if op.conflict == ADOPT_REASON
+        and op.expected is not None
+        and op.actual_state == "present"
+        and op.current_hash == op.expected_hash
+    )
 
 
 def _conflict(
@@ -564,27 +546,10 @@ def _conflict(
     on_conflict: OnConflict = "block",
     on_takeover: OnTakeover = "skip",
 ) -> RuntimeOperation:
-    """Block on a conflict, or remediate owned drift / explicit Takeover.
-
-    Remediated operations reuse the existing write paths: updates go through
-    `atomic_write` with a backup root, remediated prunes through
-    `backup_target(..., remove_source=True)`.
-    """
     if (
-        reason == IDENTITY_MISMATCH
+        actual.state == "symlink"
         and expected is not None
-        and prior is not None
-        and expected.owner == prior.owner
-        and actual.digest is not None
-        and (
-            # Same owner, same bytes as the newly locked content: only the
-            # attested identity moved (the lock file changed).
-            actual.digest == expected_hash
-            # Or the target is still byte-for-byte what we installed, so the
-            # source moved underneath a pristine target. There is no local
-            # content to review, so write the new bytes and re-record.
-            or (actual.digest == installed_hash and actual.mode == prior.mode)
-        )
+        and ((prior is None and on_takeover == "backup") or (prior is not None and on_conflict == "backup"))
     ):
         return RuntimeOperation(
             "update", "update", target, source_identity, expected_hash,
@@ -607,8 +572,6 @@ def _conflict(
         and expected is not None
         and actual.state == "present"
     ):
-        # Takeover is outside ownership repair: backup the foreign bytes, then
-        # write managed content and record ownership for the first time.
         return RuntimeOperation(
             "update", "update", target, source_identity, expected_hash,
             actual.digest, installed_hash, reason, expected, prior, actual.state, True,
@@ -627,27 +590,28 @@ def compile_skills_plan(
     state_home: Path | None = None,
     target_root: Path | None = None,
     source_root: Path | None = None,
+    skill_dirs: Mapping[str, Path] | None = None,
     owner_prefix: str = OWNER_PREFIX,
     identity_prefix: str = "agents/skills",
-    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
     on_takeover: OnTakeover = "skip",
 ) -> SkillsPlan:
-    """Compile expected first-party runtime and ownership decisions without writes."""
+    """Compile expected Agent runtime and ownership decisions without writes."""
     repo = root.expanduser().absolute()
     base_home = (home or Path.home()).expanduser().absolute()
     state = _state_home(base_home, state_home)
-    base_target = (target_root or base_home / ".agents" / "skills").expanduser().absolute()
-    base_target = assert_path_confined(base_home, base_target)
+    base_target = assert_path_confined(
+        base_home, (target_root or base_home / ".agents" / "skills").expanduser().absolute()
+    )
     resolved_source_root = (source_root or repo / "agents" / "skills").expanduser().absolute()
     expected = collect_runtime_files(
         repo, base_home, base_target, render_skill,
         source_root=resolved_source_root,
+        skill_dirs=skill_dirs,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
-        identity_suffixes=identity_suffixes,
         include_unlisted=include_unlisted,
         only_ids=only_ids,
     )
@@ -660,7 +624,6 @@ def compile_skills_plan(
         source_root=resolved_source_root,
         owner_prefix=owner_prefix,
         identity_prefix=identity_prefix,
-        identity_suffixes=identity_suffixes,
         include_unlisted=include_unlisted,
         only_ids=only_ids,
         on_conflict=on_conflict,
@@ -680,7 +643,6 @@ def compile_owned_plan(
     source_root: Path,
     owner_prefix: str,
     identity_prefix: str,
-    identity_suffixes: Mapping[str, str] | None = None,
     include_unlisted: bool = False,
     only_ids: frozenset[str] | None = None,
     on_conflict: OnConflict = "block",
@@ -697,19 +659,18 @@ def compile_owned_plan(
     }
     operations: list[RuntimeOperation] = []
     expected_targets = {item.target for item in expected}
-    conflict_kw = {"on_conflict": on_conflict, "on_takeover": on_takeover}
+    kw = {"on_conflict": on_conflict, "on_takeover": on_takeover}
 
     if snapshot.status == "malformed":
         for item in expected:
-            actual = _read_actual(home, Path(item.target))
+            actual = _inspect_target(home, target_root, Path(item.target))
             operations.append(_conflict(
                 item.target, item.source_identity, item.expected_hash, actual, None,
-                "agents manifest is malformed or incompatible", item, None,
-                **conflict_kw,
+                "agents manifest is malformed or incompatible", item, None, **kw,
             ))
     else:
         for item in expected:
-            actual = _read_actual(home, Path(item.target))
+            actual = _inspect_target(home, target_root, Path(item.target))
             prior = prior_by_target.get(item.target)
             if prior is None:
                 if actual.state == "missing":
@@ -717,44 +678,53 @@ def compile_owned_plan(
                         "create", "create", item.target, item.source_identity,
                         item.expected_hash, None, None, None, item, None, "missing",
                     ))
+                elif actual.state == "symlink":
+                    operations.append(_conflict(
+                        item.target, item.source_identity, item.expected_hash, actual, None,
+                        SYMLINK_CONFLICT, item, None, **kw,
+                    ))
+                elif actual.state == "unsafe":
+                    operations.append(_conflict(
+                        item.target, item.source_identity, item.expected_hash, actual, None,
+                        actual.detail or "target path contains an unsafe type", item, None, **kw,
+                    ))
                 else:
                     operations.append(_conflict(
                         item.target, item.source_identity, item.expected_hash, actual, None,
-                        "target exists without agents ownership", item, None,
-                        **conflict_kw,
+                        ADOPT_REASON, item, None, **kw,
                     ))
                 continue
+
             if actual.state == "missing":
-                # A missing target has no local bytes to protect. Recreate it
-                # even when a lock update moved our ownership identity, instead
-                # of treating the stale manifest entry as a blocking conflict.
                 operations.append(RuntimeOperation(
                     "create", "create", item.target, item.source_identity,
                     item.expected_hash, None, prior.installed_hash, None, item, prior, "missing",
                 ))
-            elif prior.owner != item.owner or prior.source_identity != item.source_identity:
+            elif prior.owner != item.owner:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, IDENTITY_MISMATCH, item, prior,
-                    **conflict_kw,
+                    prior.installed_hash, IDENTITY_MISMATCH, item, prior, **kw,
                 ))
             elif actual.state == "unsafe":
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, "target path contains a symlink or unsafe type", item, prior,
-                    **conflict_kw,
+                    prior.installed_hash, actual.detail or "target path contains an unsafe type",
+                    item, prior, **kw,
+                ))
+            elif actual.state == "symlink":
+                operations.append(_conflict(
+                    item.target, item.source_identity, item.expected_hash, actual,
+                    prior.installed_hash, SYMLINK_CONFLICT, item, prior, **kw,
                 ))
             elif actual.digest != prior.installed_hash:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, CONTENT_DRIFT, item, prior,
-                    **conflict_kw,
+                    prior.installed_hash, CONTENT_DRIFT, item, prior, **kw,
                 ))
             elif actual.mode != prior.mode:
                 operations.append(_conflict(
                     item.target, item.source_identity, item.expected_hash, actual,
-                    prior.installed_hash, MODE_DRIFT, item, prior,
-                    **conflict_kw,
+                    prior.installed_hash, MODE_DRIFT, item, prior, **kw,
                 ))
             elif actual.digest == item.expected_hash and actual.mode == item.mode:
                 operations.append(RuntimeOperation(
@@ -783,36 +753,39 @@ def compile_owned_plan(
                 normalized = assert_path_confined(home, target)
                 normalized.relative_to(target_root)
             except (OSError, PathBoundaryError, ValueError):
-                actual = _Actual("unsafe", None)
                 operations.append(_conflict(
-                    prior.target, prior.source_identity, None, actual, prior.installed_hash,
-                    outside_root_message, None, prior,
-                    **conflict_kw,
+                    prior.target, prior.source_identity, None, _Actual("unsafe", None),
+                    prior.installed_hash, outside_root_message, None, prior, **kw,
                 ))
                 continue
-            actual = _read_actual(home, normalized)
+            actual = _inspect_target(home, target_root, normalized)
             if actual.state == "unsafe":
                 operations.append(_conflict(
                     prior.target, prior.source_identity, None, actual, prior.installed_hash,
-                    "stale target path contains a symlink or unsafe type", None, prior,
-                    **conflict_kw,
+                    actual.detail or "stale target path contains an unsafe type", None, prior, **kw,
                 ))
-            elif actual.state == "present" and actual.digest != prior.installed_hash:
+            elif actual.state == "symlink":
                 if on_conflict == "backup":
-                    # The desired set no longer holds this file. Preserve the
-                    # locally modified bytes in the backup directory, then let
-                    # the prune proceed instead of blocking the whole Skill.
                     operations.append(RuntimeOperation(
                         "prune", "prune", prior.target, prior.source_identity, None,
-                        actual.digest, prior.installed_hash,
-                        "stale owned target was modified locally", None, prior,
-                        actual.state, True,
+                        None, prior.installed_hash, SYMLINK_CONFLICT, None, prior, "symlink", True,
                     ))
                 else:
                     operations.append(_conflict(
                         prior.target, prior.source_identity, None, actual, prior.installed_hash,
-                        "stale owned target was modified locally", None, prior,
-                        **conflict_kw,
+                        SYMLINK_CONFLICT, None, prior, **kw,
+                    ))
+            elif actual.state == "present" and actual.digest != prior.installed_hash:
+                if on_conflict == "backup":
+                    operations.append(RuntimeOperation(
+                        "prune", "prune", prior.target, prior.source_identity, None,
+                        actual.digest, prior.installed_hash,
+                        "stale owned target was modified locally", None, prior, "present", True,
+                    ))
+                else:
+                    operations.append(_conflict(
+                        prior.target, prior.source_identity, None, actual, prior.installed_hash,
+                        "stale owned target was modified locally", None, prior, **kw,
                     ))
             else:
                 operations.append(RuntimeOperation(
@@ -838,7 +811,6 @@ def compile_owned_plan(
         on_conflict,
         on_takeover,
         isolate_by_skill,
-        identity_suffixes=identity_suffixes,
     )
 
 
@@ -847,11 +819,7 @@ def _ensure_state(home: Path, state_home: Path) -> Path:
     boundary = _boundary(home, directory)
     ensure_directory(boundary, state_home, mode=0o700)
     ensure_directory(boundary, directory, mode=0o700)
-    fd = open_directory_nofollow(boundary, directory)
-    try:
-        os.fchmod(fd, 0o700)
-    finally:
-        os.close(fd)
+    os.chmod(directory, 0o700)
     return directory
 
 
@@ -866,9 +834,7 @@ class AgentManifestLock:
     def __enter__(self) -> "AgentManifestLock":
         _ensure_state(self.home, self.state_home)
         path = lock_path(self.home, self.state_home)
-        self.fd = open_nofollow(
-            _boundary(self.home, path), path, os.O_RDWR | os.O_CREAT, 0o600,
-        )
+        self.fd = open_nofollow(_boundary(self.home, path), path, os.O_RDWR | os.O_CREAT, 0o600)
         if stat.S_IMODE(os.fstat(self.fd).st_mode) != 0o600:
             os.fchmod(self.fd, 0o600)
         fcntl.flock(self.fd, fcntl.LOCK_EX)
@@ -881,134 +847,13 @@ class AgentManifestLock:
             self.fd = None
 
 
-def _expected_signature(plan: SkillsPlan) -> tuple[tuple[str, str, str, int], ...]:
-    return tuple(sorted(
-        (op.target, op.source_identity, op.expected_hash or "", op.expected.mode)
-        for op in plan.operations
-        if op.expected is not None
-    ))
-
-
-def _actual_matches(operation: RuntimeOperation, actual: _Actual) -> bool:
-    if operation.remediated:
-        # Drift was accepted up front, so the lock-time re-check must not demand
-        # the very equality the conflict already reported as broken.
-        return actual.state == operation.actual_state and actual.digest == operation.current_hash
-    expected_mode = operation.expected.mode if operation.action == "chmod" and operation.prior is None else (
-        operation.prior.mode if operation.prior is not None else None
-    )
-    return (
-        actual.state == operation.actual_state
-        and actual.digest == operation.current_hash
-        and (actual.state != "present" or actual.mode == expected_mode)
-    )
-
-
-def _chmod_owned(
-    home: Path,
-    target: Path,
-    installed_hash: str,
-    current_mode: int,
-    desired_mode: int,
-) -> None:
-    parent_fd, name = open_parent_nofollow(home, target)
-    fd: int | None = None
-    try:
-        item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if stat.S_ISLNK(item.st_mode) or not stat.S_ISREG(item.st_mode):
-            raise AgentRuntimeConflict(f"unsafe owned target: {target}")
-        fd = os.open(
-            name,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-            dir_fd=parent_fd,
-        )
-        opened = os.fstat(fd)
-        if (opened.st_dev, opened.st_ino) != (item.st_dev, item.st_ino):
-            raise AgentRuntimeConflict(f"owned target changed while opening: {target}")
-        if stat.S_IMODE(opened.st_mode) != current_mode:
-            raise AgentRuntimeConflict(f"owned target mode changed after planning: {target}")
-        if _sha256(_read_fd(fd)) != installed_hash:
-            raise AgentRuntimeConflict(f"owned target changed after planning: {target}")
-        current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if (current.st_dev, current.st_ino, current.st_mode) != (
-            item.st_dev,
-            item.st_ino,
-            item.st_mode,
-        ):
-            raise AgentRuntimeConflict(f"owned target changed while reading: {target}")
-        os.fchmod(fd, desired_mode)
-        os.fsync(fd)
-        final = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if (final.st_dev, final.st_ino) != (item.st_dev, item.st_ino):
-            raise AgentRuntimeConflict(f"owned target changed during chmod: {target}")
-        if stat.S_IMODE(final.st_mode) != desired_mode:
-            raise AgentRuntimeConflict(f"owned target mode remediation failed: {target}")
-    except FileNotFoundError as exc:
-        raise AgentRuntimeConflict(f"owned target disappeared: {target}") from exc
-    except OSError as exc:
-        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
-            raise AgentRuntimeConflict(f"unsafe owned target: {target}") from exc
-        raise
-    finally:
-        if fd is not None:
-            os.close(fd)
-        os.close(parent_fd)
-
-
-def _unlink_owned(home: Path, target: Path, installed_hash: str) -> None:
-    parent_fd, name = open_parent_nofollow(home, target)
-    fd: int | None = None
-    try:
-        item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if stat.S_ISLNK(item.st_mode) or not stat.S_ISREG(item.st_mode):
-            raise AgentRuntimeConflict(f"unsafe stale target: {target}")
-        fd = os.open(
-            name,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-            dir_fd=parent_fd,
-        )
-        opened = os.fstat(fd)
-        if (opened.st_dev, opened.st_ino) != (item.st_dev, item.st_ino):
-            raise AgentRuntimeConflict(f"stale target changed while opening: {target}")
-        content = _read_fd(fd)
-        current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if (current.st_dev, current.st_ino) != (item.st_dev, item.st_ino):
-            raise AgentRuntimeConflict(f"stale target changed while reading: {target}")
-        if _sha256(content) != installed_hash:
-            raise AgentRuntimeConflict(f"stale target was modified locally: {target}")
-        os.unlink(name, dir_fd=parent_fd)
-        os.fsync(parent_fd)
-    except FileNotFoundError:
-        return
-    except OSError as exc:
-        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
-            raise AgentRuntimeConflict(f"unsafe stale target: {target}") from exc
-        raise
-    finally:
-        if fd is not None:
-            os.close(fd)
-        os.close(parent_fd)
-
-
-def _remove_empty_parents(home: Path, target_root: Path, start: Path) -> None:
+def _remove_empty_parents(target_root: Path, start: Path) -> None:
     current = start
-    while current != target_root and current != home:
+    while current != target_root:
         try:
-            parent_fd, name = open_parent_nofollow(home, current)
-        except (FileNotFoundError, OSError):
+            os.rmdir(current)
+        except OSError:
             return
-        try:
-            item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-            if not stat.S_ISDIR(item.st_mode) or stat.S_ISLNK(item.st_mode):
-                return
-            os.rmdir(name, dir_fd=parent_fd)
-            os.fsync(parent_fd)
-        except (FileNotFoundError, OSError) as exc:
-            if isinstance(exc, OSError) and exc.errno not in (errno.ENOENT, errno.ENOTEMPTY, errno.EEXIST):
-                raise
-            return
-        finally:
-            os.close(parent_fd)
         current = current.parent
 
 
@@ -1028,38 +873,6 @@ def _write_manifest(home: Path, state_home: Path, manifest: ManagedManifest) -> 
         sensitive=True,
     )
     return path
-
-
-def _repair_manifest_mode(
-    home: Path,
-    state_home: Path,
-    snapshot: _ManifestSnapshot,
-) -> _ManifestSnapshot:
-    if snapshot.status != "ok" or snapshot.mode == 0o600:
-        return snapshot
-    if snapshot.digest is None or snapshot.mode is None:
-        raise AgentRuntimeConflict("agents manifest mode cannot be safely repaired")
-    path = manifest_path(home, state_home)
-    try:
-        fd = open_nofollow(_boundary(home, path), path)
-    except (OSError, PathBoundaryError) as exc:
-        raise AgentRuntimeConflict("agents manifest became unsafe during mode repair") from exc
-    try:
-        item = os.fstat(fd)
-        if not stat.S_ISREG(item.st_mode) or _sha256(_read_fd(fd)) != snapshot.digest:
-            raise AgentRuntimeConflict("agents manifest changed during mode repair")
-        os.fchmod(fd, 0o600)
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-    verified = _read_manifest(home, state_home)
-    if (
-        verified.status != "ok"
-        or verified.digest != snapshot.digest
-        or verified.mode != 0o600
-    ):
-        raise AgentRuntimeConflict("agents manifest mode remediation could not be verified")
-    return verified
 
 
 def _managed_item(expected: RuntimeFile, run_id: str) -> ManagedItem:
@@ -1082,11 +895,8 @@ def apply_skills_plan(
     *,
     run_id: str | None = None,
 ) -> SkillsApplyResult:
-    """Apply a skills plan under the Agent manifest lock.
+    """Apply a skills plan under the Agent manifest lock."""
 
-    A concurrent equivalent run is allowed to turn create/update into unchanged;
-    source expectations must remain byte-identical to the caller's plan.
-    """
     def compile_current() -> SkillsPlan:
         return compile_skills_plan(
             Path(plan.repo_root),
@@ -1097,7 +907,6 @@ def apply_skills_plan(
             source_root=Path(plan.source_root),
             owner_prefix=plan.owner_prefix,
             identity_prefix=plan.identity_prefix,
-            identity_suffixes=plan.identity_suffixes,
             include_unlisted=plan.include_unlisted,
             only_ids=plan.only_ids,
             on_conflict=plan.on_conflict,
@@ -1107,26 +916,12 @@ def apply_skills_plan(
     return apply_owned_plan(plan, compile_current, run_id=run_id)
 
 
-def _quarantined_skills(
-    plan: SkillsPlan,
-    blocking: list[RuntimeOperation],
-) -> set[str]:
-    """Skill ids to quarantine so the rest of the run can proceed.
-
-    A conflict the plan cannot attribute to one Skill directory has no smaller
-    unit to isolate, so it aborts the whole run instead of being swallowed.
-    """
+def _quarantined_skills(plan: SkillsPlan, blocking: list[RuntimeOperation]) -> set[str]:
     skipped: set[str] = set()
     for operation in blocking:
-        skill_id = (
-            skill_id_from_target(operation.target, plan.target_root)
-            if plan.isolate_by_skill
-            else None
-        )
+        skill_id = skill_id_from_target(operation.target, plan.target_root) if plan.isolate_by_skill else None
         if skill_id is None:
-            raise AgentRuntimeConflict(
-                f"{operation.target}: {operation.conflict or 'conflict outside skills root'}"
-            )
+            raise AgentRuntimeConflict(f"{operation.target}: {operation.conflict or 'conflict outside skills root'}")
         skipped.add(skill_id)
     return skipped
 
@@ -1135,9 +930,8 @@ def _plan_excluding_skills(plan: SkillsPlan, skip: frozenset[str]) -> SkillsPlan
     if not skip:
         return plan
     kept = tuple(
-        operation
-        for operation in plan.operations
-        if skill_id_from_target(operation.target, plan.target_root) not in skip
+        op for op in plan.operations
+        if skill_id_from_target(op.target, plan.target_root) not in skip
     )
     return replace(plan, operations=kept)
 
@@ -1156,82 +950,45 @@ def apply_owned_plan(
     target_root = Path(plan.target_root)
     run = run_id or generate_run_id()
     changed = 0
-    unchanged = 0
-    pruned = 0
     manifest_file = manifest_path(home, state_home)
 
     with AgentManifestLock(home, state_home):
-        current = compile_current()
-        if _expected_signature(current) != _expected_signature(plan):
-            raise AgentRuntimeConflict("runtime source changed after planning")
-        if current.manifest_status == "malformed":
-            raise AgentRuntimeConflict("agents manifest is malformed or incompatible")
         snapshot = _read_manifest(home, state_home)
-        if (
-            snapshot.status != current.manifest_status
-            or snapshot.digest != current.manifest_digest
-        ):
-            raise AgentRuntimeConflict("agents manifest changed after planning")
-        manifest_mode_changed = snapshot.status == "ok" and snapshot.mode != 0o600
-        snapshot = _repair_manifest_mode(home, state_home, snapshot)
-        if manifest_mode_changed:
+        if snapshot.status == "malformed":
+            raise AgentRuntimeConflict("agents manifest is malformed or incompatible")
+        if snapshot.status == plan.manifest_status and snapshot.digest == plan.manifest_digest:
+            current = plan
+        else:
+            current = compile_current()
+            if current.manifest_status == "malformed":
+                raise AgentRuntimeConflict("agents manifest is malformed or incompatible")
+
+        if snapshot.status == "ok" and snapshot.mode != 0o600:
+            os.chmod(manifest_file, 0o600)
             changed += 1
 
-        # Identify Skills that cannot proceed (unresolved conflicts). Equivalent
-        # unowned bytes in those Skills are left alone — Skill-atomic skip.
-        adoptable = adoptable_equivalent(current)
-        adoptable_targets = {item.target for item in adoptable}
-        blocking = [
-            operation
-            for operation in current.conflicts
-            if operation.target not in adoptable_targets
-        ]
-        skipped = _quarantined_skills(current, blocking)
+        adoptable_targets = {item.target for item in adoptable_equivalent(current)}
+        blocking = [op for op in current.conflicts if op.target not in adoptable_targets]
+        skipped = frozenset(_quarantined_skills(current, blocking))
+        skipped_priors = tuple(
+            op.prior for op in current.operations
+            if skill_id_from_target(op.target, current.target_root) in skipped and op.prior is not None
+        )
+        effective = _plan_excluding_skills(current, skipped)
 
-        # Take over unowned targets that already hold the managed bytes, then
-        # re-plan so they come back as creates under our ownership. Nothing
-        # unverified is overwritten: these bytes match what we would write.
-        released: list[tuple[Path, bytes]] = []
-        for operation in adoptable:
-            skill_id = skill_id_from_target(operation.target, current.target_root)
-            if skill_id in skipped:
-                continue
-            assert operation.expected is not None
-            target = Path(operation.target)
-            released.append((target, operation.expected.content))
-            target.unlink()
-        if released:
-            current = compile_current()
-            # Recompute skip set after replan (adopted creates no longer conflict).
-            adoptable_after = {item.target for item in adoptable_equivalent(current)}
-            skipped = _quarantined_skills(
-                current,
-                [item for item in current.conflicts if item.target not in adoptable_after],
-            )
-
-        skipped_frozen = frozenset(skipped)
-        skipped_priors = [
-            operation.prior
-            for operation in current.operations
-            if skill_id_from_target(operation.target, current.target_root) in skipped_frozen
-            and operation.prior is not None
-        ]
-        current = _plan_excluding_skills(current, skipped_frozen)
-
-        try:
-            result = _apply_operations(
-                current, home, state_home, target_root, snapshot, run,
-                changed=changed, unchanged=unchanged, pruned=pruned,
-                manifest_file=manifest_file,
-                retain_priors=tuple(skipped_priors),
-            )
-        except BaseException:
-            for target, content in released:
-                if not target.exists():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(content)
-            raise
-        return replace(result, skipped_skills=tuple(sorted(skipped_frozen)))
+        result = _apply_operations(
+            effective,
+            home,
+            state_home,
+            target_root,
+            snapshot,
+            run,
+            changed=changed,
+            manifest_file=manifest_file,
+            adoptable_targets=adoptable_targets,
+            retain_priors=skipped_priors,
+        )
+        return replace(result, skipped_skills=tuple(sorted(skipped)))
 
 
 def _apply_operations(
@@ -1243,100 +1000,98 @@ def _apply_operations(
     run: str,
     *,
     changed: int,
-    unchanged: int,
-    pruned: int,
     manifest_file: Path,
+    adoptable_targets: set[str],
     retain_priors: tuple[ManagedItem, ...] = (),
 ) -> SkillsApplyResult:
-    if current.conflicts:
-        details = "; ".join(f"{item.target}: {item.conflict}" for item in current.conflicts)
-        raise AgentRuntimeConflict(details)
+    unresolved = [op for op in current.conflicts if op.target not in adoptable_targets]
+    if unresolved:
+        raise AgentRuntimeConflict("; ".join(f"{op.target}: {op.conflict}" for op in unresolved))
 
-    retained = [
-        item for item in snapshot.manifest.items
-        if not item.owner.startswith(current.owner_prefix)
-    ]
+    retained = [item for item in snapshot.manifest.items if not item.owner.startswith(current.owner_prefix)]
     expected_items: list[ManagedItem] = list(retain_priors)
     seen_targets = {item.target for item in expected_items}
     backup_root = state_home / "dotf" / "backups"
     pruned_parents: list[Path] = []
+    unchanged = 0
+    pruned = 0
 
-    for operation in current.operations:
-        actual = _read_actual(home, Path(operation.target))
-        if not _actual_matches(operation, actual):
-            raise AgentRuntimeConflict(f"runtime target changed after planning: {operation.target}")
-        if operation.action == "none":
-            assert operation.prior is not None
-            if operation.prior.target not in seen_targets:
-                expected_items.append(operation.prior)
-                seen_targets.add(operation.prior.target)
+    def record(item: ManagedItem) -> None:
+        if item.target not in seen_targets:
+            expected_items.append(item)
+            seen_targets.add(item.target)
+        else:
+            for idx, existing in enumerate(expected_items):
+                if existing.target == item.target:
+                    expected_items[idx] = item
+                    break
+
+    for op in current.operations:
+        if op.action == "none":
+            assert op.prior is not None
+            record(op.prior)
             unchanged += 1
             continue
-        if operation.action in {"create", "update"}:
-            assert operation.expected is not None
-            result = atomic_write(
-                operation.target,
-                operation.expected.content,
+
+        if op.target in adoptable_targets:
+            assert op.expected is not None
+            if os.stat(op.target, follow_symlinks=False).st_mode & 0o777 != op.expected.mode:
+                os.chmod(op.target, op.expected.mode)
+            record(_managed_item(op.expected, run))
+            changed += 1
+            continue
+
+        if op.action in {"create", "update"}:
+            assert op.expected is not None
+            is_symlink = op.actual_state == "symlink"
+            if is_symlink:
+                _unlink_symlink_only(target_root, Path(op.target))
+            use_backup = op.action == "update" and not is_symlink
+            atomic_write(
+                op.target,
+                op.expected.content,
                 root=home,
-                format="text" if operation.target.endswith((".md", ".mdc", ".py", ".sh")) else "binary",
-                mode=operation.expected.mode,
-                backup_root=backup_root if operation.action == "update" else None,
-                run_id=run if operation.action == "update" else None,
+                format="text" if op.target.endswith((".md", ".mdc", ".py", ".sh")) else "binary",
+                mode=op.expected.mode,
+                backup_root=backup_root if use_backup else None,
+                run_id=run if use_backup else None,
                 sensitive=False,
             )
-            del result
-            item = _managed_item(operation.expected, run)
-            if item.target not in seen_targets:
-                expected_items.append(item)
-                seen_targets.add(item.target)
-            else:
-                expected_items = [item if entry.target == item.target else entry for entry in expected_items]
+            record(_managed_item(op.expected, run))
             changed += 1
             continue
-        if operation.action == "chmod":
-            assert operation.expected is not None
-            assert operation.prior is not None
-            assert actual.mode is not None
-            _chmod_owned(
-                home,
-                Path(operation.target),
-                operation.prior.installed_hash,
-                actual.mode,
-                operation.expected.mode,
+
+        if op.action == "chmod":
+            assert op.expected is not None and op.prior is not None
+            os.chmod(op.target, op.expected.mode)
+            entry = (
+                op.prior
+                if (op.prior.expected_hash == op.expected.expected_hash and op.prior.mode == op.expected.mode)
+                else _managed_item(op.expected, run)
             )
-            if (
-                operation.prior.expected_hash == operation.expected.expected_hash
-                and operation.prior.mode == operation.expected.mode
-            ):
-                entry = operation.prior
-            else:
-                entry = _managed_item(operation.expected, run)
-            if entry.target not in seen_targets:
-                expected_items.append(entry)
-                seen_targets.add(entry.target)
+            record(entry)
             changed += 1
             continue
-        if operation.action == "prune":
-            assert operation.prior is not None
-            if actual.state == "present":
-                if operation.remediated:
-                    # Preserve the locally modified bytes, then remove the
-                    # stale target in the same verified move.
-                    backup_target(
-                        operation.target,
-                        backup_root,
-                        run,
-                        home,
-                        remove_source=True,
-                    )
+
+        if op.action == "prune":
+            assert op.prior is not None
+            if op.actual_state == "symlink":
+                _unlink_symlink_only(target_root, Path(op.target))
+                pruned_parents.append(Path(op.target).parent)
+            elif op.actual_state == "present":
+                if op.remediated:
+                    backup_target(op.target, backup_root, run, home, remove_source=True)
                 else:
-                    _unlink_owned(home, Path(operation.target), operation.prior.installed_hash)
-                pruned_parents.append(Path(operation.target).parent)
+                    try:
+                        os.unlink(op.target)
+                    except FileNotFoundError:
+                        pass
+                pruned_parents.append(Path(op.target).parent)
             pruned += 1
             changed += 1
 
     for parent in sorted(set(pruned_parents), key=lambda value: len(value.parts), reverse=True):
-        _remove_empty_parents(home, target_root, parent)
+        _remove_empty_parents(target_root, parent)
 
     new_manifest = ManagedManifest(
         schema_version=MANIFEST_SCHEMA_VERSION,

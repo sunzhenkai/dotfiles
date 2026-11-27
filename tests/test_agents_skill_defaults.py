@@ -410,7 +410,7 @@ def _lock_body_for(
 
 
 def test_entry_identity_change_reowns_equivalent_third_party_bytes(
-    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
     """A relock that moves this entry's revision must not block re-attesting its bytes.
 
@@ -448,13 +448,8 @@ def test_entry_identity_change_reowns_equivalent_third_party_bytes(
     assert defaults.install_defaults(repo, dest_root=destination) == 0
     target = destination / "demo" / "SKILL.md"
     installed = target.read_bytes()
-    manifest_file = tmp_home / ".local" / "state" / "dotf" / "agents-manifest.json"
-
-    def recorded_identity() -> str:
-        items = yaml.safe_load(manifest_file.read_text(encoding="utf-8"))["items"]
-        return next(item["source_identity"] for item in items if item["target"] == str(target))
-
-    identity_before = recorded_identity()
+    mtime_before = target.stat().st_mtime_ns
+    capsys.readouterr()
 
     # Same skill bytes, but this entry's revision advanced (pure re-pin).
     next_revision = "2" * 40
@@ -474,9 +469,49 @@ def test_entry_identity_change_reowns_equivalent_third_party_bytes(
 
     assert defaults.install_defaults(repo, dest_root=destination) == 0
     assert target.read_bytes() == installed
-    identity_after = recorded_identity()
-    assert identity_after != identity_before
-    assert identity_after.endswith("demo/SKILL.md")
+    assert target.stat().st_mtime_ns == mtime_before
+    assert "changed=0" in capsys.readouterr().out
+
+
+def test_defaults_conflict_prints_error_line_with_reason(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    defaults = _load("defaults")
+    third_party = _load("third_party")
+    repo = tmp_path / "repo"
+    (repo / "agents" / "skills").mkdir(parents=True)
+    shutil.copy2(ROOT / "agents" / "runtime.yaml", repo / "agents" / "runtime.yaml")
+    checkout = tmp_path / "checkout"
+    skill = checkout / "skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\ndescription: demo\n---\nbody\n", encoding="utf-8")
+    (checkout / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    revision = "1" * 40
+    content_hash = third_party.tree_hash(skill)
+    license_hash = hashlib.sha256((checkout / "LICENSE").read_bytes()).hexdigest()
+    _write_min_repo(
+        repo, _lock_body_for(content_hash, license_hash, revision, extra_entry=False), ids=["demo"]
+    )
+
+    def acquire(lock, destination):
+        verified = third_party.verify_checkout(lock.skills[0], checkout, revision)
+        destination.mkdir(mode=0o700)
+        output = destination / "skills"
+        output.mkdir(mode=0o700)
+        shutil.copytree(verified, output / "demo")
+        return output
+
+    monkeypatch.setattr(defaults, "acquire_all", acquire)
+    destination = tmp_home / ".agents" / "skills"
+    target = destination / "demo" / "SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("foreign content\n", encoding="utf-8")
+    capsys.readouterr()
+
+    rc = defaults.install_defaults(repo, dest_root=destination, on_takeover="skip")
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "error: defaults (shared): demo:" in err
 
 
 def test_unrelated_lock_entry_does_not_move_identity(

@@ -1,4 +1,4 @@
-"""agents sync 失败必须点名阶段，RESULT 不能只写 agents sync failed。"""
+"""agents sync 失败必须点名阶段与原因，RESULT 不能只写 agents sync failed。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SYNC_SH = ROOT / "scripts" / "modules" / "agents" / "sync.sh"
+SYNC_ALL = ROOT / "src" / "agents" / "sync_all.py"
 CONFIG_SH = ROOT / "scripts" / "modules" / "agents" / "config.sh"
 
 sys.path.insert(0, str(ROOT / "src" / "agents"))
@@ -44,13 +45,13 @@ def _stub_agents(root: Path, *, skills_rc: int = 0, defaults_rc: int = 0, opensp
     )
 
 
-def _run_sync_sh(root: Path, home: Path) -> subprocess.CompletedProcess[str]:
+def _run_sync_all(root: Path, home: Path) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["DOTFILES_ROOT"] = str(root)
     env["XDG_STATE_HOME"] = str(home / ".local" / "state")
     return subprocess.run(
-        ["bash", str(SYNC_SH)],
+        [sys.executable, str(SYNC_ALL), "--root", str(root)],
         capture_output=True,
         text=True,
         cwd=str(ROOT),
@@ -59,12 +60,17 @@ def _run_sync_sh(root: Path, home: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def test_sync_sh_delegates_to_sync_all() -> None:
+    text = SYNC_SH.read_text(encoding="utf-8")
+    assert "src/agents/sync_all.py" in text
+
+
 def test_sync_sh_names_failed_skills_stage(tmp_path: Path) -> None:
     root = tmp_path / "root"
     home = tmp_path / "home"
     home.mkdir()
     _stub_agents(root, skills_rc=1)
-    result = _run_sync_sh(root, home)
+    result = _run_sync_all(root, home)
     combined = result.stdout + result.stderr
     assert result.returncode == 1
     assert "有阶段失败: skills" in combined
@@ -77,7 +83,7 @@ def test_sync_sh_names_every_failed_stage(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir()
     _stub_agents(root, skills_rc=1, openspec_rc=2)
-    result = _run_sync_sh(root, home)
+    result = _run_sync_all(root, home)
     combined = result.stdout + result.stderr
     assert result.returncode == 2
     assert "有阶段失败: skills, openspec" in combined
@@ -89,7 +95,7 @@ def test_sync_sh_forwards_stage_error_line_to_summary(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir()
     _stub_agents(root, defaults_rc=1)
-    result = _run_sync_sh(root, home)
+    result = _run_sync_all(root, home)
     assert result.returncode == 1
     assert "有阶段失败: defaults" in result.stderr
     assert "anti-lazy: content hash does not match lock" in result.stderr

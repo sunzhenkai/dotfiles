@@ -213,7 +213,15 @@ def test_identity_mismatch_with_drift_blocks_under_block_policy(tmp_path: Path) 
 
     result = _run(repo, home, on_conflict="block")
     assert result.returncode != 0
-    assert "manifest ownership identity differs" in result.stdout
+    assert "owned target was modified locally" in result.stdout
+
+    # Different owner within the same prefix still triggers IDENTITY_MISMATCH under block policy.
+    item["owner"] = "agents:skill:other-owner"
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    manifest.chmod(0o600)
+    owner_result = _run(repo, home, on_conflict="block")
+    assert owner_result.returncode != 0
+    assert "manifest ownership identity differs" in owner_result.stdout
     assert target.read_text(encoding="utf-8") == "local edit\n"
 
 
@@ -246,18 +254,36 @@ def test_on_conflict_backup_never_remediates_unsafe_or_malformed(tmp_path: Path)
     home.mkdir()
     assert _run(repo, home).returncode == 0
 
-    # A symlinked leaf stays fail-closed even under the backup policy.
+    # A symlinked leaf inside target_root is safely unlinked (without touching outside)
+    # under default backup policy, while --on-conflict=block preserves it.
     target = home / ".agents" / "skills" / "demo" / "SKILL.md"
     outside = tmp_path / "outside"
     outside.write_text("outside\n", encoding="utf-8")
     target.unlink()
     target.symlink_to(outside)
-    link = _run(repo, home, on_conflict="backup")
-    assert link.returncode != 0
+    blocked = _run(repo, home, on_conflict="block")
+    assert blocked.returncode != 0
+    assert os.path.islink(target)
     assert outside.read_text(encoding="utf-8") == "outside\n"
 
+    unlinked = _run(repo, home, on_conflict="backup")
+    assert unlinked.returncode == 0, unlinked.stderr + unlinked.stdout
+    assert not os.path.islink(target) and target.is_file()
+    assert outside.read_text(encoding="utf-8") == "outside\n"
+
+    # A symlinked target_root itself stays fail-closed even under backup policy.
+    skills_root = home / ".agents" / "skills"
+    shutil.rmtree(skills_root)
+    outside_dir = tmp_path / "outside-dir"
+    outside_dir.mkdir()
+    skills_root.symlink_to(outside_dir, target_is_directory=True)
+    root_link = _run(repo, home, on_conflict="backup")
+    assert root_link.returncode != 0
+    assert os.path.islink(skills_root)
+    assert not (outside_dir / "demo").exists()
+
     # So does a manifest dotf cannot trust.
-    target.unlink()
+    skills_root.unlink()
     manifest = _manifest(home)
     manifest.write_text('{"schema_version": 99}\n', encoding="utf-8")
     before = manifest.read_bytes()
@@ -308,13 +334,13 @@ def test_identical_unowned_targets_are_adopted(tmp_path: Path) -> None:
 
 
 def test_intermediate_symlink_layout_is_not_adopted(tmp_path: Path) -> None:
-    """A foreign cross-layout symlink must fail closed, not unlink its target.
+    """A foreign cross-layout symlink unlinks only itself by default, and fails with symlink in strict mode.
 
     When a skill directory in one layout is itself a symlink to a sibling
     layout (for example `~/.claude/skills/demo` -> `~/.agents/skills/demo`),
-    adopting it must never follow the link and delete the sibling layout's
-    managed bytes. The intermediate link makes the leaf "unsafe", so the skill
-    is skipped and the target files survive.
+    default takeover unlinks the symlink without touching the sibling layout's
+    managed bytes and writes a real copy. Under `--takeover=skip`, it refuses
+    with a symlink reason (never misreporting as unowned).
     """
     repo = _repo(tmp_path)
     home = tmp_path / "home"
@@ -325,9 +351,6 @@ def test_intermediate_symlink_layout_is_not_adopted(tmp_path: Path) -> None:
     claude_demo = home / ".claude" / "skills" / "demo"
     managed = (shared_demo / "SKILL.md").read_bytes()
 
-    # Drop only claude ownership for demo, as if a foreign installer had put
-    # its own layout entry there, then replace the real directory with a
-    # symlink to the shared layout.
     data = json.loads(_manifest(home).read_text(encoding="utf-8"))
     data["items"] = [
         item for item in data["items"] if "/.claude/skills/demo/" not in item["target"]
@@ -337,17 +360,20 @@ def test_intermediate_symlink_layout_is_not_adopted(tmp_path: Path) -> None:
     shutil.rmtree(claude_demo)
     claude_demo.symlink_to(shared_demo, target_is_directory=True)
 
-    result = _run(repo, home)
-
-    assert result.returncode != 0, result.stderr + result.stdout
-    # The foreign symlink stays put and the shared layout is untouched: the
-    # bug would follow the link and unlink these managed bytes.
+    strict = _run(repo, home, on_takeover="skip")
+    assert strict.returncode != 0
     assert os.path.islink(claude_demo)
+    assert "symlink" in strict.stdout
+    assert "unowned" not in strict.stdout
+    assert (shared_demo / "SKILL.md").read_bytes() == managed
+
+    remediated = _run(repo, home)
+    assert remediated.returncode == 0, remediated.stderr + remediated.stdout
+    assert not os.path.islink(claude_demo) and claude_demo.is_dir()
+    assert (claude_demo / "SKILL.md").read_bytes() == managed
     assert (shared_demo / "SKILL.md").read_bytes() == managed
     assert (shared_demo / "references" / "guide.md").read_bytes() == b"guide\n"
     assert (shared_demo / "scripts" / "run.sh").read_bytes() == b"#!/bin/sh\n"
-    assert "skipped=demo" in result.stdout
-    assert "unowned" in result.stdout
 
 
 def test_divergent_unowned_targets_taken_over_by_default(tmp_path: Path) -> None:
@@ -452,33 +478,46 @@ def test_unknown_on_conflict_policy_fails_closed(tmp_path: Path) -> None:
 
 def test_parent_and_leaf_symlink_attacks_are_preserved(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
-    for leaf in (False, True):
-        home = tmp_path / ("leaf-home" if leaf else "parent-home")
-        home.mkdir()
-        outside = tmp_path / ("leaf-outside" if leaf else "parent-outside")
-        outside.mkdir()
-        if leaf:
-            target_dir = home / ".agents" / "skills" / "demo"
-            target_dir.mkdir(parents=True)
-            outside_file = outside / "victim"
-            outside_file.write_text("outside\n", encoding="utf-8")
-            (target_dir / "SKILL.md").symlink_to(outside_file)
-            attacked = target_dir / "SKILL.md"
-        else:
-            (home / ".agents").mkdir()
-            (home / ".agents" / "skills").symlink_to(outside, target_is_directory=True)
-            outside_file = outside / "sentinel"
-            outside_file.write_text("outside\n", encoding="utf-8")
-            attacked = home / ".agents" / "skills"
-        link_before = os.readlink(attacked)
-        result = _run(repo, home)
-        assert result.returncode != 0
-        assert outside_file.read_text(encoding="utf-8") == "outside\n"
-        # The attacked layout is preserved verbatim. Sibling layouts are
-        # independent, so they may still install and record their own entries.
-        assert os.path.islink(attacked)
-        assert os.readlink(attacked) == link_before
-        assert not (outside / "demo").exists()
+    # 1. Parent root symlink (~/.agents/skills -> outside) is always fail-closed.
+    parent_home = tmp_path / "parent-home"
+    parent_home.mkdir()
+    parent_outside = tmp_path / "parent-outside"
+    parent_outside.mkdir()
+    (parent_home / ".agents").mkdir()
+    (parent_home / ".agents" / "skills").symlink_to(parent_outside, target_is_directory=True)
+    outside_sentinel = parent_outside / "sentinel"
+    outside_sentinel.write_text("outside\n", encoding="utf-8")
+    attacked_root = parent_home / ".agents" / "skills"
+    link_before = os.readlink(attacked_root)
+    result = _run(repo, parent_home)
+    assert result.returncode != 0
+    assert outside_sentinel.read_text(encoding="utf-8") == "outside\n"
+    assert os.path.islink(attacked_root)
+    assert os.readlink(attacked_root) == link_before
+    assert not (parent_outside / "demo").exists()
+
+    # 2. Leaf symlink inside target_root: preserved under strict --takeover=skip,
+    # unlinked (without touching outside) under default backup policy.
+    leaf_home = tmp_path / "leaf-home"
+    leaf_home.mkdir()
+    leaf_outside = tmp_path / "leaf-outside"
+    leaf_outside.mkdir()
+    target_dir = leaf_home / ".agents" / "skills" / "demo"
+    target_dir.mkdir(parents=True)
+    outside_file = leaf_outside / "victim"
+    outside_file.write_text("outside\n", encoding="utf-8")
+    attacked_leaf = target_dir / "SKILL.md"
+    attacked_leaf.symlink_to(outside_file)
+
+    strict = _run(repo, leaf_home, on_takeover="skip")
+    assert strict.returncode != 0
+    assert os.path.islink(attacked_leaf)
+    assert outside_file.read_text(encoding="utf-8") == "outside\n"
+
+    default_run = _run(repo, leaf_home)
+    assert default_run.returncode == 0, default_run.stderr + default_run.stdout
+    assert not os.path.islink(attacked_leaf) and attacked_leaf.is_file()
+    assert outside_file.read_text(encoding="utf-8") == "outside\n"
 
 
 def test_stale_sidecar_and_whole_skill_prune_when_unmodified(tmp_path: Path) -> None:

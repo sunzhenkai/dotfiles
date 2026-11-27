@@ -206,18 +206,28 @@ def tree_hash(directory: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_checkout(lock: LockedSkill, checkout: Path, revision: str) -> Path:
+def verify_checkout(
+    lock: LockedSkill,
+    checkout: Path,
+    revision: str,
+    *,
+    verified_licenses: set[tuple[str, str]] | None = None,
+) -> Path:
     if revision != lock.revision:
         raise ThirdPartyLockError(f"{lock.id}: acquired revision does not match lock")
-    license_path = checkout / lock.license.file
-    try:
-        license_path.relative_to(checkout)
-    except ValueError as exc:
-        raise ThirdPartyLockError(f"{lock.id}: license path escapes checkout") from exc
-    if license_path.is_symlink() or not license_path.is_file():
-        raise ThirdPartyLockError(f"{lock.id}: locked license file is missing or unsafe")
-    if hashlib.sha256(license_path.read_bytes()).hexdigest() != lock.license.hash:
-        raise ThirdPartyLockError(f"{lock.id}: license hash does not match lock")
+    license_key = (lock.license.file, lock.license.hash)
+    if verified_licenses is None or license_key not in verified_licenses:
+        license_path = checkout / lock.license.file
+        try:
+            license_path.relative_to(checkout)
+        except ValueError as exc:
+            raise ThirdPartyLockError(f"{lock.id}: license path escapes checkout") from exc
+        if license_path.is_symlink() or not license_path.is_file():
+            raise ThirdPartyLockError(f"{lock.id}: locked license file is missing or unsafe")
+        if hashlib.sha256(license_path.read_bytes()).hexdigest() != lock.license.hash:
+            raise ThirdPartyLockError(f"{lock.id}: license hash does not match lock")
+        if verified_licenses is not None:
+            verified_licenses.add(license_key)
     skill = checkout / lock.subdirectory
     try:
         skill.relative_to(checkout)
@@ -345,6 +355,18 @@ def _fetch_checkout(
     _checkout(destination, revision, run=run)
 
 
+def _paths_materialized(checkout: Path, items: Sequence[LockedSkill]) -> bool:
+    """Fast check for warm cache hits: avoid spawning git when all locked paths exist."""
+    for item in items:
+        lic = checkout / item.license.file
+        marker = checkout / item.subdirectory / "SKILL.md"
+        if lic.is_symlink() or not lic.is_file():
+            return False
+        if marker.is_symlink() or not marker.is_file():
+            return False
+    return True
+
+
 def _obtain_checkout(
     source: str,
     revision: str,
@@ -355,10 +377,13 @@ def _obtain_checkout(
 ) -> Path:
     """Return a checkout of the locked revision, reusing a cached one without network."""
     entry = _cache_entry(root, source, revision)
-    if entry.is_dir() and not entry.is_symlink() and _at_revision(entry, revision, run=run):
-        _select(entry, items, run=run)
-        _checkout(entry, revision, run=run)
-        return entry
+    if entry.is_dir() and not entry.is_symlink():
+        if _paths_materialized(entry, items):
+            return entry
+        if _at_revision(entry, revision, run=run):
+            _select(entry, items, run=run)
+            _checkout(entry, revision, run=run)
+            return entry
     if root.is_symlink():
         raise ThirdPartyLockError("checkout cache directory is a symlink")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -381,6 +406,25 @@ def _obtain_checkout(
     return entry
 
 
+def resolve_locked_skills(
+    lock: ThirdPartyLock,
+    *,
+    run: Run = subprocess.run,
+    cache: Path | None = None,
+) -> dict[str, Path]:
+    """Ensure every lock entry is cached and verified; return `{skill_id: verified_dir}`."""
+    cache_root = _cache_root(cache)
+    resolved: dict[str, Path] = {}
+    for source, revision, items in _grouped(lock.skills):
+        checkout = _obtain_checkout(source, revision, items, cache_root, run=run)
+        verified_licenses: set[tuple[str, str]] = set()
+        for item in items:
+            resolved[item.id] = verify_checkout(
+                item, checkout, revision, verified_licenses=verified_licenses
+            )
+    return resolved
+
+
 def acquire_all(
     lock: ThirdPartyLock,
     destination: Path,
@@ -388,21 +432,10 @@ def acquire_all(
     run: Run = subprocess.run,
     cache: Path | None = None,
 ) -> Path:
-    """Acquire every lock entry into private staging and verify all before returning.
-
-    Entries sharing a source and revision share one checkout, that checkout holds
-    only the locked paths, and a cached one costs no network at all.
-    """
+    """Acquire every lock entry into private staging and verify all before returning."""
     destination.mkdir(mode=0o700, parents=True, exist_ok=False)
     skills_root = destination / "skills"
     skills_root.mkdir(mode=0o700)
-    cache_root = _cache_root(cache)
-    for source, revision, items in _grouped(lock.skills):
-        checkout = _obtain_checkout(source, revision, items, cache_root, run=run)
-        for item in items:
-            verified = verify_checkout(item, checkout, revision)
-            target = skills_root / item.id
-            shutil.copytree(verified, target, symlinks=False)
-            if tree_hash(target) != item.content_hash:
-                raise ThirdPartyLockError(f"{item.id}: staged copy changed after verification")
+    for skill_id, verified in resolve_locked_skills(lock, run=run, cache=cache).items():
+        shutil.copytree(verified, skills_root / skill_id, symlinks=False)
     return skills_root

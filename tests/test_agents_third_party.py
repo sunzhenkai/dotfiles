@@ -126,6 +126,23 @@ def test_acquire_all_refuses_a_tampered_cache(tmp_path: Path) -> None:
         third_party.acquire_all(lock, tmp_path / "second", cache=cache)
 
 
+def test_warm_cache_uses_zero_git_subprocesses(tmp_path: Path) -> None:
+    checkout = _upstream(tmp_path)
+    lock = _lock(checkout, "alpha", "beta")
+    cache = tmp_path / "cache"
+    third_party.resolve_locked_skills(lock, cache=cache)
+
+    calls: list[list[str]] = []
+
+    def counting_run(*args, **kwargs):
+        calls.append(args[0])
+        return subprocess.run(*args, **kwargs)
+
+    resolved = third_party.resolve_locked_skills(lock, run=counting_run, cache=cache)
+    assert sorted(resolved) == ["alpha", "beta"]
+    assert calls == []
+
+
 def test_git_timeout_is_reported_as_a_lock_error(tmp_path: Path) -> None:
     def timing_out(*args, **kwargs):
         raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout", 0))

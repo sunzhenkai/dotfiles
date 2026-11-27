@@ -57,10 +57,7 @@ LAYOUTS: tuple[SkillLayout, ...] = (SHARED, CLAUDE)
 SHARED_LAYOUT = SHARED
 LAYOUTS_BY_KEY = {layout.key: layout for layout in LAYOUTS}
 
-# Identity bases per source; `identity_prefix` appends the layout's suffix. The
-# third-party base is completed with a per-entry suffix by the caller
-# (`defaults.entry_identity_suffixes`), so one entry's relock leaves the others'
-# identities alone.
+# Identity bases per source; `identity_prefix` appends the layout's suffix.
 FIRST_PARTY_IDENTITY = "agents/skills"
 THIRD_PARTY_IDENTITY = "agents/skills.lock.yaml"
 OPENSPEC_IDENTITY = "openspec-cli"

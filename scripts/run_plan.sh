@@ -411,6 +411,15 @@ for action_pos in "${!ACTIONS[@]}"; do
       "$st" "$module" "$action" "${_d:-0}" "${_e:-0}" "${_reason:-$st}")")
   fi
   if [ "$rc" -ne 0 ] || [ "$st" = "failed" ]; then
+    if action_quiet "$action" && [ -s "$out.sani" ]; then
+      tail_lines="$(grep -Ev '^(RESULT|PROGRESS)'$'\t' "$out.sani" | grep -v '^[[:space:]]*$' | tail -n 25 || true)"
+      if [ -n "$tail_lines" ]; then
+        printf '  日志尾部 (%s/%s):\n' "$module" "$action" >&2
+        while IFS= read -r tail_line; do
+          printf '    %s\n' "$tail_line" >&2
+        done <<<"$tail_lines"
+      fi
+    fi
     state_finish_action "$_a_idx" failed failed "${_d:-0}" "${_e:-$rc}" "${_reason:-handler failed}"
   else
     state_finish_action "$_a_idx" completed "$st" "${_d:-0}" "${_e:-0}" "${_reason:-$st}"

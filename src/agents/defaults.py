@@ -4,17 +4,16 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
+import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional, Sequence
-import sys
 
 _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from ensure_pyyaml import ensure_yaml
 from layouts import (
     LAYOUTS,
     SHARED_LAYOUT,
@@ -35,16 +34,23 @@ from managed_runtime import (
     compile_skills_plan,
     on_conflict_from_env,
     on_takeover_from_env,
+    skill_id_from_target,
 )
 from skills_catalog import (
     SkillsCatalogError,
     load_skills_catalog,
     validate_first_party_coverage,
 )
-from sync import renderers_for
-from third_party import LockedSkill, ThirdPartyLock, ThirdPartyLockError, acquire_all, load_lock
+from sync import SyncOutcome, renderers_for
+from third_party import (
+    ThirdPartyLock,
+    ThirdPartyLockError,
+    acquire_all,
+    load_lock,
+    resolve_locked_skills,
+)
 
-_yaml = ensure_yaml()
+_DEFAULT_ACQUIRE_ALL = acquire_all
 CATALOG_REL = Path("agents") / "skills.yaml"
 LOCK_REL = Path("agents") / "skills.lock.yaml"
 
@@ -59,9 +65,7 @@ def first_party_skill_ids(root: Path) -> List[str]:
 
 
 def catalog_skill_ids(root: Path) -> List[str]:
-    """Every catalogued id, including `optional` ones. The automatic full
-    install covers the non-optional ids; optional entries install on demand
-    through overlay enable / `dotf agents skill apply`."""
+    """Every catalogued id, including `optional` ones."""
     return load_skills_catalog(root).ids()
 
 
@@ -71,13 +75,7 @@ def load_skills_lock(root: Path) -> ThirdPartyLock:
 
 
 def load_catalog(root: Path) -> ThirdPartyLock:
-    """Validate the unified catalog against the strict lock and return the lock.
-
-    Invariants:
-    - first-party directories and catalogued first-party ids must agree;
-    - every third-party catalogue id must be covered by the strict lock;
-    - no first-party id may appear in the lock (no source confusion).
-    """
+    """Validate the unified catalog against the strict lock and return the lock."""
     try:
         catalog = load_skills_catalog(root)
     except SkillsCatalogError as exc:
@@ -114,15 +112,7 @@ def _destination_specs(
     return tuple((layout, skills_target(layout)) for layout in LAYOUTS)
 
 
-def entry_identity_suffixes(items: Sequence[LockedSkill]) -> dict[str, str]:
-    """Per-entry identity component: what this entry is, not which lock it sits in."""
-    return {
-        item.id: hashlib.sha256(f"{item.revision}\0{item.content_hash}".encode("utf-8")).hexdigest()[:32]
-        for item in items
-    }
-
-
-def install_defaults(
+def sync_defaults(
     root: Path,
     *,
     dry_run: bool = False,
@@ -130,8 +120,8 @@ def install_defaults(
     dest_roots: Optional[Sequence[Path]] = None,
     on_conflict: OnConflict | None = None,
     on_takeover: OnTakeover | None = None,
-) -> int:
-    """Verify the strict lock; apply only bytes acquired and checked in private staging."""
+) -> list[SyncOutcome]:
+    """Verify the strict lock and install selected third-party skills; return per-layout outcomes."""
     lock = load_catalog(root)
     from desired_set import resolve_skill_desired_set
 
@@ -145,6 +135,7 @@ def install_defaults(
         else _destination_specs(dest_roots)
     )
     if dry_run:
+        outcomes: list[SyncOutcome] = []
         for layout, destination in destinations:
             print(f"==> locked default skills ({layout.key}) → {destination}")
             for item in selected:
@@ -153,63 +144,104 @@ def install_defaults(
                     f"license={item.license.spdx} audit={item.audit.status}@{item.audit.date}/{item.audit.tool}"
                 )
             print(f"  done defaults ({layout.key}, plan): locked={len(selected)} network=none writes=none")
-        return 0
+            outcomes.append(SyncOutcome(f"defaults ({layout.key})", 0))
+        return outcomes
 
-    rc = 0
-    try:
-        with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
-            staging = Path(temporary) / "acquired"
-            from dataclasses import replace
+    outcomes = []
+    only_ids = frozenset(item.id for item in selected)
 
-            filtered = replace(lock, skills=selected)
-            source_root = acquire_all(filtered, staging) if selected else staging / "empty"
-            if not selected:
-                source_root.mkdir(parents=True, exist_ok=True)
-            for layout, destination in destinations:
-                print(f"==> defaults  {layout.key}  planning…", flush=True)
-                home = home_for_target(destination)
-                renderer = renderers_for(layout)
-                try:
-                    plan = compile_skills_plan(
-                        root,
-                        renderer,
-                        home=home,
-                        target_root=destination,
-                        source_root=source_root,
-                        owner_prefix=owner_prefix(layout, "third-party"),
-                        identity_prefix=identity_prefix(layout, THIRD_PARTY_IDENTITY),
-                        identity_suffixes=entry_identity_suffixes(selected),
-                        include_unlisted=True,
-                        only_ids=frozenset(item.id for item in selected),
-                        on_conflict=policy,
-                        on_takeover=takeover,
-                    )
-                    adoptable = {item.target for item in adoptable_equivalent(plan)}
-                    for operation in plan.conflicts:
-                        if operation.target in adoptable:
-                            continue
-                        print(
-                            f"  ✗ {operation.target}: {operation.conflict or 'conflict'}",
-                            file=sys.stderr,
-                            flush=True,
-                        )
-                    result = apply_skills_plan(plan, renderer)
-                    skipped = ",".join(result.skipped_skills) if result.skipped_skills else ""
+    def _apply_for_destinations(
+        *, source_root: Path | None = None, skill_dirs: dict[str, Path] | None = None
+    ) -> None:
+        for layout, destination in destinations:
+            print(f"==> defaults  {layout.key}  planning…", flush=True)
+            home = home_for_target(destination)
+            renderer = renderers_for(layout)
+            try:
+                plan = compile_skills_plan(
+                    root,
+                    renderer,
+                    home=home,
+                    target_root=destination,
+                    source_root=source_root,
+                    skill_dirs=skill_dirs,
+                    owner_prefix=owner_prefix(layout, "third-party"),
+                    identity_prefix=identity_prefix(layout, THIRD_PARTY_IDENTITY),
+                    include_unlisted=True,
+                    only_ids=only_ids,
+                    on_conflict=policy,
+                    on_takeover=takeover,
+                )
+                adoptable = {item.target for item in adoptable_equivalent(plan)}
+                blocking = [op for op in plan.conflicts if op.target not in adoptable]
+                blocked_reasons: dict[str, str] = {}
+                for operation in blocking:
+                    sid = skill_id_from_target(operation.target, destination) or "?"
+                    blocked_reasons.setdefault(sid, operation.conflict or "conflict")
                     print(
-                        f"  done defaults ({layout.key}): locked={len(lock.skills)} changed={result.changed} "
-                        f"pruned={result.pruned} unchanged={result.unchanged}"
-                        + (f" skipped={skipped}" if skipped else ""),
+                        f"  ✗ {operation.target}: {operation.conflict or 'conflict'}",
+                        file=sys.stderr,
                         flush=True,
                     )
-                    if result.skipped_skills:
-                        rc = 1
-                except (AgentRuntimeConflict, OSError, ValueError) as exc:
-                    print(f"error: locked third-party skills ({layout.key}): {exc}", file=sys.stderr)
-                    rc = 1
+                result = apply_skills_plan(plan, renderer)
+                skipped = ",".join(result.skipped_skills) if result.skipped_skills else ""
+                print(
+                    f"  done defaults ({layout.key}): locked={len(selected)} changed={result.changed} "
+                    f"pruned={result.pruned} unchanged={result.unchanged}"
+                    + (f" skipped={skipped}" if skipped else ""),
+                    flush=True,
+                )
+                if result.skipped_skills:
+                    first_sid = result.skipped_skills[0]
+                    detail = f"{first_sid}: {blocked_reasons.get(first_sid, 'conflict')}"
+                    print(f"error: defaults ({layout.key}): {detail}", file=sys.stderr, flush=True)
+                    outcomes.append(SyncOutcome(f"defaults ({layout.key})", 1, detail))
+                else:
+                    outcomes.append(SyncOutcome(f"defaults ({layout.key})", 0))
+            except (AgentRuntimeConflict, OSError, ValueError) as exc:
+                print(f"error: defaults ({layout.key}): {exc}", file=sys.stderr)
+                outcomes.append(SyncOutcome(f"defaults ({layout.key})", 1, str(exc)))
+
+    try:
+        filtered = replace(lock, skills=selected)
+        if not selected:
+            with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
+                empty_root = Path(temporary) / "empty"
+                empty_root.mkdir(parents=True, exist_ok=True)
+                _apply_for_destinations(source_root=empty_root)
+        elif acquire_all is _DEFAULT_ACQUIRE_ALL:
+            skill_dirs = resolve_locked_skills(filtered)
+            _apply_for_destinations(skill_dirs=skill_dirs)
+        else:
+            with tempfile.TemporaryDirectory(prefix="dotf-third-party-") as temporary:
+                staging = Path(temporary) / "acquired"
+                source_root = acquire_all(filtered, staging)
+                _apply_for_destinations(source_root=source_root)
     except (ThirdPartyLockError, OSError, ValueError) as exc:
-        print(f"error: locked third-party skills: {exc}", file=sys.stderr)
-        return 1
-    return rc
+        print(f"error: defaults: {exc}", file=sys.stderr)
+        return [SyncOutcome("defaults", 1, str(exc))]
+    return outcomes
+
+
+def install_defaults(
+    root: Path,
+    *,
+    dry_run: bool = False,
+    dest_root: Optional[Path] = None,
+    dest_roots: Optional[Sequence[Path]] = None,
+    on_conflict: OnConflict | None = None,
+    on_takeover: OnTakeover | None = None,
+) -> int:
+    """Verify the strict lock; apply selected third-party skills."""
+    outcomes = sync_defaults(
+        root,
+        dry_run=dry_run,
+        dest_root=dest_root,
+        dest_roots=dest_roots,
+        on_conflict=on_conflict,
+        on_takeover=on_takeover,
+    )
+    return max((item.rc for item in outcomes), default=0)
 
 
 def main(argv: Optional[List[str]] = None) -> int:

@@ -231,37 +231,22 @@ def _install_all_catalog_skills(ctx: Ctx, argv: list[str]) -> int:
 
     ctx.export()
     print("==> skills -c  安装编目全部 skill", flush=True)
-    steps = (
-        ("--- skills ---", "sync.py"),
-        ("--- default skills ---", "defaults.py"),
-        ("--- openspec skills ---", "openspec_skills.py"),
+    agents_dir = str(SRC_DIR / "agents")
+    if agents_dir not in sys.path:
+        sys.path.insert(0, agents_dir)
+    import sync_all  # noqa: E402
+
+    results = sync_all.run_sync(
+        REPO_ROOT,
+        skills_only=True,
+        dry_run=ctx.dry_run,
+        on_conflict=ctx.on_conflict or None,  # type: ignore[arg-type]
+        on_takeover=ctx.on_takeover or None,  # type: ignore[arg-type]
+        verbose=ctx.verbose,
     )
-    failed = 0
-    failed_steps: list[str] = []
-    for label, script in steps:
-        print(label, flush=True)
-        cmd = [
-            "python3",
-            str(SRC_DIR / "agents" / script),
-            "--root",
-            str(REPO_ROOT),
-        ]
-        if ctx.dry_run:
-            cmd.append("--dry-run")
-        if ctx.on_conflict:
-            cmd += ["--on-conflict", ctx.on_conflict]
-        if ctx.on_takeover:
-            cmd += ["--takeover", ctx.on_takeover]
-        if ctx.verbose:
-            cmd.append("--verbose")
-        rc = subprocess.run(cmd, env=python_env()).returncode
-        if rc != 0:
-            print(f"warning: {script} 失败（退出码 {rc}）", flush=True)
-            failed_steps.append(script.removesuffix(".py"))
-            failed = rc
-    if failed:
-        named = ", ".join(failed_steps) if failed_steps else "unknown"
-        raise DotfError("handler", f"skills -c 有阶段失败: {named}（退出码 {failed}）")
+    failed_rc, summary, _details = sync_all.format_failure_summary(results)
+    if failed_rc:
+        raise DotfError("handler", summary)
     print("✓ skills 全量安装完成")
     return 0
 

@@ -26,7 +26,6 @@ for _path in (_SRC, _SRC / "agents"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from defaults import entry_identity_suffixes  # noqa: E402
 from desired_set import resolve_skill_desired_set  # noqa: E402
 from layouts import (  # noqa: E402
     LAYOUTS,
@@ -143,6 +142,8 @@ def _finding(op: RuntimeOperation, target_root: Path) -> str | None:
         return f"missing {relative}"
     if op.action == "update":
         return f"content {relative}"
+    if op.actual_state == "symlink":
+        return f"symlink {relative}"
     if op.actual_state == "unsafe":
         return f"unsafe {relative}"
     if op.state == "conflict":
@@ -186,7 +187,6 @@ def _check_layout(
         source_root=staging,
         owner_prefix=owner_prefix(layout, "third-party"),
         identity_prefix=identity_prefix(layout, THIRD_PARTY_IDENTITY),
-        identity_suffixes=entry_identity_suffixes(items),
         include_unlisted=True,
         only_ids=frozenset(item.id for item in items),
         # Verification reports raw drift: strict policies keep local edits and
