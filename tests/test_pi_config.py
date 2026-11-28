@@ -174,7 +174,19 @@ def test_compact_output_extension_only_replaces_renderers() -> None:
     assert 'registerCommand("compact-output"' in source
     assert "LEADING_CD" not in source
     assert "compactDirLabel" not in source
-    for symbol in ("bashDescription", "formatBashCall", "Container"):
+    for symbol in (
+        "bashDescription",
+        "formatBashCall",
+        "Container",
+        "setHiddenThinkingLabel",
+        "setWorkingMessage",
+        "session_start",
+        "tool_execution_start",
+        "tool_execution_end",
+        "agent_end",
+        '"quiet"',
+        '"compact"',
+    ):
         assert symbol in source
     for tool in ("read", "edit", "write", "bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
         assert tool in source

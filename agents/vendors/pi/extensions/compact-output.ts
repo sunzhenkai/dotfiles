@@ -1,6 +1,7 @@
-// 全工具无框单行紧凑渲染：成功只留一行摘要，失败附末 3 行，展开（Ctrl+O）看完整详情。
+// 极简输出渲染：默认 quiet 模式彻底隐藏思考占位（setHiddenThinkingLabel("")）与成功工具行，
+// 仅在工作指示器（setWorkingMessage）实时提示当前工具，失败时保留错误与末 3 行，展开（Ctrl+O）看完整详情。
 // 只替换 renderResult / renderCall（并设 renderShell: "self"），不重注册工具、不影响模型上下文。
-// 支持 /compact-output [on|off|status] 运行时切换；用户问答工具直通原生渲染。
+// 支持 /compact-output [quiet|compact|off|status] 运行时切换；用户问答工具直通原生渲染。
 // 下发位置：~/.pi/agent/extensions/compact-output.ts（dotf pi -c）
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
@@ -44,7 +45,19 @@ const EMPTY_COMPONENT = {
   invalidate() {},
 };
 
-let compactEnabled = true;
+type OutputMode = "quiet" | "compact" | "off";
+
+let outputMode: OutputMode = "quiet";
+
+interface UiContext {
+  hasUI?: boolean;
+  cwd?: string;
+  ui?: {
+    notify?: (msg: string, level?: string) => void;
+    setHiddenThinkingLabel?: (label?: string) => void;
+    setWorkingMessage?: (message?: string) => void;
+  };
+}
 
 interface Theme {
   fg(token: string, value: string): string;
@@ -73,6 +86,7 @@ interface RenderContext {
   args?: Record<string, unknown>;
   cwd?: string;
   durationMs?: number;
+  expanded?: boolean;
   isError?: boolean;
   state?: Record<string, unknown>;
 }
@@ -375,30 +389,89 @@ function summarize(
 }
 
 export default function (pi: ExtensionAPI) {
+  const activeTools = new Map<string, string>();
+
+  function applyUiPreferences(ctx: UiContext | undefined) {
+    if (!ctx?.hasUI) return;
+    if (outputMode === "off") {
+      ctx.ui?.setHiddenThinkingLabel?.();
+      ctx.ui?.setWorkingMessage?.();
+    } else {
+      ctx.ui?.setHiddenThinkingLabel?.("");
+    }
+  }
+
+  function syncWorkingMessage(ctx: UiContext | undefined) {
+    if (!ctx?.hasUI) return;
+    if (outputMode !== "quiet" || activeTools.size === 0) {
+      ctx.ui?.setWorkingMessage?.();
+      return;
+    }
+    const labels = [...activeTools.values()];
+    const current = labels[labels.length - 1];
+    const suffix = labels.length > 1 ? ` (+${labels.length - 1})` : "";
+    ctx.ui?.setWorkingMessage?.(`${current}${suffix}`);
+  }
+
+  pi.on("session_start", (_event, ctx) => {
+    activeTools.clear();
+    applyUiPreferences(ctx as UiContext);
+    syncWorkingMessage(ctx as UiContext);
+  });
+
+  pi.on("tool_execution_start", (event, ctx) => {
+    if (event.parentToolCallId || PASSTHROUGH_TOOLS.has(event.toolName)) return;
+    const uiCtx = ctx as UiContext | undefined;
+    activeTools.set(
+      event.toolCallId,
+      formatCallLabel(event.toolName, event.args as Record<string, unknown> | undefined, uiCtx?.cwd),
+    );
+    syncWorkingMessage(uiCtx);
+  });
+
+  pi.on("tool_execution_end", (event, ctx) => {
+    activeTools.delete(event.toolCallId);
+    syncWorkingMessage(ctx as UiContext);
+  });
+
+  pi.on("agent_end", (_event, ctx) => {
+    activeTools.clear();
+    syncWorkingMessage(ctx as UiContext);
+  });
+
   pi.registerCommand("compact-output", {
-    description: "Toggle compact single-line tool output (on/off/status)",
-    handler: async (args: string, ctx: { ui?: { notify?: (msg: string, level?: string) => void } }) => {
+    description: "Switch tool & thinking output mode (quiet/compact/off/status)",
+    handler: async (args: string, ctx: UiContext) => {
       const arg = (args ?? "").trim().toLowerCase();
-      if (arg === "on") compactEnabled = true;
-      else if (arg === "off") compactEnabled = false;
-      else if (arg !== "status") compactEnabled = !compactEnabled;
-      ctx?.ui?.notify?.(`compact-output: ${compactEnabled ? "on" : "off"}`, "info");
+      if (arg === "quiet" || arg === "on") outputMode = "quiet";
+      else if (arg === "compact" || arg === "line") outputMode = "compact";
+      else if (arg === "off") outputMode = "off";
+      else if (arg !== "status") {
+        outputMode = outputMode === "quiet" ? "compact" : outputMode === "compact" ? "off" : "quiet";
+      }
+      applyUiPreferences(ctx);
+      syncWorkingMessage(ctx);
+      ctx?.ui?.notify?.(`compact-output: ${outputMode}`, "info");
     },
   });
 
   pi.registerToolRenderer((toolName, next) => {
-    if (!compactEnabled || PASSTHROUGH_TOOLS.has(toolName)) return next();
+    if (outputMode === "off" || PASSTHROUGH_TOOLS.has(toolName)) return next();
     const base = next();
     return {
       renderShell: "self" as const,
       renderCall(args, theme, context) {
-        if (!compactEnabled && base?.renderCall) {
+        if (outputMode === "off" && base?.renderCall) {
           return base.renderCall(args, theme, context);
         }
         const ctx = context as RenderContext | undefined;
+        const state = ctx?.state as { callText?: Text } | undefined;
+        if (outputMode === "quiet" && !ctx?.expanded) {
+          if (state) state.callText = undefined;
+          return EMPTY_COMPONENT;
+        }
         const label = formatCallLabel(toolName, args as Record<string, unknown> | undefined, ctx?.cwd);
         const line = (theme as Theme).fg("muted", `… ${label}`);
-        const state = ctx?.state as { callText?: Text } | undefined;
         if (state?.callText && typeof state.callText.setText === "function") {
           state.callText.setText(line);
           return state.callText;
@@ -408,7 +481,7 @@ export default function (pi: ExtensionAPI) {
         return text;
       },
       renderResult(result, options, theme, context) {
-        if (!compactEnabled && base?.renderResult) {
+        if (outputMode === "off" && base?.renderResult) {
           return base.renderResult(result, options, theme, context);
         }
         const opts = (options ?? {}) as RenderOptions;
@@ -419,6 +492,9 @@ export default function (pi: ExtensionAPI) {
         const hasCallSlot = Boolean(callText && typeof callText.setText === "function");
 
         if (opts.isPartial) {
+          if (outputMode === "quiet" && !opts.expanded) {
+            return EMPTY_COMPONENT;
+          }
           return hasCallSlot ? EMPTY_COMPONENT : new Text(typedTheme.fg("muted", "… 运行中"), 0, 0);
         }
 
@@ -468,7 +544,15 @@ export default function (pi: ExtensionAPI) {
             return container;
           }
 
-          if (outputComp) return outputComp;
+          if (outputComp) {
+            if (!hasCallSlot) {
+              const container = new Container();
+              container.addChild(new Text(headline, 0, 0));
+              container.addChild(outputComp);
+              return container;
+            }
+            return outputComp;
+          }
 
           const bodyText = summary.body ? typedTheme.fg("toolOutput", summary.body) : "";
           if (!hasCallSlot) {
@@ -478,6 +562,9 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (summary.ok) {
+          if (outputMode === "quiet") {
+            return EMPTY_COMPONENT;
+          }
           return hasCallSlot ? EMPTY_COMPONENT : new Text(headline, 0, 0);
         }
 
