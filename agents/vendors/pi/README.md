@@ -53,7 +53,8 @@ dotf pi -c
 |------|------|
 | `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管键（`quietStartup: true` 等布尔、`powerline`）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
 | `extensions/exit.ts` | 本地扩展：注册 `/exit` 命令退出 pi（`ctx.shutdown()`） |
-| `extensions/compact-output.ts` | 本地扩展：全工具无框单行摘要（`renderShell: "self"` + `renderCall`/`renderResult` 合并），覆盖 `read`/`edit`/`write`/`bash`/`grep`/`find`/`ls`/`ff*`/`mcp__*` 与扩展工具；失败附末 3 行，展开（`Ctrl+O`）看完整详情，支持 `/compact-output [on\|off]` 切换；问答工具直通原生渲染，不影响模型收到的输出 |
+| `extensions/compact-output.ts` | 本地扩展：全工具无框单行摘要（`renderShell: "self"` + `renderCall`/`renderResult` 合并），覆盖 `read`/`edit`/`write`/`bash`/`grep`/`find`/`ls`/`ff*`/`mcp__*` 与扩展工具；`bash` 自动剥离同目录 `cd ... &&` 前缀并将跨目录 `cd` 缩为 `[dir]`；失败附末 3 行，展开（`Ctrl+O`）看完整详情，支持 `/compact-output [on\|off]` 切换；问答工具直通原生渲染，不影响模型收到的输出 |
+| `APPEND_SYSTEM.md` | 追加到 Pi 全局 system prompt 的交互约定（多步工具调用间简短汇报阶段进展、避免冗余 `cd <cwd> &&`） |
 | 其余文件 | 按源逐字同步 |
 
 运行时目录（`npm/`、`sessions/`、`auth.json`、`mcp*.json`、`models*.json`、`trust.json` 等）在 `modules.yaml` 的 `preserve` 中，**不被接管也不被清理**。

@@ -172,8 +172,21 @@ def test_compact_output_extension_only_replaces_renderers() -> None:
     assert "renderCall" in source
     assert "renderResult" in source
     assert 'registerCommand("compact-output"' in source
+    for symbol in ("LEADING_CD", "formatBashCall", "compactDirLabel"):
+        assert symbol in source
     for tool in ("read", "edit", "write", "bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
         assert tool in source
     # 展现层不引入外部依赖
     assert "import type { ExtensionAPI }" in source
     assert '"@earendil-works/pi-tui"' in source
+
+
+def test_append_system_prompt_guides_progress_and_cd() -> None:
+    append_system = VENDOR / "APPEND_SYSTEM.md"
+    assert append_system.is_file()
+    text = append_system.read_text(encoding="utf-8").strip()
+    assert text
+    assert "进展" in text
+    assert "cd" in text
+    assert not re.search(r"\bsk-[A-Za-z0-9]{8,}\b", text)
+    assert not re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", text)

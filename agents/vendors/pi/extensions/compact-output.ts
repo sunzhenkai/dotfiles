@@ -25,6 +25,7 @@ const BASH_TRAILER =
 const BASH_EXIT_CODE = /\n\nCommand exited with code (\d+)$/;
 const BASH_TRUNCATION = /\n\n\[Showing (?:last|lines) [\s\S]*\]$/;
 const LIST_NOTICE = /\n\n\[[\s\S]*\]$/;
+const LEADING_CD = /^cd\s+(?:(?:"([^"]+)"|'([^']+)'|([^\s;&|]+)))\s*(?:&&|;|\n)\s*([\s\S]+)$/;
 const ANSI_PATTERN = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const KEY_ARG_NAMES = [
@@ -115,6 +116,77 @@ function shortPath(rawPath: unknown, cwd?: string): string {
   return singleLine(value);
 }
 
+function normalizeDir(dir: string): string {
+  let value = dir.trim();
+  const home = typeof process !== "undefined" ? process.env?.HOME : undefined;
+  if (home) {
+    const cleanHome = home.length > 1 ? home.replace(/\/+$/, "") : home;
+    if (value === "~") value = cleanHome;
+    else if (value.startsWith("~/")) value = `${cleanHome}/${value.slice(2)}`;
+  }
+  if (value.length > 1) {
+    value = value.replace(/\/+$/, "");
+  }
+  return value;
+}
+
+function resolveEffectiveCwd(cwd?: string): string | undefined {
+  if (cwd && cwd.trim()) return cwd.trim();
+  if (typeof process !== "undefined" && typeof process.cwd === "function") {
+    try {
+      return process.cwd();
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function compactDirLabel(rawTarget: string, effectiveCwd?: string): string {
+  const target = normalizeDir(rawTarget);
+  if (effectiveCwd) {
+    const normCwd = normalizeDir(effectiveCwd);
+    const prefix = normCwd === "/" ? "/" : `${normCwd}/`;
+    if (target.startsWith(prefix)) {
+      const rel = target.slice(prefix.length);
+      if (rel && rel.length <= 24) return rel;
+    }
+  }
+  const home = typeof process !== "undefined" ? process.env?.HOME : undefined;
+  if (home && target === normalizeDir(home)) return "~";
+  if (target === "/") return "/";
+  const parts = target.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? target;
+}
+
+function formatBashCall(rawCommand: unknown, cwd?: string): string {
+  if (typeof rawCommand !== "string") return "$ (empty)";
+  const cleaned = stripAnsi(rawCommand).trim();
+  if (!cleaned) return "$ (empty)";
+
+  const match = LEADING_CD.exec(cleaned);
+  if (match) {
+    const rawTarget = (match[1] ?? match[2] ?? match[3] ?? "").trim();
+    const rest = (match[4] ?? "").trim();
+    if (rawTarget && rest && !rawTarget.startsWith("-")) {
+      const effectiveCwd = resolveEffectiveCwd(cwd);
+      const isSameDir =
+        rawTarget === "." ||
+        rawTarget === "./" ||
+        rawTarget === "$PWD" ||
+        rawTarget === "${PWD}" ||
+        (effectiveCwd !== undefined && normalizeDir(rawTarget) === normalizeDir(effectiveCwd));
+      if (isSameDir) {
+        return singleLine(`$ ${rest}`);
+      }
+      const dirLabel = compactDirLabel(rawTarget, effectiveCwd);
+      return singleLine(`[${dirLabel}] $ ${rest}`);
+    }
+  }
+
+  return singleLine(`$ ${cleaned}`);
+}
+
 function firstArgValue(args: Record<string, unknown> | undefined, cwd?: string): string {
   if (!args) return "";
   for (const key of KEY_ARG_NAMES) {
@@ -154,8 +226,7 @@ function formatCallLabel(
   }
 
   if (toolName === "bash") {
-    const cmd = typeof args?.command === "string" ? singleLine(args.command) : "";
-    return cmd ? `$ ${cmd}` : "$ (empty)";
+    return formatBashCall(args?.command, cwd);
   }
 
   if (toolName === "grep" || toolName === "ffgrep" || toolName === "fff-multi-grep") {
