@@ -27,6 +27,7 @@ echo "==> bash -n syntax"
 "$BASH_BIN" -n scripts/lib/runner.sh
 "$BASH_BIN" -n scripts/lib/compat_adapter.sh
 "$BASH_BIN" -n scripts/lib/config_safe.sh
+"$BASH_BIN" -n scripts/lib/bin_resolve.sh
 "$BASH_BIN" -n scripts/lib/handler_common.sh
 "$BASH_BIN" -n scripts/lib/doctor_l0.sh
 "$BASH_BIN" -n scripts/lib/doctor_run.sh

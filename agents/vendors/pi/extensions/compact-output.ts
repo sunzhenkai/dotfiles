@@ -1,11 +1,10 @@
-// 内置工具行的紧凑显示：成功只留一行摘要，失败给末 3 行，展开时看全文。
-// 只替换 renderResult，renderCall 和执行逻辑沿用 pi 原生实现。
+// 全工具无框单行紧凑渲染：成功只留一行摘要，失败附末 3 行，展开（Ctrl+O）看完整详情。
+// 只替换 renderResult / renderCall（并设 renderShell: "self"），不重注册工具、不影响模型上下文。
+// 支持 /compact-output [on|off|status] 运行时切换；用户问答工具直通原生渲染。
 // 下发位置：~/.pi/agent/extensions/compact-output.ts（dotf pi -c）
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
-// grep/find/ls 是内置名，ffgrep/fffind/fff-multi-grep 是 pi-fff 的替代名：
-// 内置搜索工具默认不在 defaultTools 里，实际会话走 fff，两套都要覆盖。
 const LIST_TOOLS: Record<string, { unit: string; emptyLabel: string; emptyText: string }> = {
   grep: { unit: "行", emptyLabel: "无匹配", emptyText: "No matches found" },
   ffgrep: { unit: "行", emptyLabel: "无匹配", emptyText: "No matches found" },
@@ -14,15 +13,38 @@ const LIST_TOOLS: Record<string, { unit: string; emptyLabel: string; emptyText: 
   fffind: { unit: "个", emptyLabel: "无匹配", emptyText: "No files found matching pattern" },
   ls: { unit: "项", emptyLabel: "空目录", emptyText: "(empty directory)" },
 };
-const SUMMARY_TOOLS = new Set(["bash", ...Object.keys(LIST_TOOLS)]);
+
+const PASSTHROUGH_TOOLS = new Set(["ask_user_question", "askUserQuestion", "AskUserQuestion"]);
 const FAILURE_TAIL_LINES = 3;
+const MAX_LABEL_LEN = 72;
+const MAX_INLINE_RESULT_LEN = 48;
 const SLOW_MS = 1000;
+
 const BASH_TRAILER =
   /\n\n(?:Command exited with code (\d+)|Command aborted|Command timed out after [\s\S]*|Command terminated without an exit code)$/;
 const BASH_EXIT_CODE = /\n\nCommand exited with code (\d+)$/;
 const BASH_TRUNCATION = /\n\n\[Showing (?:last|lines) [\s\S]*\]$/;
 const LIST_NOTICE = /\n\n\[[\s\S]*\]$/;
 const ANSI_PATTERN = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+
+const KEY_ARG_NAMES = [
+  "path",
+  "file_path",
+  "query",
+  "url",
+  "command",
+  "name",
+  "id",
+  "pattern",
+  "title",
+] as const;
+
+const EMPTY_COMPONENT = {
+  render: () => [] as string[],
+  invalidate() {},
+};
+
+let compactEnabled = true;
 
 interface Theme {
   fg(token: string, value: string): string;
@@ -37,6 +59,8 @@ interface ToolResult {
     resultLimitReached?: number;
     entryLimitReached?: number;
     linesTruncated?: boolean;
+    diff?: string;
+    patch?: string;
   };
 }
 
@@ -46,8 +70,11 @@ interface RenderOptions {
 }
 
 interface RenderContext {
+  args?: Record<string, unknown>;
+  cwd?: string;
   durationMs?: number;
   isError?: boolean;
+  state?: Record<string, unknown>;
 }
 
 interface Summary {
@@ -57,13 +84,129 @@ interface Summary {
   notice?: string;
 }
 
+function stripAnsi(text: string): string {
+  return text.replace(ANSI_PATTERN, "").replace(/\r/g, "");
+}
+
+function singleLine(text: string, maxLen = MAX_LABEL_LEN): string {
+  const clean = stripAnsi(text).replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return `${clean.slice(0, Math.max(1, maxLen - 1))}…`;
+}
+
+function shortPath(rawPath: unknown, cwd?: string): string {
+  if (typeof rawPath !== "string" || !rawPath.trim()) return "";
+  let value = rawPath.trim();
+  if (cwd) {
+    const normalizedCwd = cwd.endsWith("/") ? cwd : `${cwd}/`;
+    if (value === cwd) return ".";
+    if (value.startsWith(normalizedCwd)) {
+      value = value.slice(normalizedCwd.length);
+    }
+  }
+  const home = typeof process !== "undefined" ? process.env?.HOME : undefined;
+  if (home) {
+    const normalizedHome = home.endsWith("/") ? home : `${home}/`;
+    if (value === home) return "~";
+    if (value.startsWith(normalizedHome)) {
+      value = `~/${value.slice(normalizedHome.length)}`;
+    }
+  }
+  return singleLine(value);
+}
+
+function firstArgValue(args: Record<string, unknown> | undefined, cwd?: string): string {
+  if (!args) return "";
+  for (const key of KEY_ARG_NAMES) {
+    const val = args[key];
+    if (typeof val === "string" && val.trim()) {
+      return key === "path" || key === "file_path" ? shortPath(val, cwd) : singleLine(val, 40);
+    }
+  }
+  return "";
+}
+
+function formatCallLabel(
+  toolName: string,
+  args: Record<string, unknown> | undefined,
+  cwd?: string,
+): string {
+  const pathVal = shortPath(args?.path ?? args?.file_path, cwd);
+
+  if (toolName === "read") {
+    const offset = typeof args?.offset === "number" ? args.offset : undefined;
+    const limit = typeof args?.limit === "number" ? args.limit : undefined;
+    let range = "";
+    if (offset !== undefined && limit !== undefined && limit > 0) {
+      range = `:L${offset}-${offset + limit - 1}`;
+    } else if (offset !== undefined) {
+      range = `:L${offset}+`;
+    }
+    return singleLine(`Read ${pathVal || "(unknown)"}${range}`);
+  }
+
+  if (toolName === "edit") {
+    return singleLine(`Edit ${pathVal || "(unknown)"}`);
+  }
+
+  if (toolName === "write") {
+    return singleLine(`Write ${pathVal || "(unknown)"}`);
+  }
+
+  if (toolName === "bash") {
+    const cmd = typeof args?.command === "string" ? singleLine(args.command) : "";
+    return cmd ? `$ ${cmd}` : "$ (empty)";
+  }
+
+  if (toolName === "grep" || toolName === "ffgrep" || toolName === "fff-multi-grep") {
+    const pattern = typeof args?.pattern === "string" ? singleLine(args.pattern, 32) : "";
+    const inPart = pathVal ? ` in ${pathVal}` : "";
+    return singleLine(`Grep "${pattern}"${inPart}`);
+  }
+
+  if (toolName === "find" || toolName === "fffind") {
+    const query =
+      typeof args?.pattern === "string"
+        ? singleLine(args.pattern, 32)
+        : typeof args?.query === "string"
+          ? singleLine(args.query, 32)
+          : "";
+    const inPart = pathVal ? ` in ${pathVal}` : "";
+    return singleLine(`Find ${query || "*"}${inPart}`);
+  }
+
+  if (toolName === "ls") {
+    return singleLine(`Ls ${pathVal || "."}`);
+  }
+
+  if (toolName === "web_search") {
+    const query = typeof args?.query === "string" ? singleLine(args.query, 44) : "";
+    return singleLine(`Search "${query}"`);
+  }
+
+  if (toolName === "web_fetch" || toolName === "fetch_content") {
+    const url = typeof args?.url === "string" ? singleLine(args.url, 56) : "";
+    return singleLine(`Fetch ${url}`);
+  }
+
+  if (toolName.startsWith("mcp__")) {
+    const parts = toolName.slice(5).split("__");
+    const displayName = parts.length >= 2 ? `${parts[0]}/${parts.slice(1).join("_")}` : toolName;
+    const hint = firstArgValue(args, cwd);
+    return singleLine(hint ? `${displayName} ${hint}` : displayName);
+  }
+
+  const hint = firstArgValue(args, cwd);
+  return singleLine(hint ? `${toolName} ${hint}` : toolName);
+}
+
 function textOf(result: ToolResult): string {
-  return (result.content ?? [])
-    .filter((block) => block.type === "text")
-    .map((block) => block.text ?? "")
-    .join("\n")
-    .replace(ANSI_PATTERN, "")
-    .replace(/\r/g, "");
+  return stripAnsi(
+    (result.content ?? [])
+      .filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("\n"),
+  );
 }
 
 function lineCount(text: string): number {
@@ -75,8 +218,12 @@ function lastLines(text: string, count: number): string {
   return lines.slice(-count).join("\n");
 }
 
-function durationSuffix(context: RenderContext): string {
-  const ms = context.durationMs;
+function firstNonEmptyLine(text: string): string {
+  return text.split("\n").find((line) => line.trim() !== "") ?? "";
+}
+
+function durationSuffix(context: RenderContext | undefined): string {
+  const ms = context?.durationMs;
   if (typeof ms !== "number" || ms < SLOW_MS) return "";
   return ` · ${(ms / 1000).toFixed(1)}s`;
 }
@@ -99,7 +246,7 @@ function summarizeBash(result: ToolResult, raw: string, isError: boolean): Summa
 function summarizeList(tool: string, result: ToolResult, raw: string, isError: boolean): Summary {
   const body = raw.replace(LIST_NOTICE, "").trim();
   if (isError) {
-    const message = body.split("\n").find((line) => line.trim() !== "") ?? "失败";
+    const message = singleLine(firstNonEmptyLine(body) || "失败", 48);
     return { ok: false, headline: message, body };
   }
   const details = result.details;
@@ -110,8 +257,8 @@ function summarizeList(tool: string, result: ToolResult, raw: string, isError: b
   if (details?.truncation?.truncated) notices.push("输出已截断");
   if (details?.linesTruncated) notices.push("长行已截断");
 
-  const empty = body === LIST_TOOLS[tool].emptyText;
   const spec = LIST_TOOLS[tool];
+  const empty = body === spec.emptyText;
   const headline = empty ? spec.emptyLabel : `${lineCount(body)} ${spec.unit}`;
   return {
     ok: true,
@@ -121,47 +268,186 @@ function summarizeList(tool: string, result: ToolResult, raw: string, isError: b
   };
 }
 
-function summarize(tool: string, result: ToolResult, isError: boolean): Summary {
-  const raw = textOf(result).trim();
-  return tool === "bash" ? summarizeBash(result, raw, isError) : summarizeList(tool, result, raw, isError);
+function summarizeRead(result: ToolResult, raw: string, isError: boolean): Summary {
+  if (isError) {
+    return { ok: false, headline: singleLine(firstNonEmptyLine(raw) || "失败", 48), body: raw };
+  }
+  const hasImage = (result.content ?? []).some((block) => block.type === "image");
+  if (hasImage && !raw) {
+    return { ok: true, headline: "图片", body: "" };
+  }
+  const body = raw.replace(LIST_NOTICE, "").trim();
+  const count = lineCount(body);
+  const notice = result.details?.truncation?.truncated ? "已截断" : undefined;
+  return {
+    ok: true,
+    headline: count > 0 ? `${count} 行` : "空文件",
+    body,
+    notice,
+  };
 }
 
-function renderSummary(
+function countDiffLines(diffText: string, unified: boolean): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  const addRe = unified ? /^\+(?!\+\+)/ : /^\s*\+(?!\+\+)/;
+  const delRe = unified ? /^-(?!--)/ : /^\s*-(?!--)/;
+  for (const line of stripAnsi(diffText).split("\n")) {
+    if (addRe.test(line)) added += 1;
+    else if (delRe.test(line)) removed += 1;
+  }
+  return { added, removed };
+}
+
+function summarizeEdit(result: ToolResult, raw: string, isError: boolean): Summary {
+  const diffBody = stripAnsi(result.details?.diff || result.details?.patch || raw).trim();
+  if (isError) {
+    return { ok: false, headline: singleLine(firstNonEmptyLine(raw) || "失败", 48), body: diffBody };
+  }
+  const patch = result.details?.patch;
+  const diff = result.details?.diff;
+  const stats = patch
+    ? countDiffLines(patch, true)
+    : diff
+      ? countDiffLines(diff, false)
+      : { added: 0, removed: 0 };
+  const headline =
+    stats.added > 0 || stats.removed > 0 ? `+${stats.added}/-${stats.removed}` : "已更新";
+  return { ok: true, headline, body: diffBody };
+}
+
+function summarizeWrite(
+  raw: string,
+  isError: boolean,
+  args: Record<string, unknown> | undefined,
+): Summary {
+  if (isError) {
+    return { ok: false, headline: singleLine(firstNonEmptyLine(raw) || "失败", 48), body: raw };
+  }
+  const content = typeof args?.content === "string" ? stripAnsi(args.content) : "";
+  const count = content ? content.split("\n").length : 0;
+  return {
+    ok: true,
+    headline: count > 0 ? `${count} 行` : "已写入",
+    body: content || raw,
+  };
+}
+
+function summarizeGeneric(raw: string, isError: boolean): Summary {
+  if (isError) {
+    return { ok: false, headline: singleLine(firstNonEmptyLine(raw) || "失败", 48), body: raw };
+  }
+  const count = lineCount(raw);
+  if (count === 0) {
+    return { ok: true, headline: "完成", body: "" };
+  }
+  const first = singleLine(firstNonEmptyLine(raw), MAX_INLINE_RESULT_LEN + 1);
+  if (count === 1 && first.length <= MAX_INLINE_RESULT_LEN) {
+    return { ok: true, headline: first, body: raw };
+  }
+  return { ok: true, headline: `${count} 行`, body: raw };
+}
+
+function summarize(
   tool: string,
   result: ToolResult,
-  options: RenderOptions,
-  theme: Theme,
-  context: RenderContext,
-): Text {
-  if (options.isPartial) {
-    return new Text(theme.fg("muted", "… 运行中"), 0, 0);
-  }
-
-  const summary = summarize(tool, result, context.isError === true);
-  const duration = durationSuffix(context);
-  const head = summary.ok
-    ? theme.fg("success", `✓ ${summary.headline}${duration}`)
-    : theme.fg("error", `✗ ${summary.headline}${duration}`);
-  const lines = [head];
-
-  if (options.expanded) {
-    if (summary.body) lines.push(theme.fg("toolOutput", summary.body));
-  } else if (!summary.ok) {
-    const tail = lastLines(summary.body, FAILURE_TAIL_LINES);
-    if (tail) lines.push(theme.fg("toolOutput", tail));
-  }
-  if (summary.notice) lines.push(theme.fg("muted", summary.notice));
-
-  return new Text(lines.join("\n"), 0, 0);
+  isError: boolean,
+  args: Record<string, unknown> | undefined,
+): Summary {
+  const raw = textOf(result).trim();
+  if (tool === "bash") return summarizeBash(result, raw, isError);
+  if (tool in LIST_TOOLS) return summarizeList(tool, result, raw, isError);
+  if (tool === "read") return summarizeRead(result, raw, isError);
+  if (tool === "edit") return summarizeEdit(result, raw, isError);
+  if (tool === "write") return summarizeWrite(raw, isError, args);
+  return summarizeGeneric(raw, isError);
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.registerCommand("compact-output", {
+    description: "Toggle compact single-line tool output (on/off/status)",
+    handler: async (args: string, ctx: { ui?: { notify?: (msg: string, level?: string) => void } }) => {
+      const arg = (args ?? "").trim().toLowerCase();
+      if (arg === "on") compactEnabled = true;
+      else if (arg === "off") compactEnabled = false;
+      else if (arg !== "status") compactEnabled = !compactEnabled;
+      ctx?.ui?.notify?.(`compact-output: ${compactEnabled ? "on" : "off"}`, "info");
+    },
+  });
+
   pi.registerToolRenderer((toolName, next) => {
-    if (!SUMMARY_TOOLS.has(toolName)) return next();
+    if (!compactEnabled || PASSTHROUGH_TOOLS.has(toolName)) return next();
+    const base = next();
     return {
-      ...(next() ?? {}),
+      renderShell: "self" as const,
+      renderCall(args, theme, context) {
+        if (!compactEnabled && base?.renderCall) {
+          return base.renderCall(args, theme, context);
+        }
+        const ctx = context as RenderContext | undefined;
+        const label = formatCallLabel(toolName, args as Record<string, unknown> | undefined, ctx?.cwd);
+        const line = (theme as Theme).fg("muted", `… ${label}`);
+        const state = ctx?.state as { callText?: Text } | undefined;
+        if (state?.callText && typeof state.callText.setText === "function") {
+          state.callText.setText(line);
+          return state.callText;
+        }
+        const text = new Text(line, 0, 0);
+        if (state) state.callText = text;
+        return text;
+      },
       renderResult(result, options, theme, context) {
-        return renderSummary(toolName, result as ToolResult, options, theme, context);
+        if (!compactEnabled && base?.renderResult) {
+          return base.renderResult(result, options, theme, context);
+        }
+        const opts = (options ?? {}) as RenderOptions;
+        const ctx = context as RenderContext | undefined;
+        const typedTheme = theme as Theme;
+        const state = ctx?.state as { callText?: Text } | undefined;
+        const callText = state?.callText;
+        const hasCallSlot = Boolean(callText && typeof callText.setText === "function");
+
+        if (opts.isPartial) {
+          return hasCallSlot ? EMPTY_COMPONENT : new Text(typedTheme.fg("muted", "… 运行中"), 0, 0);
+        }
+
+        const label = formatCallLabel(toolName, ctx?.args, ctx?.cwd);
+        const summary = summarize(toolName, result as ToolResult, ctx?.isError === true, ctx?.args);
+        const duration = durationSuffix(ctx);
+        const noticePart = summary.notice ? ` · ${summary.notice}` : "";
+        const headline = summary.ok
+          ? typedTheme.fg("success", `✓ ${label} · ${summary.headline}${noticePart}${duration}`)
+          : typedTheme.fg("error", `✗ ${label} ${summary.headline}${duration}`);
+
+        if (hasCallSlot) {
+          callText!.setText(headline);
+        }
+
+        if (opts.expanded) {
+          if (base?.renderResult) {
+            try {
+              const nativeComp = base.renderResult(result, options, theme, context);
+              if (nativeComp) return nativeComp;
+            } catch {
+              // 原生渲染失败时回退到纯文本输出
+            }
+          }
+          const bodyText = summary.body ? typedTheme.fg("toolOutput", summary.body) : "";
+          if (!hasCallSlot) {
+            return new Text(bodyText ? `${headline}\n${bodyText}` : headline, 0, 0);
+          }
+          return bodyText ? new Text(bodyText, 2, 0) : EMPTY_COMPONENT;
+        }
+
+        if (summary.ok) {
+          return hasCallSlot ? EMPTY_COMPONENT : new Text(headline, 0, 0);
+        }
+
+        const tail = lastLines(summary.body, FAILURE_TAIL_LINES);
+        if (hasCallSlot) {
+          return tail ? new Text(typedTheme.fg("toolOutput", tail), 2, 0) : EMPTY_COMPONENT;
+        }
+        return new Text(tail ? `${headline}\n${typedTheme.fg("toolOutput", tail)}` : headline, 0, 0);
       },
     };
   });

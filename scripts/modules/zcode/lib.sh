@@ -18,10 +18,11 @@ _ensure_zcode_path() {
 }
 
 install_zcode() {
+  local zcode_bin
   _ensure_zcode_path
 
-  if command -v zcode &>/dev/null; then
-    echo "ZCode CLI 已安装: $(command -v zcode) ($(zcode --version 2>/dev/null || echo '?'))"
+  if zcode_bin="$(dotf_resolve_bin zcode)"; then
+    echo "ZCode CLI 已安装: $zcode_bin ($(zcode --version 2>/dev/null || echo '?'))"
     return 0
   fi
 
@@ -37,10 +38,13 @@ install_zcode() {
     return 1
   fi
 
+  if command -v mise >/dev/null 2>&1; then
+    mise reshim >/dev/null 2>&1 || true
+  fi
   _ensure_zcode_path
 
-  if command -v zcode &>/dev/null; then
-    echo "✓ ZCode CLI 已就绪: $(command -v zcode)"
+  if zcode_bin="$(dotf_resolve_bin zcode)"; then
+    echo "✓ ZCode CLI 已就绪: $zcode_bin"
     return 0
   fi
 

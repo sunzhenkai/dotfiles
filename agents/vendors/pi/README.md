@@ -51,9 +51,9 @@ dotf pi -c
 
 | 文件 | 行为 |
 |------|------|
-| `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管键（telemetry 等布尔、`powerline`）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
+| `settings.json` | `packages` 取仓库默认与本机已装的**并集**；托管键（`quietStartup: true` 等布尔、`powerline`）由仓库强制；其余键（`defaultModel`、`defaultProvider`、`theme`、`lastChangelogVersion` 等）保留本机 |
 | `extensions/exit.ts` | 本地扩展：注册 `/exit` 命令退出 pi（`ctx.shutdown()`） |
-| `extensions/compact-output.ts` | 本地扩展：`bash`/`grep`/`find`/`ls`（含 pi-fff 的 `ffgrep`/`fffind`/`fff-multi-grep`）折叠态只显示一行摘要（`✓ 12 行`、`✗ exit 1 · 2.3s`），失败附末 3 行，展开（ctrl+o）看全文；只换 `renderResult`，不影响模型收到的输出 |
+| `extensions/compact-output.ts` | 本地扩展：全工具无框单行摘要（`renderShell: "self"` + `renderCall`/`renderResult` 合并），覆盖 `read`/`edit`/`write`/`bash`/`grep`/`find`/`ls`/`ff*`/`mcp__*` 与扩展工具；失败附末 3 行，展开（`Ctrl+O`）看完整详情，支持 `/compact-output [on\|off]` 切换；问答工具直通原生渲染，不影响模型收到的输出 |
 | 其余文件 | 按源逐字同步 |
 
 运行时目录（`npm/`、`sessions/`、`auth.json`、`mcp*.json`、`models*.json`、`trust.json` 等）在 `modules.yaml` 的 `preserve` 中，**不被接管也不被清理**。

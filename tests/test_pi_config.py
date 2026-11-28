@@ -62,6 +62,14 @@ def test_web_search_packages_ordered_so_provider_native_wins() -> None:
     assert packages.index("npm:pi-web-search") > packages.index("npm:pi-web-access")
 
 
+def test_vendor_display_settings_are_compact() -> None:
+    vendor = _vendor()
+    assert vendor["quietStartup"] is True
+    assert vendor["hideThinkingBlock"] is True
+    assert vendor["collapseChangelog"] is True
+    assert vendor["outputPad"] == 0
+
+
 def test_vendor_powerline_shows_tokens_and_cache_hit_rate() -> None:
     powerline = _vendor()["powerline"]
     assert powerline["preset"] == "full"
@@ -160,8 +168,11 @@ def test_compact_output_extension_only_replaces_renderers() -> None:
     # 只换渲染，不重注册工具：重注册会连带覆盖执行逻辑和工具定义里的 cwd
     assert "registerToolRenderer" in source
     assert "registerTool(" not in source
+    assert 'renderShell: "self"' in source
+    assert "renderCall" in source
     assert "renderResult" in source
-    for tool in ("bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
+    assert 'registerCommand("compact-output"' in source
+    for tool in ("read", "edit", "write", "bash", "grep", "find", "ls", "ffgrep", "fffind", "fff-multi-grep"):
         assert tool in source
     # 展现层不引入外部依赖
     assert "import type { ExtensionAPI }" in source

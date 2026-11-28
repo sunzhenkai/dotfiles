@@ -1,6 +1,6 @@
 {
   "enableSkillCommands": true,
-  "quietStartup": "header",
+  "quietStartup": true,
   "hideThinkingBlock": true,
   "collapseChangelog": true,
   "outputPad": 0,

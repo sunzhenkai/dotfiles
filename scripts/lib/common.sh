@@ -1,6 +1,11 @@
 #!/bin/bash
 # 公共工具函数
 
+if ! type dotf_resolve_bin >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bin_resolve.sh"
+fi
+
 # ============================================================
 # 计时工具函数（兼容 Bash 3.2+，不使用关联数组）
 # ============================================================

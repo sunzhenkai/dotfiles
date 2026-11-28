@@ -2,6 +2,11 @@
 # 约定式处理器公共辅助（由 modules/<name>/*.sh source）
 # 依赖: DOTFILES_ROOT, DOTF_MODULE；通常已由 runner 注入 result.sh
 
+if ! type dotf_resolve_bin >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bin_resolve.sh"
+fi
+
 dotf_handler_init() {
   : "${DOTFILES_ROOT:?DOTFILES_ROOT required}"
   export SCRIPT_DIR="$DOTFILES_ROOT"
@@ -24,14 +29,12 @@ dotf_handler_init() {
 dotf_skip_if_bin() {
   local bin_name="$1"
   local local_path="${HOME}/.local/bin/${bin_name}"
-  local resolved
 
-  resolved="$(command -v "$bin_name" 2>/dev/null || true)"
-  if [ -n "$resolved" ] && [ -e "$resolved" ] && [ -x "$resolved" ]; then
+  if dotf_resolve_bin "$bin_name" >/dev/null; then
     dotf_result_unchanged "${bin_name} already installed"
     return 0
   fi
-  if [ -e "$local_path" ] && [ -x "$local_path" ]; then
+  if [ -f "$local_path" ] && [ -x "$local_path" ]; then
     dotf_result_unchanged "${bin_name} already installed"
     return 0
   fi

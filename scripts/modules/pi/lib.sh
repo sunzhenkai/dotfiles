@@ -47,49 +47,55 @@ _ensure_pi_path() {
 install_pi_packages() {
   _ensure_pi_path
 
-  if ! command -v pi &>/dev/null; then
+  if ! dotf_resolve_bin pi >/dev/null; then
     echo "✗ pi 未安装，无法安装 packages"
     return 1
   fi
 
   local pkg
   echo "正在确保 Pi packages..."
-  # pi install 内部走 npm，镜像可能未收录这些包
-  local saved_registry="${npm_config_registry:-}"
-  export npm_config_registry=https://registry.npmjs.org
   for pkg in "${PI_DEFAULT_PACKAGES[@]}"; do
     echo "  → $pkg"
     if ! pi install "$pkg"; then
-      echo "✗ 安装失败: $pkg"
-      [[ -n "$saved_registry" ]] && export npm_config_registry="$saved_registry" || unset npm_config_registry
-      return 1
+      echo "    镜像源失败，回退官方源重试: $pkg"
+      if ! npm_config_registry=https://registry.npmjs.org pi install "$pkg"; then
+        echo "✗ 安装失败: $pkg"
+        return 1
+      fi
     fi
   done
-  [[ -n "$saved_registry" ]] && export npm_config_registry="$saved_registry" || unset npm_config_registry
 
   echo "✓ Pi packages 已就绪"
 }
 
 install_pi() {
+  local pi_bin
   _ensure_pi_path
 
-  if command -v pi &>/dev/null; then
-    echo "Pi 已安装: $(command -v pi) ($(pi --version 2>/dev/null || echo '?'))"
+  if pi_bin="$(dotf_resolve_bin pi)"; then
+    echo "Pi 已安装: $pi_bin ($(pi --version 2>/dev/null || echo '?'))"
   else
     if ! command -v npm &>/dev/null; then
       echo "✗ 需要 Node.js/npm（Node ≥ 22.19）才能安装 Pi；请先: dotf sdk -i"
       return 1
     fi
 
-    echo "正在安装 Pi coding agent（官方 install.sh）..."
-    # 无 TTY 时官方脚本会自动确认 install，不阻塞 CI/非交互
-    # 强制官方源：npmmirror 等镜像未收录 @earendil-works 包
-    curl -fsSL https://pi.dev/install.sh | npm_config_registry=https://registry.npmjs.org sh
+    echo "正在安装 Pi coding agent（npm: @earendil-works/pi-coding-agent）..."
+    if ! npm install -g @earendil-works/pi-coding-agent@latest; then
+      echo "  当前镜像源安装失败，回退官方源重试..."
+      if ! npm install -g @earendil-works/pi-coding-agent@latest --registry=https://registry.npmjs.org; then
+        echo "✗ @earendil-works/pi-coding-agent 安装失败"
+        return 1
+      fi
+    fi
 
+    if command -v mise >/dev/null 2>&1; then
+      mise reshim >/dev/null 2>&1 || true
+    fi
     _ensure_pi_path
 
-    if command -v pi &>/dev/null; then
-      echo "✓ Pi 已就绪: $(command -v pi)"
+    if pi_bin="$(dotf_resolve_bin pi)"; then
+      echo "✓ Pi 已就绪: $pi_bin"
     else
       echo "⚠️  安装完成但未找到 pi，请确认 npm 全局 bin 已在 PATH 中后重新打开终端"
       echo "  提示: npm prefix -g → 将其 /bin 加入 PATH"

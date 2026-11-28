@@ -4,6 +4,11 @@
 # 返回: 0=无 fail，1=有 fail
 # 依赖: lib/registry.sh；可选 config_safe.sh 的 expand
 
+if ! type dotf_resolve_bin >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bin_resolve.sh"
+fi
+
 # 样式与 run_plan/progress 共用同一套常量。handler 输出会被捕获再转发，
 # 这里不能用 [ -t 2 ] 判断，改看 run_plan.sh 推导好的 DOTF_COLOR。
 DOTF_D0_OK=""; DOTF_D0_ERR=""; DOTF_D0_WARN=""; DOTF_D0_DIM=""; DOTF_D0_RST=""; DOTF_D0_BOLD=""
@@ -35,7 +40,7 @@ dotf_doctor_tip() {
 dotf_doctor_l0() {
   local mod="$1"
   local failed=0
-  local target bin_name cmd
+  local target bin_name cmd resolved raw
 
   printf '%s%sdoctor (%s) — L0%s\n' "$DOTF_D0_BOLD" "$DOTF_D0_DIM" "$mod" "$DOTF_D0_RST"
 
@@ -72,17 +77,24 @@ dotf_doctor_l0() {
   if modules_has "$mod" install; then
     bin_name="$(modules_bin "$mod")"
     if [ -n "$bin_name" ]; then
-      if command -v "$bin_name" >/dev/null 2>&1; then
-        dotf_doctor_line pass "install: PATH 中找到 '$bin_name' ($(command -v "$bin_name"))"
+      if resolved="$(dotf_resolve_bin "$bin_name")"; then
+        dotf_doctor_line pass "install: PATH 中找到 '$bin_name' ($resolved)"
       else
-        dotf_doctor_line fail "install: PATH 中未找到 '$bin_name'"
+        raw="$(command -v "$bin_name" 2>/dev/null || true)"
+        if [ -n "$raw" ] && dotf_is_mise_shim "$raw"; then
+          dotf_doctor_line fail "install: '$bin_name' 命中失效 mise shim ($raw)，当前激活版本未提供该命令"
+        elif [ -n "$raw" ]; then
+          dotf_doctor_line fail "install: '$bin_name' 不可执行或为悬空链接 ($raw)"
+        else
+          dotf_doctor_line fail "install: PATH 中未找到 '$bin_name'"
+        fi
         dotf_doctor_tip "dotf $mod -i"
         failed=1
       fi
     else
       cmd="$mod"
-      if command -v "$cmd" >/dev/null 2>&1; then
-        dotf_doctor_line pass "install: PATH 中找到 '$cmd' ($(command -v "$cmd"))"
+      if resolved="$(dotf_resolve_bin "$cmd")"; then
+        dotf_doctor_line pass "install: PATH 中找到 '$cmd' ($resolved)"
       else
         dotf_doctor_line skip "install: 未声明 bin，且无法判定命令名（尝试过 '$cmd'）"
       fi
