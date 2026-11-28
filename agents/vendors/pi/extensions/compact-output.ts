@@ -3,7 +3,7 @@
 // 支持 /compact-output [on|off|status] 运行时切换；用户问答工具直通原生渲染。
 // 下发位置：~/.pi/agent/extensions/compact-output.ts（dotf pi -c）
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Container, Text } from "@earendil-works/pi-tui";
 
 const LIST_TOOLS: Record<string, { unit: string; emptyLabel: string; emptyText: string }> = {
   grep: { unit: "行", emptyLabel: "无匹配", emptyText: "No matches found" },
@@ -25,7 +25,6 @@ const BASH_TRAILER =
 const BASH_EXIT_CODE = /\n\nCommand exited with code (\d+)$/;
 const BASH_TRUNCATION = /\n\n\[Showing (?:last|lines) [\s\S]*\]$/;
 const LIST_NOTICE = /\n\n\[[\s\S]*\]$/;
-const LEADING_CD = /^cd\s+(?:(?:"([^"]+)"|'([^']+)'|([^\s;&|]+)))\s*(?:&&|;|\n)\s*([\s\S]+)$/;
 const ANSI_PATTERN = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const KEY_ARG_NAMES = [
@@ -116,75 +115,16 @@ function shortPath(rawPath: unknown, cwd?: string): string {
   return singleLine(value);
 }
 
-function normalizeDir(dir: string): string {
-  let value = dir.trim();
-  const home = typeof process !== "undefined" ? process.env?.HOME : undefined;
-  if (home) {
-    const cleanHome = home.length > 1 ? home.replace(/\/+$/, "") : home;
-    if (value === "~") value = cleanHome;
-    else if (value.startsWith("~/")) value = `${cleanHome}/${value.slice(2)}`;
-  }
-  if (value.length > 1) {
-    value = value.replace(/\/+$/, "");
-  }
-  return value;
+function bashDescription(args: Record<string, unknown> | undefined): string {
+  if (typeof args?.description !== "string") return "";
+  return stripAnsi(args.description).replace(/\s+/g, " ").trim();
 }
 
-function resolveEffectiveCwd(cwd?: string): string | undefined {
-  if (cwd && cwd.trim()) return cwd.trim();
-  if (typeof process !== "undefined" && typeof process.cwd === "function") {
-    try {
-      return process.cwd();
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
-}
-
-function compactDirLabel(rawTarget: string, effectiveCwd?: string): string {
-  const target = normalizeDir(rawTarget);
-  if (effectiveCwd) {
-    const normCwd = normalizeDir(effectiveCwd);
-    const prefix = normCwd === "/" ? "/" : `${normCwd}/`;
-    if (target.startsWith(prefix)) {
-      const rel = target.slice(prefix.length);
-      if (rel && rel.length <= 24) return rel;
-    }
-  }
-  const home = typeof process !== "undefined" ? process.env?.HOME : undefined;
-  if (home && target === normalizeDir(home)) return "~";
-  if (target === "/") return "/";
-  const parts = target.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? target;
-}
-
-function formatBashCall(rawCommand: unknown, cwd?: string): string {
-  if (typeof rawCommand !== "string") return "$ (empty)";
-  const cleaned = stripAnsi(rawCommand).trim();
-  if (!cleaned) return "$ (empty)";
-
-  const match = LEADING_CD.exec(cleaned);
-  if (match) {
-    const rawTarget = (match[1] ?? match[2] ?? match[3] ?? "").trim();
-    const rest = (match[4] ?? "").trim();
-    if (rawTarget && rest && !rawTarget.startsWith("-")) {
-      const effectiveCwd = resolveEffectiveCwd(cwd);
-      const isSameDir =
-        rawTarget === "." ||
-        rawTarget === "./" ||
-        rawTarget === "$PWD" ||
-        rawTarget === "${PWD}" ||
-        (effectiveCwd !== undefined && normalizeDir(rawTarget) === normalizeDir(effectiveCwd));
-      if (isSameDir) {
-        return singleLine(`$ ${rest}`);
-      }
-      const dirLabel = compactDirLabel(rawTarget, effectiveCwd);
-      return singleLine(`[${dirLabel}] $ ${rest}`);
-    }
-  }
-
-  return singleLine(`$ ${cleaned}`);
+function formatBashCall(args: Record<string, unknown> | undefined): string {
+  const desc = bashDescription(args);
+  if (desc) return singleLine(`$ ${desc}`);
+  const cmd = typeof args?.command === "string" ? stripAnsi(args.command).trim() : "";
+  return cmd ? singleLine(`$ ${cmd}`) : "$ (empty)";
 }
 
 function firstArgValue(args: Record<string, unknown> | undefined, cwd?: string): string {
@@ -226,7 +166,7 @@ function formatCallLabel(
   }
 
   if (toolName === "bash") {
-    return formatBashCall(args?.command, cwd);
+    return formatBashCall(args);
   }
 
   if (toolName === "grep" || toolName === "ffgrep" || toolName === "fff-multi-grep") {
@@ -495,14 +435,41 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (opts.expanded) {
+          let outputComp: { render: (width: number) => string[]; invalidate: () => void } | undefined;
           if (base?.renderResult) {
             try {
               const nativeComp = base.renderResult(result, options, theme, context);
-              if (nativeComp) return nativeComp;
+              if (nativeComp) outputComp = nativeComp;
             } catch {
               // 原生渲染失败时回退到纯文本输出
             }
           }
+
+          const expandedCommand =
+            toolName === "bash" && typeof ctx?.args?.command === "string"
+              ? stripAnsi(ctx.args.command).trim()
+              : "";
+
+          if (expandedCommand) {
+            const container = new Container();
+            if (!hasCallSlot) {
+              container.addChild(new Text(headline, 0, 0));
+            }
+            container.addChild(
+              new Text(typedTheme.fg("muted", `$ ${expandedCommand}`), hasCallSlot ? 2 : 0, 0),
+            );
+            if (outputComp) {
+              container.addChild(outputComp);
+            } else if (summary.body) {
+              container.addChild(
+                new Text(typedTheme.fg("toolOutput", summary.body), hasCallSlot ? 2 : 0, 0),
+              );
+            }
+            return container;
+          }
+
+          if (outputComp) return outputComp;
+
           const bodyText = summary.body ? typedTheme.fg("toolOutput", summary.body) : "";
           if (!hasCallSlot) {
             return new Text(bodyText ? `${headline}\n${bodyText}` : headline, 0, 0);
