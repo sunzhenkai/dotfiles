@@ -39,7 +39,6 @@ groups:
     package: https://github.com/sunzhenkai/solo-skills
     skills:
       # 2026-11-13 补编目：上游一直有、本仓先前未纳入的两个 skill。
-      - agent-docs-writer
       - agent-roster
       - anti-lazy
       - project-atlas
@@ -53,7 +52,6 @@ groups:
       - ui-kit
       - project-init
       - repo-manager
-      - role-based-reviewer
       - role-chat
       - service-manager
       # 2026-11-17 上游新增 session-wrap（solo-skills dd1d60b），会话收尾补查遗留事项。
@@ -67,9 +65,14 @@ groups:
       - wiki-data
       - visualize
       # 2026-11-23 上游 agent-api-ops 并入 project-design-patterns 的 references/，不再独立编目。
-      - project-design-patterns
       - way-to-fix
       - id: way-to-cr
+        optional: true
+      - id: agent-docs
+        optional: true
+      - id: project-patterns
+        optional: true
+      - id: role-review
         optional: true
 
   mattpocock:
