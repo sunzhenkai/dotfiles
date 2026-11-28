@@ -60,7 +60,6 @@ groups:
       - session-wrap
       - skill-upgrader
       - skills-store
-      - solo-code-review
       - taskflow
       - taskrail
       - trouble-grill
@@ -70,6 +69,8 @@ groups:
       # 2026-11-23 上游 agent-api-ops 并入 project-design-patterns 的 references/，不再独立编目。
       - project-design-patterns
       - way-to-fix
+      - id: way-to-cr
+        optional: true
 
   mattpocock:
     type: third-party
@@ -167,6 +168,8 @@ groups:
       - id: device-frames
         optional: true
       - id: photographing-software
+        optional: true
+      - id: filming-software
         optional: true
 
   frontend-slides:
