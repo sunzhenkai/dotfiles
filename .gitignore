@@ -51,3 +51,4 @@ config/tools/k9s/clusters/
 # 本地隔离工作区与临时文件
 .worktrees/
 .tmp/
+.scratch/
