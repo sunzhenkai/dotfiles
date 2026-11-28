@@ -19,6 +19,8 @@ from typing import Any, Literal
 
 import yaml
 
+from .paths import dotf_state_dir, xdg_state_home as _xdg_state_home
+
 CURRENT_SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = frozenset({None, 1, CURRENT_SCHEMA_VERSION})
 
@@ -35,14 +37,7 @@ Result = Literal["changed", "unchanged", "skipped", "failed"]
 
 def xdg_state_home(home: Path | None = None) -> Path:
     """Resolve XDG_STATE_HOME per spec; default ``$HOME/.local/state``."""
-    configured = os.environ.get("XDG_STATE_HOME")
-    if configured:
-        path = Path(os.path.expanduser(configured))
-        if not path.is_absolute():
-            raise ValueError("XDG_STATE_HOME must be absolute")
-        return path
-    base = home or Path.home()
-    return base / ".local" / "state"
+    return _xdg_state_home(home)
 
 
 def state_file_path(home: Path | None = None, state_home: Path | None = None) -> Path:
@@ -51,9 +46,7 @@ def state_file_path(home: Path | None = None, state_home: Path | None = None) ->
     Resolution order: explicit ``state_home`` → ``XDG_STATE_HOME`` env → home-relative
     ``$HOME/.local/state``. Always ``<state_home>/dotf/modules-state.yaml``.
     """
-    if state_home is None:
-        state_home = xdg_state_home(home)
-    return state_home / "dotf" / "modules-state.yaml"
+    return dotf_state_dir(home, state_home) / "modules-state.yaml"
 
 
 @dataclass(frozen=True, slots=True)

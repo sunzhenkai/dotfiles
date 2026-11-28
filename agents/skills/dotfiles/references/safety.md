@@ -66,9 +66,9 @@ exec zsh -l
 
 zsh 的配置走 `copy` 落到 HOME 下的真实用户目录，不 chsh 也能用；登录默认 shell 仍是原来的。仓库源变更后要重跑 `dotf zsh -c`。
 
-## 四、台账 `~/.dotf-env.md`
+## 四、台账 `~/.config/dotf/env.md`
 
-固定放用户 HOME，不进任何仓库。
+固定放用户配置目录（`${XDG_CONFIG_HOME:-~/.config}/dotf/env.md`），不进任何仓库。优先读 `~/.config/dotf/env.md`，不存在时兼容回退读旧 `~/.dotf-env.md`；新建或更新一律写 `~/.config/dotf/env.md`。
 
 | 情况 | 行为 |
 |---|---|

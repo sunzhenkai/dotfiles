@@ -10,7 +10,7 @@
 ## 总原则
 
 1. **先定位仓库**：优先 `~/.config/dotfiles`；否则用 `dotf __path` / 当前 git 根。
-2. **先读台账**：若存在 `~/.dotf-env.md`，采用其中的共用性判定与已装模块；没有则按 `dotfiles` skill 的 `references/safety.md` 做共用性探测。
+2. **先读台账**：若存在 `~/.config/dotf/env.md`（兼容回退 `~/.dotf-env.md`），采用其中的共用性判定与已装模块；没有则按 `dotfiles` skill 的 `references/safety.md` 做共用性探测。
 3. **dry-run 优先**：任何会改系统状态的操作，先 `dotf … --dry-run`（或等价预览），再执行。
 4. **多用户安全**：`shared-user` / `shared-home` 下不擅自 `sudo`、不改 `/etc`、不 `chsh`；系统级模块须显式确认。
 5. **按分组推进**：一次只推进用户指定的分组（或按下方推荐顺序）；每组结束后汇报结果，再问是否继续。
@@ -33,8 +33,12 @@
 dotf __path
 command -v dotf
 
-# 2. 台账（若有）
-test -f ~/.dotf-env.md && sed -n '1,80p' ~/.dotf-env.md
+# 2. 台账（若有，优先 XDG 配置路径，兼容旧 ~/.dotf-env.md）
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotf/env.md" ]; then
+  sed -n '1,80p' "${XDG_CONFIG_HOME:-$HOME/.config}/dotf/env.md"
+elif [ -f ~/.dotf-env.md ]; then
+  sed -n '1,80p' ~/.dotf-env.md
+fi
 
 # 3. 运行时预检（新机）
 bash scripts/bootstrap.sh --check-only
@@ -195,7 +199,7 @@ command -v lark-cli && lark-cli auth status
 command -v dws && dws --help >/dev/null
 ```
 
-回写 `~/.dotf-env.md`：profile、已装模块、chsh/系统级决策、踩坑（无密钥）。
+回写 `~/.config/dotf/env.md`（存在旧 `~/.dotf-env.md` 时可迁至新路径）：profile、已装模块、chsh/系统级决策、踩坑（无密钥）。
 
 ## 安全边界
 

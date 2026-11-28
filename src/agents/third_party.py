@@ -284,9 +284,9 @@ def _git(
 def _cache_root(cache: Path | None) -> Path:
     if cache is not None:
         return cache.expanduser().absolute()
-    from dotf_core.modules_state import xdg_state_home
+    from dotf_core.paths import dotf_state_dir
 
-    return xdg_state_home() / "dotf" / CACHE_DIRNAME
+    return dotf_state_dir() / CACHE_DIRNAME
 
 
 def _cache_entry(root: Path, source: str, revision: str) -> Path:

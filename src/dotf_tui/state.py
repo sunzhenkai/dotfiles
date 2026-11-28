@@ -20,6 +20,7 @@ import sys
 
 from dotf_core import modules_state
 from dotf_core.overlays import catalog_from_repo, load_overlays  # noqa: F401  (lazy)
+from dotf_core.paths import dotf_state_dir
 
 # scripts/agents/ is a flat module directory (no __init__.py); expose it for
 # desired_set / overlays / managed_status lazy imports below.
@@ -170,7 +171,7 @@ def load_modules(root: Path, *, state_home: Path | None = None) -> list[ModuleRo
     registry = mods.load_registry()
     os_id = mods.detect_os()
     records = modules_state.load_state(state_home=state_home)
-    manifest_path = (state_home or modules_state.xdg_state_home()) / "dotf" / "config-manifest.json"
+    manifest_path = dotf_state_dir(state_home=state_home) / "config-manifest.json"
 
     rows: list[ModuleRow] = []
     for mod in mods.filter_modules(registry, os_id=os_id):
@@ -271,7 +272,7 @@ def load_skills(root: Path) -> list[SkillRow]:
 
 def load_journal_failures(state_home: Path | None = None) -> list[str]:
     """Return a deduplicated list of module names whose latest action was failed."""
-    runs_dir = (state_home or modules_state.xdg_state_home()) / "dotf" / "runs"
+    runs_dir = dotf_state_dir(state_home=state_home) / "runs"
     if not runs_dir.is_dir():
         return []
     latest_status: dict[str, str] = {}

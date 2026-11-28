@@ -88,7 +88,7 @@ L1 失败时 handler 输出不回放、report 里只有汇总行；在仓库根�
 | 配置漂移 | 托管目标被手改 / 外来软链 / 未托管目标 → `dotf agents --doctor`、`dotf tui` Conflicts |
 | 敏感文件权限 | `~/.ssh`（700/600）、`~/.aws`、`~/.config/gh`、`~/.gitconfig`（可能含凭证）、`~/.netrc` |
 | 可疑内容 | 仓库与本机配置里不该出现私钥 / token / 内部 URL |
-| 备份与回滚 | `~/.local/state/dotf/backups/` 有无可回滚备份；`~/.dotf-env.md` 是否存在且与现场一致 |
+| 备份与回滚 | `~/.local/state/dotf/backups/` 有无可回滚备份；`~/.config/dotf/env.md`（兼容回退 `~/.dotf-env.md`）是否存在且与现场一致 |
 
 发现密钥类问题时只报告位置与类型，不复述内容。
 

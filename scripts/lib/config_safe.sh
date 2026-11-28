@@ -2,7 +2,7 @@
 # 公共配置安全库：Bash 3.2 兼容入口；复杂安全操作委托 scripts/dotf_core。
 # 依赖: HOME、python3；可选 DOTFILES_ROOT、DOTF_TARGET_ROOT、DOTF_RUN_ID。
 
-: "${DOTF_BACKUP_DIR:=${HOME}/.config/backups}"
+: "${DOTF_BACKUP_DIR:=${XDG_STATE_HOME:-${HOME}/.local/state}/dotf/backups}"
 : "${DOTF_TARGET_ROOT:=${HOME}}"
 
 _DOTF_CONFIG_SAFE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

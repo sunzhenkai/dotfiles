@@ -40,8 +40,10 @@ from dotf_core import term  # noqa: E402
 from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
+    dotf_state_dir,
     lstat_components,
     open_nofollow,
+    xdg_state_home,
 )
 from dotf_core.sanitize import sanitize_for_terminal  # noqa: E402
 
@@ -262,7 +264,7 @@ def _check_skills_plan(
                     "skills",
                     "manifest-malformed",
                     "malformed",
-                    str(Path(plan.state_home) / "dotf" / "agents-manifest.json"),
+                    str(dotf_state_dir(state_home=plan.state_home) / "agents-manifest.json"),
                     "ownership manifest",
                 )
             )
@@ -477,7 +479,7 @@ def check_instructions_plan(
                 "instructions",
                 "manifest-malformed",
                 "malformed",
-                str(Path(plan.state_home) / "dotf" / "agents-manifest.json"),
+                str(dotf_state_dir(state_home=plan.state_home) / "agents-manifest.json"),
                 "ownership manifest",
             )
         )
@@ -771,8 +773,7 @@ def _load_security_config(root: Path) -> Mapping[str, Any]:
 
 
 def _state_home(home: Path) -> Path:
-    configured = os.environ.get("XDG_STATE_HOME")
-    return Path(configured).expanduser().absolute() if configured else home / ".local" / "state"
+    return xdg_state_home(home)
 
 
 def _parse_time(value: Any) -> datetime:
@@ -794,7 +795,7 @@ def check_sensitive_backups(
     if type(retention) is not int or retention < 1 or not isinstance(metadata_name, str) or not metadata_name:
         report.add("security", "sensitive-backups", STATUS_FAIL, "malformed sensitive backup retention policy")
         return
-    backup_root = _state_home(home) / "dotf" / "backups"
+    backup_root = dotf_state_dir(home) / "backups"
     try:
         root_item = backup_root.lstat()
     except FileNotFoundError:

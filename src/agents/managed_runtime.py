@@ -26,9 +26,11 @@ from dotf_core.paths import (  # noqa: E402
     PathBoundaryError,
     assert_no_symlinks,
     assert_path_confined,
+    dotf_state_dir,
     ensure_directory,
     lstat_components,
     open_nofollow,
+    xdg_state_home,
 )
 from dotf_core.schemas import (  # noqa: E402
     MANIFEST_SCHEMA_VERSION,
@@ -239,10 +241,7 @@ def _sha256(content: bytes) -> str:
 
 
 def _state_home(home: Path, state_home: Path | None) -> Path:
-    if state_home is not None:
-        return state_home.expanduser().absolute()
-    configured = os.environ.get("XDG_STATE_HOME")
-    return Path(configured).expanduser().absolute() if configured else home / ".local" / "state"
+    return xdg_state_home(home, state_home)
 
 
 def resolve_state_home(home: Path, state_home: Path | None = None) -> Path:
@@ -251,7 +250,7 @@ def resolve_state_home(home: Path, state_home: Path | None = None) -> Path:
 
 def manifest_path(home: Path | None = None, state_home: Path | None = None) -> Path:
     base_home = (home or Path.home()).expanduser().absolute()
-    return _state_home(base_home, state_home) / "dotf" / AGENTS_MANIFEST_NAME
+    return dotf_state_dir(base_home, state_home) / AGENTS_MANIFEST_NAME
 
 
 def lock_path(home: Path | None = None, state_home: Path | None = None) -> Path:
@@ -1011,7 +1010,7 @@ def _apply_operations(
     retained = [item for item in snapshot.manifest.items if not item.owner.startswith(current.owner_prefix)]
     expected_items: list[ManagedItem] = list(retain_priors)
     seen_targets = {item.target for item in expected_items}
-    backup_root = state_home / "dotf" / "backups"
+    backup_root = dotf_state_dir(state_home=state_home) / "backups"
     pruned_parents: list[Path] = []
     unchanged = 0
     pruned = 0

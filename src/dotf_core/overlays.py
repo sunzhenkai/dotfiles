@@ -22,6 +22,8 @@ from typing import Any, Iterable, Mapping
 
 import yaml
 
+from .paths import dotf_config_dir as _dotf_config_dir, xdg_config_home as _xdg_config_home
+
 OVERLAY_SCHEMA_VERSION = 1
 OVERLAY_KIND = "dotf-overlay"
 PROFILE_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -67,18 +69,17 @@ class LoadedOverlays:
 
 
 def xdg_config_home(home: Path | None = None) -> Path:
-    configured = os.environ.get("XDG_CONFIG_HOME")
-    if configured:
-        path = Path(os.path.expanduser(configured))
-        if not path.is_absolute():
-            raise OverlayError("XDG_CONFIG_HOME must be an absolute path")
-        return path
-    base = home or Path.home()
-    return base / ".config"
+    try:
+        return _xdg_config_home(home)
+    except ValueError as exc:
+        raise OverlayError(str(exc)) from exc
 
 
 def overlay_directory(home: Path | None = None) -> Path:
-    return xdg_config_home(home) / "dotf" / "overlays"
+    try:
+        return _dotf_config_dir(home) / "overlays"
+    except ValueError as exc:
+        raise OverlayError(str(exc)) from exc
 
 
 def _unknown(value: Mapping[str, Any], allowed: set[str], label: str) -> None:

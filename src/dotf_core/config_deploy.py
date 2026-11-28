@@ -29,10 +29,12 @@ from .paths import (
     PathBoundaryError,
     assert_no_symlinks,
     assert_path_confined,
+    dotf_state_dir,
     ensure_directory,
     open_directory_nofollow,
     open_nofollow,
     open_parent_nofollow,
+    xdg_state_home,
 )
 from .schemas import (
     MANIFEST_SCHEMA_VERSION,
@@ -480,10 +482,7 @@ def declaration_from_registry(
 
 
 def _state_home(home: Path, state_home: os.PathLike[str] | str | None) -> Path:
-    if state_home is not None:
-        return Path(state_home).absolute()
-    configured = os.environ.get("XDG_STATE_HOME")
-    return Path(configured).absolute() if configured else home / ".local" / "state"
+    return xdg_state_home(home, state_home)
 
 
 def _boundary_for(home: Path, path: Path) -> Path:
@@ -504,7 +503,7 @@ def _empty_manifest() -> ManagedManifest:
 
 
 def _manifest_paths(home: Path, state_home: Path) -> tuple[Path, Path, Path]:
-    directory = state_home / "dotf"
+    directory = dotf_state_dir(home, state_home)
     return directory, directory / CONFIG_MANIFEST_NAME, directory / CONFIG_LOCK_NAME
 
 
@@ -1642,7 +1641,7 @@ def apply_config_plan(
     home_path = Path(home).absolute()
     state = _state_home(home_path, state_home)
     run = run_id or generate_run_id()
-    backup_root = state / "dotf" / "backups"
+    backup_root = dotf_state_dir(home_path, state) / "backups"
     changed = 0
     unchanged = 0
     pruned = 0
@@ -1825,7 +1824,7 @@ def deconfig_owned(
     state = _state_home(home_path, state_home)
     owner = f"{_OWNER_PREFIX}{module_name}"
     run = run_id or generate_run_id()
-    backup_root = Path(os.environ.get("DOTF_BACKUP_DIR") or str(state / "dotf" / "backups"))
+    backup_root = Path(os.environ.get("DOTF_BACKUP_DIR") or str(dotf_state_dir(home_path, state) / "backups"))
     backups: list[Path] = []
     pruned = 0
     conflicts = 0

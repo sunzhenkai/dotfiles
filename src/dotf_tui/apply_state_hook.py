@@ -27,13 +27,14 @@ def _compute_manifest_managed(action: str, module: str) -> int | None:
     if action != "config":
         return None
     try:
-        from dotf_core.schemas import validate_managed_manifest
-        from dotf_core.paths import xdg_state_home  # noqa: F401  (sanity import)
+        import json
 
-        manifest_path = (Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "dotf" / "config-manifest.json")
+        from dotf_core.paths import dotf_state_dir
+        from dotf_core.schemas import validate_managed_manifest
+
+        manifest_path = dotf_state_dir() / "config-manifest.json"
         if not manifest_path.exists():
             return None
-        import json
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest = validate_managed_manifest(data)
         count = sum(1 for entry in manifest.items if entry.owner == f"config:{module}" or entry.owner.startswith(f"config:{module}:"))

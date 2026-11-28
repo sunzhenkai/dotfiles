@@ -15,7 +15,7 @@ description: 用 dotf 管理开发环境：新机初始化（bootstrap / dotf in
 | 新机初始化、bootstrap、选 profile | `references/init.md` |
 | 体检、整体检查、看看缺啥、健康检查 | `references/check.md` |
 | 改本仓（模块、skill、编目、测试、lock） | `references/repo.md` |
-| 共用性判定、系统级门禁、chsh、`~/.dotf-env.md` | `references/safety.md` |
+| 共用性判定、系统级门禁、chsh、`~/.config/dotf/env.md` | `references/safety.md` |
 
 凡是会改系统状态的活，动手前都先读 `references/safety.md`：它给出这台机器属于 solo / shared-user / shared-home 的判定，以及 shared 下的门禁。
 
@@ -24,7 +24,7 @@ description: 用 dotf 管理开发环境：新机初始化（bootstrap / dotf in
 1. **薄包装**：使用类操作不改 `modules.yaml`、不写临时安装脚本。执行一律走 `bin/dotf` 与 `scripts/bootstrap.sh`。仓库维护类改动（modules.yaml / handler / 编目）见 `references/repo.md`。
 2. **dry-run 优先**：任何改状态的动作先 `--dry-run` 让用户看计划；非 TTY 又没 `--yes` 时 dotf 会快速失败。
 3. **shared 门禁**：sudo、chsh、改 `/etc`、加 docker 组必须显式确认，能用户级就用户级。
-4. **回写台账**：`~/.dotf-env.md` 记共用性判定、profile、已装模块、踩坑；不写密钥。
+4. **回写台账**：`~/.config/dotf/env.md`（读时兼容回退 `~/.dotf-env.md`）记共用性判定、profile、已装模块、踩坑；不写密钥。
 
 ## Agent / 非 TTY 操作守则
 
@@ -63,4 +63,4 @@ dotf skills -c | skills list | skills -i/-r
 
 - 配置不自动传播：改了仓库里的 `config/` 要重跑 `dotf <module> -c`。
 - 本 skill 与全局 `AGENTS.md` 的源都在本仓 `agents/`（`agents/skills/dotfiles/`、`agents/instructions/`），改完要 `dotf agents -c` 才在本机生效。
-- 结论回写台账：`~/.dotf-env.md` 的「已初始化模块」与「踩坑」。
+- 结论回写台账：`~/.config/dotf/env.md` 的「已初始化模块」与「踩坑」。

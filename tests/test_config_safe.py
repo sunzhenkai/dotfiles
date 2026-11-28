@@ -200,3 +200,40 @@ def test_operations_stay_in_tmp_home(
     assert Path(os.environ["HOME"]).resolve() == tmp_home.resolve()
     # 链接路径本身在临时 HOME（resolve 会跟到 tmp_path 源，故不 follow）
     assert str(target).startswith(str(tmp_home))
+
+
+def test_default_backup_dir_uses_xdg_state_home(tmp_home: Path, tmp_path: Path) -> None:
+    custom_state = tmp_path / "xdg_state"
+    env_with_xdg = os.environ.copy()
+    env_with_xdg.pop("DOTF_BACKUP_DIR", None)
+    env_with_xdg["HOME"] = str(tmp_home)
+    env_with_xdg["DOTFILES_ROOT"] = str(ROOT)
+    env_with_xdg["XDG_STATE_HOME"] = str(custom_state)
+
+    r1 = subprocess.run(
+        ["bash", "-c", f'set -euo pipefail; source "{LIB}"; printf "%s\\n" "$DOTF_BACKUP_DIR"'],
+        capture_output=True,
+        text=True,
+        env=env_with_xdg,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert r1.returncode == 0, r1.stderr
+    assert r1.stdout.strip() == str(custom_state / "dotf" / "backups")
+
+    env_default = os.environ.copy()
+    env_default.pop("DOTF_BACKUP_DIR", None)
+    env_default.pop("XDG_STATE_HOME", None)
+    env_default["HOME"] = str(tmp_home)
+    env_default["DOTFILES_ROOT"] = str(ROOT)
+
+    r2 = subprocess.run(
+        ["bash", "-c", f'set -euo pipefail; source "{LIB}"; printf "%s\\n" "$DOTF_BACKUP_DIR"'],
+        capture_output=True,
+        text=True,
+        env=env_default,
+        cwd=str(ROOT),
+        check=False,
+    )
+    assert r2.returncode == 0, r2.stderr
+    assert r2.stdout.strip() == str(tmp_home / ".local" / "state" / "dotf" / "backups")

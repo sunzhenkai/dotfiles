@@ -5,7 +5,7 @@
 ## 前置
 
 1. `dotf __path` 打印仓库根；失败说明没初始化或 PATH 缺，转 `references/init.md`，不要在这里硬装。
-2. 读 `~/.dotf-env.md`（若有）拿共用性判定与已装模块。没有就按 `references/safety.md` 现场探测。
+2. 读 `~/.config/dotf/env.md`（若不存在则兼容回退读 `~/.dotf-env.md`）拿共用性判定与已装模块。没有就按 `references/safety.md` 现场探测。
 
 ## 模块地图（非权威，速查用）
 

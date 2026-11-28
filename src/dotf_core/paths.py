@@ -235,3 +235,45 @@ def open_directory_nofollow(
         raise
     finally:
         os.close(parent_fd)
+
+
+def xdg_config_home(home: os.PathLike[str] | str | None = None) -> Path:
+    """Resolve XDG_CONFIG_HOME per spec; default ``$HOME/.config``."""
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    if configured:
+        path = Path(os.path.expanduser(configured))
+        if not path.is_absolute():
+            raise ValueError("XDG_CONFIG_HOME must be an absolute path")
+        return path
+    base = Path(home).expanduser().absolute() if home is not None else Path.home()
+    return base / ".config"
+
+
+def dotf_config_dir(home: os.PathLike[str] | str | None = None) -> Path:
+    """Return ``${XDG_CONFIG_HOME:-$HOME/.config}/dotf``."""
+    return xdg_config_home(home) / "dotf"
+
+
+def xdg_state_home(
+    home: os.PathLike[str] | str | None = None,
+    state_home: os.PathLike[str] | str | None = None,
+) -> Path:
+    """Resolve XDG_STATE_HOME per spec; explicit ``state_home`` wins, else env, else ``$HOME/.local/state``."""
+    if state_home is not None:
+        return Path(state_home).expanduser().absolute()
+    configured = os.environ.get("XDG_STATE_HOME")
+    if configured:
+        path = Path(os.path.expanduser(configured))
+        if not path.is_absolute():
+            raise ValueError("XDG_STATE_HOME must be an absolute path")
+        return path
+    base = Path(home).expanduser().absolute() if home is not None else Path.home()
+    return base / ".local" / "state"
+
+
+def dotf_state_dir(
+    home: os.PathLike[str] | str | None = None,
+    state_home: os.PathLike[str] | str | None = None,
+) -> Path:
+    """Return ``${XDG_STATE_HOME:-$HOME/.local/state}/dotf``."""
+    return xdg_state_home(home, state_home) / "dotf"

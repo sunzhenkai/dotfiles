@@ -16,6 +16,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from dotf_core import term  # noqa: E402
+from dotf_core.paths import dotf_state_dir  # noqa: E402
 from dotf_core.schemas import SchemaError, validate_managed_manifest  # noqa: E402
 
 
@@ -27,11 +28,7 @@ class ManagedStatus:
 
 
 def manifest_path(home: Path | None = None, state_home: Path | None = None) -> Path:
-    base_home = home or Path.home()
-    if state_home is None:
-        configured = os.environ.get("XDG_STATE_HOME")
-        state_home = Path(configured) if configured else base_home / ".local" / "state"
-    return state_home / "dotf" / "agents-manifest.json"
+    return dotf_state_dir(home, state_home) / "agents-manifest.json"
 
 
 def _sha256(path: Path) -> str:

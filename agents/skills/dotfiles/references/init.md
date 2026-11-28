@@ -46,7 +46,7 @@ PYTHONPATH=src python3 -m dotf_core.registry list --filter-os
 
 ### check（只读）
 
-1. 读 `~/.dotf-env.md`（若有）。
+1. 读 `~/.config/dotf/env.md`（若不存在则兼容回退读 `~/.dotf-env.md`）。
 2. 跑共用性探测，得出 solo / shared-*。
 3. 运行时预检：在仓库根 `bash scripts/bootstrap.sh --check-only`。
 4. 环境状态：`dotf status`（只读 L0）。
@@ -85,7 +85,7 @@ PYTHONPATH=src python3 -m dotf_core.registry list --filter-os
 
 ### ledger
 
-单独读写 `~/.dotf-env.md`：`ledger show` 打印，`ledger update` 重新探测并更新（不改系统状态）。用户说「记一下这台机器」「更新台账」时进这个 phase。模板与写入门禁见 `references/safety.md`。
+单独读写 `~/.config/dotf/env.md`（读时兼容回退 `~/.dotf-env.md`）：`ledger show` 打印，`ledger update` 重新探测并更新（不改系统状态）。用户说「记一下这台机器」「更新台账」时进这个 phase。模板与写入门禁见 `references/safety.md`。
 
 ## 常见交互
 
