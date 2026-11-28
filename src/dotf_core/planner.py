@@ -21,7 +21,8 @@ ACTION_ORDER = plan_protocol.ACTION_ORDER
 
 # agents -i 展开为独立单工具 install 动作（不污染 agents -c）
 # kiro 已停用（modules.yaml 条目被注释），不再进聚合安装
-AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "mcode", "antigravity")
+# mcode 已退役（2026-11-28，modules.yaml 条目被注释），不再进聚合安装
+AGENTS_INSTALL_BUNDLE = ("cursor", "opencode", "codex", "kimi-code", "pi", "zcode", "claude-code", "claude-plugins", "antigravity")
 
 
 @dataclass

@@ -361,14 +361,15 @@ modules:
     doctor: true
     bin: claude
 
-  - name: mcode
-    kind: binary
-    desc: MiniMax Code CLI（npm -g @minimax-ai/code）
-    group: agents
-    depends_on: [sdk]
-    install: true
-    doctor: true
-    bin: mcode
+  # mcode 退役：MiniMax Code CLI 不再安装（2026-11-28），保留条目供回滚
+  # - name: mcode
+  #   kind: binary
+  #   desc: MiniMax Code CLI（npm -g @minimax-ai/code）
+  #   group: agents
+  #   depends_on: [sdk]
+  #   install: true
+  #   doctor: true
+  #   bin: mcode
 
   - name: antigravity
     kind: binary

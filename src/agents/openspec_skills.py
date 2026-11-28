@@ -77,28 +77,43 @@ def renderers_for(layout: SkillLayout):
 
 
 def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
-    """Generate generic OpenSpec skills through the Cursor adapter."""
+    """Generate generic OpenSpec skills through the Cursor adapter.
+
+    OpenSpec 1.x writes ``.cursor/skills`` and rejects ``--scope``; 2.x writes
+    ``.agents/skills`` and only targets the project directory when
+    ``--scope project`` is given (otherwise it installs globally). Try the 2.x
+    form first and fall back to the 1.x form when the flag is unknown.
+    """
     project = destination / "project"
     project.mkdir(parents=True)
-    completed = subprocess.run(
+    attempts = (
+        [str(openspec), "init", "--tools", "cursor", "--scope", "project", str(project)],
         [str(openspec), "init", "--tools", "cursor", str(project)],
-        capture_output=True,
-        text=True,
-        check=False,
     )
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "openspec init failed").strip()
+    generated: Optional[Path] = None
+    last_detail = ""
+    for argv in attempts:
+        completed = subprocess.run(argv, capture_output=True, text=True, check=False)
+        if completed.returncode != 0:
+            last_detail = (completed.stderr or completed.stdout or "openspec init failed").strip()
+            continue
+        for candidate in (project / ".cursor" / "skills", project / ".agents" / "skills"):
+            if candidate.is_dir():
+                generated = candidate
+                break
+        if generated is not None:
+            break
+    if generated is None:
+        detail = last_detail or "openspec init --tools cursor did not create a skills directory"
         raise OpenSpecSkillsError(detail)
-    generated = project / ".cursor" / "skills"
-    if not generated.is_dir():
-        raise OpenSpecSkillsError("openspec init --tools cursor did not create .cursor/skills")
     skills = destination / "skills"
     skills.mkdir(parents=True)
     copied = 0
     for child in sorted(generated.iterdir()):
         if not child.is_dir() or child.is_symlink():
             continue
-        if not child.name.startswith("openspec-"):
+        # 1.x ships only openspec-*; 2.x adds the plain "openspec" entry skill.
+        if child.name != "openspec" and not child.name.startswith("openspec-"):
             continue
         marker = child / "SKILL.md"
         if not marker.is_file() or marker.is_symlink():
@@ -106,7 +121,7 @@ def generate_openspec_skills(destination: Path, *, openspec: Path) -> Path:
         shutil.copytree(child, skills / child.name, symlinks=False)
         copied += 1
     if copied == 0:
-        raise OpenSpecSkillsError("openspec init --tools cursor produced no openspec-* skills")
+        raise OpenSpecSkillsError("openspec init --tools cursor produced no openspec* skills")
     return skills
 
 
